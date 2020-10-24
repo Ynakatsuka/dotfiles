@@ -1,0 +1,23 @@
+er]
+  name = y.nakatsuka
+  email = nk.tsssa@gmail.com
+[alias]
+  st = status
+  ch = checkout
+  ps = push
+  pl = pull
+  ft = fetch
+  cm = commit
+  br = branch
+[color]
+  ui = true
+  diff = auto
+  status = auto
+  branch = auto
+  interactive = auto
+[url "git@github.com:"]
+  insteadOf = https://github.com/
+[credential]
+  helper = osxkeychain
+[push]
+  default = nothing
