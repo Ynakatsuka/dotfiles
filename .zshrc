@@ -14,7 +14,7 @@ autoload -Uz colors && colors
 if [ -e $(brew --prefix)/opt/zsh-git-prompt/zshrc.sh ]; then
     source $(brew --prefix)/opt/zsh-git-prompt/zshrc.sh
 fi
-PROMPT="%F{green}%n%f %F{cyan}($(arch))%f:%F{blue}%~%f $(git_super_status)$ "
+PROMPT="%F{green}%n%f %F{cyan}($(arch))%f:%F{blue}%C%f$ "
 
 # --------------------------------------------
 # 補完
