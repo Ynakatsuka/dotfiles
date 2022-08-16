@@ -111,3 +111,12 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
+
+# docker alias
+alias dc='docker compose'
+alias dcps='docker compose ps'
+alias dcud='docker compose up -d'
+alias dcudb='docker compose up -d --build'
+alias dce='docker compose exec $(docker compose ps --services)'
+alias dcl='docker compose logs'
+alias dcd='docker compose down'

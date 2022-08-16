@@ -14,19 +14,17 @@ autoload -Uz colors && colors
 if [ -e $(brew --prefix)/opt/zsh-git-prompt/zshrc.sh ]; then
     source $(brew --prefix)/opt/zsh-git-prompt/zshrc.sh
 fi
-PROMPT='%F{034}%n%f %F{036}($(arch))%f:%F{020}%~%f $(git_super_status)'
-PROMPT+=""$'\n'"%# "
+PROMPT="%F{green}%n%f %F{cyan}($(arch))%f:%F{blue}%~%f $(git_super_status)$ "
 
 # --------------------------------------------
 # 補完
 # --------------------------------------------
-if [ -e /usr/local/share/zsh-completions ]; then
-  fpath=(/usr/local/share/zsh-completions $fpath)
-fi
-
 # 補完を有効にする
-autoload -Uz compinit
-compinit
+if type brew &>/dev/null; then
+  FPATH=$(brew --prefix)/share/zsh-completions:$FPATH
+  source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+  autoload -Uz compinit && compinit
+fi
 
 # タブキーの連打で自動的にメニュー補完
 setopt auto_menu
@@ -117,53 +115,18 @@ setopt hist_save_no_dups
 setopt inc_append_history
 
 # --------------------------------------------
-# zplug
+# alias
 # --------------------------------------------
-export ZPLUG_HOME=~/.zplug
-source $ZPLUG_HOME/init.zsh
-zplug 'zplug/zplug', hook-build:'zplug --self-manage'
+# some more ls aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
 
-# zshの補完機能を更に強力にする
-# https://github.com/zsh-users/zsh-completions
-zplug "zsh-users/zsh-completions"
-
-# コマンドライン自体の色付けを行う
-# https://github.com/zsh-users/zsh-syntax-highlighting
-zplug "zsh-users/zsh-syntax-highlighting", defer:3
-
-# zshのヒストリーサーチを便利にする
-# https://github.com/zsh-users/zsh-history-substring-search
-zplug "zsh-users/zsh-history-substring-search", defer:3
-
-# ヒストリーから現在入力中のコマンドを探して, 補完を薄文字で表示する
-# https://github.com/zsh-users/zsh-autosuggestions
-zplug "zsh-users/zsh-autosuggestions"
-
-# ターミナルを256色使用可能にする
-# https://github.com/chrissicool/zsh-256color
-zplug "chrissicool/zsh-256color"
-
-# oh-my-zsh のリポジトリにある plugin/ 以下をコマンド/プラグインとして管理する
-zplug "plugins/git", from:oh-my-zsh
-
-# preztoのプラグインを使う
-zplug "modules/editor", from:prezto
-zplug "modules/history", from:prezto
-
-# インタラクティブフィルタ
-zplug "junegunn/fzf-bin", as:command, from:gh-r, rename-to:fzf
-zplug "junegunn/fzf", as:command, use:bin/fzf-tmux   # tmux用の拡張
-
-# https://github.com/denysdovhan/spaceship-prompt
-zplug "denysdovhan/spaceship-prompt", use:spaceship.zsh, from:github, as:theme
-
-# pluginがなかったらインストールする
-if ! zplug check --verbose; then
-    printf "Install? [y/N]: "
-    if read -q; then
-        echo; zplug install
-    fi
-fi
-
-# source plugins and add commands to $PATH
-zplug load
+# docker alias
+alias dc='docker compose'
+alias dcps='docker compose ps'
+alias dcud='docker compose up -d'
+alias dcudb='docker compose up -d --build'
+alias dce='docker compose exec $(docker compose ps --services)'
+alias dcl='docker compose logs'
+alias dcd='docker compose down'
