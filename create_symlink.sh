@@ -1,8 +1,7 @@
 #!/bin/bash
 #*******************************************************************************
 #
-# Ref: https://tech.kanmu.co.jp/entry/2021/05/20/134419
-# ワンラインでdotfilesのシンボリックリンクを作る
+# Ref: https://github.com/yonchu/dotfiles
 #
 #*******************************************************************************
 
@@ -37,10 +36,5 @@ create_dotfiles_symlinks() {
 # --------------------------------------------
 # Main
 # --------------------------------------------
-DOT_DIR="$HOME/dotfiles"
-
-# clone
-git clone https://github.com/Ynakatsuka/dotfiles.git ${DOT_DIR}
-
-# install
-./create_symlink.sh
+# シンボリックリンク作成
+create_dotfiles_symlinks
