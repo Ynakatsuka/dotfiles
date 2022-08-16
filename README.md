@@ -20,6 +20,7 @@ cd dotfiles
 
 ```
 cat .bashrc <(echo "") >> $HOME/.bashrc
+cat .zshrc <(echo "") >> $HOME/.zshrc
 cat .gitconfig <(echo "") >> $HOME/.gitconfig
 ```
 
@@ -28,7 +29,7 @@ cat .gitconfig <(echo "") >> $HOME/.gitconfig
 - zsh
 
 ```
-brew install zsh-completions zsh-git-prompt zplug
+brew install zsh-completions zsh-git-prompt zsh-autosuggestions
 ```
 
 - bash
@@ -39,7 +40,7 @@ sudo apt-get update && sudo apt-get install -y bash-completion
 
 ## Other Tricks
 
-- Ubuntu の shell を変更する場合
+- shell を変更する場合
 
 ```
 chsh -s $(which zsh)
