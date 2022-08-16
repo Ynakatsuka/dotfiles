@@ -1,17 +1,34 @@
-
-rt LANG=ja_JP.UTF-8
+# --------------------------------------------
+# 言語設定
+# --------------------------------------------
+# 日本語設定
+export LANG=ja_JP.UTF-8
 
 # 補完候補リストの日本語を表示可能にする
 setopt print_eight_bit
 
-# Ctrl+S / Ctrl+Q によるフロー制御を使わないようにする
-setopt no_flow_control
+# --------------------------------------------
+# PROMPT
+# --------------------------------------------
+autoload -Uz colors && colors
+if [ -e $(brew --prefix)/opt/zsh-git-prompt/zshrc.sh ]; then
+    source $(brew --prefix)/opt/zsh-git-prompt/zshrc.sh
+fi
+PROMPT='%F{034}%n%f %F{036}($(arch))%f:%F{020}%~%f $(git_super_status)'
+PROMPT+=""$'\n'"%# "
+
+# --------------------------------------------
+# 補完
+# --------------------------------------------
+if [ -e /usr/local/share/zsh-completions ]; then
+  fpath=(/usr/local/share/zsh-completions $fpath)
+fi
 
 # 補完を有効にする
 autoload -Uz compinit
 compinit
 
-#タブキーの連打で自動的にメニュー補完
+# タブキーの連打で自動的にメニュー補完
 setopt auto_menu
 
 # 補完候補が複数ある時に、一覧表示
@@ -56,10 +73,10 @@ setopt magic_equal_subst
 # カッコの対応などを自動的に補完
 setopt auto_param_keys
 
-#コマンドのスペルの訂正を使用する
+# コマンドのスペルの訂正を使用する
 setopt correct
 
-#引数のスペルの訂正を使用する
+# 引数のスペルの訂正を使用する
 unsetopt correct_all
 
 # 拡張グロブで補完(~とか^とか。例えばless *.txt~memo.txt ならmemo.txt 以外の *.txt にマッチ)
@@ -68,21 +85,40 @@ setopt extended_glob
 # 明確なドットの指定なしで.から始まるファイルをマッチ
 setopt globdots
 
-#補完でカラーを使用する
+# 補完でカラーを使用する
 autoload colors
 zstyle ':completion:*' list-colors "${LS_COLORS}"
 
-#ヒストリーサイズ設定
+# --------------------------------------------
+# History
+# --------------------------------------------
+# ヒストリーサイズ設定
 HISTFILE=$HOME/.zsh_history
 HISTSIZE=1000000
 SAVEHIST=1000000
 
-#ヒストリの一覧を読みやすい形に変更
+# ヒストリの一覧を読みやすい形に変更
 HISTTIMEFORMAT="[%Y/%M/%D %H:%M:%S] "
 
-# =========================================
-# === zplugの設定
-# =========================================
+# 履歴を他のシェルとリアルタイム共有する
+setopt share_history
+
+# 同じコマンドをhistoryに残さない
+setopt hist_ignore_all_dups
+
+# historyに保存するときに余分なスペースを削除する
+setopt hist_ignore_space       
+setopt hist_reduce_blanks
+
+# 重複するコマンドが保存されるとき、古い方を削除する
+setopt hist_save_no_dups
+
+# 実行時に履歴をファイルに追加していく
+setopt inc_append_history
+
+# --------------------------------------------
+# zplug
+# --------------------------------------------
 export ZPLUG_HOME=~/.zplug
 source $ZPLUG_HOME/init.zsh
 zplug 'zplug/zplug', hook-build:'zplug --self-manage'
@@ -107,7 +143,7 @@ zplug "zsh-users/zsh-autosuggestions"
 # https://github.com/chrissicool/zsh-256color
 zplug "chrissicool/zsh-256color"
 
-# oh-my-zsh のリポジトリにある plugin/ 以下をコマンド／プラグインとして管理する
+# oh-my-zsh のリポジトリにある plugin/ 以下をコマンド/プラグインとして管理する
 zplug "plugins/git", from:oh-my-zsh
 
 # preztoのプラグインを使う

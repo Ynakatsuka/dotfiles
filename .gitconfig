@@ -1,17 +1,19 @@
-er]
-  name = y.nakatsuka
+[user]
+  name = Ynakatsuka
   email = nk.tsssa@gmail.com
 [alias]
   st = status
   ch = checkout
+  chb = checkout -b
   ps = push
   pl = pull
   ft = fetch
   cm = commit
   br = branch
 [color]
-  ui = true
+  ui = auto
   diff = auto
+  grep = auto
   status = auto
   branch = auto
   interactive = auto
@@ -20,4 +22,6 @@ er]
 [credential]
   helper = osxkeychain
 [push]
-  default = nothing
+  default = upstream
+[safe]
+	directory = /home/working
