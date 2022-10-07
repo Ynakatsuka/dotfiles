@@ -58,6 +58,8 @@ chsh -s $(which zsh)
 tmux source ~/.tmux.conf
 ```
 
+then, `prefix + I`
+
 ## References
 
 - https://github.com/yonchu/dotfiles
