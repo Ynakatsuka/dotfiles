@@ -21,6 +21,7 @@ create_dotfiles_symlinks() {
         .bashrc
         .gitignore
         .gitconfig
+        .tmux.conf
         .zshrc)
 
     (

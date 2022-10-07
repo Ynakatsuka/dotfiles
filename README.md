@@ -38,6 +38,12 @@ brew install zsh-completions zsh-git-prompt zsh-autosuggestions
 sudo apt-get update && sudo apt-get install -y bash-completion
 ```
 
+- tpm
+
+```
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+```
+
 ## Other Tricks
 
 - shell を変更する場合
@@ -46,7 +52,14 @@ sudo apt-get update && sudo apt-get install -y bash-completion
 chsh -s $(which zsh)
 ```
 
+- tmux の設定の反映
+
+```
+tmux source ~/.tmux.conf
+```
+
 ## References
 
 - https://github.com/yonchu/dotfiles
 - https://github.com/reireias/dotfiles
+- https://github.com/shunk031/dotfiles
