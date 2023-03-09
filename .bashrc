@@ -116,6 +116,7 @@ fi
 alias dc='docker compose'
 alias dcps='docker compose ps'
 alias dcud='docker compose up -d'
+alias dcudf='docker compose up -d --force-recreate'
 alias dcudb='docker compose up -d --build'
 alias dce='docker compose exec $(docker compose ps --services)'
 alias dcl='docker compose logs'

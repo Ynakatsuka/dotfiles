@@ -16,12 +16,30 @@ cd dotfiles
 ./create_symlink.sh
 ```
 
-- すでに dotfile がある場合
+- すでに dotfile があり、追記する場合
 
 ```
 cat .bashrc <(echo "") >> $HOME/.bashrc
 cat .zshrc <(echo "") >> $HOME/.zshrc
 cat .gitconfig <(echo "") >> $HOME/.gitconfig
+cat .tmux.conf <(echo "") >> $HOME/.tmux.conf
+```
+
+- すでに dotfile があり、置換する場合
+
+```
+cp .bashrc $HOME/
+cp .zshrc $HOME/
+cp .gitconfig $HOME/
+cp .tmux.conf $HOME/
+```
+
+- 再読み込み
+
+```
+source $HOME/.bashrc
+source $HOME/.zshrc
+tmux source $HOME/.tmux.conf
 ```
 
 ## Dependencies

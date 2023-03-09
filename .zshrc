@@ -111,9 +111,6 @@ setopt hist_reduce_blanks
 # 重複するコマンドが保存されるとき、古い方を削除する
 setopt hist_save_no_dups
 
-# 実行時に履歴をファイルに追加していく
-setopt inc_append_history
-
 # --------------------------------------------
 # alias
 # --------------------------------------------
@@ -127,6 +124,7 @@ alias dc='docker compose'
 alias dcps='docker compose ps'
 alias dcud='docker compose up -d'
 alias dcudb='docker compose up -d --build'
+alias dcudf='docker compose up -d --force-recreate'
 alias dce='docker compose exec $(docker compose ps --services)'
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
