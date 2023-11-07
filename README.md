@@ -29,7 +29,7 @@ cat .tmux.conf <(echo "") >> $HOME/.tmux.conf
 
 ```
 cp .bashrc $HOME/
-cp .zshrc $HOME/
+cp zsh/.z* $HOME/
 cp .gitconfig $HOME/
 cp .tmux.conf $HOME/
 ```
@@ -47,7 +47,7 @@ tmux source $HOME/.tmux.conf
 - zsh
 
 ```
-brew install zsh-completions zsh-git-prompt zsh-autosuggestions
+git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
 ```
 
 - bash
