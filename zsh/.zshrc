@@ -17,11 +17,14 @@ fi
 #
 export LSCOLORS=gxfxcxdxbxegedabagacad
 
-#
-# Language
-#
-export LANG=ja_JP.UTF-8
-setopt print_eight_bit
+case "$OSTYPE" in
+  linux*)
+    export PROMPT='%F{82}%n@%m%f:%F{63}%1~%f$ '
+    ;;
+  *)
+    export PROMPT='%F{13}%n@%m%f:%F{39}%1~%f$ '
+    ;;
+esac
 
 #
 # Alias
