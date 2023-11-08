@@ -48,3 +48,8 @@ alias dcd='docker compose down'
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh" || true
 # rye
 source "$HOME/.rye/env"
+# cuda
+if [ -d "/usr/local/cuda/bin" ]; then
+    export PATH="/usr/local/cuda/bin:$PATH"
+    export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+fi
