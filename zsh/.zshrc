@@ -19,10 +19,10 @@ export LSCOLORS=gxfxcxdxbxegedabagacad
 
 case "$OSTYPE" in
   linux*)
-    export PROMPT='%F{82}%n@%m%f:%F{63}%1~%f$ '
+    export PROMPT='%F{82}%n@%m%f:%F{63}%~%f$ '
     ;;
   *)
-    export PROMPT='%F{13}%n@%m%f:%F{39}%1~%f$ '
+    export PROMPT='%F{13}%n@%m%f:%F{39}%~%f$ '
     ;;
 esac
 
