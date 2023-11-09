@@ -22,7 +22,7 @@ case "$OSTYPE" in
     export PROMPT='%F{82}%n@%m%f:%F{63}%~%f$ '
     ;;
   *)
-    export PROMPT='%F{13}%n@%m%f:%F{39}%~%f$ '
+    export PROMPT='%F{141}%n@%m%f:%F{39}%~%f$ '
     ;;
 esac
 
