@@ -5,7 +5,7 @@
 githubにログインした後、
 
 ```
-sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply git@github.com:$GITHUB_USERNAME/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply git@github.com:Ynakatsuka/dotfiles.git
 ```
 
 ## その他
