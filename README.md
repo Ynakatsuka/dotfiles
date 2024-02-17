@@ -13,7 +13,7 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- init --apply git@github.com:$GITHUB_USER
 ### ファイルの編集後、変更を反映する場合
 
 ```
-chezmoi apply -v 
+chezmoi apply -v
 ```
 
 ### 最新のリモートリポジトリを反映する場合
