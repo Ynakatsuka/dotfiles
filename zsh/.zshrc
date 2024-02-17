@@ -65,3 +65,7 @@ if [ -d "/usr/local/cuda/bin" ]; then
 fi
 # dotenv
 eval "$(direnv hook zsh)"
+# chezmoi
+if [ -d "${HOME}/.local/share/chezmoi" ]; then
+    export PATH="${HOME}/.local/share/chezmoi/bin:$PATH"
+fi
