@@ -59,15 +59,21 @@ alias rr='rye run'
 #
 # iterm2
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh" || true
+
 # rye
 source "$HOME/.rye/env"
+
 # cuda
 if [ -d "/usr/local/cuda/bin" ]; then
     export PATH="/usr/local/cuda/bin:$PATH"
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
 fi
+
 # dotenv
-eval "$(direnv hook zsh)"
+if type direnv > /dev/null 2>&1; then
+    eval "$(direnv hook zsh)"
+fi
+
 # chezmoi
 if [ -d "${HOME}/.local/share/chezmoi" ]; then
     export PATH="${HOME}/.local/share/chezmoi/bin:$PATH"
