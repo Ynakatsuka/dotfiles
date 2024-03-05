@@ -74,7 +74,6 @@ if type direnv > /dev/null 2>&1; then
     eval "$(direnv hook zsh)"
 fi
 
-# chezmoi
-if [ -d "${HOME}/.local/share/chezmoi" ]; then
-    export PATH="${HOME}/.local/share/chezmoi/bin:$PATH"
-fi
+# .local
+export PATH="$HOME/.local/bin:$PATH"
+

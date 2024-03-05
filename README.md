@@ -10,10 +10,22 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin -- init --apply git@
 
 ## その他
 
+### ファイルの編集
+
+```
+chezmoi edit README.md
+```
+
 ### ファイルの編集後、変更を反映する場合
 
 ```
 chezmoi apply -v
+```
+
+### リポジトリへ移動する場合
+
+```
+chezmoi cd
 ```
 
 ### 最新のリモートリポジトリを反映する場合
