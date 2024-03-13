@@ -7,7 +7,9 @@ githubにログインした後、
 ```
 # zprezto
 git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
+# tpm
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+# chezmoi
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin -- init --apply git@github.com:Ynakatsuka/dotfiles.git
 source ~/.zshrc
 ```
