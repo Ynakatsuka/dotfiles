@@ -5,7 +5,11 @@
 githubにログインした後、
 
 ```
+# zprezto
+git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin -- init --apply git@github.com:Ynakatsuka/dotfiles.git
+source ~/.zshrc
 ```
 
 ## その他
@@ -42,30 +46,12 @@ source $HOME/.zshrc
 tmux source $HOME/.tmux.conf
 ```
 
-## Dependencies
+## Other Dependencies
 
-### chezmoi
-
-```
-sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin
-```
-
-### zsh
-
-```
-git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
-```
-
-### bash
+### bash-completion
 
 ```
 sudo apt-get update && sudo apt-get install -y bash-completion
-```
-
-### tpm
-
-```
-git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 ```
 
 ## Other Tricks
