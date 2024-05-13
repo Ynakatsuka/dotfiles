@@ -10,7 +10,9 @@ git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$H
 # tpm
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 # chezmoi
-sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin -- init --apply git@github.com:Ynakatsuka/dotfiles.git
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin
+~/.local/bin/chezmoi init https://github.com/Ynakatsuka/dotfiles.git
+~/.local/bin/chezmoi update -v
 source ~/.zshrc
 ```
 
