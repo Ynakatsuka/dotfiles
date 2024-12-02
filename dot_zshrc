@@ -60,9 +60,6 @@ alias rr='rye run'
 # iterm2
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh" || true
 
-# rye
-source "$HOME/.rye/env"
-
 # cuda
 if [ -d "/usr/local/cuda/bin" ]; then
     export PATH="/usr/local/cuda/bin:$PATH"
@@ -82,3 +79,8 @@ if [[ $(uname -m) == "arm64" ]]; then
   export DOCKER_DEFAULT_PLATFORM=linux/amd64
 fi
 
+# go
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+export VOLTA_HOME="$HOME/.volta"
+export PATH="$VOLTA_HOME/bin:$PATH"
