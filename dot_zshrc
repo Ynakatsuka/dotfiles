@@ -51,9 +51,6 @@ alias dce='docker compose exec $(docker compose ps --services)'
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
 
-# rye alias
-alias rr='rye run'
-
 #
 # Path
 #
@@ -82,5 +79,7 @@ fi
 # go
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOPATH/bin
+
+# volta
 export VOLTA_HOME="$HOME/.volta"
 export PATH="$VOLTA_HOME/bin:$PATH"

@@ -121,6 +121,3 @@ alias dcudb='docker compose up -d --build'
 alias dce='docker compose exec $(docker compose ps --services)'
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
-
-# rye alias
-alias rr='rye run'
