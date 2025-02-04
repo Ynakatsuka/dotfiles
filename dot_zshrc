@@ -86,3 +86,8 @@ export PATH="$VOLTA_HOME/bin:$PATH"
 
 # direnv
 eval "$(direnv hook zsh)"
+
+# rye
+if [ -d "$HOME/.rye" ]; then
+    source "$HOME/.rye/env"
+fi
