@@ -121,3 +121,9 @@ alias dcudb='docker compose up -d --build'
 alias dce='docker compose exec $(docker compose ps --services)'
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
+
+# gcloud
+alias gca='gcloud config configurations activate'
+alias gcl='gcloud config configurations list'
+alias gal='gcloud auth application-default login'
+alias gcsp='gcloud config set project'
