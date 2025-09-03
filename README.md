@@ -18,6 +18,18 @@ source ~/.zshrc
 
 ## その他
 
+### 管理ファイルの追加
+
+```
+chezmoi add README.md
+```
+
+### 管理ファイルの削除
+
+```
+chezmoi rm README.md
+```
+
 ### ファイルの編集
 
 ```
