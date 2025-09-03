@@ -60,6 +60,12 @@ chezmoi cd
 chezmoi update -v
 ```
 
+### 全ファイルの強制同期
+
+```
+chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
+```
+
 ### 再読み込みをする場合
 
 ```
