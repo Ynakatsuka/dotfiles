@@ -43,24 +43,6 @@
 - Finalize process before actual output:
     - Remove all descriptive comments from the generated code.
 
-## Agent Mode
-
-- Iteratively explore and modify the codebase. **Always** start by identifying necessary changes and tracing dependencies **before** writing any code.
-- For new features, **you MUST** use a bullet-point task list to track progress. Update the progress marker (`[ ]` to `[✅]`) as each task is completed.
-    ```
-    Task Progress: 1/3
-    [✅] Task 1
-    [ ] Task 2
-    [ ] Task 3
-    ```
-- The `z/` directory is a sandbox that the Agent can use freely. For complex implementations, you must first create an implementation plan in `plan.md` and manage its progress.
-- For routine implementation tasks, create a playbook upon completion and request a review.
-- **Always apply the Python section guidelines** (environment usage, code-quality tools, testing, logging, performance benchmarking) to all code you touch during agent operations.
-- **Staged implementation workflow**
-    1. **Interface design** with Protocols or ABCs.  
-    2. **Write tests first** to express the desired behaviour.  
-    3. **Iterative delivery** – minimal viable code, followed by refactor and optimisation, ensuring tests remain green at each step.  
-
 ## BigQuery
 
 - Interact with BigQuery **exclusively** via the `bq` command-line tool.
