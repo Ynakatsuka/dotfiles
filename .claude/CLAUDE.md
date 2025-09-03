@@ -1,5 +1,6 @@
 ## General Guidelines
 
+- **Responses MUST be in Japanese.**
 - Refer to `README.md` for execution instructions.
 - Provide accurate, factual, and thoughtful answers with step-by-step reasoning.
 - Maintain concise detail and use examples to clarify concepts.
@@ -7,7 +8,6 @@
 - Clearly communicate any limitations in responses.
 - Simplify complex concepts using analogies.
 - Never delete files or folders that are not tracked by Git.
-- **Responses MUST be in Japanese.**
 - **However, code comments, docstrings, commit messages, and README.md MUST be written in English.** This is a strict requirement.
 
 ## Coding
@@ -201,35 +201,3 @@
 - **Always** use the `-u` flag when pushing a new branch (`git push -u origin <branch-name>`).
 - **Do not** use interactive rebase (`git rebase -i`) or force push (`git push --force`) unless explicitly instructed and fully understanding the consequences.
 - **Do not** alter global or local Git configuration files (`.gitconfig`, `.git/config`) unless specifically required for a setup task.
-
-### Pull Request Template (Use this Japanese template for the PR description)
-
-```markdown
-## 概要
-ここにPRの目的を簡潔に記述してください。(例: TypeScriptのエラー処理を型安全にするため、Result型を導入)
-
-## 変更内容
-- 具体的な変更点をリストアップしてください。
-- (例: `neverthrow` ライブラリを導入)
-- (例: 既存のAPIクライアントの実装をResult型を使用するように修正)
-- (例: エラーケースに対応する型定義を追加)
-- (例: 関連するユニットテストケースを追加・修正)
-
-## 技術的な詳細 (任意)
-- 実装に関する技術的な判断や設計について説明が必要な場合に記述してください。
-- (例: 全てのエラーパスで例外を投げずにResult型で返すように統一)
-- (例: エラーの種類を判別するための共通エラー型を定義)
-- (例: テストのモックを改善し、より現実に近い振る舞いをシミュレート)
-
-## レビューのポイント
-- レビュワーに特に見てほしい点や懸念点を記述してください。
-- (例: Result型の使用方法が適切か)
-- (例: エラーハンドリングのパターンが他の箇所と一貫しているか)
-- (例: テストケースがエッジケースをカバーできているか)
-
-## 関連Issue (あれば)
-- (例: #123)
-
-## その他 (あれば)
-- スクリーンショットや補足情報など。
-```
