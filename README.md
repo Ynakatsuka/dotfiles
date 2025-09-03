@@ -33,7 +33,7 @@ chezmoi add README.md
 ### 管理ファイルの削除
 
 ```
-chezmoi rm README.md
+chezmoi forget README.md
 ```
 
 ### ファイルの編集
