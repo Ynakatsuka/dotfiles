@@ -1,0 +1,10 @@
+model_reasoning_effort = "high"
+hide_agent_reasoning = true
+network_access = true
+
+[tools]
+web_search = true
+
+[mcp_servers.spec-workflow]
+command = "npx"
+args = ["-y", "@pimzino/spec-workflow-mcp@latest"]
