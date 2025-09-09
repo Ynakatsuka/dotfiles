@@ -183,3 +183,4 @@
 - **Always** use the `-u` flag when pushing a new branch (`git push -u origin <branch-name>`).
 - **Do not** use interactive rebase (`git rebase -i`) or force push (`git push --force`) unless explicitly instructed and fully understanding the consequences.
 - **Do not** alter global or local Git configuration files (`.gitconfig`, `.git/config`) unless specifically required for a setup task.
+- **Never make commits automatically without explicit user approval.**
