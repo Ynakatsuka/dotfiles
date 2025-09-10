@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install custom commands from dot_codex/prompts to Claude or Cursor directories.
+"""Install custom commands from .codex/prompts to Claude or Cursor directories.
 
 This script copies command files from the dotfiles repository to the appropriate
 directories for Claude (.claude/commands) or Cursor (.cursor/commands).
@@ -20,7 +20,7 @@ def get_dotfiles_path() -> Path:
 
 def get_source_commands_path() -> Path:
     """Get the path to the source commands directory."""
-    return get_dotfiles_path() / "dot_codex" / "prompts"
+    return get_dotfiles_path() / ".codex" / "prompts"
 
 
 def get_target_commands_path(
