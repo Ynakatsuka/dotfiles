@@ -98,6 +98,16 @@ tmux source ~/.tmux.conf
 
 then, `prefix + I`
 
+## Custom Commands Installation
+
+### Install custom commands to Claude or Cursor
+
+The `install_custom_commands.py` script installs custom commands from `dot_codex/prompts` to Claude or Cursor directories.
+
+```bash
+./install_custom_commands.py /path/to/project {claude,cursor} [--overwrite]
+```
+
 ## References
 
 - https://www.chezmoi.io/
