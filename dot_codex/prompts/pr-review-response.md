@@ -214,6 +214,7 @@ Please let me know if this addresses your concern or if you'd like a different a
 ## Important Notes
 
 - **Always get user approval before making changes**
+  - Never commit before getting user approval
 - **Each loop iteration handles one comment or a group of related comments**
 - **Maintain traceability between comments and commits**
 - **Use Japanese for user interactions, English for code and commits**
