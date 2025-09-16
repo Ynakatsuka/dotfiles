@@ -14,6 +14,9 @@ typos = "latest"
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
+# vibe-kanban - NPX wrapper around vibe-kanban and vibe-kanban-mcp
+"npm:vibe-kanban" = "latest"
+
 # Node.js - JavaScript runtime
 node = "latest"
 
