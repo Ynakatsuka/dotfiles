@@ -11,8 +11,8 @@ uv = "latest"
 # typos - Source code spell checker
 typos = "latest"
 
-# codex is not available in mise registry
-# You may need to install it manually or through other methods
+# OpenAI Codex CLI
+"npm:@openai/codex" = "latest"
 
 [settings]
 # Always use the latest version when running `mise up`
