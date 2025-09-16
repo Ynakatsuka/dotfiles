@@ -97,3 +97,8 @@ eval "$(direnv hook zsh)"
 if [ -d "$HOME/.rye" ]; then
     source "$HOME/.rye/env"
 fi
+
+# mise
+if [ -s ${HOME}/.local/bin/mise ]; then
+  eval "$(${HOME}/.local/bin/mise activate zsh)"
+fi

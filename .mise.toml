@@ -1,0 +1,25 @@
+[tools]
+# Claude CLI - AI coding assistant
+claude-code = "latest"
+
+# Gemini CLI - Google AI CLI
+gemini-cli = "latest"
+
+# uv - Fast Python package installer and resolver
+uv = "latest"
+
+# typos - Source code spell checker
+typos = "latest"
+
+# codex is not available in mise registry
+# You may need to install it manually or through other methods
+
+[settings]
+# Always use the latest version when running `mise up`
+always_keep_download = false
+always_keep_install = false
+legacy_version_file = true
+plugin_autoupdate_last_check_duration = "7 days"
+
+[env]
+# Environment variables can be set here if needed
