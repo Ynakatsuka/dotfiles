@@ -1,1 +1,0 @@
-{{- include "dot_codex/AGENTS.md" -}}
