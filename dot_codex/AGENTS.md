@@ -9,6 +9,7 @@
 - Simplify complex concepts using analogies.
 - Never delete files or folders that are not tracked by Git.
 - **However, code comments, docstrings, commit messages, and README.md MUST be written in English.** This is a strict requirement.
+- **Never make commits automatically without explicit user approval.**
 
 ## Coding
 
@@ -139,6 +140,13 @@
 
 ## Git Workflow
 
+- Never commit automatically without explicit user approval.
+- Commit **only** relevant files related to the change. Avoid committing unrelated files, IDE configuration, or empty commits.
+- Use `git commit -am` (stage and commit in one step) **only** when you are certain **all** modified files should be included in the commit. Be cautious.
+- **Always** use the `-u` flag when pushing a new branch (`git push -u origin <branch-name>`).
+- **Do not** use interactive rebase (`git rebase -i`) or force push (`git push --force`) unless explicitly instructed and fully understanding the consequences.
+- **Do not** alter global or local Git configuration files (`.gitconfig`, `.git/config`) unless specifically required for a setup task.
+
 ### Committing Changes
 
 1.  **Inspect changes thoroughly before committing:**
@@ -175,12 +183,3 @@
     ```
 2.  **Analyze the commits** and their overall impact. Ensure commits are logical and atomic.
 3.  **Create the pull request** using the `gh pr create` command.
-
-### Important Reminders (Strict Rules)
-
-- Commit **only** relevant files related to the change. Avoid committing unrelated files, IDE configuration, or empty commits.
-- Use `git commit -am` (stage and commit in one step) **only** when you are certain **all** modified files should be included in the commit. Be cautious.
-- **Always** use the `-u` flag when pushing a new branch (`git push -u origin <branch-name>`).
-- **Do not** use interactive rebase (`git rebase -i`) or force push (`git push --force`) unless explicitly instructed and fully understanding the consequences.
-- **Do not** alter global or local Git configuration files (`.gitconfig`, `.git/config`) unless specifically required for a setup task.
-- **Never make commits automatically without explicit user approval.**
