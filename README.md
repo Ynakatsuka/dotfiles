@@ -20,55 +20,6 @@ source ~/.zshrc
 mise up
 ```
 
-## Development Tools Management
-
-このリポジトリでは [mise](https://mise.jdx.dev/) を使用して開発ツールを統一管理しています。
-chezmoiと連携し、`~/.mise.toml` が自動で配置・同期されます。
-
-### 管理対象ツール
-
-| ツール | 実行コマンド | 説明 |
-|--------|--------------|------|
-| Claude Code | `claude` | Anthropic AI コーディングアシスタント |
-| Gemini CLI | `gemini` | Google AI CLI |
-| uv | `uv` | 高速Python パッケージインストーラー |
-| typos | `typos` | ソースコードスペルチェッカー |
-| OpenAI Codex | `codex` | OpenAI Codex CLI |
-
-### 基本的な使用方法
-
-```bash
-# すべてのツールを最新版に更新
-mise up
-
-# インストール済みツールの確認
-mise list
-
-# ツールの状態確認
-mise doctor
-
-# 特定ツールのバージョン確認
-claude --version
-gemini --version
-uv --version
-typos --version
-codex --version
-```
-
-### 新しい環境での setup
-
-```bash
-# 1. このdotfilesリポジトリをセットアップ（Quick Start参照）
-# 2. mise設定が自動で ~/.mise.toml に配置される
-# 3. 開発ツールをインストール
-mise up
-```
-
-### ツール設定の更新
-
-新しいツールを追加したい場合は、`~/.local/share/chezmoi/dot_mise.toml` を編集してcommit・pushしてください。
-他の環境では `chezmoi update && mise up` で同期されます。
-
 ## その他
 
 ### 管理ファイルの確認
