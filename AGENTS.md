@@ -65,7 +65,7 @@
     - These CTEs must only reference `import_` CTEs or other `logic_` CTEs.
 - **Name the Final CTE `final`:**
     - The last CTE in the query, representing the final dataset, must be named `final`.
-    - The final statement of the query must be `SELECT * FROM final;`.
+    - The final statement of the query must be `SELECT * FROM final`.
 - **Use Japanese for SQL Comments:**
     - Add comments within the SQL query to explain the "why" behind specific logic or transformations. Note: This is a specific exception to the general rule that all code comments must be in English. SQL comments MUST be in Japanese.
 - **Casing Convention:**
