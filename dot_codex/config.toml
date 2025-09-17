@@ -7,3 +7,7 @@ web_search = true
 [mcp_servers.spec-workflow]
 command = "npx"
 args = ["-y", "@pimzino/spec-workflow-mcp@latest"]
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp@latest"]
