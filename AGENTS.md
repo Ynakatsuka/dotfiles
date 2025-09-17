@@ -43,6 +43,7 @@
     - Respect Bounded Contexts.
 - Finalize process before actual output:
     - Remove all descriptive comments from the generated code.
+- If an edited file differs from the last loaded version, it means the user has manually edited it. Unless there are explicit instructions from the user, always treat the manually edited file as the correct version and do not roll it back.
 
 ## BigQuery
 
