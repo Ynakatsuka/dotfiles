@@ -184,3 +184,8 @@
     ```
 2.  **Analyze the commits** and their overall impact. Ensure commits are logical and atomic.
 3.  **Create the pull request** using the `gh pr create` command.
+
+## MCP Servers
+
+- **context7**: Upstash Context7 MCP Server. Use it for getting latest documents of library.
+- **spec-workflow**: Spec Workflow MCP Server
