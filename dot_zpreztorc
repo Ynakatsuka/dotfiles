@@ -48,6 +48,7 @@ zstyle ':prezto:load' pmodule \
 
 # Set the query found color.
 # zstyle ':prezto:module:autosuggestions:color' found ''
+typeset -g ZSH_AUTOSUGGEST_USE_ASYNC=1
 
 #
 # Completions
@@ -59,6 +60,7 @@ zstyle ':prezto:load' pmodule \
 
 zstyle ':completion:*' use-cache 'yes'
 zstyle ':completion:*' cache-path "$HOME/.zsh/cache"
+zstyle ':completion:*' rehash 'no'
 
 #
 # Editor
