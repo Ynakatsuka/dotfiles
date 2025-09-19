@@ -21,6 +21,9 @@ catboost_info/
 kaggle.json
 .netrc
 
+### Agent ###
+.claude/
+
 ### Django ###
 *.log
 *.pot
