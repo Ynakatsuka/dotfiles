@@ -17,12 +17,48 @@ fi
 #
 export LSCOLORS=gxfxcxdxbxegedabagacad
 
+# Google Cloud config info for prompt
+setopt PROMPT_SUBST  # Enable command substitution in prompts
+
+gcloud_prompt_info() {
+  local config_path="$HOME/.config/gcloud/active_config"
+  [[ -r "$config_path" ]] || return
+  local config
+  config=$(<"$config_path") || return
+  config=${config//$'\n'/}
+  [[ -n "$config" ]] && print " [%F{220}$config%f]"
+}
+
+# Fast custom prompt function to show truncated path with ellipsis
+custom_pwd() {
+  local pwd_length=3  # Number of directories to show
+  local current_dir="$PWD"
+  
+  # Replace home directory with ~
+  if [[ "$current_dir" == "$HOME"* ]]; then
+    current_dir="~${current_dir#$HOME}"
+  fi
+  
+  # Split path into array using zsh built-in
+  local -a path_parts
+  path_parts=(${(s:/:)current_dir})
+  
+  # If path is short enough, return as is
+  if (( ${#path_parts} <= $((pwd_length + 1)) )); then
+    echo "$current_dir"
+  else
+    # Take last pwd_length parts using zsh array slicing
+    local short_path="${(j:/:)path_parts[-$pwd_length,-1]}"
+    echo "~/.../$short_path"
+  fi
+}
+
 case "$OSTYPE" in
   linux*)
-    export PROMPT='%F{82}%n@%m%f:%F{63}%~%f$ '
+    export PROMPT='%F{82}%n@%m%f:%F{63}$(custom_pwd)%f$(gcloud_prompt_info)$ '
     ;;
   *)
-    export PROMPT='%F{141}%n@%m%f:%F{39}%~%f$ '
+    export PROMPT='%F{141}%n@%m%f:%F{39}$(custom_pwd)%f$(gcloud_prompt_info)$ '
     ;;
 esac
 
@@ -59,7 +95,10 @@ alias gcsp='gcloud config set project'
 
 #
 # Path
-#
+
+# cache directory
+[[ -d "$HOME/.zsh/cache" ]] || mkdir -p "$HOME/.zsh/cache"
+
 # iterm2
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh" || true
 
@@ -89,9 +128,6 @@ export PATH=$PATH:$GOPATH/bin
 # volta
 export VOLTA_HOME="$HOME/.volta"
 export PATH="$VOLTA_HOME/bin:$PATH"
-
-# direnv
-eval "$(direnv hook zsh)"
 
 # rye
 if [ -d "$HOME/.rye" ]; then
