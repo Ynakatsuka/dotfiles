@@ -43,6 +43,11 @@ if confirm "Install uv (via installer script)?"; then
   run bash -lc 'uvx sqlfluff || true'
 fi
 
+if confirm "Install mise (via official installer)?"; then
+  run bash -lc 'curl https://mise.run | sh'
+  warn "Restart your shell or source the activation in your rc to use mise."
+fi
+
 if confirm "Install rye (optional)?"; then
   run bash -lc 'curl -sSf https://rye.astral.sh/get | bash'
   run bash -lc 'echo '"'"'source "$HOME/.rye/env"'"'"' >> "$HOME/.zshrc"'
@@ -67,4 +72,3 @@ if confirm "Install Tailscale? (login needs manual 'tailscale up')"; then
 fi
 
 log "CLIs module completed"
-
