@@ -8,6 +8,9 @@ gemini-cli = "latest"
 # uv - Fast Python package installer and resolver
 uv = "latest"
 
+# rye - Python package manager
+rye = "latest"
+
 # typos - Source code spell checker
 typos = "latest"
 
