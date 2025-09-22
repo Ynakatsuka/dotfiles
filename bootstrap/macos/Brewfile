@@ -1,6 +1,5 @@
 tap "homebrew/cask"
 
-brew "git"
 brew "tree"
 brew "wget"
 brew "trash"
@@ -10,7 +9,6 @@ brew "cmake"
 brew "tmux"
 brew "chezmoi"
 brew "mise"
-brew "uv"
 brew "direnv"
 brew "ssh-copy-id"
 
