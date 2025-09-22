@@ -14,6 +14,26 @@ Minimal, reproducible setup for new machines. Destructive actions always ask for
   make -C bootstrap linux
   ```
 
+### Pre‑clone Setup (Fresh Machines)
+
+If the machine does not have Git yet, use one of these minimal flows to obtain this repository first.
+
+- macOS
+  ```bash
+  xcode-select --install
+  git clone https://github.com/Ynakatsuka/dotfiles.git
+  cd dotfiles
+  make -C bootstrap macos
+  ```
+
+- Ubuntu 22.04
+  ```bash
+  sudo apt-get update && sudo apt-get install -y git curl
+  git clone https://github.com/Ynakatsuka/dotfiles.git
+  cd dotfiles
+  make -C bootstrap linux
+  ```
+
 ### What It Does
 
 - macOS
