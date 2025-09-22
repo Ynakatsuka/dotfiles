@@ -100,6 +100,10 @@ tmux source ~/.tmux.conf
 
 then, `prefix + I`
 
+## Bootstrap (Linux/macOS)
+
+Please see `bootstrap/README.md` for complete, up‑to‑date bootstrap instructions for macOS and Ubuntu 22.04.
+
 ## References
 
 - https://www.chezmoi.io/
