@@ -14,6 +14,18 @@ Minimal, reproducible setup for new machines. Destructive actions always ask for
   make -C bootstrap linux
   ```
 
+### Make Targets
+
+```bash
+# Full setups
+make -C bootstrap macos   # macOS full bootstrap (apps included)
+make -C bootstrap linux   # Ubuntu 22.04 full bootstrap
+
+# Dotfiles only
+make -C bootstrap macos-dotfiles
+make -C bootstrap linux-dotfiles
+```
+
 ### Pre‑clone Setup (Fresh Machines)
 
 If the machine does not have Git yet, use one of these minimal flows to obtain this repository first.

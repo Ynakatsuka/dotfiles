@@ -2,20 +2,13 @@
 
 ## Quick Start
 
+
 ```bash
-# zprezto
-git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
-# tpm
-git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
-# chezmoi
-sh -c "$(curl -fsLS get.chezmoi.io)" -- -b $HOME/.local/bin
-~/.local/bin/chezmoi init https://github.com/Ynakatsuka/dotfiles.git
-~/.local/bin/chezmoi update -v
-# mise (development tools manager)
-curl https://mise.run | sh
-source ~/.zshrc
-# install development tools
-mise up
+# macOS
+make -C bootstrap macos-dotfiles
+
+# Ubuntu 22.04
+make -C bootstrap linux-dotfiles
 ```
 
 ## その他

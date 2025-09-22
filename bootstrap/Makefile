@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: macos linux
+.PHONY: macos linux macos-dotfiles linux-dotfiles
 
 # Simple entrypoints with minimal options.
 
@@ -19,3 +19,11 @@ macos:
 
 linux:
 	bash linux/main.sh --with-docker --with-clis --with-cleanup
+
+# Dotfiles-only targets
+
+macos-dotfiles:
+	bash macos/45_dotfiles.sh
+
+linux-dotfiles:
+	bash linux/modules/40_dotfiles.sh
