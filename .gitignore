@@ -23,6 +23,7 @@ kaggle.json
 
 ### Agent ###
 .claude/
+z/
 
 ### Django ###
 *.log
