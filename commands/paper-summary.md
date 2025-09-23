@@ -218,4 +218,26 @@ The content to analyze will be provided in the format:
 {content}
 ```
 
+### Content Source Guidelines
+
+For different types of academic sources, use the following formats to obtain full content:
+
+#### ArXiv Papers
+For ArXiv papers, you can obtain the full HTML content by using the HTML version URL:
+- **Standard ArXiv URL**: `https://arxiv.org/abs/2306.08121v2`
+- **HTML full-text URL**: `@https://arxiv.org/html/2306.08121v2`
+
+Simply prefix the HTML ArXiv URL with `@` to retrieve the complete paper content including:
+- Full text of all sections
+- Mathematical equations
+- Figure captions and descriptions
+- References and citations
+- Appendices
+
+#### Other Academic Sources
+- **PDF content**: Extract and paste the text content
+- **Conference proceedings**: Copy the full paper text
+- **Journal articles**: Include abstract, methodology, results, and conclusions
+- **Preprints**: Full text from various preprint servers
+
 Process this content according to the above guidelines and create the Markdown file in the specified location.
