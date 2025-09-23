@@ -26,6 +26,9 @@ node = "latest"
 # Go - The Go programming language
 go = "latest"
 
+# Terraform - Infrastructure as Code
+terraform = "latest"
+
 [settings]
 # Always use the latest version when running `mise up`
 always_keep_download = false
