@@ -2,7 +2,6 @@
 
 ## Quick Start
 
-
 ```bash
 # macOS
 make -C bootstrap macos-dotfiles
