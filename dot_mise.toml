@@ -29,6 +29,9 @@ go = "latest"
 # Terraform - Infrastructure as Code
 terraform = "latest"
 
+# gh - GitHub CLI
+gh = "latest"
+
 [settings]
 # Always use the latest version when running `mise up`
 always_keep_download = false
