@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure brew is available in PATH
+if ! command -v brew >/dev/null 2>&1; then
+  if [ -x "/opt/homebrew/bin/brew" ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+  elif [ -x "/usr/local/bin/brew" ]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+  else
+    echo "[ERROR] Homebrew not found. Please install Homebrew first." >&2
+    exit 1
+  fi
+fi
+
 echo "[INFO] Dotfiles setup (prezto/tpm/chezmoi/mise)"
 
 if ! command -v git >/dev/null 2>&1; then
