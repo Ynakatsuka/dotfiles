@@ -4,6 +4,16 @@ set -euo pipefail
 echo "[INFO] Installing Xcode Command Line Tools (if needed)"
 xcode-select --install || true
 
+# Install Rosetta 2 on Apple Silicon Macs (required for some Intel-based applications)
+if [ "$(uname -m)" = "arm64" ]; then
+  if ! /usr/bin/pgrep -q oahd; then
+    echo "[INFO] Installing Rosetta 2 (required for Intel-based applications)"
+    softwareupdate --install-rosetta --agree-to-license
+  else
+    echo "[INFO] Rosetta 2 already installed"
+  fi
+fi
+
 if ! command -v brew >/dev/null 2>&1; then
   echo "[INFO] Installing Homebrew..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
