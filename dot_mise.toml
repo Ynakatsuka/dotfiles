@@ -14,12 +14,6 @@ rye = "latest"
 # ruff - Python code formatter and linter
 ruff = "latest"
 
-# mypy - Python static type checker
-mypy = "latest"
-
-# sqlfluff - SQL linter and formatter
-sqlfluff = "latest"
-
 # typos - Source code spell checker
 typos = "latest"
 
