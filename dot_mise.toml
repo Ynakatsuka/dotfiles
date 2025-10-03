@@ -14,6 +14,9 @@ rye = "latest"
 # ruff - Python code formatter and linter
 ruff = "latest"
 
+# Task - Task runner
+task = "latest"
+
 # typos - Source code spell checker
 typos = "latest"
 
