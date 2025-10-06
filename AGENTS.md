@@ -229,3 +229,4 @@
 
 - **context7**: Upstash Context7 MCP Server. Use it for getting latest documents of library.
 - **spec-workflow**: Spec Workflow MCP Server
+- **playwright**: Playwright MCP Server
