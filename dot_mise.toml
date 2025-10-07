@@ -38,6 +38,12 @@ terraform = "latest"
 # gh - GitHub CLI
 gh = "latest"
 
+# aws - AWS CLI
+aws = "latest"
+
+# gcloud - Google Cloud CLI
+gcloud = "latest"
+
 [settings]
 # Always use the latest version when running `mise up`
 always_keep_download = false
