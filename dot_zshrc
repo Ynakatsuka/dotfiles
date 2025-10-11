@@ -126,6 +126,15 @@ _gw_open_cursor() {
     fi
 }
 
+# Helper function to copy .env file from original repository
+_gw_copy_env() {
+    local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [ -f "$git_root/.env" ] && [ ! -f ".env" ]; then
+        echo "Found .env file in original repository. Copying to worktree..."
+        cp "$git_root/.env" .
+    fi
+}
+
 # Smart git worktree function for InsightX
 function gw() {
     local branch_name=$1
@@ -140,7 +149,8 @@ function gw() {
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
             
-            # direnv設定とCursorを開く処理
+            # .envファイル、direnv設定とCursorを開く処理
+            _gw_copy_env
             _gw_setup_direnv
             _gw_open_cursor
             return 0
@@ -159,7 +169,8 @@ function gw() {
         echo "Changing directory to existing worktree..."
         cd "$worktree_dir"
         
-        # direnv設定とCursorを開く処理
+        # .envファイル、direnv設定とCursorを開く処理
+        _gw_copy_env
         _gw_setup_direnv
         _gw_open_cursor
         return 0
@@ -190,7 +201,8 @@ function gw() {
 
     # 新しいworktreeが作成された場合の処理
     if [ "$new_worktree_created" = true ]; then
-        # direnv設定とCursorを開く処理
+        # .envファイル、direnv設定とCursorを開く処理
+        _gw_copy_env
         _gw_setup_direnv
         _gw_open_cursor
     fi
