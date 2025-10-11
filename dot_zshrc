@@ -100,6 +100,233 @@ alias cl='claude'
 # codex
 alias co='codex'
 
+# Git worktree
+alias gwt='git worktree'
+alias gwta='git worktree add'
+alias gwtl='git worktree list'
+alias gwtr='git worktree remove'
+
+#
+# Git Worktree Management
+#
+
+# Smart git worktree function for InsightX
+function gw() {
+    local branch_name=$1
+    local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    local repo_name=$(basename "$git_root")
+    local worktree_base="$HOME/.worktree/${repo_name}"
+
+    # 引数がない場合はfzfでworktree一覧から選択
+    if [ -z "$branch_name" ]; then
+        local selected_worktree=$(git worktree list | fzf --height=40% --reverse --preview='echo "Branch: $(basename $(echo {} | awk "{print \$1}"))"' | awk '{print $1}')
+        if [ -n "$selected_worktree" ]; then
+            echo "Moving to worktree: $selected_worktree"
+            cd "$selected_worktree"
+            return 0
+        else
+            echo "No worktree selected"
+            return 1
+        fi
+    fi
+
+    # worktree用のディレクトリパス
+    local worktree_dir="${worktree_base}/${branch_name//\//-}"
+
+    # すでにworktreeが存在するかチェック
+    if git worktree list | grep -q "$worktree_dir"; then
+        echo "Worktree already exists at: $worktree_dir"
+        echo "Changing directory to existing worktree..."
+        cd "$worktree_dir"
+        return 0
+    fi
+
+    local new_worktree_created=false
+
+    # 現在のブランチと同じ名前の場合
+    current_branch=$(git branch --show-current)
+    if [ "$branch_name" = "$current_branch" ]; then
+        echo "Creating worktree for current branch: $branch_name"
+        git worktree add "$worktree_dir" "$branch_name"
+        cd "$worktree_dir"
+        new_worktree_created=true
+    elif git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+        echo "Creating worktree for existing branch: $branch_name"
+        git worktree add "$worktree_dir" "$branch_name"
+        cd "$worktree_dir"
+        new_worktree_created=true
+    else
+        echo "Creating new branch and worktree: $branch_name"
+        git worktree add -b "$branch_name" "$worktree_dir"
+        cd "$worktree_dir"
+        new_worktree_created=true
+    fi
+}
+
+# Git worktree cleanup function
+function gwc() {
+    local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    local repo_name=$(basename "$git_root")
+    local worktree_base="$HOME/.worktree/${repo_name}"
+
+    # 現在のworktree一覧を取得（メインリポジトリ以外）
+    local worktrees=$(git worktree list | grep -v "$(git rev-parse --show-toplevel)$")
+
+    if [ -z "$worktrees" ]; then
+        echo "削除可能なworktreeが見つかりません"
+        return 1
+    fi
+
+    # fzfでworktreeを選択（角括弧を除去）
+    local selected_line=$(echo "$worktrees" | sed 's/\[//g; s/\]//g' | fzf \
+        --height=60% \
+        --reverse \
+        --prompt="削除するworktreeを選択: ")
+
+    if [ -z "$selected_line" ]; then
+        echo "worktreeが選択されませんでした"
+        return 1
+    fi
+
+    # 選択されたworktreeのパスを取得
+    local worktree_path=$(echo "$selected_line" | awk '{print $1}')
+    local branch_name=$(echo "$selected_line" | awk '{print $2}')
+
+    # 確認メッセージ
+    echo "削除予定のworktree:"
+    echo "  パス: $worktree_path"
+    echo "  ブランチ: $branch_name"
+    echo -n "本当に削除しますか？ (y/N): "
+    read confirmation
+
+    if [[ "$confirmation" =~ ^[yY]$ ]]; then
+        # worktreeを削除
+        echo "worktreeを削除中..."
+        if git worktree remove "$worktree_path" --force; then
+            echo "✅ worktreeが削除されました: $worktree_path"
+
+            # ディレクトリが残っている場合は非同期で削除
+            if [ -d "$worktree_path" ]; then
+                echo "📂 残りのディレクトリを削除中..."
+                rm -rf "$worktree_path"
+            fi
+        else
+            echo "❌ worktreeの削除に失敗しました"
+            return 1
+        fi
+    else
+        echo "削除をキャンセルしました"
+        return 0
+    fi
+}
+
+#
+# Codex Integration
+#
+
+# Internal helper: portable dev:inode fetch
+_codex_devino() {
+  if stat -c '%d:%i' "$1" >/dev/null 2>&1; then
+    stat -c '%d:%i' "$1"
+  else
+    stat -f '%d:%i' "$1"
+  fi
+}
+
+# Core sync helper
+_codex_sync_impl() {
+  local src="$1" dest="$2"
+  if [ ! -d "$src" ]; then
+    echo "Source directory not found: $src" >&2
+    return 1
+  fi
+  mkdir -p "$dest"
+  local src_real dest_real
+  src_real=$(readlink -f "$src" 2>/dev/null || printf %s "$src")
+  dest_real=$(readlink -f "$dest" 2>/dev/null || printf %s "$dest")
+  if [ -d "$dest_real" ] && [ "$(_codex_devino "$src_real")" = "$(_codex_devino "$dest_real")" ]; then
+    echo "Source and destination refer to the same directory; nothing to do."
+    return 0
+  fi
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -av --delete "$src_real"/ "$dest_real"/
+  else
+    find "$dest_real" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+    cp -a "$src_real"/. "$dest_real"/
+  fi
+  echo "Synced: $src_real -> $dest_real"
+}
+
+# Flattening sync helper: subdir/file.md -> subdir-file.md
+_codex_flatten_sync_impl() {
+  local src="$1" dest="$2"
+  if [ ! -d "$src" ]; then
+    echo "Source directory not found: $src" >&2
+    return 1
+  fi
+  mkdir -p "$dest"
+  local src_real dest_real
+  src_real=$(readlink -f "$src" 2>/dev/null || printf %s "$src")
+  dest_real=$(readlink -f "$dest" 2>/dev/null || printf %s "$dest")
+
+  # 安全対策: 同一ディレクトリ指し示しの早期終了
+  if [ -d "$dest_real" ] && [ "$(_codex_devino "$src_real")" = "$(_codex_devino "$dest_real")" ]; then
+    echo "Source and destination refer to the same directory; aborting to avoid self-sync." >&2
+    echo "  src:  $src_real" >&2
+    echo "  dest: $dest_real" >&2
+    echo "Hint: 引数で別の出力先を指定するか、シンボリックリンクを外してください。" >&2
+    return 1
+  fi
+
+  # ミラーセマンティクスに合わせて出力側をクリア（rsync --delete 相当）
+  find "$dest_real" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+
+  # 再帰的にファイルを列挙し、パス区切りを '-' に置換してコピー
+  while IFS= read -r -d '' file; do
+    local rel flattened target base ext n src_base
+    rel=${file#"$src_real/"}
+    flattened=${rel//\//-}
+
+    # src がコマンド直下（.../.claude/commands）でない場合は、
+    # 常に src のベース名を接頭辞として付与（例: src=.../mtg -> mtg-* / src=.../kiro -> kiro-*）。
+    # commands 直下を src に指定している場合は、サブディレクトリ名（mtg/kiro/...) が既に先頭に入るので付与しない。
+    src_base=$(basename "$src_real")
+    if [[ "$src_base" != "commands" && "$flattened" != ${src_base}-* ]]; then
+      flattened="${src_base}-${flattened}"
+    fi
+
+    target="$dest_real/$flattened"
+
+    # 名前衝突時は -2, -3 ... と連番を付与
+    if [ -e "$target" ]; then
+      if [[ "$flattened" == *.* ]]; then
+        base="${flattened%.*}"; ext=".${flattened##*.}"
+      else
+        base="$flattened"; ext=""
+      fi
+      n=2
+      while [ -e "$dest_real/${base}-${n}${ext}" ]; do n=$((n+1)); done
+      target="$dest_real/${base}-${n}${ext}"
+    fi
+
+    cp -a "$file" "$target"
+  done < <(find "$src_real" -type f -print0)
+
+  echo "Flatten-synced: $src_real -> $dest_real"
+}
+
+# Default repo sync
+codex-sync() {
+  local guessed_src
+  if git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    guessed_src="$git_root/.claude/commands"
+  fi
+  local fallback_src="/home/claude-code/Documents/src/github.com/Revie0701/insightx/.claude/commands"
+  local src="${1:-${guessed_src:-$fallback_src}}"
+  local dest="${2:-$HOME/.codex/prompts}"
+  _codex_flatten_sync_impl "$src" "$dest"
+}
+
 #
 # Path
 #
