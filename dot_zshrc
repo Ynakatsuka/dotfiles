@@ -128,19 +128,11 @@ _gw_open_cursor() {
 
 # Helper function to copy .env file from original repository
 _gw_copy_env() {
-    local original_git_root="$1"  # メインリポジトリのパスを引数で受け取る
-    
-    echo "Debug: original_git_root = $original_git_root"
-    echo "Debug: Current directory = $(pwd)"
-    echo "Debug: Checking for .env at: $original_git_root/.env"
+    local original_git_root="$1"
     
     if [ -f "$original_git_root/.env" ] && [ ! -f ".env" ]; then
         echo "Found .env file in original repository. Copying to worktree..."
         cp "$original_git_root/.env" .
-    elif [ -f "$original_git_root/.env" ] && [ -f ".env" ]; then
-        echo ".env file already exists in worktree, skipping copy."
-    elif [ ! -f "$original_git_root/.env" ]; then
-        echo "No .env file found in original repository."
     fi
 }
 
