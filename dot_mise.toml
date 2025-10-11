@@ -44,6 +44,9 @@ aws = "latest"
 # gcloud - Google Cloud CLI
 gcloud = "latest"
 
+# fzf - Fuzzy Finder
+fzf = "latest"
+
 [settings]
 # Always use the latest version when running `mise up`
 always_keep_download = false
