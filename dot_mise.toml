@@ -27,7 +27,7 @@ typos = "latest"
 "npm:vibe-kanban" = "latest"
 
 # Node.js - JavaScript runtime
-node = "latest"
+node = "24.9"
 
 # Go - The Go programming language
 go = "latest"
