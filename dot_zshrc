@@ -138,7 +138,7 @@ autoload -Uz add-zsh-hook
 _initialize_runtime_tools() {
   add-zsh-hook -d precmd _initialize_runtime_tools
   # rye
-  if [[ -d "$HOME/.rye" ]]; then
+  if [[ -f "$HOME/.rye/env" ]]; then
     source "$HOME/.rye/env"
   fi
 
