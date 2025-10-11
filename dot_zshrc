@@ -123,6 +123,11 @@ function gw() {
         if [ -n "$selected_worktree" ]; then
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
+            # cursorがインストールされている場合は開く
+            if command -v cursor >/dev/null 2>&1; then
+                echo "Opening Cursor..."
+                cursor .
+            fi
             return 0
         else
             echo "No worktree selected"
@@ -138,6 +143,11 @@ function gw() {
         echo "Worktree already exists at: $worktree_dir"
         echo "Changing directory to existing worktree..."
         cd "$worktree_dir"
+        # cursorがインストールされている場合は開く
+        if command -v cursor >/dev/null 2>&1; then
+            echo "Opening Cursor..."
+            cursor .
+        fi
         return 0
     fi
 
@@ -162,6 +172,12 @@ function gw() {
         git worktree add -b "$branch_name" "$worktree_dir"
         cd "$worktree_dir"
         new_worktree_created=true
+    fi
+
+    # 新しいworktreeが作成された場合、cursorがインストールされていれば開く
+    if [ "$new_worktree_created" = true ] && command -v cursor >/dev/null 2>&1; then
+        echo "Opening Cursor..."
+        cursor .
     fi
 }
 
