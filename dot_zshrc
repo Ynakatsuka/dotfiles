@@ -128,10 +128,19 @@ _gw_open_cursor() {
 
 # Helper function to copy .env file from original repository
 _gw_copy_env() {
-    local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
-    if [ -f "$git_root/.env" ] && [ ! -f ".env" ]; then
+    local original_git_root="$1"  # メインリポジトリのパスを引数で受け取る
+    
+    echo "Debug: original_git_root = $original_git_root"
+    echo "Debug: Current directory = $(pwd)"
+    echo "Debug: Checking for .env at: $original_git_root/.env"
+    
+    if [ -f "$original_git_root/.env" ] && [ ! -f ".env" ]; then
         echo "Found .env file in original repository. Copying to worktree..."
-        cp "$git_root/.env" .
+        cp "$original_git_root/.env" .
+    elif [ -f "$original_git_root/.env" ] && [ -f ".env" ]; then
+        echo ".env file already exists in worktree, skipping copy."
+    elif [ ! -f "$original_git_root/.env" ]; then
+        echo "No .env file found in original repository."
     fi
 }
 
@@ -150,7 +159,7 @@ function gw() {
             cd "$selected_worktree"
             
             # .envファイル、direnv設定とCursorを開く処理
-            _gw_copy_env
+            _gw_copy_env "$git_root"
             _gw_setup_direnv
             _gw_open_cursor
             return 0
@@ -170,7 +179,7 @@ function gw() {
         cd "$worktree_dir"
         
         # .envファイル、direnv設定とCursorを開く処理
-        _gw_copy_env
+        _gw_copy_env "$git_root"
         _gw_setup_direnv
         _gw_open_cursor
         return 0
@@ -202,7 +211,7 @@ function gw() {
     # 新しいworktreeが作成された場合の処理
     if [ "$new_worktree_created" = true ]; then
         # .envファイル、direnv設定とCursorを開く処理
-        _gw_copy_env
+        _gw_copy_env "$git_root"
         _gw_setup_direnv
         _gw_open_cursor
     fi
