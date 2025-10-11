@@ -143,18 +143,20 @@ function gw() {
 
     local new_worktree_created=false
 
-    # 現在のブランチと同じ名前の場合
+    # 現在のブランチと同じ名前の場合は新しいworktreeを作成
     current_branch=$(git branch --show-current)
     if [ "$branch_name" = "$current_branch" ]; then
         echo "Creating worktree for current branch: $branch_name"
         git worktree add "$worktree_dir" "$branch_name"
         cd "$worktree_dir"
         new_worktree_created=true
+    # 存在するブランチの場合はworktreeを作成
     elif git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
         echo "Creating worktree for existing branch: $branch_name"
         git worktree add "$worktree_dir" "$branch_name"
         cd "$worktree_dir"
         new_worktree_created=true
+    # 存在しないブランチの場合は新しいブランチを作成
     else
         echo "Creating new branch and worktree: $branch_name"
         git worktree add -b "$branch_name" "$worktree_dir"
