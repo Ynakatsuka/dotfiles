@@ -127,3 +127,9 @@ alias gca='gcloud config configurations activate'
 alias gcl='gcloud config configurations list'
 alias gal='gcloud auth application-default login'
 alias gcsp='gcloud config set project'
+
+# claude code
+alias cl='claude'
+
+# codex
+alias co='codex'
