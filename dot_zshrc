@@ -110,6 +110,22 @@ alias gwtr='git worktree remove'
 # Git Worktree Management
 #
 
+# Helper function to handle direnv setup in worktree
+_gw_setup_direnv() {
+    if [ -f ".envrc" ] && command -v direnv >/dev/null 2>&1; then
+        echo "Found .envrc file. Allowing direnv..."
+        direnv allow
+    fi
+}
+
+# Helper function to open Cursor if available
+_gw_open_cursor() {
+    if command -v cursor >/dev/null 2>&1; then
+        echo "Opening Cursor..."
+        cursor .
+    fi
+}
+
 # Smart git worktree function for InsightX
 function gw() {
     local branch_name=$1
@@ -123,11 +139,10 @@ function gw() {
         if [ -n "$selected_worktree" ]; then
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
-            # cursorがインストールされている場合は開く
-            if command -v cursor >/dev/null 2>&1; then
-                echo "Opening Cursor..."
-                cursor .
-            fi
+            
+            # direnv設定とCursorを開く処理
+            _gw_setup_direnv
+            _gw_open_cursor
             return 0
         else
             echo "No worktree selected"
@@ -143,11 +158,10 @@ function gw() {
         echo "Worktree already exists at: $worktree_dir"
         echo "Changing directory to existing worktree..."
         cd "$worktree_dir"
-        # cursorがインストールされている場合は開く
-        if command -v cursor >/dev/null 2>&1; then
-            echo "Opening Cursor..."
-            cursor .
-        fi
+        
+        # direnv設定とCursorを開く処理
+        _gw_setup_direnv
+        _gw_open_cursor
         return 0
     fi
 
@@ -174,10 +188,11 @@ function gw() {
         new_worktree_created=true
     fi
 
-    # 新しいworktreeが作成された場合、cursorがインストールされていれば開く
-    if [ "$new_worktree_created" = true ] && command -v cursor >/dev/null 2>&1; then
-        echo "Opening Cursor..."
-        cursor .
+    # 新しいworktreeが作成された場合の処理
+    if [ "$new_worktree_created" = true ]; then
+        # direnv設定とCursorを開く処理
+        _gw_setup_direnv
+        _gw_open_cursor
     fi
 }
 
