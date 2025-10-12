@@ -1,4 +1,5 @@
 {
+    "defaultMode": "acceptEdits",
     "statusLine": {
       "type": "command",
       "command": "npx -y ccusage statusline"
