@@ -17,6 +17,11 @@
 
 set -euo pipefail
 
+# Initialize mise environment for tools installed via mise
+if command -v mise &> /dev/null; then
+    eval "$(mise activate bash --shims)"
+fi
+
 # Constants
 PAPERS_DIR="$HOME/papers"
 TEMP_DIR=$(mktemp -d)
@@ -66,7 +71,24 @@ check_dependencies() {
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
         log_error "Missing required dependencies: ${missing_deps[*]}"
-        log_error "Please install them before running this script."
+
+        # Provide installation instructions for specific tools
+        for dep in "${missing_deps[@]}"; do
+            case "$dep" in
+                claude)
+                    log_error "Install Claude Code via mise:"
+                    log_error "  mise use -g claude-code@latest"
+                    ;;
+                pandoc)
+                    log_error "Install pandoc via Homebrew:"
+                    log_error "  brew install pandoc"
+                    ;;
+                *)
+                    log_error "Install $dep and ensure it's in your PATH"
+                    ;;
+            esac
+        done
+
         exit 1
     fi
 }

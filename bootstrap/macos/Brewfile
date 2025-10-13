@@ -9,6 +9,7 @@ brew "mise"
 brew "direnv"
 brew "ssh-copy-id"
 brew "poppler"
+brew "pandoc"
 
 cask "alt-tab"
 cask "cleanmymac"
