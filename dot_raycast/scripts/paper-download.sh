@@ -94,30 +94,96 @@ process_with_claude() {
     local content_file=$1
     local url=$2
 
-    log INFO "Processing with Claude Code..."
-    mkdir -p "$PAPERS_DIR"
+    # Check file size
+    local file_size
+    file_size=$(wc -c < "$content_file")
+    local file_lines
+    file_lines=$(wc -l < "$content_file")
 
-    local system_prompt
-    system_prompt=$(sed 's|z/paper|.|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md")
+    log INFO "Processing with Claude Code... (Content: ${file_lines} lines, $(numfmt --to=iec-i --suffix=B "$file_size" 2>/dev/null || echo "${file_size} bytes"))"
+
+    if [ "$file_size" -gt 1048576 ]; then  # 1MB
+        log WARN "Large content detected (>1MB). This may take several minutes..."
+    fi
+
+    mkdir -p "$PAPERS_DIR"
 
     # Run Claude in papers directory for write permissions
     local output_file="$TEMP_DIR/claude_output.txt"
+    local timeout_seconds=300  # 5 minutes timeout
+
     (
         cd "$PAPERS_DIR"
         {
-            echo "コンテンツ:"
             cat "$content_file"
             echo ""
+            echo "---"
             echo "元のURL: $url"
-        } | claude -p --system-prompt "$system_prompt" > "$output_file" 2>&1
-    ) &
+        } | timeout "$timeout_seconds" claude -p --system-prompt "$(cat <<'PROMPT'
+Analyze the provided paper content and generate a comprehensive Japanese summary as a Markdown file.
+
+## Task
+1. Extract paper title, authors, and key information
+2. Create a URL-friendly filename from the title (lowercase, hyphens, max 60 chars)
+3. Generate the summary file as: {paper_title_slug}.md
+
+## Output Format (Markdown)
+```markdown
+# {Paper Title}
+
+## 概要
+{5行以内の概要：研究目的、主な貢献、手法、結果、意義}
+
+## 技術的なラベル
+{カンマ区切りで最大10個：Recommender Systems, Deep Learning, etc.}
+
+## コードリンク
+{GitHubリンクまたは「なし」}
+
+## 詳細な内容
+
+### リサーチクエスチョン
+- **問題設定**: {解決する問題}
+- **研究の動機**: {重要性}
+- **仮説**: {検証する仮説}
+
+### 技術的側面
+- **手法の概要**: {使用した手法の説明}
+- **実装方法**: {具体的な実装アプローチ}
+- **重要な数式**: {LaTeX形式: $$formula$$}
+
+### 研究の結果
+- **主要な結果**: {定量的・定性的結果}
+- **有効性の証明**: {手法の有効性を示すエビデンス}
+
+### 結果の解釈と限界
+- **限界と適用範囲**: {制約や適用可能な範囲}
+- **今後の研究方向**: {将来的な研究課題}
+
+### 関連研究
+- **論文名・著者・発表年**: {引用箇所}
+
+### 図表の説明
+- **Figure X**: {説明と重要性}
+- **Table Y**: {主要な発見}
+```
+
+## Guidelines
+- Write summary in Japanese
+- Use **bold** for important terms
+- Use $$formula$$ for mathematical expressions
+- Create the file using Write tool
+- Ensure the filename is URL-friendly
+PROMPT
+)" > "$output_file" 2>&1
+        ) &
 
     local claude_pid=$!
     local elapsed=0
 
     # Display elapsed time while Claude is processing (every 10 seconds)
     while kill -0 "$claude_pid" 2>/dev/null; do
-        if [ $((elapsed % 10)) -eq 0 ]; then
+        if [ $((elapsed % 10)) -eq 0 ] && [ "$elapsed" -gt 0 ]; then
             printf "\r\033[K\033[0;36m[PROCESSING]\033[0m %d seconds elapsed..." "$elapsed"
         fi
         sleep 1
@@ -132,9 +198,14 @@ process_with_claude() {
 
     if [ $exit_status -eq 0 ]; then
         log INFO "Processing completed in ${elapsed} seconds"
-    else
-        log ERROR "Claude processing failed after ${elapsed} seconds"
+    elif [ $exit_status -eq 124 ]; then
+        log ERROR "Processing timed out after ${timeout_seconds} seconds"
         log ERROR "Output saved to: $output_file"
+        return 1
+    else
+        log ERROR "Claude processing failed after ${elapsed} seconds (exit code: $exit_status)"
+        log ERROR "Output saved to: $output_file"
+        cat "$output_file" >&2
         return 1
     fi
 }
