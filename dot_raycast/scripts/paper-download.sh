@@ -101,15 +101,42 @@ process_with_claude() {
     system_prompt=$(sed 's|z/paper|.|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md")
 
     # Run Claude in papers directory for write permissions
+    local output_file="$TEMP_DIR/claude_output.txt"
     (
         cd "$PAPERS_DIR"
-        cat "$content_file" | claude -p --system-prompt "$system_prompt" <<EOF
-コンテンツ:
-$(cat "$content_file")
+        {
+            echo "コンテンツ:"
+            cat "$content_file"
+            echo ""
+            echo "元のURL: $url"
+        } | claude -p --system-prompt "$system_prompt" > "$output_file" 2>&1
+    ) &
 
-元のURL: $url
-EOF
-    )
+    local claude_pid=$!
+    local elapsed=0
+
+    # Display elapsed time while Claude is processing
+    printf "\033[0;36m[PROCESSING]\033[0m "
+    while kill -0 "$claude_pid" 2>/dev/null; do
+        printf "\rProcessing... %d seconds elapsed" "$elapsed"
+        sleep 1
+        ((elapsed++))
+    done
+
+    # Wait for the process to complete and get exit status
+    wait "$claude_pid"
+    local exit_status=$?
+
+    printf "\r\033[K"  # Clear the line
+
+    if [ $exit_status -eq 0 ]; then
+        log INFO "Processing completed in ${elapsed} seconds"
+        cat "$output_file"
+    else
+        log ERROR "Claude processing failed after ${elapsed} seconds"
+        cat "$output_file" >&2
+        return 1
+    fi
 }
 
 # Open generated file in Cursor if available
