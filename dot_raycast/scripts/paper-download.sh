@@ -17,212 +17,141 @@
 
 set -euo pipefail
 
-# Initialize mise environment for tools installed via mise
-if command -v mise &> /dev/null; then
-    eval "$(mise activate bash --shims)"
-fi
+# Initialize mise environment
+command -v mise &> /dev/null && eval "$(mise activate bash --shims)"
 
 # Constants
-PAPERS_DIR="$HOME/papers"
-TEMP_DIR=$(mktemp -d)
-CLAUDE_COMMANDS_DIR="$HOME/dotfiles/commands"
+readonly PAPERS_DIR="$HOME/papers"
+readonly TEMP_DIR=$(mktemp -d)
+readonly CLAUDE_COMMANDS_DIR="$HOME/dotfiles/commands"
 
 # Cleanup on exit
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Functions
-log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+# Logging
+log() {
+    local level=$1; shift
+    local color=""
+    case "$level" in
+        INFO)  color='\033[0;32m' ;;
+        ERROR) color='\033[0;31m' ;;
+        WARN)  color='\033[1;33m' ;;
+    esac
+    echo -e "${color}[${level}]\033[0m $*"
 }
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
-
+# Check required dependencies
 check_dependencies() {
-    local missing_deps=()
+    local deps=("curl" "pandoc" "claude")
+    local missing=()
 
-    if ! command -v curl &> /dev/null; then
-        missing_deps+=("curl")
-    fi
+    for cmd in "${deps[@]}"; do
+        command -v "$cmd" &> /dev/null || missing+=("$cmd")
+    done
 
-    if ! command -v pandoc &> /dev/null; then
-        missing_deps+=("pandoc")
-    fi
-
-    if ! command -v pdftotext &> /dev/null; then
-        log_warn "pdftotext not found. PDF support will be limited."
-        log_warn "Install with: brew install poppler"
-    fi
-
-    if ! command -v claude &> /dev/null; then
-        missing_deps+=("claude")
-    fi
-
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        log_error "Missing required dependencies: ${missing_deps[*]}"
-
-        # Provide installation instructions for specific tools
-        for dep in "${missing_deps[@]}"; do
-            case "$dep" in
-                claude)
-                    log_error "Install Claude Code via mise:"
-                    log_error "  mise use -g claude-code@latest"
-                    ;;
-                pandoc)
-                    log_error "Install pandoc via Homebrew:"
-                    log_error "  brew install pandoc"
-                    ;;
-                *)
-                    log_error "Install $dep and ensure it's in your PATH"
-                    ;;
-            esac
-        done
-
+    if [ ${#missing[@]} -gt 0 ]; then
+        log ERROR "Missing dependencies: ${missing[*]}"
+        log ERROR "Install with:"
+        log ERROR "  brew install pandoc"
+        log ERROR "  mise use -g claude-code@latest"
         exit 1
     fi
+
+    # Optional: pdftotext for PDF support
+    command -v pdftotext &> /dev/null || log WARN "pdftotext not found. Install: brew install poppler"
 }
 
-get_content_type() {
-    local url="$1"
-    curl -sI "$url" | grep -i "content-type:" | awk '{print $2}' | tr -d '\r'
+# Detect if URL is PDF
+is_pdf_url() {
+    local url=$1
+    [[ "$url" =~ \.pdf$ ]] || [[ $(curl -sI "$url" | grep -i "content-type:" | grep -i "pdf") ]]
 }
 
-download_and_convert_html() {
-    local url="$1"
-    local output_file="$2"
+# Download and convert content
+download_content() {
+    local url=$1
+    local output=$2
 
-    log_info "Downloading HTML content..."
-
-    # Download HTML and convert to markdown using pandoc
-    curl -sL "$url" | pandoc -f html -t markdown -o "$output_file"
-
-    if [ -s "$output_file" ]; then
-        log_info "HTML content converted successfully"
-        return 0
+    if is_pdf_url "$url"; then
+        if ! command -v pdftotext &> /dev/null; then
+            log ERROR "pdftotext required for PDF. Install: brew install poppler"
+            return 1
+        fi
+        log INFO "Downloading PDF..."
+        curl -sL "$url" -o "$TEMP_DIR/paper.pdf"
+        pdftotext -layout "$TEMP_DIR/paper.pdf" "$output"
     else
-        log_error "Failed to download or convert HTML content"
-        return 1
+        log INFO "Downloading HTML..."
+        curl -sL "$url" | pandoc -f html -t markdown -o "$output"
     fi
+
+    [ -s "$output" ] || { log ERROR "Download failed"; return 1; }
+    log INFO "Content downloaded successfully"
 }
 
-download_and_convert_pdf() {
-    local url="$1"
-    local output_file="$2"
-
-    if ! command -v pdftotext &> /dev/null; then
-        log_error "pdftotext is required for PDF processing"
-        log_error "Install with: brew install poppler"
-        return 1
-    fi
-
-    log_info "Downloading PDF content..."
-
-    local pdf_file="$TEMP_DIR/paper.pdf"
-    curl -sL "$url" -o "$pdf_file"
-
-    if [ ! -f "$pdf_file" ]; then
-        log_error "Failed to download PDF"
-        return 1
-    fi
-
-    log_info "Converting PDF to text..."
-    pdftotext -layout "$pdf_file" "$output_file"
-
-    if [ -s "$output_file" ]; then
-        log_info "PDF content converted successfully"
-        return 0
-    else
-        log_error "Failed to convert PDF to text"
-        return 1
-    fi
-}
-
+# Process with Claude Code
 process_with_claude() {
-    local content_file="$1"
-    local url="$2"
+    local content_file=$1
+    local url=$2
 
-    log_info "Processing content with Claude Code..."
-
-    # Create papers directory if it doesn't exist
+    log INFO "Processing with Claude Code..."
     mkdir -p "$PAPERS_DIR"
 
-    # Prepare input for Claude
-    local content
-    content=$(cat "$content_file")
-
-    # Read the paper-summary command template and modify it to save to current directory
-    # Since we'll cd into PAPERS_DIR, change z/paper to . (current directory)
     local system_prompt
     system_prompt=$(sed 's|z/paper|.|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md")
 
-    # Execute Claude Code from within the papers directory
-    # This ensures Claude has permission to write to the directory
+    # Run Claude in papers directory for write permissions
     (
         cd "$PAPERS_DIR"
-        echo "コンテンツ:
-$content
+        cat "$content_file" | claude -p --system-prompt "$system_prompt" <<EOF
+コンテンツ:
+$(cat "$content_file")
 
-元のURL: $url" | claude -p --system-prompt "$system_prompt"
+元のURL: $url
+EOF
     )
-
-    log_info "Paper summary generated successfully"
 }
 
+# Open generated file in Cursor if available
+open_in_cursor() {
+    local timestamp=$1
+    sleep 1
+
+    local file
+    file=$(find "$PAPERS_DIR" -maxdepth 1 -type f -name "*.md" -newermt "@$timestamp" -print | head -1)
+
+    if [ -n "$file" ]; then
+        log INFO "Generated: $file"
+
+        if command -v cursor &> /dev/null; then
+            cursor "$file"
+        elif [ -d "/Applications/Cursor.app" ]; then
+            open -a "Cursor" "$file"
+        fi
+    else
+        log WARN "Generated file not found. Check $PAPERS_DIR"
+    fi
+}
+
+# Main
 main() {
     local url="${1:-}"
 
-    if [ -z "$url" ]; then
-        log_error "No URL provided"
-        echo "Usage: $0 <paper_url>"
-        exit 1
-    fi
+    [ -z "$url" ] && { log ERROR "No URL provided"; echo "Usage: $0 <paper_url>"; exit 1; }
 
-    log_info "Processing URL: $url"
-
-    # Check dependencies
+    log INFO "Processing: $url"
     check_dependencies
 
-    # Determine content type
-    local content_type
-    content_type=$(get_content_type "$url")
-    log_info "Content type: $content_type"
-
     local content_file="$TEMP_DIR/content.txt"
+    download_content "$url" "$content_file" || exit 1
 
-    # Download and convert based on content type
-    case "$content_type" in
-        *pdf*)
-            download_and_convert_pdf "$url" "$content_file" || exit 1
-            ;;
-        *html*|*text*)
-            download_and_convert_html "$url" "$content_file" || exit 1
-            ;;
-        *)
-            # Try to detect from URL extension
-            if [[ "$url" =~ \.pdf$ ]]; then
-                download_and_convert_pdf "$url" "$content_file" || exit 1
-            else
-                # Default to HTML
-                download_and_convert_html "$url" "$content_file" || exit 1
-            fi
-            ;;
-    esac
+    local timestamp
+    timestamp=$(date +%s)
 
-    # Process with Claude Code
     process_with_claude "$content_file" "$url"
+    open_in_cursor "$timestamp"
 
-    log_info "Done! Check $PAPERS_DIR for the generated summary."
+    log INFO "Done! Check $PAPERS_DIR for the summary."
 }
 
 main "$@"
