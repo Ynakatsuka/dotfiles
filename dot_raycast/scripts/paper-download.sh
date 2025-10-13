@@ -161,16 +161,20 @@ process_with_claude() {
     local content
     content=$(cat "$content_file")
 
-    # Read the paper-summary command template and modify it to save to ~/papers
+    # Read the paper-summary command template and modify it to save to current directory
+    # Since we'll cd into PAPERS_DIR, change z/paper to . (current directory)
     local system_prompt
-    system_prompt=$(sed 's|z/paper|'"$PAPERS_DIR"'|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md")
+    system_prompt=$(sed 's|z/paper|.|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md")
 
-    # Execute Claude Code with the paper-summary system prompt
-    # Pass content to Claude via stdin in print mode
-    echo "コンテンツ:
+    # Execute Claude Code from within the papers directory
+    # This ensures Claude has permission to write to the directory
+    (
+        cd "$PAPERS_DIR"
+        echo "コンテンツ:
 $content
 
 元のURL: $url" | claude -p --system-prompt "$system_prompt"
+    )
 
     log_info "Paper summary generated successfully"
 }
