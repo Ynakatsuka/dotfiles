@@ -22,6 +22,7 @@ command -v mise &> /dev/null && eval "$(mise activate bash --shims)"
 
 # Constants
 readonly PAPERS_DIR="$HOME/papers"
+readonly PAPERS_RAW_DIR="$HOME/papers/raw"
 readonly TEMP_DIR=$(mktemp -d)
 
 # Cleanup on exit
@@ -71,27 +72,42 @@ download_content() {
     local url=$1
     local output=$2
 
+    # Create raw directory
+    mkdir -p "$PAPERS_RAW_DIR"
+
+    # Generate filename from URL
+    local raw_filename
+    raw_filename=$(echo "$url" | sed 's|https\?://||' | sed 's|[/?&=]|-|g' | sed 's/--*/-/g' | cut -c1-100)
+
     if is_pdf_url "$url"; then
         if ! command -v pdftotext &> /dev/null; then
             log ERROR "pdftotext required for PDF. Install: brew install poppler"
             return 1
         fi
         log INFO "Downloading PDF..."
+        local raw_file="$PAPERS_RAW_DIR/${raw_filename}.pdf"
         curl -sL "$url" -o "$TEMP_DIR/paper.pdf"
+        cp "$TEMP_DIR/paper.pdf" "$raw_file"
         pdftotext -layout "$TEMP_DIR/paper.pdf" "$output"
+        echo "$raw_file"
     else
         log INFO "Downloading HTML..."
+        local raw_file="$PAPERS_RAW_DIR/${raw_filename}.txt"
         curl -sL "$url" | pandoc -f html -t markdown -o "$output"
+        cp "$output" "$raw_file"
+        echo "$raw_file"
     fi
 
     [ -s "$output" ] || { log ERROR "Download failed"; return 1; }
     log INFO "Content downloaded successfully"
+    log INFO "Raw file saved to: $raw_file"
 }
 
 # Process with Claude Code
 process_with_claude() {
     local content_file=$1
     local url=$2
+    local raw_file=$3
 
     # Check file size
     local file_size
@@ -111,11 +127,15 @@ process_with_claude() {
     local output_file="$TEMP_DIR/claude_output.txt"
     local timeout_seconds=300  # 5 minutes timeout
 
+    # Convert raw file path to use tilde notation
+    local raw_file_display="${raw_file/#$HOME/~}"
+
     {
         cat "$content_file"
         echo ""
         echo "---"
         echo "元のURL: $url"
+        echo "Raw file: $raw_file_display"
     } | claude -p --system-prompt "$(cat <<'PROMPT'
 Analyze the provided paper content and generate a comprehensive Japanese summary in Markdown format.
 
@@ -123,7 +143,11 @@ Output ONLY the markdown content, starting with the paper title heading.
 
 ## Required Structure
 ```markdown
-# {Paper Title in English}
+# {Paper Title}
+
+## メタ情報
+- **元のURL**: {論文の元URL}
+- **Raw file**: {保存したrawファイルへのパス}
 
 ## 概要
 {5行以内の概要：研究目的、主な貢献、手法、結果、意義}
@@ -253,9 +277,10 @@ main() {
     check_dependencies
 
     local content_file="$TEMP_DIR/content.txt"
-    download_content "$url" "$content_file" || exit 1
+    local raw_file
+    raw_file=$(download_content "$url" "$content_file") || exit 1
 
-    process_with_claude "$content_file" "$url"
+    process_with_claude "$content_file" "$url" "$raw_file"
 
     log INFO "Done! Check $PAPERS_DIR for the summary."
 }
