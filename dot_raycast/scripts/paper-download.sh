@@ -131,10 +131,9 @@ process_with_claude() {
 
     if [ $exit_status -eq 0 ]; then
         log INFO "Processing completed in ${elapsed} seconds"
-        cat "$output_file"
     else
         log ERROR "Claude processing failed after ${elapsed} seconds"
-        cat "$output_file" >&2
+        log ERROR "Output saved to: $output_file"
         return 1
     fi
 }
