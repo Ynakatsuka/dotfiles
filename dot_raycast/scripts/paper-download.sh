@@ -174,9 +174,9 @@ PROMPT
     local claude_pid=$!
     local elapsed=0
 
-    # Display elapsed time while Claude is processing (every 1 seconds)
+    # Display elapsed time while Claude is processing (every 10 seconds)
     while kill -0 "$claude_pid" 2>/dev/null; do
-        if [ $((elapsed % 1)) -eq 0 ] && [ "$elapsed" -gt 0 ]; then
+        if [ $((elapsed % 10)) -eq 0 ] && [ "$elapsed" -gt 0 ]; then
             printf "\r\033[K\033[0;36m[PROCESSING]\033[0m %d seconds elapsed..." "$elapsed"
         fi
 
