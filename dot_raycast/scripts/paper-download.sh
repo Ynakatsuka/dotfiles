@@ -161,16 +161,16 @@ process_with_claude() {
     local content
     content=$(cat "$content_file")
 
-    # Create a temporary command file that will save to ~/papers instead of z/paper
-    local temp_command="$TEMP_DIR/paper-summary-custom.md"
-    sed 's|z/paper|'"$PAPERS_DIR"'|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md" > "$temp_command"
+    # Read the paper-summary command template and modify it to save to ~/papers
+    local system_prompt
+    system_prompt=$(sed 's|z/paper|'"$PAPERS_DIR"'|g' "$CLAUDE_COMMANDS_DIR/paper-summary.md")
 
-    # Execute Claude Code with the paper-summary command
-    # Pass content to Claude via stdin
+    # Execute Claude Code with the paper-summary system prompt
+    # Pass content to Claude via stdin in print mode
     echo "コンテンツ:
 $content
 
-元のURL: $url" | claude --command "$temp_command"
+元のURL: $url" | claude -p --system-prompt "$system_prompt"
 
     log_info "Paper summary generated successfully"
 }
