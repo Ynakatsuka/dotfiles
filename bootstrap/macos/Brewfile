@@ -8,6 +8,7 @@ brew "chezmoi"
 brew "mise"
 brew "direnv"
 brew "ssh-copy-id"
+brew "poppler"
 
 cask "alt-tab"
 cask "cleanmymac"
