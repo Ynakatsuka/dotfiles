@@ -4,6 +4,6 @@
       "type": "command",
       "command": "npx -y ccusage statusline"
     },
-    "alwaysThinkingEnabled": true,
+    "alwaysThinkingEnabled": false,
     "dangerously-skip-permissions": true
 }
