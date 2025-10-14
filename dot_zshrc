@@ -94,9 +94,6 @@ alias gcl='gcloud config configurations list'
 alias gal='gcloud auth application-default login'
 alias gcsp='gcloud config set project'
 
-# claude code
-alias cl='claude'
-
 # codex
 alias co='codex'
 
@@ -398,6 +395,18 @@ function fzf-cdr() {
 zle -N fzf-cdr
 setopt noflowcontrol
 bindkey '^q' fzf-cdr
+
+#
+# Claude Code
+#
+function cl() {
+    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    if [ -f "$git_root/.claude/mcp.json" ]; then
+        claude --mcp-config="$git_root/.claude/mcp.json" "$@" "--dangerously-skip-permissions"
+    else
+        claude "$@" "--dangerously-skip-permissions"
+    fi
+}
 
 #
 # Path
