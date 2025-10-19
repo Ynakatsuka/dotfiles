@@ -98,6 +98,13 @@ alias gcsp='gcloud config set project'
 # codex
 alias co='codex'
 
+#
+# Git
+#
+
+# git checkout lb
+alias -g lb='`git branch | fzf --prompt="GIT BRANCH> " --height=40% --reverse | head -n 1 | sed -e "s/^\*\s*//g"`'
+
 # Git worktree
 alias gwt='git worktree'
 alias gwta='git worktree add'
@@ -407,6 +414,18 @@ function fzf-cdr() {
 zle -N fzf-cdr
 setopt noflowcontrol
 bindkey '^q' fzf-cdr
+
+# gcloud fzf activate login
+function gcloud-fzf-activate-login() {
+    local config
+    config=$(gcloud config configurations list --format="value(NAME)" | fzf --prompt="GCloud Config> " --height=40% --reverse)
+    if [ -n "$config" ]; then
+        gcloud config configurations activate "$config"
+        gcloud auth application-default login
+    fi
+}
+zle -N gcloud-fzf-activate-login
+bindkey '^g' gcloud-fzf-activate-login
 
 #
 # Claude Code
