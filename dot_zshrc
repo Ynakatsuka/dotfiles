@@ -415,7 +415,7 @@ zle -N fzf-cdr
 setopt noflowcontrol
 bindkey '^q' fzf-cdr
 
-# gcloud fzf activate login
+# fzf gcloud configuration select and login
 function gcloud-fzf-activate-login() {
     local config
     config=$(gcloud config configurations list --format="value(NAME)" | fzf --prompt="GCloud Config> " --height=40% --reverse)
@@ -426,6 +426,18 @@ function gcloud-fzf-activate-login() {
 }
 zle -N gcloud-fzf-activate-login
 bindkey '^g' gcloud-fzf-activate-login
+
+# fzf ghq repository select
+function fzf-ghq-src () {
+  local selected_dir=$(ghq list -p | fzf --prompt="repositories >" --query "$LBUFFER" --height=40% --reverse)
+  if [ -n "$selected_dir" ]; then
+    BUFFER="cd ${selected_dir}"
+    zle accept-line
+  fi
+  zle clear-screen
+}
+zle -N fzf-ghq-src
+bindkey '^h' fzf-ghq-src
 
 #
 # Claude Code
