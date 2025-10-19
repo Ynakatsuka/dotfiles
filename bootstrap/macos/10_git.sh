@@ -22,5 +22,7 @@ fi
 git config --global user.name "$name"
 git config --global user.email "$email"
 
-echo "[INFO] Git identity configured: $name <$email>"
+mkdir -p ~/repositories
+git config --global ghq.root "$HOME/repositories"
 
+echo "[INFO] Git identity configured: $name <$email>"
