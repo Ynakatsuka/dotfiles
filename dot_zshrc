@@ -87,6 +87,7 @@ alias dcudf='docker compose up -d --force-recreate'
 alias dce='docker compose exec $(docker compose ps --services)'
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
+alias de='docker exec -it $(docker ps | fzf | awk "{print \$1}") /bin/bash'
 
 # gcloud
 alias gca='gcloud config configurations activate'
