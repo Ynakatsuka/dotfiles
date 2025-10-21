@@ -5,5 +5,29 @@
       "command": "npx -y ccusage statusline"
     },
     "alwaysThinkingEnabled": false,
-    "dangerously-skip-permissions": true
+    "dangerously-skip-permissions": true,
+    "hooks": {
+      "Notification": [
+        {
+          "matcher": "",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "~/.local/bin/remote-notify.sh 'Claude Code' \"セッション: $CLAUDE_SESSION_NAME\""
+            }
+          ]
+        }
+      ],
+      "Stop": [
+        {
+          "matcher": "",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "~/.local/bin/remote-notify.sh 'Claude Code' \"セッション: $CLAUDE_SESSION_NAME - 作業が完了しました。\""
+            }
+          ]
+        }
+      ]
+    }
 }
