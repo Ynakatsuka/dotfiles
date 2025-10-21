@@ -72,6 +72,18 @@ check_dependencies() {
 
     # Optional: pandoc for HTML support
     command -v pandoc &> /dev/null || log WARN "pandoc not found. Install: brew install pandoc (needed for HTML papers)"
+
+    # Optional: Playwright for fallback when curl fails
+    if command -v uv &> /dev/null; then
+        local script_dir
+        script_dir=$(dirname "$0")
+        if ! uv run --directory "$script_dir" python -c "import playwright" 2>/dev/null; then
+            log WARN "Playwright not found. Install: cd $script_dir && uv sync && uv run playwright install chromium"
+            log WARN "Playwright is used as fallback when curl fails to download PDFs"
+        fi
+    else
+        log WARN "uv not found. Playwright fallback will not be available"
+    fi
 }
 
 # Check if input is a local file
@@ -102,20 +114,50 @@ download_paper() {
         local raw_file="$PAPERS_RAW_DIR/${raw_filename}.pdf"
 
         # Use -L to follow redirects
-        if ! curl -sL "$url" -o "$raw_file"; then
-            log ERROR "Failed to download PDF"
-            return 1
+        local curl_success=false
+        if curl -sL "$url" -o "$raw_file"; then
+            # Verify it's actually a PDF
+            if file "$raw_file" | grep -q "PDF"; then
+                curl_success=true
+            else
+                log WARN "curl downloaded file is not a valid PDF, will try Playwright"
+                log WARN "File type: $(file "$raw_file")"
+                rm "$raw_file"
+            fi
+        else
+            log WARN "curl failed, trying Playwright..."
         fi
 
-        # Verify it's actually a PDF
-        if ! file "$raw_file" | grep -q "PDF"; then
-            log ERROR "Downloaded file is not a valid PDF"
-            log ERROR "File type: $(file "$raw_file")"
-            rm "$raw_file"
-            return 1
+        # Fallback to Playwright if curl failed
+        if [ "$curl_success" = false ]; then
+            local script_dir
+            script_dir=$(dirname "$0")
+            local playwright_script="$script_dir/dl_pdf.py"
+
+            if [ ! -f "$playwright_script" ]; then
+                log ERROR "Playwright script not found: $playwright_script"
+                return 1
+            fi
+
+            log INFO "Attempting download with Playwright..."
+            if ! uv run --directory "$script_dir" python "$playwright_script" "$url" "$raw_file"; then
+                log ERROR "Failed to download PDF with Playwright"
+                return 1
+            fi
+
+            # Verify it's actually a PDF
+            if ! file "$raw_file" | grep -q "PDF"; then
+                log ERROR "Downloaded file is not a valid PDF"
+                log ERROR "File type: $(file "$raw_file")"
+                rm "$raw_file"
+                return 1
+            fi
+
+            log INFO "PDF downloaded successfully with Playwright"
+        else
+            log INFO "PDF downloaded successfully with curl"
         fi
 
-        log INFO "PDF downloaded successfully"
         log INFO "Raw file saved to: $raw_file"
         echo "$raw_file"
     else
