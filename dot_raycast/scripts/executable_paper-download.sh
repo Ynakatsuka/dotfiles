@@ -7,11 +7,11 @@
 
 # Optional parameters:
 # @raycast.icon 📄
-# @raycast.argument1 { "type": "text", "placeholder": "Paper URL" }
+# @raycast.argument1 { "type": "text", "placeholder": "Paper URL or local file path" }
 # @raycast.packageName Research Tools
 
 # Documentation:
-# @raycast.description Download paper from URL and generate summary using Claude Code
+# @raycast.description Download paper from URL or process local PDF file and generate summary using Claude Code
 # @raycast.author yuki
 # @raycast.authorURL https://github.com/yourusername
 
@@ -23,10 +23,7 @@ command -v mise &> /dev/null && eval "$(mise activate bash --shims)"
 # Constants
 readonly PAPERS_DIR="$HOME/papers"
 readonly PAPERS_RAW_DIR="$HOME/papers/raw"
-readonly TEMP_DIR=$(mktemp -d)
-
-# Cleanup on exit
-trap 'rm -rf "$TEMP_DIR"' EXIT
+readonly PAPERS_LOGS_DIR="$HOME/papers/logs"
 
 # Logging
 log() {
@@ -37,12 +34,29 @@ log() {
         ERROR) color='\033[0;31m' ;;
         WARN)  color='\033[1;33m' ;;
     esac
-    echo -e "${color}[${level}]\033[0m $*"
+    local message="${color}[${level}]\033[0m $*"
+    echo -e "$message"
+
+    # Also log to file if LOG_FILE is set
+    if [ -n "${LOG_FILE:-}" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" >> "$LOG_FILE"
+    fi
+}
+
+# Send desktop notification
+notify() {
+    local title=$1
+    local message=$2
+    local sound=${3:-"default"}
+
+    if command -v osascript &> /dev/null; then
+        osascript -e "display notification \"$message\" with title \"$title\" sound name \"$sound\""
+    fi
 }
 
 # Check required dependencies
 check_dependencies() {
-    local deps=("curl" "pandoc" "claude")
+    local deps=("curl" "claude")
     local missing=()
 
     for cmd in "${deps[@]}"; do
@@ -52,25 +66,29 @@ check_dependencies() {
     if [ ${#missing[@]} -gt 0 ]; then
         log ERROR "Missing dependencies: ${missing[*]}"
         log ERROR "Install with:"
-        log ERROR "  brew install pandoc"
         log ERROR "  mise use -g claude-code@latest"
         exit 1
     fi
 
-    # Optional: pdftotext for PDF support
-    command -v pdftotext &> /dev/null || log WARN "pdftotext not found. Install: brew install poppler"
+    # Optional: pandoc for HTML support
+    command -v pandoc &> /dev/null || log WARN "pandoc not found. Install: brew install pandoc (needed for HTML papers)"
+}
+
+# Check if input is a local file
+is_local_file() {
+    local input=$1
+    [[ -f "$input" ]]
 }
 
 # Detect if URL is PDF
 is_pdf_url() {
     local url=$1
-    [[ "$url" =~ \.pdf$ ]] || [[ $(curl -sI "$url" | grep -i "content-type:" | grep -i "pdf") ]]
+    [[ "$url" =~ \.pdf$ ]] || [[ $(curl -sI -L "$url" 2>/dev/null | grep -i "^content-type:" | grep -i "pdf") ]]
 }
 
-# Download and convert content
-download_content() {
+# Download paper (PDF or HTML)
+download_paper() {
     local url=$1
-    local output=$2
 
     # Create raw directory
     mkdir -p "$PAPERS_RAW_DIR"
@@ -80,74 +98,94 @@ download_content() {
     raw_filename=$(echo "$url" | sed 's|https\?://||' | sed 's|[/?&=]|-|g' | sed 's/--*/-/g' | cut -c1-100)
 
     if is_pdf_url "$url"; then
-        if ! command -v pdftotext &> /dev/null; then
-            log ERROR "pdftotext required for PDF. Install: brew install poppler"
-            return 1
-        fi
         log INFO "Downloading PDF..."
         local raw_file="$PAPERS_RAW_DIR/${raw_filename}.pdf"
-        curl -sL "$url" -o "$TEMP_DIR/paper.pdf"
-        cp "$TEMP_DIR/paper.pdf" "$raw_file"
-        pdftotext -layout "$TEMP_DIR/paper.pdf" "$output"
+
+        # Use -L to follow redirects
+        if ! curl -sL "$url" -o "$raw_file"; then
+            log ERROR "Failed to download PDF"
+            return 1
+        fi
+
+        # Verify it's actually a PDF
+        if ! file "$raw_file" | grep -q "PDF"; then
+            log ERROR "Downloaded file is not a valid PDF"
+            log ERROR "File type: $(file "$raw_file")"
+            rm "$raw_file"
+            return 1
+        fi
+
+        log INFO "PDF downloaded successfully"
+        log INFO "Raw file saved to: $raw_file"
         echo "$raw_file"
     else
         log INFO "Downloading HTML..."
-        local raw_file="$PAPERS_RAW_DIR/${raw_filename}.txt"
-        curl -sL "$url" | pandoc -f html -t markdown -o "$output"
-        cp "$output" "$raw_file"
+        local raw_file="$PAPERS_RAW_DIR/${raw_filename}.html"
+
+        if ! command -v pandoc &> /dev/null; then
+            log ERROR "pandoc required for HTML. Install: brew install pandoc"
+            return 1
+        fi
+
+        if ! curl -sL "$url" -o "$raw_file"; then
+            log ERROR "Failed to download HTML"
+            return 1
+        fi
+
+        log INFO "HTML downloaded successfully"
+        log INFO "Raw file saved to: $raw_file"
         echo "$raw_file"
     fi
-
-    [ -s "$output" ] || { log ERROR "Download failed"; return 1; }
-    log INFO "Content downloaded successfully"
-    log INFO "Raw file saved to: $raw_file"
 }
 
 # Process with Claude Code
 process_with_claude() {
-    local content_file=$1
+    local paper_file=$1
     local url=$2
-    local raw_file=$3
 
-    # Check file size
+    # Check file size and type
     local file_size
-    file_size=$(wc -c < "$content_file")
-    local file_lines
-    file_lines=$(wc -l < "$content_file")
+    file_size=$(wc -c < "$paper_file")
+    local file_type
+    file_type=$(file -b "$paper_file")
 
-    log INFO "Processing with Claude Code... (Content: ${file_lines} lines, $(numfmt --to=iec-i --suffix=B "$file_size" 2>/dev/null || echo "${file_size} bytes"))"
+    log INFO "Processing with Claude Code..."
+    log INFO "File: $(basename "$paper_file")"
+    log INFO "Type: $file_type"
+    log INFO "Size: $(numfmt --to=iec-i --suffix=B "$file_size" 2>/dev/null || echo "${file_size} bytes")"
 
-    if [ "$file_size" -gt 1048576 ]; then  # 1MB
-        log WARN "Large content detected (>1MB). This may take several minutes..."
+    if [ "$file_size" -gt 10485760 ]; then  # 10MB
+        log WARN "Large file detected (>10MB). This may take several minutes..."
     fi
 
     mkdir -p "$PAPERS_DIR"
 
-    # Run Claude in papers directory for write permissions
     local output_file="$TEMP_DIR/claude_output.txt"
-    local timeout_seconds=300  # 5 minutes timeout
+    local timeout_seconds=600  # 10 minutes timeout
 
-    # Convert raw file path to use tilde notation
-    local raw_file_display="${raw_file/#$HOME/~}"
+    # Convert file path to use tilde notation
+    local paper_file_display="${paper_file/#$HOME/~}"
 
-    {
-        cat "$content_file"
-        echo ""
-        echo "---"
-        echo "元のURL: $url"
-        echo "Raw file: $raw_file_display"
-    } | claude -p --system-prompt "$(cat <<'PROMPT'
-Analyze the provided paper content and generate a comprehensive Japanese summary in Markdown format.
+    # Prepare the prompt with file reference and metadata
+    local prompt_file="$TEMP_DIR/prompt.txt"
+    cat > "$prompt_file" <<EOF
+Analyze the paper at this file path: $paper_file
+
+Generate a comprehensive Japanese summary in Markdown format.
+
+**Paper Information:**
+- Original URL: $url
+- Raw file: $paper_file_display
 
 Output ONLY the markdown content, starting with the paper title heading.
 
 ## Required Structure
-```markdown
+\`\`\`markdown
 # {Paper Title}
 
 ## メタ情報
-- **元のURL**: {論文の元URL}
-- **Raw file**: {保存したrawファイルへのパス}
+- **元のURL**: $url
+- **Raw file**: $paper_file_display
 
 ## 概要
 {5行以内の概要：研究目的、主な貢献、手法、結果、意義}
@@ -168,7 +206,7 @@ Output ONLY the markdown content, starting with the paper title heading.
 ### 技術的側面
 - **手法の概要**: {使用した手法の説明}
 - **実装方法**: {具体的な実装アプローチ}
-- **重要な数式**: {LaTeX形式: $$formula$$}
+- **重要な数式**: {LaTeX形式: \$\$formula\$\$}
 
 ### 学習の詳細（該当する場合）
 - **入力データ**: {モデルへの入力の形式と内容}
@@ -190,16 +228,22 @@ Output ONLY the markdown content, starting with the paper title heading.
 ### 図表の説明
 - **Figure X**: {説明と重要性}
 - **Table Y**: {主要な発見}
-```
+\`\`\`
 
 ## Guidelines
 - Write summary in Japanese (except for the paper title)
 - Use **bold** for important terms
-- Use $$formula$$ for mathematical expressions
+- Use \$\$formula\$\$ for mathematical expressions
 - Output ONLY the markdown content, no extra commentary
 - Ensure comprehensive analysis of the paper
-PROMPT
-)" > "$output_file" 2>&1 &
+- Extract all important information from the paper including figures and tables
+EOF
+
+    # Run Claude with the paper file directly
+    # Add papers directory to allowed directories for file access
+    {
+        cat "$prompt_file" | claude -p --add-dir "$PAPERS_DIR" --add-dir "$PAPERS_RAW_DIR" > "$output_file" 2>&1
+    } &
 
     local claude_pid=$!
     local elapsed=0
@@ -267,22 +311,90 @@ PROMPT
     fi
 }
 
+# Background job wrapper
+run_in_background() {
+    local input=$1
+
+    # Setup log directory
+    mkdir -p "$PAPERS_LOGS_DIR"
+
+    # Generate unique log filename
+    local timestamp
+    timestamp=$(date '+%Y%m%d_%H%M%S')
+    local log_filename="paper-download-${timestamp}.log"
+    export LOG_FILE="$PAPERS_LOGS_DIR/$log_filename"
+
+    log INFO "Starting background job..."
+    log INFO "Log file: $LOG_FILE"
+
+    # Show immediate feedback
+    echo ""
+    echo "🚀 Background job started!"
+    echo "📝 Log file: $LOG_FILE"
+    echo "💡 You can close this window safely."
+    echo ""
+    echo "To view progress:"
+    echo "  tail -f $LOG_FILE"
+
+    # Run actual processing in background
+    {
+        # Create temp directory for this background job
+        local TEMP_DIR
+        TEMP_DIR=$(mktemp -d)
+        trap 'rm -rf "$TEMP_DIR"' EXIT
+
+        check_dependencies
+
+        local paper_file
+        local source_url=""
+
+        # Check if input is a local file or URL
+        if is_local_file "$input"; then
+            log INFO "Processing local file: $input"
+
+            # Copy to raw directory for record keeping
+            mkdir -p "$PAPERS_RAW_DIR"
+            local filename
+            filename=$(basename "$input")
+            local raw_file="$PAPERS_RAW_DIR/${timestamp}-${filename}"
+            cp "$input" "$raw_file"
+
+            paper_file="$raw_file"
+            source_url="(local file: $input)"
+            log INFO "File copied to: $raw_file"
+        else
+            log INFO "Downloading from URL: $input"
+            source_url="$input"
+            paper_file=$(download_paper "$input")
+        fi
+
+        if [ $? -eq 0 ] && [ -n "$paper_file" ]; then
+            if process_with_claude "$paper_file" "$source_url"; then
+                log INFO "✅ Successfully completed!"
+                notify "📄 Paper Download Complete" "Summary has been generated and saved" "Glass"
+            else
+                log ERROR "❌ Failed to process with Claude"
+                notify "📄 Paper Download Failed" "Claude processing failed. Check log for details." "Basso"
+            fi
+        else
+            log ERROR "❌ Failed to process paper"
+            notify "📄 Paper Download Failed" "Paper processing failed. Check log for details." "Basso"
+        fi
+
+        log INFO "Done! Check $PAPERS_DIR for the summary."
+    } &
+
+    # Return immediately
+    disown
+}
+
 # Main
 main() {
-    local url="${1:-}"
+    local input="${1:-}"
 
-    [ -z "$url" ] && { log ERROR "No URL provided"; echo "Usage: $0 <paper_url>"; exit 1; }
+    [ -z "$input" ] && { log ERROR "No input provided"; echo "Usage: $0 <paper_url_or_file_path>"; exit 1; }
 
-    log INFO "Processing: $url"
-    check_dependencies
-
-    local content_file="$TEMP_DIR/content.txt"
-    local raw_file
-    raw_file=$(download_content "$url" "$content_file") || exit 1
-
-    process_with_claude "$content_file" "$url" "$raw_file"
-
-    log INFO "Done! Check $PAPERS_DIR for the summary."
+    run_in_background "$input"
 }
 
 main "$@"
