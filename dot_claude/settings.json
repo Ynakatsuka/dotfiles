@@ -17,17 +17,6 @@
             }
           ]
         }
-      ],
-      "Error": [
-        {
-          "matcher": "",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "exit 0"
-            }
-          ]
-        }
       ]
     }
 }
