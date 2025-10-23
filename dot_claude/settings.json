@@ -13,7 +13,7 @@
           "hooks": [
             {
               "type": "command",
-              "command": "~/.local/bin/remote-notify.sh 'Claude Code' \"セッション: $CLAUDE_SESSION_NAME - 作業が完了しました。\""
+              "command": "$HOME/.local/bin/remote-notify.sh 'Claude Code' \"セッション: $CLAUDE_SESSION_NAME - 作業が完了しました.\""
             }
           ]
         }
