@@ -103,9 +103,15 @@ download_paper() {
     # Create raw directory
     mkdir -p "$PAPERS_RAW_DIR"
 
-    # Generate filename from URL
+    # Generate safe filename from URL
+    # Remove protocol, convert special chars to underscore, remove consecutive underscores
     local raw_filename
-    raw_filename=$(echo "$url" | sed 's|https\?://||' | sed 's|[/?&=]|-|g' | sed 's/--*/-/g' | cut -c1-100)
+    raw_filename=$(echo "$url" | sed 's|https\?://||' | sed 's|[^a-zA-Z0-9]|_|g' | sed 's/__*/_/g' | sed 's/^_\|_$//g' | cut -c1-80)
+
+    # Add timestamp for uniqueness
+    local timestamp
+    timestamp=$(date '+%Y%m%d_%H%M%S')
+    raw_filename="${timestamp}_${raw_filename}"
 
     if is_pdf_url "$url"; then
         log INFO "Downloading PDF..."
