@@ -7,11 +7,11 @@
 
 # Optional parameters:
 # @raycast.icon 📄
-# @raycast.argument1 { "type": "text", "placeholder": "Paper URL or local file path" }
+# @raycast.argument1 { "type": "text", "placeholder": "Paper URL(s) or local file path(s) - space separated" }
 # @raycast.packageName Research Tools
 
 # Documentation:
-# @raycast.description Download paper from URL or process local PDF file and generate summary using Claude Code
+# @raycast.description Download paper(s) from URL(s) or process local PDF file(s) and generate summaries using Claude Code. Supports multiple URLs/files.
 # @raycast.author yuki
 # @raycast.authorURL https://github.com/yourusername
 
@@ -325,6 +325,7 @@ EOF
 # Background job wrapper
 run_in_background() {
     local input=$1
+    local job_index=${2:-}
 
     # Setup log directory
     mkdir -p "$PAPERS_LOGS_DIR"
@@ -332,15 +333,28 @@ run_in_background() {
     # Generate unique log filename
     local timestamp
     timestamp=$(date '+%Y%m%d_%H%M%S')
-    local log_filename="paper-download-${timestamp}.log"
+
+    # Add job index to filename if processing multiple URLs
+    local log_filename
+    if [ -n "$job_index" ]; then
+        log_filename="paper-download-${timestamp}-job${job_index}.log"
+    else
+        log_filename="paper-download-${timestamp}.log"
+    fi
+
     export LOG_FILE="$PAPERS_LOGS_DIR/$log_filename"
 
     log INFO "Starting background job..."
+    log INFO "Input: $input"
     log INFO "Log file: $LOG_FILE"
 
     # Show immediate feedback
     echo ""
     echo "🚀 Background job started!"
+    if [ -n "$job_index" ]; then
+        echo "📋 Job: $job_index"
+    fi
+    echo "📄 Input: $input"
     echo "📝 Log file: $LOG_FILE"
     echo "💡 You can close this window safely."
     echo ""
@@ -399,11 +413,55 @@ run_in_background() {
 
 # Main
 main() {
-    local input="${1:-}"
+    # Check if any arguments provided
+    [ $# -eq 0 ] && {
+        echo "Usage: $0 <paper_url_or_file_path> [<url2> <url3> ...]"
+        echo ""
+        echo "Examples:"
+        echo "  $0 https://arxiv.org/pdf/2403.00133.pdf"
+        echo "  $0 /path/to/local/paper.pdf"
+        echo "  $0 https://arxiv.org/pdf/2403.00133.pdf https://openreview.net/pdf?id=abc123"
+        exit 1
+    }
 
-    [ -z "$input" ] && { log ERROR "No input provided"; echo "Usage: $0 <paper_url_or_file_path>"; exit 1; }
+    # If multiple URLs provided, process them sequentially
+    if [ $# -gt 1 ]; then
+        echo "========================================"
+        echo "📚 Processing $# papers sequentially"
+        echo "========================================"
+        echo ""
 
-    run_in_background "$input"
+        local total=$#
+        local current=0
+
+        for input in "$@"; do
+            current=$((current + 1))
+            echo "----------------------------------------"
+            echo "[$current/$total] Processing: $input"
+            echo "----------------------------------------"
+            run_in_background "$input" "$current"
+
+            # Wait a bit between launches to avoid overwhelming the system
+            if [ $current -lt $total ]; then
+                echo ""
+                echo "⏳ Waiting 3 seconds before next paper..."
+                sleep 3
+                echo ""
+            fi
+        done
+
+        echo ""
+        echo "========================================"
+        echo "✅ All $total papers queued!"
+        echo "========================================"
+        echo ""
+        echo "📂 Check logs in: $PAPERS_LOGS_DIR"
+        echo "📊 Monitor all jobs:"
+        echo "  tail -f $PAPERS_LOGS_DIR/paper-download-*.log"
+    else
+        # Single URL - original behavior
+        run_in_background "$1"
+    fi
 }
 
 main "$@"
