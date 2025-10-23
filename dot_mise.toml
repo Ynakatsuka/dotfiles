@@ -59,3 +59,17 @@ plugin_autoupdate_last_check_duration = "7 days"
 
 [env]
 # Environment variables can be set here if needed
+
+[tasks.claude-viewer]
+description = "Claude Code Viewer (port 50100)"
+run = "npx @kimuson/claude-code-viewer@latest"
+env = { PORT = "50100" }
+
+[tasks.vibe-kanban]
+description = "vibe-kanban (port 50101)"
+run = "npx vibe-kanban"
+env = { PORT = "50101" }
+
+[tasks.workspace]
+description = "Start all development servers"
+depends = ["claude-viewer", "vibe-kanban"]
