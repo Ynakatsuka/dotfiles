@@ -7,7 +7,7 @@
     "alwaysThinkingEnabled": false,
     "dangerously-skip-permissions": true,
     "hooks": {
-      "stop": [
+      "Stop": [
         {
           "matcher": "",
           "hooks": [
