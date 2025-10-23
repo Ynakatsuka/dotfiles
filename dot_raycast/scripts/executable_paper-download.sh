@@ -28,19 +28,8 @@ readonly PAPERS_LOGS_DIR="$HOME/papers/logs"
 # Logging
 log() {
     local level=$1; shift
-    local color=""
-    case "$level" in
-        INFO)  color='\033[0;32m' ;;
-        ERROR) color='\033[0;31m' ;;
-        WARN)  color='\033[1;33m' ;;
-    esac
-    local message="${color}[${level}]\033[0m $*"
-    echo -e "$message"
-
-    # Also log to file if LOG_FILE is set
-    if [ -n "${LOG_FILE:-}" ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" >> "$LOG_FILE"
-    fi
+    echo "[$level] $*" >&2
+    [ -n "${LOG_FILE:-}" ] && echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $*" >> "$LOG_FILE"
 }
 
 # Send desktop notification
@@ -95,7 +84,16 @@ is_local_file() {
 # Detect if URL is PDF
 is_pdf_url() {
     local url=$1
-    [[ "$url" =~ \.pdf$ ]] || [[ $(curl -sI -L "$url" 2>/dev/null | grep -i "^content-type:" | grep -i "pdf") ]]
+
+    # Check if URL ends with .pdf or has pdf-related query parameters
+    if [[ "$url" =~ \.pdf$ ]] || [[ "$url" =~ (\?|\&)name=pdf ]]; then
+        return 0
+    fi
+
+    # Fallback: Check Content-Type header
+    local content_type
+    content_type=$(curl -sI -L "$url" 2>/dev/null | grep -i "^content-type:" | head -1)
+    [[ -n "$content_type" ]] && [[ "$content_type" =~ pdf ]]
 }
 
 # Download paper (PDF or HTML)
@@ -115,17 +113,11 @@ download_paper() {
 
         # Use -L to follow redirects
         local curl_success=false
-        if curl -sL "$url" -o "$raw_file"; then
-            # Verify it's actually a PDF
-            if file "$raw_file" | grep -q "PDF"; then
-                curl_success=true
-            else
-                log WARN "curl downloaded file is not a valid PDF, will try Playwright"
-                log WARN "File type: $(file "$raw_file")"
-                rm "$raw_file"
-            fi
+        if curl -sL "$url" -o "$raw_file" && file "$raw_file" | grep -q "PDF"; then
+            curl_success=true
         else
             log WARN "curl failed, trying Playwright..."
+            [ -f "$raw_file" ] && rm "$raw_file"
         fi
 
         # Fallback to Playwright if curl failed
@@ -139,23 +131,17 @@ download_paper() {
                 return 1
             fi
 
-            log INFO "Attempting download with Playwright..."
             if ! uv run --directory "$script_dir" python "$playwright_script" "$url" "$raw_file"; then
-                log ERROR "Failed to download PDF with Playwright"
+                log ERROR "Playwright download failed"
                 return 1
             fi
 
             # Verify it's actually a PDF
             if ! file "$raw_file" | grep -q "PDF"; then
                 log ERROR "Downloaded file is not a valid PDF"
-                log ERROR "File type: $(file "$raw_file")"
-                rm "$raw_file"
+                [ -f "$raw_file" ] && rm "$raw_file"
                 return 1
             fi
-
-            log INFO "PDF downloaded successfully with Playwright"
-        else
-            log INFO "PDF downloaded successfully with curl"
         fi
 
         log INFO "Raw file saved to: $raw_file"
@@ -185,20 +171,11 @@ process_with_claude() {
     local paper_file=$1
     local url=$2
 
-    # Check file size and type
+    log INFO "Processing with Claude Code..."
+
     local file_size
     file_size=$(wc -c < "$paper_file")
-    local file_type
-    file_type=$(file -b "$paper_file")
-
-    log INFO "Processing with Claude Code..."
-    log INFO "File: $(basename "$paper_file")"
-    log INFO "Type: $file_type"
-    log INFO "Size: $(numfmt --to=iec-i --suffix=B "$file_size" 2>/dev/null || echo "${file_size} bytes")"
-
-    if [ "$file_size" -gt 10485760 ]; then  # 10MB
-        log WARN "Large file detected (>10MB). This may take several minutes..."
-    fi
+    [ "$file_size" -gt 10485760 ] && log WARN "Large file (>10MB), may take several minutes"
 
     mkdir -p "$PAPERS_DIR"
 
@@ -290,42 +267,30 @@ EOF
     local claude_pid=$!
     local elapsed=0
 
-    # Display elapsed time while Claude is processing (every 10 seconds)
+    # Wait with timeout
     while kill -0 "$claude_pid" 2>/dev/null; do
-        if [ $((elapsed % 10)) -eq 0 ] && [ "$elapsed" -gt 0 ]; then
-            printf "\r\033[K\033[0;36m[PROCESSING]\033[0m %d seconds elapsed..." "$elapsed"
-        fi
-
-        # Check for timeout
-        if [ "$elapsed" -ge "$timeout_seconds" ]; then
+        [ "$elapsed" -ge "$timeout_seconds" ] && {
             kill "$claude_pid" 2>/dev/null
             wait "$claude_pid" 2>/dev/null
-            printf "\r\033[K"
-            log ERROR "Processing timed out after ${timeout_seconds} seconds"
-            log ERROR "Output saved to: $output_file"
+            log ERROR "Processing timed out after ${timeout_seconds}s"
             return 1
-        fi
-
+        }
         sleep 1
         ((elapsed++))
     done
 
-    # Wait for the process to complete and get exit status
     wait "$claude_pid"
     local exit_status=$?
 
-    printf "\r\033[K"  # Clear the line
-
     if [ $exit_status -eq 0 ]; then
-        log INFO "Processing completed in ${elapsed} seconds"
+        log INFO "Processing completed (${elapsed}s)"
 
         # Extract title and create filename
         local paper_title
         paper_title=$(head -1 "$output_file" | sed 's/^# //')
 
         if [ -z "$paper_title" ]; then
-            log ERROR "Failed to extract paper title from output"
-            log ERROR "Output saved to: $output_file"
+            log ERROR "Failed to extract paper title"
             return 1
         fi
 
@@ -346,9 +311,7 @@ EOF
         fi
 
     else
-        log ERROR "Claude processing failed after ${elapsed} seconds (exit code: $exit_status)"
-        log ERROR "Output saved to: $output_file"
-        head -20 "$output_file" >&2
+        log ERROR "Claude processing failed (exit code: $exit_status)"
         return 1
     fi
 }
@@ -412,18 +375,16 @@ run_in_background() {
 
         if [ $? -eq 0 ] && [ -n "$paper_file" ]; then
             if process_with_claude "$paper_file" "$source_url"; then
-                log INFO "✅ Successfully completed!"
+                log INFO "Successfully completed"
                 notify "📄 Paper Download Complete" "Summary has been generated and saved" "Glass"
             else
-                log ERROR "❌ Failed to process with Claude"
-                notify "📄 Paper Download Failed" "Claude processing failed. Check log for details." "Basso"
+                log ERROR "Failed to process with Claude"
+                notify "📄 Paper Download Failed" "Claude processing failed" "Basso"
             fi
         else
-            log ERROR "❌ Failed to process paper"
-            notify "📄 Paper Download Failed" "Paper processing failed. Check log for details." "Basso"
+            log ERROR "Failed to download paper"
+            notify "📄 Paper Download Failed" "Download failed" "Basso"
         fi
-
-        log INFO "Done! Check $PAPERS_DIR for the summary."
     } &
 
     # Return immediately
