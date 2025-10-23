@@ -67,11 +67,13 @@ check_dependencies() {
         local script_dir
         script_dir=$(dirname "$0")
         if ! uv run --directory "$script_dir" python -c "import playwright" 2>/dev/null; then
-            log WARN "Playwright not found. Install: cd $script_dir && uv sync && uv run playwright install chromium"
+            log WARN "Playwright not found. Install with:"
+            log WARN "  cd $script_dir && uv sync && uv run playwright install chromium"
             log WARN "Playwright is used as fallback when curl fails to download PDFs"
         fi
     else
-        log WARN "uv not found. Playwright fallback will not be available"
+        log WARN "uv not found. Install: brew install uv"
+        log WARN "Playwright fallback will not be available without uv"
     fi
 }
 
@@ -420,29 +422,41 @@ main() {
         echo "Examples:"
         echo "  $0 https://arxiv.org/pdf/2403.00133.pdf"
         echo "  $0 /path/to/local/paper.pdf"
-        echo "  $0 https://arxiv.org/pdf/2403.00133.pdf https://openreview.net/pdf?id=abc123"
+        echo "  $0 'https://arxiv.org/pdf/2403.00133.pdf https://openreview.net/pdf?id=abc123'"
         exit 1
     }
 
+    # Parse input: if first argument contains spaces, split it into multiple URLs
+    local -a inputs=()
+    if [[ "$1" =~ [[:space:]] ]]; then
+        # Raycast passes multiple URLs as a single space-separated string
+        # Split by whitespace into array
+        read -ra inputs <<< "$1"
+    else
+        # Multiple arguments passed directly
+        inputs=("$@")
+    fi
+
+    local num_inputs=${#inputs[@]}
+
     # If multiple URLs provided, process them sequentially
-    if [ $# -gt 1 ]; then
+    if [ $num_inputs -gt 1 ]; then
         echo "========================================"
-        echo "📚 Processing $# papers sequentially"
+        echo "📚 Processing $num_inputs papers sequentially"
         echo "========================================"
         echo ""
 
-        local total=$#
         local current=0
 
-        for input in "$@"; do
+        for input in "${inputs[@]}"; do
             current=$((current + 1))
             echo "----------------------------------------"
-            echo "[$current/$total] Processing: $input"
+            echo "[$current/$num_inputs] Processing: $input"
             echo "----------------------------------------"
             run_in_background "$input" "$current"
 
             # Wait a bit between launches to avoid overwhelming the system
-            if [ $current -lt $total ]; then
+            if [ $current -lt $num_inputs ]; then
                 echo ""
                 echo "⏳ Waiting 3 seconds before next paper..."
                 sleep 3
@@ -452,7 +466,7 @@ main() {
 
         echo ""
         echo "========================================"
-        echo "✅ All $total papers queued!"
+        echo "✅ All $num_inputs papers queued!"
         echo "========================================"
         echo ""
         echo "📂 Check logs in: $PAPERS_LOGS_DIR"
@@ -460,7 +474,7 @@ main() {
         echo "  tail -f $PAPERS_LOGS_DIR/paper-download-*.log"
     else
         # Single URL - original behavior
-        run_in_background "$1"
+        run_in_background "${inputs[0]}"
     fi
 }
 
