@@ -70,6 +70,15 @@ description = "vibe-kanban (port 50101)"
 run = "npx vibe-kanban"
 env = { PORT = "50101" }
 
+[tasks.update-dotfile]
+description = "Update dotfiles and development environment"
+run = """
+chezmoi update -v && \
+mise up && \
+mise cache clean && \
+source ~/.zshrc
+"""
+
 [tasks.workspace]
 description = "Start all development servers"
 depends = ["claude-viewer", "vibe-kanban"]
