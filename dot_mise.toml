@@ -75,8 +75,7 @@ description = "Update dotfiles and development environment"
 run = """
 chezmoi update -v && \
 mise up && \
-mise cache clean && \
-source ~/.zshrc
+mise cache clean
 """
 
 [tasks.workspace]
