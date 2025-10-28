@@ -5,6 +5,9 @@ claude-code = "latest"
 # Gemini CLI - Google AI CLI
 gemini-cli = "latest"
 
+# python - Python runtime
+python = "latest"
+
 # uv - Fast Python package installer and resolver
 uv = "latest"
 
