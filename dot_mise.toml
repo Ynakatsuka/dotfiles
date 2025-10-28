@@ -6,7 +6,7 @@ claude-code = "latest"
 gemini-cli = "latest"
 
 # python - Python runtime
-python = "latest"
+python = "3.12"
 
 # uv - Fast Python package installer and resolver
 uv = "latest"
