@@ -1,22 +1,22 @@
 {
-    "defaultMode": "acceptEdits",
-    "statusLine": {
-      "type": "command",
-      "command": "npx -y ccusage statusline"
-    },
-    "alwaysThinkingEnabled": false,
-    "dangerously-skip-permissions": true,
-    "hooks": {
-      "Stop": [
-        {
-          "matcher": "",
-          "hooks": [
-            {
-              "type": "command",
-              "command": "if [ \"$(uname)\" = \"Darwin\" ]; then osascript -e 'display notification \"セッション: '\"$CLAUDE_SESSION_NAME\"' - 作業が完了しました.\" with title \"Claude Code\"'; fi"
-            }
-          ]
-        }
-      ]
-    }
+  "defaultMode": "acceptEdits",
+  "statusLine": {
+    "type": "command",
+    "command": "npx -y ccusage statusline"
+  },
+  "alwaysThinkingEnabled": false,
+  "dangerously-skip-permissions": true,
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ \"$(uname)\" = \"Darwin\" ]; then SESSION=\"${CLAUDE_SESSION_NAME:-不明}\"; osascript -e \"display notification \\\"セッション: $SESSION - 作業が完了しました.\\\" with title \\\"Claude Code\\\"\"; fi"
+          }
+        ]
+      }
+    ]
+  }
 }
