@@ -193,7 +193,7 @@ function gw() {
         git branch "$base_branch" "origin/$base_branch"
     else
         # If staging is checked out in a worktree, update it there
-        local staging_worktree=$(git worktree list --porcelain | grep -A 3 "branch refs/heads/$base_branch" | grep "worktree" | cut -d ' ' -f 2)
+        local staging_worktree=$(git worktree list --porcelain | awk '/^worktree/ {wt=$2} /^branch refs\/heads\/'"$base_branch"'$/ {print wt; exit}')
         if [ -n "$staging_worktree" ]; then
             echo "Updating $base_branch in worktree: $staging_worktree"
             (cd "$staging_worktree" && git pull origin "$base_branch")
