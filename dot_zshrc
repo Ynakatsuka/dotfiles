@@ -145,6 +145,13 @@ _gw_copy_env() {
 function gw() {
     local branch_name=$1
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+
+    # Check if we're in a git repository
+    if [ -z "$git_root" ]; then
+        echo "Error: not a git repository"
+        return 1
+    fi
+
     local repo_name=$(basename "$git_root")
     local worktree_base="${git_root}-worktree"
     local base_branch="staging"
@@ -170,8 +177,8 @@ function gw() {
     # worktree用のディレクトリパス
     local worktree_dir="${worktree_base}/${branch_name//\//-}"
 
-    # すでにworktreeが存在するかチェック
-    if git worktree list | grep -q "$worktree_dir"; then
+    # すでにworktreeが存在するかチェック (Fix grep option parsing issue)
+    if git worktree list | grep -qF "$worktree_dir"; then
         echo "Worktree already exists at: $worktree_dir"
         echo "Changing directory to existing worktree..."
         cd "$worktree_dir"
