@@ -147,6 +147,7 @@ function gw() {
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     local repo_name=$(basename "$git_root")
     local worktree_base="${git_root}-worktree"
+    local base_branch="staging"
 
     # 引数がない場合はfzfでworktree一覧から選択
     if [ -z "$branch_name" ]; then
@@ -154,7 +155,7 @@ function gw() {
         if [ -n "$selected_worktree" ]; then
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
-            
+
             # .envファイル、direnv設定とCursorを開く処理
             _gw_copy_env "$git_root"
             _gw_setup_direnv
@@ -174,7 +175,7 @@ function gw() {
         echo "Worktree already exists at: $worktree_dir"
         echo "Changing directory to existing worktree..."
         cd "$worktree_dir"
-        
+
         # .envファイル、direnv設定とCursorを開く処理
         _gw_copy_env "$git_root"
         _gw_setup_direnv
@@ -182,25 +183,36 @@ function gw() {
         return 0
     fi
 
+    # Update staging branch to latest remote
+    echo "Updating $base_branch branch to latest remote..."
+    git fetch origin "$base_branch"
+    if git show-ref --verify --quiet "refs/heads/$base_branch"; then
+        # If local staging exists, update it
+        git branch -f "$base_branch" "origin/$base_branch"
+    else
+        # If local staging doesn't exist, create it
+        git branch "$base_branch" "origin/$base_branch"
+    fi
+
     local new_worktree_created=false
 
     # 現在のブランチと同じ名前の場合は新しいworktreeを作成
     current_branch=$(git branch --show-current)
     if [ "$branch_name" = "$current_branch" ]; then
-        echo "Creating worktree for current branch: $branch_name"
+        echo "Creating worktree for current branch: $branch_name from $base_branch"
         git worktree add "$worktree_dir" "$branch_name"
         cd "$worktree_dir"
         new_worktree_created=true
     # 存在するブランチの場合はworktreeを作成
     elif git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
-        echo "Creating worktree for existing branch: $branch_name"
+        echo "Creating worktree for existing branch: $branch_name from $base_branch"
         git worktree add "$worktree_dir" "$branch_name"
         cd "$worktree_dir"
         new_worktree_created=true
-    # 存在しないブランチの場合は新しいブランチを作成
+    # 存在しないブランチの場合はstagingから新しいブランチを作成
     else
-        echo "Creating new branch and worktree: $branch_name"
-        git worktree add -b "$branch_name" "$worktree_dir"
+        echo "Creating new branch '$branch_name' from $base_branch and worktree"
+        git worktree add -b "$branch_name" "$worktree_dir" "$base_branch"
         cd "$worktree_dir"
         new_worktree_created=true
     fi
