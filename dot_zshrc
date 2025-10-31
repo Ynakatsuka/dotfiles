@@ -186,12 +186,21 @@ function gw() {
     # Update staging branch to latest remote
     echo "Updating $base_branch branch to latest remote..."
     git fetch origin "$base_branch"
-    if git show-ref --verify --quiet "refs/heads/$base_branch"; then
-        # If local staging exists, update it
-        git branch -f "$base_branch" "origin/$base_branch"
-    else
-        # If local staging doesn't exist, create it
+
+    # Check if staging branch exists locally
+    if ! git show-ref --verify --quiet "refs/heads/$base_branch"; then
+        # If local staging doesn't exist, create it from remote
         git branch "$base_branch" "origin/$base_branch"
+    else
+        # If staging is checked out in a worktree, update it there
+        local staging_worktree=$(git worktree list --porcelain | grep -A 3 "branch refs/heads/$base_branch" | grep "worktree" | cut -d ' ' -f 2)
+        if [ -n "$staging_worktree" ]; then
+            echo "Updating $base_branch in worktree: $staging_worktree"
+            (cd "$staging_worktree" && git pull origin "$base_branch")
+        else
+            # If staging exists but not in a worktree, force update it
+            git branch -f "$base_branch" "origin/$base_branch"
+        fi
     fi
 
     local new_worktree_created=false
