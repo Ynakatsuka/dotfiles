@@ -5,6 +5,12 @@ claude-code = "latest"
 # Gemini CLI - Google AI CLI
 gemini-cli = "latest"
 
+# OpenAI Codex CLI
+"npm:@openai/codex" = "latest"
+
+# vibe-kanban - NPX wrapper around vibe-kanban and vibe-kanban-mcp
+"npm:vibe-kanban" = "latest"
+
 # python - Python runtime
 python = "3.12"
 
@@ -22,12 +28,6 @@ task = "latest"
 
 # typos - Source code spell checker
 typos = "latest"
-
-# OpenAI Codex CLI
-"npm:@openai/codex" = "latest"
-
-# vibe-kanban - NPX wrapper around vibe-kanban and vibe-kanban-mcp
-"npm:vibe-kanban" = "latest"
 
 # Node.js - JavaScript runtime
 node = "24.9"
