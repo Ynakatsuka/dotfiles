@@ -468,6 +468,22 @@ zle -N fzf-ghq-src
 bindkey '^h' fzf-ghq-src
 
 #
+# Copy Last Output
+#
+function copy_last_output() {
+  local lastcmd=$(fc -ln -20 | grep -v 'copy_last_output' | grep -v '^[[:space:]]*$' | tail -n 1)
+  if [[ -z "$lastcmd" ]]; then
+    echo "No previous command found."
+    return 1
+  fi
+
+  local output
+  output=$(eval "$lastcmd" 2>&1)
+  echo "$output" | pbcopy
+}
+bindkey '^o' copy_last_output
+
+#
 # Claude Code
 #
 function cl() {
