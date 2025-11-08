@@ -481,6 +481,7 @@ function copy_last_output() {
   output=$(eval "$lastcmd" 2>&1)
   echo "$output" | pbcopy
 }
+zle -N copy_last_output
 bindkey '^o' copy_last_output
 
 #
