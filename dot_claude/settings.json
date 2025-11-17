@@ -1,11 +1,4 @@
 {
-  "defaultMode": "acceptEdits",
-  "statusLine": {
-    "type": "command",
-    "command": "npx -y ccusage statusline"
-  },
-  "alwaysThinkingEnabled": false,
-  "dangerously-skip-permissions": true,
   "hooks": {
     "Stop": [
       {
@@ -18,5 +11,13 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "npx -y ccusage statusline"
+  },
+  "alwaysThinkingEnabled": false,
+  "defaultMode": "acceptEdits",
+  "dangerously-skip-permissions": true,
+  "model": "sonnet[1m]"
 }
