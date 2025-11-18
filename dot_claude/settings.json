@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ \"$(uname)\" = \"Darwin\" ]; then SESSION=\"${CLAUDE_SESSION_NAME:-不明}\"; osascript -e \"display notification \\\"セッション: $SESSION - Agentから質問があります.\\\" with title \\\"Claude Code\\\"\"; fi"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",
