@@ -256,41 +256,68 @@ function gwc() {
         return 1
     fi
 
-    # fzfでworktreeを選択（角括弧を除去）
-    local selected_line=$(echo "$worktrees" | sed 's/\[//g; s/\]//g' | fzf \
+    # fzfでworktreeを選択（角括弧を除去、複数選択可能）
+    local selected_lines=$(echo "$worktrees" | sed 's/\[//g; s/\]//g' | fzf \
+        -m \
         --height=60% \
         --reverse \
-        --prompt="削除するworktreeを選択: ")
+        --prompt="削除するworktreeを選択 (Tab: 複数選択): " \
+        --header="Tab: 選択/解除, Enter: 確定")
 
-    if [ -z "$selected_line" ]; then
+    if [ -z "$selected_lines" ]; then
         echo "worktreeが選択されませんでした"
         return 1
     fi
 
-    # 選択されたworktreeのパスを取得
-    local worktree_path=$(echo "$selected_line" | awk '{print $1}')
-    local branch_name=$(echo "$selected_line" | awk '{print $2}')
+    # 選択されたworktreeの情報を配列に格納
+    local -a worktree_paths
+    local -a branch_names
+    while IFS= read -r line; do
+        worktree_paths+=("$(echo "$line" | awk '{print $1}')")
+        branch_names+=("$(echo "$line" | awk '{print $2}')")
+    done <<< "$selected_lines"
 
     # 確認メッセージ
-    echo "削除予定のworktree:"
-    echo "  パス: $worktree_path"
-    echo "  ブランチ: $branch_name"
+    echo "削除予定のworktree (${#worktree_paths[@]}件):"
+    for i in {1..${#worktree_paths[@]}}; do
+        echo "  [$i] パス: ${worktree_paths[$i]}"
+        echo "      ブランチ: ${branch_names[$i]}"
+    done
     echo -n "本当に削除しますか？ (y/N): "
     read confirmation
 
     if [[ "$confirmation" =~ ^[yY]$ ]]; then
-        # worktreeを削除
-        echo "worktreeを削除中..."
-        if git worktree remove "$worktree_path" --force; then
-            echo "✅ worktreeが削除されました: $worktree_path"
+        local success_count=0
+        local fail_count=0
 
-            # ディレクトリが残っている場合は非同期で削除
-            if [ -d "$worktree_path" ]; then
-                echo "📂 残りのディレクトリを削除中..."
-                rm -rf "$worktree_path"
+        # worktreeを一つずつ削除
+        for i in {1..${#worktree_paths[@]}}; do
+            local worktree_path="${worktree_paths[$i]}"
+            local branch_name="${branch_names[$i]}"
+
+            echo ""
+            echo "[$i/${#worktree_paths[@]}] worktreeを削除中: $worktree_path"
+            if git worktree remove "$worktree_path" --force; then
+                echo "✅ worktreeが削除されました: $worktree_path"
+                ((success_count++))
+
+                # ディレクトリが残っている場合は削除
+                if [ -d "$worktree_path" ]; then
+                    echo "📂 残りのディレクトリを削除中..."
+                    rm -rf "$worktree_path"
+                fi
+            else
+                echo "❌ worktreeの削除に失敗しました: $worktree_path"
+                ((fail_count++))
             fi
-        else
-            echo "❌ worktreeの削除に失敗しました"
+        done
+
+        echo ""
+        echo "=========================================="
+        echo "削除完了: 成功 $success_count 件, 失敗 $fail_count 件"
+        echo "=========================================="
+
+        if [ $fail_count -gt 0 ]; then
             return 1
         fi
     else
