@@ -235,10 +235,54 @@ function gw() {
 
     # 新しいworktreeが作成された場合の処理
     if [ "$new_worktree_created" = true ]; then
-        # .envファイル、direnv設定とCursorを開く処理
+        # .envファイル、direnv設定
         _gw_copy_env "$git_root"
         _gw_setup_direnv
-        _gw_open_cursor
+
+        # カラー設定付きの.code-workspaceファイルを作成
+        local colors=(
+            "#e74c3c" "#3498db" "#2ecc71" "#f39c12" "#9b59b6"
+            "#1abc9c" "#e91e63" "#ff5722" "#607d8b" "#795548"
+            "#ff9800" "#4caf50" "#00bcd4" "#673ab7" "#009688"
+            "#8bc34a" "#ffc107" "#03a9f4" "#ff6f00" "#7b1fa2"
+            "#00695c" "#c2185b" "#1976d2" "#388e3c"
+        )
+        local color_index=$(( $(echo "$branch_name" | cksum | cut -d' ' -f1) % ${#colors[@]} ))
+        local color="${colors[$color_index]}"
+
+        local workspace_file="${worktree_dir}/worktree.code-workspace"
+        cat > "$workspace_file" << EOF
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "window.title": "${repo_name}:${branch_name}",
+    "workbench.colorCustomizations": {
+      "titleBar.activeBackground": "$color",
+      "titleBar.activeForeground": "#fff"
+    }
+  }
+}
+EOF
+
+        # .git/info/excludeに追加してgit差分から除外
+        local exclude_file=".git/info/exclude"
+        if [ -f "$exclude_file" ]; then
+            if ! grep -q "^worktree\.code-workspace$" "$exclude_file"; then
+                echo "worktree.code-workspace" >> "$exclude_file"
+            fi
+        fi
+
+        echo "🎨 Branch: $branch_name | Color: $color"
+
+        # workspaceファイルでCursorを開く
+        if command -v cursor >/dev/null 2>&1; then
+            echo "Opening Cursor with workspace file..."
+            cursor "$workspace_file"
+        fi
     fi
 }
 
