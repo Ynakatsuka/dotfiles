@@ -11,6 +11,9 @@ gemini-cli = "latest"
 # vibe-kanban - NPX wrapper around vibe-kanban and vibe-kanban-mcp
 "npm:vibe-kanban" = "latest"
 
+# vsce - Visual Studio Code Extension CLI
+vsce = "latest"
+
 # python - Python runtime
 python = "3.12"
 
