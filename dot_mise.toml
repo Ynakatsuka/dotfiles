@@ -12,7 +12,7 @@ gemini-cli = "latest"
 "npm:vibe-kanban" = "latest"
 
 # vsce - Visual Studio Code Extension CLI
-vsce = "latest"
+"npm:@vscode/vsce" = "latest"
 
 # python - Python runtime
 python = "3.12"
