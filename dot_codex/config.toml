@@ -1,9 +1,12 @@
 hide_agent_reasoning = true
 network_access = true
-dangerously-bypass-approvals-and-sandbox = true
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
 
 [tools]
-web_search = true
+unified_exec = true
+streamable_shell = true
+web_search_request = true
 
 [mcp_servers.context7]
 command = "npx"
