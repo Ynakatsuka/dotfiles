@@ -2,6 +2,7 @@ hide_agent_reasoning = true
 network_access = true
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+model = "gpt-5.1-codex-max"
 
 [tools]
 unified_exec = true
@@ -11,3 +12,6 @@ web_search_request = true
 [mcp_servers.context7]
 command = "npx"
 args = ["-y", "@upstash/context7-mcp@latest"]
+
+[notice]
+"hide_gpt-5.1-codex-max_migration_prompt" = true
