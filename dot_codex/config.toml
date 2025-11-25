@@ -1,5 +1,6 @@
 hide_agent_reasoning = true
 network_access = true
+dangerously-bypass-approvals-and-sandbox = true
 
 [tools]
 web_search = true
