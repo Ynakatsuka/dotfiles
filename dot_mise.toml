@@ -14,6 +14,9 @@ gemini-cli = "latest"
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
+# ni - use the right package manager
+"npm:@antfu/ni" = "latest"
+
 # python - Python runtime
 python = "3.12"
 
