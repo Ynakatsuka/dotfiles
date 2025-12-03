@@ -14,6 +14,9 @@ gemini-cli = "latest"
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
+# bun - Bun package manager
+bun = "latest"
+
 # ni - use the right package manager
 "npm:@antfu/ni" = "latest"
 
