@@ -62,6 +62,9 @@ fzf = "latest"
 # ghq - 
 ghq = "latest"
 
+# gopls - Go language server
+"go:golang.org/x/tools/gopls" = { version = "latest" }
+
 [settings]
 # Always use the latest version when running `mise up`
 always_keep_download = false
