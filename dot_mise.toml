@@ -66,6 +66,7 @@ ghq = "latest"
 "go:golang.org/x/tools/gopls" = { version = "latest" }
 
 [settings]
+experimental = true
 # Always use the latest version when running `mise up`
 always_keep_download = false
 always_keep_install = false
