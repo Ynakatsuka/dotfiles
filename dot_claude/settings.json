@@ -29,6 +29,5 @@
   },
   "alwaysThinkingEnabled": false,
   "defaultMode": "acceptEdits",
-  "dangerously-skip-permissions": true,
-  "model": "sonnet[1m]"
+  "dangerously-skip-permissions": true
 }
