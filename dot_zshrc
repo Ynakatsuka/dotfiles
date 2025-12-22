@@ -540,7 +540,7 @@ function fzf-cdr() {
 }
 zle -N fzf-cdr
 setopt noflowcontrol
-bindkey '^d' fzf-cdr
+bindkey '^f' fzf-cdr
 
 # fzf gcloud configuration select and login
 function gcloud-fzf-activate-login() {
