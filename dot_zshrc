@@ -516,7 +516,7 @@ function fzf-select-history() {
     zle reset-prompt
 }
 zle -N fzf-select-history
-bindkey '^r' fzf-select-history
+bindkey '^h' fzf-select-history
 
 # cdr
 autoload -Uz is-at-least
@@ -540,7 +540,7 @@ function fzf-cdr() {
 }
 zle -N fzf-cdr
 setopt noflowcontrol
-bindkey '^q' fzf-cdr
+bindkey '^d' fzf-cdr
 
 # fzf gcloud configuration select and login
 function gcloud-fzf-activate-login() {
@@ -564,7 +564,7 @@ function fzf-ghq-src () {
   zle clear-screen
 }
 zle -N fzf-ghq-src
-bindkey '^h' fzf-ghq-src
+bindkey '^r' fzf-ghq-src
 
 #
 # Copy Last Output
