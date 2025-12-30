@@ -589,9 +589,9 @@ bindkey '^o' copy_last_output
 function cl() {
     git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     if [ -f "$git_root/.claude/mcp.json" ]; then
-        claude --mcp-config="$git_root/.claude/mcp.json" "$@" "--dangerously-skip-permissions"
+        ENABLE_TOOL_SEARCH=true claude --mcp-config="$git_root/.claude/mcp.json" "$@" "--dangerously-skip-permissions"
     else
-        claude "$@" "--dangerously-skip-permissions"
+        ENABLE_TOOL_SEARCH=true claude "$@" "--dangerously-skip-permissions"
     fi
 }
 
