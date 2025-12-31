@@ -65,6 +65,9 @@ ghq = "latest"
 # gopls - Go language server
 "go:golang.org/x/tools/gopls" = { version = "latest" }
 
+# sdf - SDF CLI
+"npm:sdf-labs/sdf-cli" = { exe = "sdf" }
+
 [settings]
 experimental = true
 # Always use the latest version when running `mise up`
