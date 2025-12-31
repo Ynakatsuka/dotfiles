@@ -66,7 +66,7 @@ ghq = "latest"
 "go:golang.org/x/tools/gopls" = { version = "latest" }
 
 # sdf - SDF CLI
-"ubi:sdf-labs/sdf-cli" = "latest"
+"ubi:sdf-labs/sdf-cli" = { version = "latest", matching = "sdf-*.tar.gz", exe = "sdf" }
 
 [settings]
 experimental = true
