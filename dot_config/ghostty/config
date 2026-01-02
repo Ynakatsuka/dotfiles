@@ -13,6 +13,11 @@ window-padding-x = 2
 window-padding-y = 2
 window-padding-balance = true
 
+# Quick Terminal (Hotkey window)
+# Toggle with Cmd + Space (requires disabling Spotlight hotkey)
+quick-terminal = true
+macos-titlebar-style = hidden
+
 # Theme and colors (iTerm2 default colors)
 background = 000000
 foreground = ffffff
@@ -47,6 +52,8 @@ cursor-style-blink = false
 mouse-hide-while-typing = true
 
 # Keybindings
+# Command + Space for Quick Terminal toggle
+keybind = super+space=toggle_quick_terminal
 # Command + T for new tab
 keybind = super+t=new_tab
 # Command + W for close tab
