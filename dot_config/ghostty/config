@@ -1,0 +1,73 @@
+# Ghostty Configuration
+# Migrated from iTerm2
+
+# Font configuration
+font-family = Monaco
+font-size = 12
+
+# Terminal type
+term = xterm-256color
+
+# Window settings
+window-padding-x = 2
+window-padding-y = 2
+window-padding-balance = true
+
+# Theme and colors (iTerm2 default colors)
+background = 000000
+foreground = ffffff
+
+# ANSI colors (from iTerm2)
+palette = 0=#000000
+palette = 1=#bb0000
+palette = 2=#00bb00
+palette = 3=#bbbb00
+palette = 4=#0000bb
+palette = 5=#bb00bb
+palette = 6=#00bbbb
+palette = 7=#bbbbbb
+palette = 8=#555555
+palette = 9=#ff5555
+palette = 10=#55ff55
+palette = 11=#ffff55
+palette = 12=#5555ff
+palette = 13=#ff55ff
+palette = 14=#55ffff
+palette = 15=#ffffff
+
+# Shell integration
+shell-integration = detect
+shell-integration-features = true
+
+# Cursor
+cursor-style = block
+cursor-style-blink = false
+
+# Mouse
+mouse-hide-while-typing = true
+
+# Keybindings
+# Command + T for new tab
+keybind = super+t=new_tab
+# Command + W for close tab
+keybind = super+w=close_surface
+# Command + N for new window
+keybind = super+n=new_window
+# Command + Number for tab switching
+keybind = super+1=goto_tab:1
+keybind = super+2=goto_tab:2
+keybind = super+3=goto_tab:3
+keybind = super+4=goto_tab:4
+keybind = super+5=goto_tab:5
+keybind = super+6=goto_tab:6
+keybind = super+7=goto_tab:7
+keybind = super+8=goto_tab:8
+keybind = super+9=goto_tab:9
+
+# Clipboard
+clipboard-read = allow
+clipboard-write = allow
+clipboard-paste-protection = false
+
+# Performance
+resize-overlay = never
