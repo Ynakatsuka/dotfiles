@@ -155,7 +155,7 @@ local function getExternalScreen()
     return nil
 end
 
--- Get the first usable window for an application
+-- Get the first usable window for an application (only on current space)
 local function getAppWindow(app, shouldCreateWindow)
     if not app then
         return nil
@@ -164,6 +164,22 @@ local function getAppWindow(app, shouldCreateWindow)
     -- First, check if the app has any windows at all
     local windows = app:allWindows()
     print(string.format("    App has %d total windows", #windows))
+
+    -- Filter to only windows on current space
+    local windowsOnCurrentSpace = {}
+    for _, win in ipairs(windows) do
+        local spaces = hs.spaces.windowSpaces(win:id())
+        local currentSpace = hs.spaces.focusedSpace()
+        for _, spaceId in ipairs(spaces) do
+            if spaceId == currentSpace then
+                table.insert(windowsOnCurrentSpace, win)
+                break
+            end
+        end
+    end
+
+    print(string.format("    Windows on current space: %d", #windowsOnCurrentSpace))
+    windows = windowsOnCurrentSpace
 
     -- If no windows and we should create one, try to create a new window
     if #windows == 0 and shouldCreateWindow then
@@ -306,28 +322,33 @@ local function layoutExternalDisplay()
         }
     }
 
-    -- Apply layouts
+    -- Apply layouts in parallel
+    local tasks = {}
     for appName, rect in pairs(layouts) do
-        print(string.format("Attempting to position: %s", appName))
-        local app = hs.application.get(appName)
-        if app then
-            print(string.format("  Found app: %s", appName))
-            local window = getAppWindow(app, true) -- true = should create window if missing
-            if window then
-                print(string.format("  Found window for %s", appName))
-                print(string.format("  Setting frame: x=%d, y=%d, w=%d, h=%d",
-                    math.floor(rect.x), math.floor(rect.y),
-                    math.floor(rect.w), math.floor(rect.h)))
-                window:setFrame(rect, 0)
-                hs.alert.show(string.format("Positioned %s", appName))
+        table.insert(tasks, function()
+            print(string.format("Attempting to position: %s", appName))
+            local app = hs.application.get(appName)
+            if app then
+                print(string.format("  Found app: %s", appName))
+                local window = getAppWindow(app, false) -- false = don't create window for speed
+                if window then
+                    print(string.format("  Found window for %s", appName))
+                    print(string.format("  Setting frame: x=%d, y=%d, w=%d, h=%d",
+                        math.floor(rect.x), math.floor(rect.y),
+                        math.floor(rect.w), math.floor(rect.h)))
+                    window:setFrame(rect, 0)
+                else
+                    print(string.format("  Failed to get window for %s", appName))
+                end
             else
-                print(string.format("  Failed to get window for %s", appName))
-                hs.alert.show(string.format("%s: Could not get window", appName))
+                print(string.format("  %s is not running", appName))
             end
-        else
-            print(string.format("  %s is not running", appName))
-            hs.alert.show(string.format("%s is not running", appName))
-        end
+        end)
+    end
+
+    -- Execute all positioning tasks in parallel
+    for _, task in ipairs(tasks) do
+        task()
     end
 end
 
@@ -339,22 +360,21 @@ local function layoutBuiltInDisplay()
 
     local topHeight = frame.h * builtInLayout.topHeight
 
-    -- Position apps that use top 10% (Sublime Text, ghostty)
+    -- Position apps that use top 20% (Sublime Text, ghostty)
     for _, appName in ipairs(builtInLayout.topApps) do
-        print(string.format("Attempting to position (top 10%%): %s", appName))
+        print(string.format("Attempting to position (top 20%%): %s", appName))
         local app = hs.application.get(appName)
         if app then
             print(string.format("  Found app: %s", appName))
-            local window = getAppWindow(app, true) -- true = should create window if missing
+            local window = getAppWindow(app, false) -- false = don't create window for speed
             if window then
-                print(string.format("  Found window, positioning to top 10%%..."))
+                print(string.format("  Found window, positioning to top 20%%..."))
                 window:setFrame({
                     x = frame.x,
                     y = frame.y,
                     w = frame.w,
                     h = topHeight
                 }, 0)
-                hs.alert.show(string.format("Positioned %s (top 10%%)", appName))
             else
                 print(string.format("  Failed to get window for %s", appName))
             end
@@ -369,7 +389,7 @@ local function layoutBuiltInDisplay()
         local app = hs.application.get(appName)
         if app then
             print(string.format("  Found app: %s", appName))
-            local window = getAppWindow(app, true) -- true = should create window if missing
+            local window = getAppWindow(app, false) -- false = don't create window for speed
             if window and window:screen() == builtInScreen then
                 print(string.format("  Positioning %s to fullscreen", appName))
                 window:setFrame({
@@ -378,7 +398,6 @@ local function layoutBuiltInDisplay()
                     w = frame.w,
                     h = frame.h
                 }, 0)
-                hs.alert.show(string.format("Positioned %s (fullscreen)", appName))
             else
                 if not window then
                     print(string.format("  Failed to get window for %s", appName))
