@@ -97,6 +97,25 @@ mise up && \
 mise cache clean
 """
 
+[tasks.brew-update]
+description = "Update Homebrew and all installed packages"
+run = """
+brew update && \
+brew upgrade && \
+brew upgrade --cask
+"""
+
+[tasks.brew-cleanup]
+description = "Clean up Homebrew cache and old versions"
+run = """
+brew cleanup -s && \
+brew autoremove
+"""
+
+[tasks.brew-maintenance]
+description = "Run Homebrew update and cleanup"
+depends = ["brew-update", "brew-cleanup"]
+
 [tasks.workspace]
 description = "Start all development servers"
 depends = ["claude-viewer", "vibe-kanban"]
