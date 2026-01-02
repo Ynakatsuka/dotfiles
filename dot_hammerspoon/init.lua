@@ -77,7 +77,6 @@ local function isExternalDisplayConnected()
                      string.find(name, "LG") or
                      string.find(name, "Dell") or
                      string.find(name, "ASUS")) then
-            print(string.format("Single external display detected: %s", name))
             return true
         end
     end
@@ -127,7 +126,6 @@ local function getExternalScreen()
                      string.find(name, "LG") or
                      string.find(name, "Dell") or
                      string.find(name, "ASUS")) then
-            print(string.format("Using external display in clamshell mode: %s", name))
             return screen
         end
         return nil
@@ -155,134 +153,39 @@ local function getExternalScreen()
     return nil
 end
 
--- Get the first usable window for an application (only on current space)
-local function getAppWindow(app, shouldCreateWindow)
+-- Get all usable windows for an application
+local function getAppWindows(app)
     if not app then
-        return nil
+        return {}
     end
 
-    -- First, check if the app has any windows at all
     local windows = app:allWindows()
-    print(string.format("    App has %d total windows", #windows))
-
-    -- Filter to only windows on current space
-    local windowsOnCurrentSpace = {}
-    for _, win in ipairs(windows) do
-        local spaces = hs.spaces.windowSpaces(win:id())
-        local currentSpace = hs.spaces.focusedSpace()
-        for _, spaceId in ipairs(spaces) do
-            if spaceId == currentSpace then
-                table.insert(windowsOnCurrentSpace, win)
-                break
-            end
-        end
+    if #windows == 0 then
+        return {}
     end
 
-    print(string.format("    Windows on current space: %d", #windowsOnCurrentSpace))
-    windows = windowsOnCurrentSpace
-
-    -- If no windows and we should create one, try to create a new window
-    if #windows == 0 and shouldCreateWindow then
-        print("    No windows found, attempting to create one...")
-        app:activate(true) -- bring all windows forward
-        hs.timer.usleep(300000) -- 300ms
-
-        -- Try Cmd+N to create new window
-        hs.eventtap.keyStroke({"cmd"}, "n", 0, app)
-        hs.timer.usleep(800000) -- 800ms - wait for window creation
-
-        -- Refresh windows list
-        windows = app:allWindows()
-        print(string.format("    After Cmd+N: %d windows", #windows))
-
-        if #windows == 0 then
-            print("    Still no windows, giving up")
-            return nil
-        end
-    end
-
-    -- Now try to find and prepare a window
-    -- First, activate and unhide the app
+    -- Activate and unhide the app
     app:activate(true)
     app:unhide()
-    hs.timer.usleep(200000) -- 200ms
 
-    -- Try mainWindow first
-    local window = app:mainWindow()
-    if window then
-        print("    Found mainWindow")
-        if window:isMinimized() then
-            print("    Unminimizing mainWindow")
-            window:unminimize()
-        end
-        return window
-    end
-
-    -- Try focused window
-    local focusedWindow = app:focusedWindow()
-    if focusedWindow then
-        print("    Found focusedWindow")
-        if focusedWindow:isMinimized() then
-            print("    Unminimizing focusedWindow")
-            focusedWindow:unminimize()
-        end
-        return focusedWindow
-    end
-
-    -- Try all windows
-    for i, win in ipairs(windows) do
-        print(string.format("    Checking window %d: isMinimized=%s, isStandard=%s", i, tostring(win:isMinimized()), tostring(win:isStandard())))
-        if win:isMinimized() then
-            win:unminimize()
-            hs.timer.usleep(100000)
-        end
-        if win:isStandard() then
-            print(string.format("    Using window %d", i))
-            return win
-        end
-    end
-
-    -- Last resort: return first window
-    if #windows > 0 then
-        print("    Using first available window")
-        local win = windows[1]
+    -- Unminimize all windows
+    for _, win in ipairs(windows) do
         if win:isMinimized() then
             win:unminimize()
         end
-        return win
     end
 
-    print("    No usable window found")
-    return nil
-end
-
--- Debug function to show running applications
-local function showRunningApps()
-    local runningApps = hs.application.runningApplications()
-    local appNames = {}
-    for _, app in ipairs(runningApps) do
-        local window = getAppWindow(app, false) -- false = don't create window, just check
-        if window then
-            table.insert(appNames, app:name())
-        end
-    end
-    hs.alert.show("Running apps with windows:\n" .. table.concat(appNames, "\n"))
-    print("Running applications with windows:")
-    for _, name in ipairs(appNames) do
-        print("  - " .. name)
-    end
+    return windows
 end
 
 -- Layout configuration for external display (4-split)
 local function layoutExternalDisplay()
     local externalScreen = getExternalScreen()
     if not externalScreen then
-        hs.alert.show("No external display detected")
         return
     end
 
     local frame = externalScreen:frame()
-    print(string.format("External display frame: x=%d, y=%d, w=%d, h=%d", frame.x, frame.y, frame.w, frame.h))
 
     -- Calculate dimensions based on configuration
     local leftWidth = frame.w * externalLayout.leftWidth
@@ -322,33 +225,15 @@ local function layoutExternalDisplay()
         }
     }
 
-    -- Apply layouts in parallel
-    local tasks = {}
+    -- Apply layouts to all windows
     for appName, rect in pairs(layouts) do
-        table.insert(tasks, function()
-            print(string.format("Attempting to position: %s", appName))
-            local app = hs.application.get(appName)
-            if app then
-                print(string.format("  Found app: %s", appName))
-                local window = getAppWindow(app, false) -- false = don't create window for speed
-                if window then
-                    print(string.format("  Found window for %s", appName))
-                    print(string.format("  Setting frame: x=%d, y=%d, w=%d, h=%d",
-                        math.floor(rect.x), math.floor(rect.y),
-                        math.floor(rect.w), math.floor(rect.h)))
-                    window:setFrame(rect, 0)
-                else
-                    print(string.format("  Failed to get window for %s", appName))
-                end
-            else
-                print(string.format("  %s is not running", appName))
+        local app = hs.application.get(appName)
+        if app then
+            local windows = getAppWindows(app)
+            for _, window in ipairs(windows) do
+                window:setFrame(rect, 0)
             end
-        end)
-    end
-
-    -- Execute all positioning tasks in parallel
-    for _, task in ipairs(tasks) do
-        task()
+        end
     end
 end
 
@@ -356,150 +241,68 @@ end
 local function layoutBuiltInDisplay()
     local builtInScreen = getBuiltInScreen()
     local frame = builtInScreen:frame()
-    print(string.format("Built-in display frame: x=%d, y=%d, w=%d, h=%d", frame.x, frame.y, frame.w, frame.h))
-
     local topHeight = frame.h * builtInLayout.topHeight
 
     -- Position apps that use top 20% (Sublime Text, ghostty)
     for _, appName in ipairs(builtInLayout.topApps) do
-        print(string.format("Attempting to position (top 20%%): %s", appName))
         local app = hs.application.get(appName)
         if app then
-            print(string.format("  Found app: %s", appName))
-            local window = getAppWindow(app, false) -- false = don't create window for speed
-            if window then
-                print(string.format("  Found window, positioning to top 20%%..."))
+            local windows = getAppWindows(app)
+            for _, window in ipairs(windows) do
                 window:setFrame({
                     x = frame.x,
                     y = frame.y,
                     w = frame.w,
                     h = topHeight
                 }, 0)
-            else
-                print(string.format("  Failed to get window for %s", appName))
             end
-        else
-            print(string.format("  %s is not running", appName))
         end
     end
 
     -- Position apps that use fullscreen (Chrome, Cursor)
     for _, appName in ipairs(builtInLayout.fullscreenApps) do
-        print(string.format("Attempting to position (fullscreen): %s", appName))
         local app = hs.application.get(appName)
         if app then
-            print(string.format("  Found app: %s", appName))
-            local window = getAppWindow(app, false) -- false = don't create window for speed
-            if window and window:screen() == builtInScreen then
-                print(string.format("  Positioning %s to fullscreen", appName))
-                window:setFrame({
-                    x = frame.x,
-                    y = frame.y,
-                    w = frame.w,
-                    h = frame.h
-                }, 0)
-            else
-                if not window then
-                    print(string.format("  Failed to get window for %s", appName))
-                else
-                    print(string.format("  %s is not on built-in display", appName))
+            local windows = getAppWindows(app)
+            for _, window in ipairs(windows) do
+                if window:screen() == builtInScreen then
+                    window:setFrame({
+                        x = frame.x,
+                        y = frame.y,
+                        w = frame.w,
+                        h = frame.h
+                    }, 0)
                 end
             end
-        else
-            print(string.format("  %s is not running", appName))
         end
     end
 end
 
 -- Smart layout: applies the correct layout based on display configuration
 local function smartLayout()
-    print("Checking display configuration...")
-    local screenCount = #hs.screen.allScreens()
-    print(string.format("Number of screens detected: %d", screenCount))
-
     if isExternalDisplayConnected() then
-        print("External display detected, applying external layout")
-        hs.alert.show("Applying external display layout")
         layoutExternalDisplay()
     else
-        print("No external display, applying built-in layout")
-        hs.alert.show("Applying built-in display layout")
         layoutBuiltInDisplay()
     end
 end
 
 -- Bind hotkeys
 hs.hotkey.bind(hyper, "H", function()
-    print("=== Smart Layout triggered ===")
     smartLayout()
 end)
 
--- Separate hotkeys for each display
 hs.hotkey.bind(hyper, "E", function()
-    print("=== External Display Layout triggered ===")
     layoutExternalDisplay()
 end)
 
 hs.hotkey.bind(hyper, "I", function()
-    print("=== Built-in Display Layout triggered ===")
     layoutBuiltInDisplay()
 end)
 
--- Debug hotkey to show running apps
-hs.hotkey.bind(hyper, "D", function()
-    print("=== Debug: Showing running apps ===")
-    showRunningApps()
+-- Watch for display changes and auto-apply layout
+local displayWatcherObj = hs.screen.watcher.new(function()
+    -- Auto-apply layout when displays change
+    smartLayout()
 end)
-
--- Test hotkey to check display information
-hs.hotkey.bind(hyper, "T", function()
-    print("=== Test: Checking Display Information ===")
-
-    local screens = hs.screen.allScreens()
-    print(string.format("Total screens detected: %d", #screens))
-
-    for i, screen in ipairs(screens) do
-        print(string.format("\nScreen %d:", i))
-        print(string.format("  Name: %s", screen:name() or "unknown"))
-        local mode = screen:currentMode()
-        print(string.format("  Resolution: %dx%d", mode.w, mode.h))
-        local frame = screen:frame()
-        print(string.format("  Frame: x=%d, y=%d, w=%d, h=%d", frame.x, frame.y, frame.w, frame.h))
-        local uuid = screen:getUUID()
-        print(string.format("  UUID: %s", uuid or "none"))
-
-        -- Check if this is the primary screen
-        local primary = hs.screen.primaryScreen()
-        if screen == primary then
-            print("  ** This is the PRIMARY screen **")
-        end
-    end
-
-    print("\n=== Checking external display detection ===")
-    if isExternalDisplayConnected() then
-        print("External display detected: YES")
-        local ext = getExternalScreen()
-        if ext then
-            print(string.format("External screen name: %s", ext:name() or "unknown"))
-        end
-    else
-        print("External display detected: NO")
-    end
-end)
-
--- Watch for display changes
-local function displayWatcher()
-    hs.alert.show("Display configuration changed")
-    -- Optionally, auto-apply layout when displays change
-    -- smartLayout()
-end
-
-local displayWatcherObj = hs.screen.watcher.new(displayWatcher)
 displayWatcherObj:start()
-
--- Notification
-hs.alert.show("Hammerspoon config loaded")
-hs.notify.new({
-    title = "Hammerspoon",
-    informativeText = "Window management hotkeys:\n⌥⌃H - Smart layout\n⌥⌃E - External display layout\n⌥⌃I - Built-in display layout\n⌥⌃D - Debug (show running apps)\n⌥⌃T - Test display detection"
-}):send()
