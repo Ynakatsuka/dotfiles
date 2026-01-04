@@ -300,9 +300,9 @@ hs.hotkey.bind(hyper, "I", function()
     layoutBuiltInDisplay()
 end)
 
--- Watch for display changes and auto-apply layout
-local displayWatcherObj = hs.screen.watcher.new(function()
-    -- Auto-apply layout when displays change
-    smartLayout()
-end)
-displayWatcherObj:start()
+-- Watch for display changes (auto-apply disabled)
+-- To apply layout manually, use: Alt+Ctrl+H
+-- local displayWatcherObj = hs.screen.watcher.new(function()
+--     smartLayout()
+-- end)
+-- displayWatcherObj:start()
