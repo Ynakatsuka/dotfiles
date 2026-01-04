@@ -32,7 +32,7 @@ local externalLayout = {
 -- Most apps: fullscreen
 -- Sublime Text & ghostty: top 20%
 local builtInLayout = {
-    topHeight = 0.2,  -- Top area for Sublime Text and ghostty: 20%
+    topHeight = 0.4,  -- Top area for Sublime Text and ghostty: 20%
 
     -- Applications that use top 20%
     topApps = {
