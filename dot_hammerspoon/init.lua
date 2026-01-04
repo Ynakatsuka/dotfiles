@@ -30,17 +30,14 @@ local externalLayout = {
 
 -- Built-in Display Layout
 -- Most apps: fullscreen
--- Sublime Text & ghostty: top 20%
 local builtInLayout = {
-    topHeight = 0.4,  -- Top area for Sublime Text and ghostty: 20%
+    topHeight = 0.4,
 
-    -- Applications that use top 20%
     topApps = {
         "Sublime Text",
         "ghostty"
     },
 
-    -- Applications that use fullscreen (everything else)
     fullscreenApps = {
         "Google Chrome",
         "Cursor"
@@ -299,10 +296,3 @@ end)
 hs.hotkey.bind(hyper, "I", function()
     layoutBuiltInDisplay()
 end)
-
--- Watch for display changes (auto-apply disabled)
--- To apply layout manually, use: Alt+Ctrl+H
--- local displayWatcherObj = hs.screen.watcher.new(function()
---     smartLayout()
--- end)
--- displayWatcherObj:start()
