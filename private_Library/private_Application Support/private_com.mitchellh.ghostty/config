@@ -52,12 +52,6 @@ cursor-style-blink = false
 mouse-hide-while-typing = true
 
 # Keybindings
-# Command + T for new tab
-keybind = super+t=new_tab
-# Command + W for close tab
-keybind = super+w=close_surface
-# Command + N for new window
-keybind = super+n=new_window
 # Command + Number for tab switching
 keybind = super+1=goto_tab:1
 keybind = super+2=goto_tab:2
