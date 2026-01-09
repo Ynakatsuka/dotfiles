@@ -18,8 +18,8 @@ local externalLayout = {
     -- Split ratios
     leftWidth = 0.45,  -- Left side: 45%
     rightWidth = 0.55, -- Right side: 55%
-    topHeight = 0.4,   -- Top area: 20%
-    bottomHeight = 0.6, -- Bottom area: 80%
+    topHeight = 0.25,   -- Top area: 25%
+    bottomHeight = 0.75, -- Bottom area: 75%
 
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
@@ -31,7 +31,7 @@ local externalLayout = {
 -- Built-in Display Layout
 -- Most apps: fullscreen
 local builtInLayout = {
-    topHeight = 0.5,
+    topHeight = 0.4,
 
     topApps = {
         "Sublime Text",
