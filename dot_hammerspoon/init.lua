@@ -13,13 +13,16 @@ local hyper = {"alt", "ctrl"}
 
 -- External Display Layout (4-split configuration)
 -- Left: 45% | Right: 55%
--- Each side: Top 20% | Bottom 80%
+-- Left side: Top 20% | Bottom 80%
+-- Right side: Top 25% | Bottom 75%
 local externalLayout = {
     -- Split ratios
     leftWidth = 0.45,  -- Left side: 45%
     rightWidth = 0.55, -- Right side: 55%
-    topHeight = 0.25,   -- Top area: 25%
-    bottomHeight = 0.75, -- Bottom area: 75%
+    leftTopHeight = 0.2,     -- Left top area: 20%
+    leftBottomHeight = 0.8,  -- Left bottom area: 80%
+    rightTopHeight = 0.25,   -- Right top area: 25%
+    rightBottomHeight = 0.75, -- Right bottom area: 75%
 
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
@@ -187,38 +190,40 @@ local function layoutExternalDisplay()
     -- Calculate dimensions based on configuration
     local leftWidth = frame.w * externalLayout.leftWidth
     local rightWidth = frame.w * externalLayout.rightWidth
-    local topHeight = frame.h * externalLayout.topHeight
-    local bottomHeight = frame.h * externalLayout.bottomHeight
+    local leftTopHeight = frame.h * externalLayout.leftTopHeight
+    local leftBottomHeight = frame.h * externalLayout.leftBottomHeight
+    local rightTopHeight = frame.h * externalLayout.rightTopHeight
+    local rightBottomHeight = frame.h * externalLayout.rightBottomHeight
 
     -- Define 4-split layout positions
     local layouts = {
-        -- Left top: Sublime Text (40% x 10%)
+        -- Left top: Sublime Text
         [externalLayout.leftTop] = {
             x = frame.x,
             y = frame.y,
             w = leftWidth,
-            h = topHeight
+            h = leftTopHeight
         },
-        -- Left bottom: Chrome (40% x 90%)
+        -- Left bottom: Chrome
         [externalLayout.leftBottom] = {
             x = frame.x,
-            y = frame.y + topHeight,
+            y = frame.y + leftTopHeight,
             w = leftWidth,
-            h = bottomHeight
+            h = leftBottomHeight
         },
-        -- Right top: ghostty (60% x 10%)
+        -- Right top: ghostty
         [externalLayout.rightTop] = {
             x = frame.x + leftWidth,
             y = frame.y,
             w = rightWidth,
-            h = topHeight
+            h = rightTopHeight
         },
-        -- Right bottom: Cursor (60% x 90%)
+        -- Right bottom: Cursor
         [externalLayout.rightBottom] = {
             x = frame.x + leftWidth,
-            y = frame.y + topHeight,
+            y = frame.y + rightTopHeight,
             w = rightWidth,
-            h = bottomHeight
+            h = rightBottomHeight
         }
     }
 
