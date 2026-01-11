@@ -10,87 +10,152 @@ make -C bootstrap macos-dotfiles
 make -C bootstrap linux-dotfiles
 ```
 
-## その他
+## Commands & Shortcuts
 
-### 管理ファイルの確認
+### Zsh Keybindings
 
-```
-chezmoi managed
-```
+| Keybinding | Description |
+|------------|-------------|
+| `Ctrl+H` | FZF history search |
+| `Ctrl+F` | FZF recent directory navigation (cdr) |
+| `Ctrl+G` | GCloud configuration selector with login |
+| `Ctrl+R` | FZF ghq repository search |
+| `Ctrl+O` | Copy last command output to clipboard |
 
-### 管理ファイルの追加
+### Hammerspoon Window Management
 
-```
-chezmoi add README.md
-```
+| Keybinding | Description |
+|------------|-------------|
+| `Alt+Ctrl+H` | Smart layout (auto-detect display type) |
+| `Alt+Ctrl+E` | Force external display layout (4-split) |
+| `Alt+Ctrl+I` | Force built-in display layout |
 
-### 管理ファイルの削除
+**External Display Layout:**
+- Left 45%: Sublime Text (top 20%) / Chrome (bottom 80%)
+- Right 55%: ghostty (top 25%) / Cursor (bottom 75%)
 
-```
-chezmoi forget README.md
-```
+**Built-in Display Layout:**
+- Top 40%: Sublime Text, ghostty
+- Fullscreen: Chrome, Cursor
 
-### ファイルの編集
+### Git Aliases
 
-```
-chezmoi edit README.md
-```
+| Alias | Command |
+|-------|---------|
+| `st` | `git status` |
+| `ch` | `git checkout` |
+| `chb` | `git checkout -b` |
+| `ps` | `git push` |
+| `pl` | `git pull` |
+| `ft` | `git fetch` |
+| `cm` | `git commit` |
+| `br` | `git branch` |
+| `lb` | Select branch with FZF |
 
-### ファイルの編集後、変更を反映する場合
+### Git Worktree Management
 
-```
-chezmoi apply -v
-```
+| Command | Description |
+|---------|-------------|
+| `gw` | Smart worktree manager (create/switch with FZF) |
+| `gw <branch>` | Create or switch to worktree for branch |
+| `gwc` | Cleanup worktrees (FZF multi-select) |
+| `gwt` | `git worktree` |
+| `gwta` | `git worktree add` |
+| `gwtl` | `git worktree list` |
+| `gwtr` | `git worktree remove` |
 
-### リポジトリへ移動する場合
+### Docker Aliases
 
-```
-chezmoi cd
-```
+| Alias | Command |
+|-------|---------|
+| `dc` | `docker compose` |
+| `dcps` | `docker compose ps` |
+| `dcud` | `docker compose up -d` |
+| `dcudb` | `docker compose up -d --build` |
+| `dcudf` | `docker compose up -d --force-recreate` |
+| `dce` | `docker compose exec` (auto-select service) |
+| `dcl` | `docker compose logs` |
+| `dcd` | `docker compose down` |
+| `de` | Interactive docker exec with FZF |
 
-### 最新のリモートリポジトリを反映する場合
+### GCloud Aliases
 
-```
-chezmoi update -v
-```
+| Alias | Command |
+|-------|---------|
+| `gca` | `gcloud config configurations activate` |
+| `gcl` | `gcloud config configurations list` |
+| `gal` | `gcloud auth application-default login` |
+| `gcsp` | `gcloud config set project` |
 
-### 全ファイルの強制同期
+### Claude Code
 
-```
+| Command | Description |
+|---------|-------------|
+| `cl` | Launch Claude Code with MCP config (auto-detect) |
+
+### Tmux
+
+Default prefix: `Ctrl+b`
+
+| Keybinding | Description |
+|------------|-------------|
+| `prefix + I` | Install plugins (TPM) |
+
+Installed plugins:
+- `tmux-plugins/tpm` - Plugin manager
+- `tmux-plugins/tmux-sensible` - Sensible defaults
+- `Morantron/tmux-fingers` - Copy text with hints
+
+## Chezmoi Usage
+
+### Basic Operations
+
+| Command | Description |
+|---------|-------------|
+| `chezmoi managed` | List managed files |
+| `chezmoi add <file>` | Add file to management |
+| `chezmoi forget <file>` | Remove file from management |
+| `chezmoi edit <file>` | Edit a managed file |
+| `chezmoi apply -v` | Apply changes |
+| `chezmoi cd` | Go to chezmoi source directory |
+| `chezmoi update -v` | Pull and apply remote changes |
+
+### Force Sync
+
+```bash
 chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 ```
 
-### 再読み込みをする場合
+### Reload Configs
 
-```
-source $HOME/.bashrc
+```bash
 source $HOME/.zshrc
 tmux source $HOME/.tmux.conf
 ```
 
 ## Other Dependencies
 
-### bash-completion
+### bash-completion (Ubuntu)
 
-```
+```bash
 sudo apt-get update && sudo apt-get install -y bash-completion
 ```
 
 ## Other Tricks
 
-shell を変更
+### Change Default Shell
 
-```
+```bash
 chsh -s $(which zsh)
 ```
 
-tmux の設定の反映
+### Reload Tmux Config
 
-```
+```bash
 tmux source ~/.tmux.conf
 ```
 
-then, `prefix + I`
+Then press `prefix + I` to install plugins.
 
 ## Bootstrap (Linux/macOS)
 
