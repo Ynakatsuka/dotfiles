@@ -153,7 +153,7 @@ local function getExternalScreen()
     return nil
 end
 
--- Get all usable windows for an application
+-- Get all usable windows for an application (excludes minimized windows)
 local function getAppWindows(app)
     if not app then
         return {}
@@ -164,18 +164,20 @@ local function getAppWindows(app)
         return {}
     end
 
-    -- Activate and unhide the app
-    app:activate(true)
-    app:unhide()
-
-    -- Unminimize all windows
+    -- Filter out minimized windows - keep them minimized
+    local usableWindows = {}
     for _, win in ipairs(windows) do
-        if win:isMinimized() then
-            win:unminimize()
+        if not win:isMinimized() then
+            table.insert(usableWindows, win)
         end
     end
 
-    return windows
+    -- Only activate if there are usable (non-minimized) windows
+    if #usableWindows > 0 then
+        app:unhide()
+    end
+
+    return usableWindows
 end
 
 -- Layout configuration for external display (4-split)
