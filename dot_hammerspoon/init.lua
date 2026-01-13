@@ -153,28 +153,21 @@ local function getExternalScreen()
     return nil
 end
 
--- Get all usable windows for an application (excludes minimized windows)
+-- Get all visible (non-minimized) windows for an application
 local function getAppWindows(app)
     if not app then
         return {}
     end
 
-    local windows = app:allWindows()
-    if #windows == 0 then
-        return {}
-    end
+    -- Use visibleWindows() to get only non-minimized, non-hidden windows
+    local windows = app:visibleWindows()
 
-    -- Filter out minimized windows - keep them minimized
+    -- Filter to standard windows only (exclude panels, sheets, etc.)
     local usableWindows = {}
     for _, win in ipairs(windows) do
-        if not win:isMinimized() then
+        if win:isStandard() then
             table.insert(usableWindows, win)
         end
-    end
-
-    -- Only activate if there are usable (non-minimized) windows
-    if #usableWindows > 0 then
-        app:unhide()
     end
 
     return usableWindows
