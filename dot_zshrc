@@ -595,34 +595,35 @@ function cl() {
     fi
 }
 
-# fzf Claude Code session resume
+# fzf Claude Code session resume (current directory only)
 function fzf-claude-resume() {
     local claude_projects_dir="$HOME/.claude/projects"
 
-    if [[ ! -d "$claude_projects_dir" ]]; then
-        zle -M "Claude projects directory not found"
+    # Convert current directory to Claude's project directory format
+    local current_dir="${PWD//\//-}"
+    current_dir="${current_dir#-}"
+    local project_dir="$claude_projects_dir/-$current_dir"
+
+    if [[ ! -d "$project_dir" ]]; then
+        zle -M "No Claude sessions for this directory"
         return 1
     fi
 
-    # Build session list with summary, date, and session ID
+    # Build session list (only UUID files, skip agent files)
+    # Sort by mtime (numeric), then format for display
     local sessions=$(
-        find "$claude_projects_dir" -name "*.jsonl" -type f ! -name "agent-*.jsonl" 2>/dev/null | while read -r file; do
-            local session_id=$(basename "$file" .jsonl)
-            # Skip if not a valid UUID format (use grep for portability)
-            echo "$session_id" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' || continue
+        for file in "$project_dir"/*.jsonl(N); do
+            [[ -f "$file" ]] || continue
+            local name=$(basename "$file" .jsonl)
+            [[ "$name" == agent-* ]] && continue
+            [[ ${#name} -ne 36 ]] && continue
 
-            local summary=$(head -1 "$file" 2>/dev/null | jq -r '.summary // empty' 2>/dev/null)
+            local summary=$(head -1 "$file" | jq -r '.summary // empty' 2>/dev/null)
             [[ -z "$summary" ]] && summary="(no summary)"
 
-            local mtime=$(stat -f "%m" "$file" 2>/dev/null || stat -c "%Y" "$file" 2>/dev/null)
-            local date=$(date -r "$mtime" "+%Y-%m-%d %H:%M" 2>/dev/null || date -d "@$mtime" "+%Y-%m-%d %H:%M" 2>/dev/null)
-
-            # Extract project name from parent directory
-            local project_dir=$(dirname "$file")
-            local project_name=$(basename "$project_dir" | sed 's/^-//' | tr '-' '/')
-
-            printf "%s\t%s\t%s\t%s\n" "$date" "$summary" "$project_name" "$session_id"
-        done | sort -t$'\t' -k1 -r
+            local mtime=$(stat -f "%m" "$file" 2>/dev/null)
+            printf "%s\t%s\t%s\t%s\n" "$mtime" "$(date -r "$mtime" "+%Y/%m/%d %H:%M")" "$summary" "$name"
+        done | sort -t$'\t' -k1 -nr | cut -f2-
     )
 
     if [[ -z "$sessions" ]]; then
@@ -632,15 +633,14 @@ function fzf-claude-resume() {
 
     local selected=$(echo "$sessions" | fzf \
         --prompt="Claude Session> " \
-        --height=50% \
+        --height=40% \
         --reverse \
         --delimiter=$'\t' \
-        --with-nth=1,2,3 \
-        --preview-window=hidden \
-        --header="DATE            SUMMARY                              PROJECT")
+        --with-nth=1,2 \
+        --preview-window=hidden)
 
     if [[ -n "$selected" ]]; then
-        local session_id=$(echo "$selected" | awk -F'\t' '{print $4}')
+        local session_id=$(echo "$selected" | awk -F'\t' '{print $3}')
         BUFFER="claude --resume $session_id"
         zle accept-line
     fi
