@@ -21,6 +21,7 @@ make -C bootstrap linux-dotfiles
 | `Ctrl+G` | GCloud configuration selector with login |
 | `Ctrl+R` | FZF ghq repository search |
 | `Ctrl+O` | Copy last command output to clipboard |
+| `Ctrl+L` | FZF Claude Code session resume |
 
 ### Hammerspoon Window Management
 

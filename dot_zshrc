@@ -595,6 +595,60 @@ function cl() {
     fi
 }
 
+# fzf Claude Code session resume
+function fzf-claude-resume() {
+    local claude_projects_dir="$HOME/.claude/projects"
+
+    if [[ ! -d "$claude_projects_dir" ]]; then
+        zle -M "Claude projects directory not found"
+        return 1
+    fi
+
+    # Build session list with summary, date, and session ID
+    local sessions=$(
+        find "$claude_projects_dir" -name "*.jsonl" -type f ! -name "agent-*.jsonl" 2>/dev/null | while read -r file; do
+            local session_id=$(basename "$file" .jsonl)
+            # Skip if not a valid UUID format (use grep for portability)
+            echo "$session_id" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' || continue
+
+            local summary=$(head -1 "$file" 2>/dev/null | jq -r '.summary // empty' 2>/dev/null)
+            [[ -z "$summary" ]] && summary="(no summary)"
+
+            local mtime=$(stat -f "%m" "$file" 2>/dev/null || stat -c "%Y" "$file" 2>/dev/null)
+            local date=$(date -r "$mtime" "+%Y-%m-%d %H:%M" 2>/dev/null || date -d "@$mtime" "+%Y-%m-%d %H:%M" 2>/dev/null)
+
+            # Extract project name from parent directory
+            local project_dir=$(dirname "$file")
+            local project_name=$(basename "$project_dir" | sed 's/^-//' | tr '-' '/')
+
+            printf "%s\t%s\t%s\t%s\n" "$date" "$summary" "$project_name" "$session_id"
+        done | sort -t$'\t' -k1 -r
+    )
+
+    if [[ -z "$sessions" ]]; then
+        zle -M "No Claude sessions found"
+        return 1
+    fi
+
+    local selected=$(echo "$sessions" | fzf \
+        --prompt="Claude Session> " \
+        --height=50% \
+        --reverse \
+        --delimiter=$'\t' \
+        --with-nth=1,2,3 \
+        --preview-window=hidden \
+        --header="DATE            SUMMARY                              PROJECT")
+
+    if [[ -n "$selected" ]]; then
+        local session_id=$(echo "$selected" | awk -F'\t' '{print $4}')
+        BUFFER="claude --resume $session_id"
+        zle accept-line
+    fi
+    zle reset-prompt
+}
+zle -N fzf-claude-resume
+bindkey '^l' fzf-claude-resume
+
 #
 # Path
 #
