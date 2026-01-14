@@ -9,5 +9,5 @@ font-size = 12
 term = xterm-256color
 
 # Key bindings for tab navigation
-keybind = super+left=goto_tab:-1
-keybind = super+right=goto_tab:+1
+keybind = super+left=previous_tab
+keybind = super+right=next_tab
