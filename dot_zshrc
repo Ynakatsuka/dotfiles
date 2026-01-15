@@ -78,6 +78,9 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
+# process management
+alias fkill='ps aux | fzf --height=40% --reverse | awk "{print \$2}" | xargs kill -9'
+
 # docker alias
 alias dc='docker compose'
 alias dcps='docker compose ps'
@@ -110,6 +113,10 @@ alias gwt='git worktree'
 alias gwta='git worktree add'
 alias gwtl='git worktree list'
 alias gwtr='git worktree remove'
+
+# Git utilities
+alias gco='git checkout $(git branch --sort=-committerdate | fzf --height=40% --reverse)'
+alias ghopen='gh repo view --web'
 
 #
 # Git Worktree Management
