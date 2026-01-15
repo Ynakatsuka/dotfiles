@@ -649,11 +649,11 @@ function fzf-claude-resume() {
         --reverse \
         --delimiter=$'\t' \
         --with-nth=1,2,3,4 \
-        --preview="echo {} | awk -F'\t' '{print \$5}' | xargs -I{} sh -c 'cat \"$project_dir/{}.jsonl\" | jq -r \"select(.type==\\\"user\\\") | .message.content\" 2>/dev/null | head -20'" \
+        --preview="echo {} | awk -F'\t' '{print \$4}' | xargs -I{} sh -c 'cat \"$project_dir/{}.jsonl\" | jq -r \"select(.type==\\\"user\\\") | .message.content\" 2>/dev/null | head -20'" \
         --preview-window=right:40%:wrap)
 
     if [[ -n "$selected" ]]; then
-        local session_id=$(echo "$selected" | awk -F'\t' '{print $5}')
+        local session_id=$(echo "$selected" | awk -F'\t' '{print $4}')
         BUFFER="cl -r $session_id"
         zle accept-line
     fi
