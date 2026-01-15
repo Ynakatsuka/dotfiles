@@ -620,7 +620,7 @@ function fzf-claude-resume() {
     fi
 
     # Build session list (only UUID files, skip agent files)
-    # Sort by mtime (numeric), then format for display
+    # Format: mtime \t date \t msg_count \t summary \t session_id
     local sessions=$(
         for file in "$project_dir"/*.jsonl(N); do
             [[ -f "$file" ]] || continue
@@ -631,8 +631,10 @@ function fzf-claude-resume() {
             local summary=$(head -1 "$file" | jq -r '.summary // empty' 2>/dev/null)
             [[ -z "$summary" ]] && summary="(no summary)"
 
+            local msg_count=$(grep -c '"type":"user"' "$file" 2>/dev/null || echo "0")
+
             local mtime=$(stat -f "%m" "$file" 2>/dev/null)
-            printf "%s\t%s\t%s\t%s\n" "$mtime" "$(date -r "$mtime" "+%Y/%m/%d %H:%M")" "$summary" "$name"
+            printf "%s\t%s\t%s\t%s\t%s\n" "$mtime" "$(date -r "$mtime" "+%m/%d %H:%M")" "${msg_count}msg" "$summary" "$name"
         done | sort -t$'\t' -k1 -nr | cut -f2-
     )
 
@@ -643,14 +645,15 @@ function fzf-claude-resume() {
 
     local selected=$(echo "$sessions" | fzf \
         --prompt="Claude Session> " \
-        --height=40% \
+        --height=50% \
         --reverse \
         --delimiter=$'\t' \
-        --with-nth=1,2 \
-        --preview-window=hidden)
+        --with-nth=1,2,3,4 \
+        --preview="echo {} | awk -F'\t' '{print \$5}' | xargs -I{} sh -c 'cat \"$project_dir/{}.jsonl\" | jq -r \"select(.type==\\\"user\\\") | .message.content\" 2>/dev/null | head -20'" \
+        --preview-window=right:40%:wrap)
 
     if [[ -n "$selected" ]]; then
-        local session_id=$(echo "$selected" | awk -F'\t' '{print $3}')
+        local session_id=$(echo "$selected" | awk -F'\t' '{print $5}')
         BUFFER="cl -r $session_id"
         zle accept-line
     fi
