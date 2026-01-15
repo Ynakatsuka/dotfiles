@@ -651,7 +651,7 @@ function fzf-claude-resume() {
 
     if [[ -n "$selected" ]]; then
         local session_id=$(echo "$selected" | awk -F'\t' '{print $3}')
-        BUFFER="claude --resume $session_id"
+        BUFFER="cl --resume $session_id"
         zle accept-line
     fi
     zle reset-prompt
