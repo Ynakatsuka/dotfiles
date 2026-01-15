@@ -600,12 +600,15 @@ function fzf-claude-resume() {
     local claude_projects_dir="$HOME/.claude/projects"
 
     # Convert current directory to Claude's project directory format
-    local current_dir="${PWD//\//-}"
+    # Claude replaces both '/' and '.' with '-' in project directory names
+    local current_path="$(pwd)"
+    local current_dir="${current_path//\//-}"
+    current_dir="${current_dir//./-}"
     current_dir="${current_dir#-}"
     local project_dir="$claude_projects_dir/-$current_dir"
 
     if [[ ! -d "$project_dir" ]]; then
-        zle -M "No Claude sessions for this directory"
+        zle -M "No Claude sessions for this directory: $project_dir"
         return 1
     fi
 
