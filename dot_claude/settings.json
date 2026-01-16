@@ -1,4 +1,9 @@
 {
+  "permissions": {
+    "deny": [
+      "NotebookEdit"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
