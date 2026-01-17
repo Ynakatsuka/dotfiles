@@ -59,8 +59,11 @@ gcloud = "latest"
 # fzf - Fuzzy Finder
 fzf = "latest"
 
-# ghq - 
+# ghq -
 ghq = "latest"
+
+# prek - Preview Kubernetes manifests
+prek = "latest"
 
 # gopls - Go language server
 "go:golang.org/x/tools/gopls" = { version = "latest" }
