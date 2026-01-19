@@ -34,5 +34,6 @@
   },
   "alwaysThinkingEnabled": false,
   "defaultMode": "acceptEdits",
-  "dangerously-skip-permissions": true
+  "dangerously-skip-permissions": true,
+  "plansDirectory": "./plans"
 }
