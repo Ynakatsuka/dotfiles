@@ -73,10 +73,11 @@ export LANGUAGE=en_US.UTF-8
 # Alias
 #
 
-# some more ls aliases
-alias ll='ls -alF'
-alias la='ls -A'
-alias l='ls -CF'
+# eza aliases (modern ls replacement)
+alias ll='eza --icons -al --group-directories-first'
+alias la='eza --icons -a --group-directories-first'
+alias l='eza --icons --group-directories-first'
+alias tree='eza --icons -al -T -L 2'
 
 # process management
 alias fkill='ps aux | fzf --height=40% --reverse | awk "{print \$2}" | xargs kill -9'

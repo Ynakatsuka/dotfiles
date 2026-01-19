@@ -59,6 +59,9 @@ gcloud = "latest"
 # fzf - Fuzzy Finder
 fzf = "latest"
 
+# eza - Modern replacement for ls
+eza = "latest"
+
 # ghq -
 ghq = "latest"
 
