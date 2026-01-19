@@ -11,6 +11,37 @@
 - **However, code comments, docstrings, commit messages, and README.md MUST be written in English.** This is a strict requirement.
 - **Never make commits automatically without explicit user approval.**
 
+## User Interaction Guidelines
+
+### When to Use AskUserQuestion
+
+Use the `AskUserQuestion` tool proactively in the following situations:
+
+1. **Ambiguous Instructions**: When the user's intent or requirements are unclear
+   - Vague task descriptions without specific details
+   - Instructions that could be interpreted in multiple ways
+   - Missing context that is essential for correct implementation
+
+2. **Multiple Valid Approaches**: When there are several reasonable ways to accomplish a task
+   - Different architectural patterns or design choices
+   - Trade-offs between performance, maintainability, and simplicity
+   - Technology or library selection decisions
+
+### Consolidate Questions
+
+**Always batch related questions together** to minimize back-and-forth:
+
+- At the **start of a task**, gather all necessary information upfront
+- Use a **single AskUserQuestion call with multiple questions** (up to 4) instead of asking one at a time
+- Group questions by topic or decision area
+
+### When NOT to Use AskUserQuestion
+
+- When the user has given explicit, detailed instructions
+- When there is only one reasonable approach
+- When the decision is trivial or easily reversible
+- When you can make a sensible default choice and note it in your response
+
 ## Error Handling Principles
 
 - **Never implement automatic fallbacks without explicit user approval.**
