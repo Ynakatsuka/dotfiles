@@ -65,6 +65,9 @@ eza = "latest"
 # ghq -
 ghq = "latest"
 
+# dotenvx - Environment variable management
+dotenvx = "latest"
+
 # gopls - Go language server
 "go:golang.org/x/tools/gopls" = { version = "latest" }
 
