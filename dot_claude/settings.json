@@ -1,6 +1,6 @@
 {
   "enabledPlugins": {
-    "claude-mem@thedotmack": true
+    "claude-mem@thedotmack": false
   },
   "permissions": {
     "deny": [
