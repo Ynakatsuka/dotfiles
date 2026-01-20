@@ -449,35 +449,60 @@ function gbc() {
 
     local current_branch=$(git branch --show-current)
 
-    # Get local branches (excluding current branch)
-    local branches=$(git branch --format='%(refname:short)' | grep -v "^${current_branch}$")
+    # Fetch remote to ensure we have latest remote branch info
+    git fetch --prune >/dev/null 2>&1
 
-    if [ -z "$branches" ]; then
+    # Get local branches (excluding current branch) with local/remote status
+    local branches_with_status=""
+    while read -r branch; do
+        local status=""
+        local has_local=true
+        local has_remote=false
+
+        if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            has_remote=true
+        fi
+
+        if [ "$has_local" = true ] && [ "$has_remote" = true ]; then
+            status="[L+R]"
+        else
+            status="[L]  "
+        fi
+
+        branches_with_status+="${status} ${branch}"$'\n'
+    done < <(git branch --format='%(refname:short)' | grep -v "^${current_branch}$")
+
+    branches_with_status=$(echo "$branches_with_status" | sed '/^$/d')
+
+    if [ -z "$branches_with_status" ]; then
         echo "削除可能なブランチがありません（現在のブランチ: $current_branch）"
         return 1
     fi
 
     # Select branches with fzf (multiple selection with Tab)
-    local selected_branches=$(echo "$branches" | fzf \
+    local selected_lines=$(echo "$branches_with_status" | fzf \
         -m \
         --height=60% \
         --reverse \
         --prompt="削除するブランチを選択 (Tab: 複数選択): " \
-        --header="現在のブランチ: $current_branch | Tab: 選択/解除, Enter: 確定" \
-        --preview='git log --oneline -10 {}')
+        --header="現在のブランチ: $current_branch | [L]=Local only, [L+R]=Local+Remote | Tab: 選択/解除" \
+        --preview='git log --oneline -10 $(echo {} | awk "{print \$2}")')
 
-    if [ -z "$selected_branches" ]; then
+    if [ -z "$selected_lines" ]; then
         echo "ブランチが選択されませんでした"
         return 1
     fi
+
+    # Extract branch names from selected lines (format: "[L+R] branch_name")
+    local selected_branches=$(echo "$selected_lines" | awk '{print $2}')
 
     # Count selected branches
     local branch_count=$(echo "$selected_branches" | wc -l | tr -d ' ')
 
     # Confirmation message
     echo "削除予定のブランチ (${branch_count}件):"
-    echo "$selected_branches" | while read -r branch; do
-        echo "  - $branch"
+    echo "$selected_lines" | while read -r line; do
+        echo "  $line"
     done
     echo -n "本当に削除しますか？ (y/N): "
     read confirmation
