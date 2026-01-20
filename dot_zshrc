@@ -434,6 +434,78 @@ function gwc() {
     fi
 }
 
+# Git local branch cleanup function
+function gbc() {
+    # Check if we're in a git repository
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "Error: not a git repository"
+        return 1
+    fi
+
+    local current_branch=$(git branch --show-current)
+
+    # Get local branches (excluding current branch)
+    local branches=$(git branch --format='%(refname:short)' | grep -v "^${current_branch}$")
+
+    if [ -z "$branches" ]; then
+        echo "削除可能なブランチがありません（現在のブランチ: $current_branch）"
+        return 1
+    fi
+
+    # Select branches with fzf (multiple selection with Tab)
+    local selected_branches=$(echo "$branches" | fzf \
+        -m \
+        --height=60% \
+        --reverse \
+        --prompt="削除するブランチを選択 (Tab: 複数選択): " \
+        --header="現在のブランチ: $current_branch | Tab: 選択/解除, Enter: 確定" \
+        --preview='git log --oneline -10 {}')
+
+    if [ -z "$selected_branches" ]; then
+        echo "ブランチが選択されませんでした"
+        return 1
+    fi
+
+    # Count selected branches
+    local branch_count=$(echo "$selected_branches" | wc -l | tr -d ' ')
+
+    # Confirmation message
+    echo "削除予定のブランチ (${branch_count}件):"
+    echo "$selected_branches" | while read -r branch; do
+        echo "  - $branch"
+    done
+    echo -n "本当に削除しますか？ (y/N): "
+    read confirmation
+
+    if [[ "$confirmation" =~ ^[yY]$ ]]; then
+        local success_count=0
+        local fail_count=0
+
+        echo "$selected_branches" | while read -r branch; do
+            echo ""
+            echo "ブランチを削除中: $branch"
+            if git branch -d "$branch" 2>/dev/null; then
+                echo "✅ ブランチが削除されました: $branch"
+                ((success_count++))
+            elif git branch -D "$branch" 2>/dev/null; then
+                echo "⚠️ ブランチを強制削除しました: $branch"
+                ((success_count++))
+            else
+                echo "❌ ブランチの削除に失敗しました: $branch"
+                ((fail_count++))
+            fi
+        done
+
+        echo ""
+        echo "=========================================="
+        echo "削除完了"
+        echo "=========================================="
+    else
+        echo "削除をキャンセルしました"
+        return 0
+    fi
+}
+
 #
 # Codex Integration
 #
