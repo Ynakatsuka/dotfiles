@@ -270,6 +270,11 @@ function gw() {
             echo "Error: Failed to fetch branch $branch_name from remote"
             return 1
         fi
+        # Delete local branch if exists to ensure worktree uses latest remote
+        if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+            echo "Deleting local branch to sync with remote: $branch_name"
+            git branch -D "$branch_name"
+        fi
         echo "Creating worktree for remote branch: $branch_name"
         if ! git worktree add "$worktree_dir" "$branch_name"; then
             echo "Error: Failed to create worktree for branch $branch_name"
