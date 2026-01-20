@@ -262,19 +262,10 @@ function gw() {
         fi
     fi
 
-    # 存在するブランチの場合はworktreeを作成
-    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-        # ローカルブランチが存在する場合
-        echo "Creating worktree for existing local branch: $branch_name"
-        if ! git worktree add "$worktree_dir" "$branch_name"; then
-            echo "Error: Failed to create worktree for branch $branch_name"
-            return 1
-        fi
-        cd "$worktree_dir"
-        new_worktree_created=true
-    elif git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
-        # リモートブランチのみ存在する場合、fetchしてからworktreeを作成
-        echo "Fetching remote branch: origin/$branch_name"
+    # Check remote branch first, then local branch
+    if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+        # Remote branch exists - fetch latest and create worktree
+        echo "Fetching latest remote branch: origin/$branch_name"
         if ! git fetch origin "$branch_name"; then
             echo "Error: Failed to fetch branch $branch_name from remote"
             return 1
@@ -286,7 +277,16 @@ function gw() {
         fi
         cd "$worktree_dir"
         new_worktree_created=true
-    # 存在しないブランチの場合はstagingから新しいブランチを作成
+    elif git show-ref --verify --quiet "refs/heads/$branch_name"; then
+        # Local branch only (no remote) - create worktree from local
+        echo "Creating worktree for local-only branch: $branch_name"
+        if ! git worktree add "$worktree_dir" "$branch_name"; then
+            echo "Error: Failed to create worktree for branch $branch_name"
+            return 1
+        fi
+        cd "$worktree_dir"
+        new_worktree_created=true
+    # Branch doesn't exist - create new branch from base
     else
         echo "Creating new branch '$branch_name' from $base_branch and worktree"
         if ! git worktree add -b "$branch_name" "$worktree_dir" "$base_branch"; then
