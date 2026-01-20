@@ -239,25 +239,27 @@ function gw() {
 
     local new_worktree_created=false
 
-    # 現在のブランチと同じ名前の場合はエラー（既にチェックアウト済み）
-    current_branch=$(git branch --show-current)
-    if [ "$branch_name" = "$current_branch" ]; then
-        echo "Branch '$branch_name' is already checked out in: $git_root"
-        echo "You are already on this branch. No worktree needed."
-        return 1
-    fi
-
     # ブランチが他のworktreeで既に使用されているかチェック
     local branch_worktree=$(git worktree list --porcelain | awk '/^worktree/ {wt=$2} /^branch refs\/heads\/'"$branch_name"'$/ {print wt; exit}')
     if [ -n "$branch_worktree" ]; then
-        echo "Branch '$branch_name' is already checked out in worktree: $branch_worktree"
-        echo "Changing directory to existing worktree..."
-        cd "$branch_worktree"
+        # メインリポジトリでチェックアウトされている場合はbase_branchに切り替えてworktreeを作成
+        if [ "$branch_worktree" = "$git_root" ]; then
+            echo "Branch '$branch_name' is checked out in main repository. Switching to $base_branch..."
+            if ! git checkout "$base_branch"; then
+                echo "Error: Failed to switch to $base_branch"
+                return 1
+            fi
+        else
+            # 他のworktreeで使用されている場合はそこに移動
+            echo "Branch '$branch_name' is already checked out in worktree: $branch_worktree"
+            echo "Changing directory to existing worktree..."
+            cd "$branch_worktree"
 
-        _gw_copy_env "$git_root"
-        _gw_setup_direnv
-        _gw_open_cursor
-        return 0
+            _gw_copy_env "$git_root"
+            _gw_setup_direnv
+            _gw_open_cursor
+            return 0
+        fi
     fi
 
     # 存在するブランチの場合はworktreeを作成
