@@ -263,8 +263,23 @@ function gw() {
     fi
 
     # 存在するブランチの場合はworktreeを作成
-    if git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
-        echo "Creating worktree for existing branch: $branch_name"
+    if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+        # ローカルブランチが存在する場合
+        echo "Creating worktree for existing local branch: $branch_name"
+        if ! git worktree add "$worktree_dir" "$branch_name"; then
+            echo "Error: Failed to create worktree for branch $branch_name"
+            return 1
+        fi
+        cd "$worktree_dir"
+        new_worktree_created=true
+    elif git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+        # リモートブランチのみ存在する場合、fetchしてからworktreeを作成
+        echo "Fetching remote branch: origin/$branch_name"
+        if ! git fetch origin "$branch_name"; then
+            echo "Error: Failed to fetch branch $branch_name from remote"
+            return 1
+        fi
+        echo "Creating worktree for remote branch: $branch_name"
         if ! git worktree add "$worktree_dir" "$branch_name"; then
             echo "Error: Failed to create worktree for branch $branch_name"
             return 1
