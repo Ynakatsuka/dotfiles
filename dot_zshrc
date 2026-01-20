@@ -239,19 +239,30 @@ function gw() {
 
     local new_worktree_created=false
 
-    # 現在のブランチと同じ名前の場合は新しいworktreeを作成
+    # 現在のブランチと同じ名前の場合はエラー（既にチェックアウト済み）
     current_branch=$(git branch --show-current)
     if [ "$branch_name" = "$current_branch" ]; then
-        echo "Creating worktree for current branch: $branch_name from $base_branch"
-        if ! git worktree add "$worktree_dir" "$branch_name"; then
-            echo "Error: Failed to create worktree for branch $branch_name"
-            return 1
-        fi
-        cd "$worktree_dir"
-        new_worktree_created=true
+        echo "Branch '$branch_name' is already checked out in: $git_root"
+        echo "You are already on this branch. No worktree needed."
+        return 1
+    fi
+
+    # ブランチが他のworktreeで既に使用されているかチェック
+    local branch_worktree=$(git worktree list --porcelain | awk '/^worktree/ {wt=$2} /^branch refs\/heads\/'"$branch_name"'$/ {print wt; exit}')
+    if [ -n "$branch_worktree" ]; then
+        echo "Branch '$branch_name' is already checked out in worktree: $branch_worktree"
+        echo "Changing directory to existing worktree..."
+        cd "$branch_worktree"
+
+        _gw_copy_env "$git_root"
+        _gw_setup_direnv
+        _gw_open_cursor
+        return 0
+    fi
+
     # 存在するブランチの場合はworktreeを作成
-    elif git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
-        echo "Creating worktree for existing branch: $branch_name from $base_branch"
+    if git show-ref --verify --quiet "refs/heads/$branch_name" || git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+        echo "Creating worktree for existing branch: $branch_name"
         if ! git worktree add "$worktree_dir" "$branch_name"; then
             echo "Error: Failed to create worktree for branch $branch_name"
             return 1
