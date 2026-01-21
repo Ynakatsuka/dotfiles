@@ -23,3 +23,15 @@ git config --global user.name "$name"
 git config --global user.email "$email"
 
 echo "[INFO] Git identity configured: $name <$email>"
+
+# Install gh-dash extension
+if command -v gh &>/dev/null; then
+  if ! gh extension list | grep -q "dlvhdr/gh-dash"; then
+    echo "[INFO] Installing gh-dash extension..."
+    gh extension install dlvhdr/gh-dash
+  else
+    echo "[INFO] gh-dash already installed"
+  fi
+else
+  echo "[WARN] gh not found; skipping gh-dash installation"
+fi

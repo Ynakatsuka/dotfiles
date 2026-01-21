@@ -35,6 +35,10 @@ if confirm "Install GitHub CLI (gh)?"; then
   warn "Run 'gh auth login' manually after installation."
 fi
 
+if confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
+  run gh extension install dlvhdr/gh-dash
+fi
+
 if confirm "Install uv (via installer script)?"; then
   run bash -lc 'curl -LsSf https://astral.sh/uv/install.sh | sh'
   run bash -lc 'source "$HOME/.cargo/env" || true'
