@@ -355,6 +355,29 @@ EOF
     fi
 }
 
+# Helper function to remove Claude Code cache for a worktree path
+_gwc_remove_claude_cache() {
+    local worktree_path="$1"
+    local claude_projects_dir="$HOME/.claude/projects"
+
+    # Convert worktree path to Claude's project directory format
+    # Claude replaces '/' with '-' in project directory names
+    local cache_dir_name="${worktree_path//\//-}"
+    cache_dir_name="${cache_dir_name//./-}"
+    cache_dir_name="${cache_dir_name#-}"
+    local claude_cache_path="$claude_projects_dir/-$cache_dir_name"
+
+    if [ -d "$claude_cache_path" ]; then
+        echo "🗑️  Claude Codeのキャッシュを削除中: $claude_cache_path"
+        rm -rf "$claude_cache_path"
+        echo "✅ Claude Codeのキャッシュを削除しました"
+        return 0
+    else
+        echo "ℹ️  Claude Codeのキャッシュは見つかりませんでした"
+        return 1
+    fi
+}
+
 # Git worktree cleanup function
 function gwc() {
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -419,6 +442,9 @@ function gwc() {
                     echo "📂 残りのディレクトリを削除中..."
                     rm -rf "$worktree_path"
                 fi
+
+                # Claude Codeのキャッシュを削除
+                _gwc_remove_claude_cache "$worktree_path"
             else
                 echo "❌ worktreeの削除に失敗しました: $worktree_path"
                 ((fail_count++))
