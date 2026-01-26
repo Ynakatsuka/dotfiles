@@ -62,6 +62,14 @@ tmux source ~/.tmux.conf   # Reload tmux config
 
 ## Architecture Notes
 
+### Repository Location
+
+This repository may have multiple clones on the system:
+- **Primary (authoritative)**: `~/ghq/github.com/Ynakatsuka/dotfiles/`
+- **Chezmoi source**: `~/.local/share/chezmoi/` (used by chezmoi for deployment)
+
+Always edit files in the `ghq` directory. Changes need to be committed/pushed from there and pulled into the chezmoi source directory, or applied directly to both locations.
+
 ### Template Processing
 
 Files ending in `.tmpl` use Go templates. Common patterns:
