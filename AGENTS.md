@@ -106,3 +106,73 @@ Use the `AskUserQuestion` tool proactively in the following situations:
 - Finalize process before actual output:
   - Remove all descriptive comments from the generated code.
 - If an edited file differs from the last loaded version, it means the user has manually edited it. Unless there are explicit instructions from the user, always treat the manually edited file as the correct version and do not roll it back.
+
+## Parallel Task Execution
+
+Use subagents (Task tool) to execute independent tasks in parallel for maximum efficiency.
+
+### When to Parallelize
+
+- **Independent file operations**: Different files with no dependencies
+- **Implementation + Tests**: Write implementation while subagent creates test skeleton
+- **Multiple components**: Separate modules or features that don't share state
+- **Verification tasks**: Linting, type checking, and test runs in background
+
+### Parallel Patterns
+
+**Pattern 1: Implementation + Test (TDD Hybrid)**
+```
+Main Agent     → Implement feature in src/feature.py
+Subagent 1     → Create test file structure in tests/test_feature.py
+```
+
+**Pattern 2: Multi-Component Development**
+```
+Main Agent     → Component A (e.g., API handler)
+Subagent 1     → Component B (e.g., Data model)
+Subagent 2     → Component C (e.g., CLI interface)
+```
+
+**Pattern 3: Background Verification**
+```
+Main Agent     → Continue with next task
+Subagent (bg)  → Run test suite
+Subagent (bg)  → Run linter and type checker
+```
+
+**Pattern 4: Research + Implementation**
+```
+Main Agent     → Implement based on current understanding
+Subagent 1     → Research edge cases or best practices
+```
+
+### Subagent Launch Guidelines
+
+1. **Use `run_in_background: true`** for long-running tasks (tests, builds)
+2. **Provide clear, self-contained instructions** - subagents don't share context
+3. **Specify expected outputs** - what files to create/modify, what to report
+4. **Set constraints** - files NOT to modify, patterns to follow
+
+### Example: Parallel Feature Implementation
+
+```
+Task: Implement user authentication feature
+
+1. Launch in parallel:
+   - Main: Implement auth service in src/auth/service.py
+   - Subagent 1: Create test file tests/test_auth_service.py with test cases
+   - Subagent 2: Create auth types in src/auth/types.py
+
+2. After parallel completion:
+   - Main: Integrate components and run tests
+   - Subagent (bg): Run full test suite
+
+3. Continue to next task while tests run in background
+```
+
+### Anti-Patterns (Avoid)
+
+- **Parallel edits to the same file** - causes conflicts
+- **Dependent tasks in parallel** - one needs output from another
+- **Too many subagents** - overhead exceeds benefit (max 3-4 concurrent)
+- **Vague subagent instructions** - leads to incorrect implementations
