@@ -17,10 +17,11 @@
   status = auto
   branch = auto
   interactive = auto
+{{- if eq .chezmoi.os "darwin" }}
 [url "git@github.com:"]
   insteadOf = https://github.com/
 [credential]
   helper = osxkeychain
+{{- end }}
 [push]
   default = upstream
-
