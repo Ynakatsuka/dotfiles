@@ -12,13 +12,13 @@ local hyper = {"alt", "ctrl"}
 -- ============================================================================
 
 -- External Display Layout (4-split configuration)
--- Left: 55% | Right: 45%
+-- Left: 50% | Right: 50%
 -- Left side: Top 20% | Bottom 80%
 -- Right side: Top 25% | Bottom 75%
 local externalLayout = {
     -- Split ratios
-    leftWidth = 0.55,  -- Left side: 55%
-    rightWidth = 0.45, -- Right side: 45%
+    leftWidth = 0.5,   -- Left side: 50%
+    rightWidth = 0.5,  -- Right side: 50%
     leftTopHeight = 0.2,     -- Left top area: 20%
     leftBottomHeight = 0.8,  -- Left bottom area: 80%
     rightTopHeight = 0.25,   -- Right top area: 25%
