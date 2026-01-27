@@ -174,6 +174,7 @@ local function getAppWindows(app)
 end
 
 -- Layout configuration for external display (4-split)
+-- Only affects windows currently on the external display
 local function layoutExternalDisplay()
     local externalScreen = getExternalScreen()
     if not externalScreen then
@@ -222,13 +223,15 @@ local function layoutExternalDisplay()
         }
     }
 
-    -- Apply layouts to all windows
+    -- Apply layouts only to windows on the external display
     for appName, rect in pairs(layouts) do
         local app = hs.application.get(appName)
         if app then
             local windows = getAppWindows(app)
             for _, window in ipairs(windows) do
-                window:setFrame(rect, 0)
+                if window:screen() == externalScreen then
+                    window:setFrame(rect, 0)
+                end
             end
         end
     end
@@ -295,4 +298,31 @@ end)
 
 hs.hotkey.bind(hyper, "I", function()
     layoutBuiltInDisplay()
+end)
+
+-- Toggle active window between external and built-in display (maximized)
+hs.hotkey.bind(hyper, "J", function()
+    local window = hs.window.focusedWindow()
+    if not window then
+        return
+    end
+
+    local externalScreen = getExternalScreen()
+    local builtInScreen = getBuiltInScreen()
+
+    if not externalScreen or not builtInScreen then
+        return
+    end
+
+    local currentScreen = window:screen()
+    local targetScreen
+
+    if currentScreen == externalScreen then
+        targetScreen = builtInScreen
+    else
+        targetScreen = externalScreen
+    end
+
+    local frame = targetScreen:frame()
+    window:setFrame(frame, 0)
 end)
