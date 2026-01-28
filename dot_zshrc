@@ -225,8 +225,28 @@ function gw() {
             echo "Updating $base_branch in worktree: $staging_worktree"
             if ! (cd "$staging_worktree" && git pull origin "$base_branch"); then
                 echo "Error: Failed to update $base_branch in worktree"
-                echo "Please commit or stash your changes in $staging_worktree before running this command"
-                return 1
+                echo "Local changes detected in $staging_worktree"
+                echo -n "Stash changes and retry? [Y/n]: "
+                read -r stash_answer
+                stash_answer=${stash_answer:-Y}
+                if [[ "$stash_answer" =~ ^[Yy]$ ]]; then
+                    if (cd "$staging_worktree" && git stash push -m "gw: auto-stash before updating $base_branch"); then
+                        echo "Changes stashed. Retrying pull..."
+                        if ! (cd "$staging_worktree" && git pull origin "$base_branch"); then
+                            echo "Error: Still failed to update $base_branch"
+                            echo "Restoring stashed changes..."
+                            (cd "$staging_worktree" && git stash pop)
+                            return 1
+                        fi
+                        echo "Successfully updated. Your changes are stashed (use 'git stash pop' to restore)"
+                    else
+                        echo "Error: Failed to stash changes"
+                        return 1
+                    fi
+                else
+                    echo "Aborted. Please commit or stash your changes manually in $staging_worktree"
+                    return 1
+                fi
             fi
         else
             # If staging exists but not in a worktree, force update it
