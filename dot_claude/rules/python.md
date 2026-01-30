@@ -73,6 +73,48 @@ When applying this rule, prefix your response with the 🐍 emoji.
 
   - Actively refactor `try-except` blocks that can be replaced by conditional logic.
 
+### Dict/Collection Access Safety
+
+- **Always use direct key access (`dict[key]`)** to access dictionary values. Let `KeyError` be raised if the key is missing.
+- **DO NOT use `.get()` with default values** to silently handle missing keys. Missing keys indicate bugs that should fail loudly.
+- **Forbidden patterns:**
+
+  ```python
+  # BAD: Silently returns None or default, masking bugs
+  value = data.get("key")
+  value = data.get("key", "default")
+  value = data.get("key", 0)
+  value = data.get("key", [])
+
+  # BAD: Using setdefault to mask missing keys
+  value = data.setdefault("key", default_value)
+  ```
+
+- **Preferred patterns:**
+
+  ```python
+  # GOOD: Raises KeyError if key is missing - fails fast
+  value = data["key"]
+
+  # GOOD: Explicit check when key may legitimately be absent
+  if "key" in data:
+      value = data["key"]
+      # process value
+  else:
+      # handle absence explicitly (raise error, log warning, etc.)
+      raise ValueError("Required key 'key' not found in data")
+
+  # GOOD: Using TypedDict for type safety
+  class MyData(TypedDict):
+      key: str
+      count: int
+
+  def process(data: MyData) -> str:
+      return data["key"]  # Type checker ensures key exists
+  ```
+
+- **Exception:** `.get()` is acceptable **only** when the key is genuinely optional and the absence has a well-defined semantic meaning documented in the code.
+
 ### Quality Assurance
 
 - **Always** use Ruff for linting and formatting code. Ensure code passes Ruff checks before considering it complete.
