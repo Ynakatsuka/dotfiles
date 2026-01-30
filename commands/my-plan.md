@@ -138,7 +138,7 @@ docs/specs/{feature-name}/
   - 受入基準: Y件
   - 優先度 Must: Z件
 
-👉 次のステップ: `/my-tasks` を実行してタスク分解を行ってください。
+👉 次のステップ: `/my-tasks docs/specs/{feature-name}` を実行してタスク分解を行ってください。
 ```
 
 ## 重要なルール
