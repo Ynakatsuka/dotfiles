@@ -38,5 +38,6 @@
   "alwaysThinkingEnabled": false,
   "defaultMode": "acceptEdits",
   "dangerously-skip-permissions": true,
-  "plansDirectory": "./plans"
+  "plansDirectory": "./.plans",
+  "autoUpdatesChannel": "latest"
 }
