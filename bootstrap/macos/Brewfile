@@ -14,6 +14,8 @@ brew "pandoc"
 brew "k9s"
 tap "johanhaleby/kubetail"
 brew "johanhaleby/kubetail/kubetail"
+tap "steipete/tap"
+brew "steipete/tap/gogcli"  # Google CLI for Gmail, Calendar, Drive, and Contacts
 
 cask "alt-tab"
 cask "cleanmymac"
