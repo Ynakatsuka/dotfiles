@@ -141,6 +141,8 @@ docs/specs/{feature-name}/
 👉 次のステップ: `/my-tasks docs/specs/{feature-name}` を実行してタスク分解を行ってください。
 ```
 
+**重要: 次のステップでは必ずスペックディレクトリのパス（`docs/specs/{feature-name}`）を含めること。パスなしでコマンドのみを提示することは禁止。**
+
 ## 重要なルール
 
 1. **次のフェーズに自動で進まない**: タスク分解（/my-tasks）や実装（/my-impl）は行わない
