@@ -41,6 +41,9 @@ typos = "latest"
 # Node.js - JavaScript runtime
 node = "24.9"
 
+# Volta - JavaScript toolchain manager
+volta = "latest"
+
 # Go - The Go programming language
 go = "latest"
 
