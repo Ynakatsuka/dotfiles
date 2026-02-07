@@ -204,12 +204,15 @@ function gw() {
         return 0
     fi
 
-    # Update staging branch to latest remote
-    echo "Updating $base_branch branch to latest remote..."
-    if ! git fetch origin "$base_branch"; then
-        echo "Error: Failed to fetch $base_branch from remote"
+    # Fetch all latest remote refs
+    echo "Fetching latest from origin..."
+    if ! git fetch origin; then
+        echo "Error: Failed to fetch from remote"
         return 1
     fi
+
+    # Update base branch to latest remote
+    echo "Updating $base_branch branch to latest remote..."
 
     # Check if staging branch exists locally
     if ! git show-ref --verify --quiet "refs/heads/$base_branch"; then
@@ -284,12 +287,7 @@ function gw() {
 
     # Check remote branch first, then local branch
     if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
-        # Remote branch exists - fetch latest and create worktree
-        echo "Fetching latest remote branch: origin/$branch_name"
-        if ! git fetch origin "$branch_name"; then
-            echo "Error: Failed to fetch branch $branch_name from remote"
-            return 1
-        fi
+        # Remote branch exists - create worktree from latest remote
         # Delete local branch if exists to ensure worktree uses latest remote
         if git show-ref --verify --quiet "refs/heads/$branch_name"; then
             echo "Deleting local branch to sync with remote: $branch_name"
