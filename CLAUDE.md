@@ -91,6 +91,18 @@ The `dot_claude/` directory deploys as `~/.claude/`:
 - `rules/` → Domain-specific rules (bigquery, python, gpu, git)
 - `commands/` → Skill definitions for Claude Code
 
+## Critical Rules
+
+### File Placement
+
+**NEVER create files directly under `~/` (e.g., `~/.claude/`, `~/.codex/`).** All configuration files MUST be created in this dotfiles repository (`dot_` prefixed) first, then deployed. Creating files outside this repo means they won't be tracked by Git.
+
+- `~/.claude/` files → create in `dot_claude/`
+- `~/.codex/` files → create in `dot_codex/`
+- `~/.config/` files → create in `private_dot_config/`
+
+After editing, manually copy to the deploy target or run `chezmoi apply`.
+
 ## When Editing
 
 ### Shell Configuration (`dot_zshrc`)
