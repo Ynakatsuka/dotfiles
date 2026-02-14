@@ -65,6 +65,19 @@ description: Creates sophisticated multi-page documentation systems.  # Missing 
 description: Implements the Project entity model with hierarchical relationships.  # Too technical
 ```
 
+Negative triggers (prevent misfires):
+```yaml
+# Good - includes negative triggers to prevent misfires
+description: |
+  Deploys applications to AWS ECS. Use when user says "deploy to ECS", "update service".
+  Do NOT use for Lambda deployments or local Docker builds.
+
+# Good - clear boundary setting
+description: |
+  Generates unit tests for Python code. Triggers on "write tests", "add test coverage".
+  Do NOT use for integration tests, E2E tests, or test infrastructure setup.
+```
+
 Optional fields: `license`, `compatibility` (1-500 chars, environment requirements), `allowed-tools`, `metadata` (author, version, mcp-server).
 
 ### Resource Guidelines
@@ -139,6 +152,8 @@ The skill is for another Claude instance to use. Include information that is ben
 - **All "when to use" information goes in the description**, not the body. The body is only loaded after triggering.
 - Be specific and actionable: provide exact commands with parameters, not vague instructions
 - Include error handling for common failure modes
+- Scope permissions minimally: use `allowed-tools` in frontmatter to restrict tool access to only what the skill needs
+- Separate network-dependent operations: isolate steps that require network access (API calls, package installs) from steps that perform local file operations, so failures in one do not cascade
 - Reference bundled resources clearly with paths and context for when to read them
 
 #### Design Pattern References
@@ -160,7 +175,11 @@ Start with the resources identified in Step 2. This step may require user input 
 
 1. **Triggering tests**: Does the skill trigger on obvious tasks? On paraphrased requests? Does it NOT trigger on unrelated topics? (Target: 90% trigger rate on relevant queries)
 2. **Functional tests**: Are outputs correct? Do scripts work? Are edge cases handled?
-3. **Performance comparison**: Fewer messages, fewer failed API calls, less token consumption vs. baseline?
+3. **Performance comparison**: Measure concrete metrics with vs. without the skill:
+   - Token consumption (target: 30-50% reduction)
+   - API/tool call failure rate (target: 0 failures)
+   - End-to-end task completion rate
+   - Number of user interventions required
 
 Debugging trigger issues: Ask Claude "When would you use the [skill name] skill?" — Claude will quote the description back. Adjust based on what's missing.
 
@@ -173,5 +192,15 @@ Debugging trigger issues: Ask Claude "When would you use the [skill name] skill?
 | Inconsistent results | Instruction quality | Be more specific, add validation steps, use scripts for determinism |
 | Instructions not followed | Buried or verbose | Put critical instructions at top, use bullet points, move details to references |
 | Slow or degraded responses | Context overload | Move docs to references/, keep SKILL.md under 5,000 words, reduce enabled skills |
+
+#### Production Tip: Explicit Invocation
+
+For critical or production workflows where routing accuracy matters, instruct users to invoke skills explicitly rather than relying on fuzzy description matching:
+
+```
+Use the <skill-name> skill to [do X].
+```
+
+This bypasses the description-based routing and guarantees the correct skill is loaded. Recommended for CI/CD pipelines, automated workflows, or when multiple similar skills are enabled.
 
 For detailed troubleshooting, see `references/complete-guide.md` (Chapter 5: Patterns and Troubleshooting).

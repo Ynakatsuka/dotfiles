@@ -196,6 +196,43 @@ Forbidden in frontmatter:
 - XML angle brackets (< >)
 - Skills with "claude" or "anthropic" in name (reserved)
 
+### Security Considerations
+
+#### Principle of Least Privilege
+
+Use `allowed-tools` in frontmatter to restrict tool access to only what the skill requires:
+
+```yaml
+---
+name: data-analyzer
+description: Analyzes CSV data files and generates summary statistics.
+allowed-tools: "Bash(python:*) Read Write"
+---
+```
+
+This prevents the skill from accidentally invoking tools it does not need (e.g., network access, git operations).
+
+#### Isolate Network-Dependent Operations
+
+Skills that combine network access with powerful local operations (file writes, command execution) carry higher risk. Mitigate by:
+
+1. **Separating fetch and process phases**: Download data first, validate it, then process locally
+2. **Validating external data**: Check file sizes, formats, and content before processing
+3. **Using scripts for deterministic operations**: Move critical transformations into tested scripts rather than relying on ad-hoc commands
+
+```markdown
+# Risky: single step combines network fetch and file write
+Run `curl https://api.example.com/data | python process.py > output.csv`
+
+# Safer: separate steps with validation
+## Step 1: Fetch data
+Run `curl https://api.example.com/data -o data/raw.json`
+Validate: file exists and is valid JSON
+
+## Step 2: Process locally
+Run `python scripts/process.py --input data/raw.json --output output.csv`
+```
+
 ### Writing Effective Skills
 
 #### The Description Field
@@ -536,6 +573,48 @@ Solutions:
 1. Move detailed docs to references/
 2. Keep SKILL.md under 5,000 words
 3. Evaluate if too many skills are enabled simultaneously (>20-50)
+
+### Pattern 6: Enterprise Standard Operating Procedures
+
+Use when: Teams need to codify repeatable business processes into consistent, auditable workflows.
+
+Organizations that convert their SOPs into skills can achieve significant improvements in consistency and efficiency. For example, standardizing a review workflow as a skill can improve accuracy by 10-20% while reducing token consumption by 30-50%.
+
+Key techniques:
+
+**Structure the SOP as a skill:**
+```markdown
+## Workflow: Code Review Checklist
+
+### Step 1: Gather Context
+Read the PR diff and related files.
+Identify: scope of changes, affected modules, test coverage.
+
+### Step 2: Apply Review Criteria
+Check against team standards:
+- [ ] Follows naming conventions
+- [ ] Error handling is complete
+- [ ] No security vulnerabilities (OWASP top 10)
+- [ ] Test coverage for new code paths
+
+### Step 3: Generate Review
+Write structured feedback with:
+- Summary of changes
+- Issues found (categorized by severity)
+- Suggestions for improvement
+```
+
+**Measure effectiveness:**
+- Track task completion rate (target: >90% without manual intervention)
+- Compare token usage with vs. without skill (target: 30-50% reduction)
+- Monitor error rates in automated steps (target: <5% failure rate)
+- Collect qualitative feedback from team members
+
+**Iteration strategy:**
+1. Start with the most frequently performed SOP
+2. Instrument with metrics from day one
+3. Iterate weekly based on failure cases
+4. Expand to adjacent workflows once baseline is stable
 
 ## Quick Checklist
 
