@@ -29,6 +29,17 @@ gcloud_prompt_info() {
   [[ -n "$config" ]] && print " [%F{220}$config%f]"
 }
 
+# Git branch info for prompt
+git_prompt_info() {
+  local branch
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null) || return
+  local color="green"
+  if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+    color="yellow"
+  fi
+  print " %F{${color}}🌿 ${branch}%f"
+}
+
 # Fast custom prompt function to show truncated path with ellipsis
 custom_pwd() {
   local pwd_length=3  # Number of directories to show
@@ -55,10 +66,10 @@ custom_pwd() {
 
 case "$OSTYPE" in
   linux*)
-    export PROMPT='%F{82}%n@%m%f:%F{63}$(custom_pwd)%f$(gcloud_prompt_info)$ '
+    export PROMPT='%F{82}%n@%m%f:%F{63}$(custom_pwd)%f$(git_prompt_info)$(gcloud_prompt_info)$ '
     ;;
   *)
-    export PROMPT='%F{141}%n@%m%f:%F{39}$(custom_pwd)%f$(gcloud_prompt_info)$ '
+    export PROMPT='%F{141}%n@%m%f:%F{39}$(custom_pwd)%f$(git_prompt_info)$(gcloud_prompt_info)$ '
     ;;
 esac
 
@@ -699,6 +710,19 @@ function fzf-select-history() {
 }
 zle -N fzf-select-history
 bindkey '^h' fzf-select-history
+
+# fzf git branch checkout
+function fzf-git-checkout() {
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { zle -M "Not a git repository"; return 1; }
+    local branch=$(git branch --sort=-committerdate --format='%(refname:short)' | fzf --prompt="GIT BRANCH> " --height=40% --reverse --preview='git log --oneline -20 {}')
+    if [ -n "$branch" ]; then
+        BUFFER="git checkout $branch"
+        zle accept-line
+    fi
+    zle reset-prompt
+}
+zle -N fzf-git-checkout
+bindkey '^b' fzf-git-checkout
 
 # cdr
 autoload -Uz is-at-least
