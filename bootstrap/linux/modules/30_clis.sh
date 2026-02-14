@@ -76,7 +76,7 @@ if confirm "Install Tailscale? (login needs manual 'tailscale up')"; then
 fi
 
 if confirm "Install Claude Code (native installer)?"; then
-  run bash -lc 'curl -fsSL https://cli.claude.ai/install.sh | sh'
+  run bash -lc 'curl -fsSL https://claude.ai/install.sh | bash'
 fi
 
 log "CLIs module completed"

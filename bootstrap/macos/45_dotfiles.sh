@@ -96,7 +96,7 @@ fi
 if ! command -v claude >/dev/null 2>&1; then
   read -r -p "Install Claude Code (native installer)? [y/N]: " install_claude
   if [[ "$install_claude" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-    curl -fsSL https://cli.claude.ai/install.sh | sh
+    curl -fsSL https://claude.ai/install.sh | bash
   else
     echo "[WARN] Skipped Claude Code installation"
   fi
