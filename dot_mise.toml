@@ -1,7 +1,4 @@
 [tools]
-# Claude CLI - AI coding assistant
-claude-code = "latest"
-
 # Gemini CLI - Google AI CLI
 gemini-cli = "latest"
 

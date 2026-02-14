@@ -92,5 +92,17 @@ else
   echo "[WARN] mise not found. Install via Homebrew (brew install mise) if needed."
 fi
 
+# Install Claude Code (native installer)
+if ! command -v claude >/dev/null 2>&1; then
+  read -r -p "Install Claude Code (native installer)? [y/N]: " install_claude
+  if [[ "$install_claude" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    curl -fsSL https://cli.claude.ai/install.sh | sh
+  else
+    echo "[WARN] Skipped Claude Code installation"
+  fi
+else
+  echo "[INFO] Claude Code already installed"
+fi
+
 echo "[INFO] Dotfiles setup completed"
 
