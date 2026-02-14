@@ -132,6 +132,15 @@ Examples:
 
 ### Step 3: Initialize the Skill
 
+#### Determine the output directory
+
+Choose the correct skill output directory based on the current working directory:
+
+- **If inside a dotfiles repository** (i.e., the repo manages chezmoi dotfiles and contains a `dot_claude/skills/` directory): create the skill under `dot_claude/skills/` in that repository. This ensures the skill is tracked by Git and deployed via chezmoi.
+- **Otherwise**: create the skill under `.claude/skills/` in the project root (or `~/.claude/skills/` for global skills).
+
+#### Run the initializer
+
 For new skills, run:
 
 ```bash
