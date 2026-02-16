@@ -1,6 +1,5 @@
 ---
-name: my-skill-wip
-alias: my-wip
+name: my-wip
 description: >-
   Report current git branch progress with structured status.
   Shows recent commits, staged/unstaged changes, and related SDD documents.
