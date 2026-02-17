@@ -1,5 +1,5 @@
 ---
-name: codex-runner
+name: my-codex
 description: Delegate tasks to OpenAI Codex CLI using gpt-5.3-codex model. Use when the user wants to run a task with Codex, delegate coding work to Codex, get a second opinion from Codex, or explicitly mentions "codex". Triggers on requests like "codexで実行", "codexに聞いて", "codexでやって", "run with codex", "ask codex", or any task delegation to Codex CLI.
 ---
 
