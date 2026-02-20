@@ -21,8 +21,8 @@ local externalLayout = {
     rightWidth = 0.5,  -- Right side: 50%
     leftTopHeight = 0.2,     -- Left top area: 20%
     leftBottomHeight = 0.8,  -- Left bottom area: 80%
-    rightTopHeight = 0.25,   -- Right top area: 25%
-    rightBottomHeight = 0.75, -- Right bottom area: 75%
+    rightTopHeight = 0.4,    -- Right top area: 40%
+    rightBottomHeight = 0.6,  -- Right bottom area: 60%
 
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
