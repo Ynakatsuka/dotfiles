@@ -34,7 +34,7 @@ local externalLayout = {
 -- Built-in Display Layout
 -- Most apps: fullscreen
 local builtInLayout = {
-    topHeight = 0.4,
+    topHeight = 0.8,
 
     topApps = {
         "Sublime Text",
