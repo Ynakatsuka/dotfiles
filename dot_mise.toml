@@ -5,9 +5,6 @@ gemini-cli = "latest"
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
-# vibe-kanban - NPX wrapper around vibe-kanban and vibe-kanban-mcp
-"npm:vibe-kanban" = "latest"
-
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
@@ -87,11 +84,6 @@ description = "Claude Code Viewer (port 50100)"
 run = "npx @kimuson/claude-code-viewer@latest"
 env = { PORT = "50100" }
 
-[tasks.vibe-kanban]
-description = "vibe-kanban (port 50101)"
-run = "npx vibe-kanban"
-env = { PORT = "50101" }
-
 [tasks.update-dotfile]
 description = "Update dotfiles and development environment"
 run = """
@@ -100,25 +92,12 @@ mise up && \
 mise cache clean
 """
 
-[tasks.brew-update]
+[tasks.update-brew]
 description = "Update Homebrew and all installed packages"
 run = """
 brew update && \
 brew upgrade && \
-brew upgrade --cask
-"""
-
-[tasks.brew-cleanup]
-description = "Clean up Homebrew cache and old versions"
-run = """
+brew upgrade --cask && \
 brew cleanup -s && \
 brew autoremove
 """
-
-[tasks.brew-maintenance]
-description = "Run Homebrew update and cleanup"
-depends = ["brew-update", "brew-cleanup"]
-
-[tasks.workspace]
-description = "Start all development servers"
-depends = ["claude-viewer", "vibe-kanban"]
