@@ -67,28 +67,31 @@ run() {
   fi
 }
 
+_dry_run_flag() { [ "$DRY_RUN" -eq 1 ] && echo "--dry-run" || true; }
+_xdg_flag() { [ "$XDG_ENGLISH_DIRS" -eq 1 ] && echo "--xdg-english-dirs" || true; }
+
 log "Running 00_base.sh"
-"${SCRIPT_DIR}/modules/00_base.sh" ${DRY_RUN:+--dry-run} ${XDG_ENGLISH_DIRS:+--xdg-english-dirs}
+"${SCRIPT_DIR}/modules/00_base.sh" $(_dry_run_flag) $(_xdg_flag)
 
 if [ "$WITH_EXPRESSVPN" -eq 1 ]; then
   log "Running 05_expressvpn.sh"
-  "${SCRIPT_DIR}/modules/05_expressvpn.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/05_expressvpn.sh" $(_dry_run_flag)
 fi
 
 if [ "$WITH_DOCKER" -eq 1 ]; then
   log "Running 20_docker.sh"
-  "${SCRIPT_DIR}/modules/20_docker.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/20_docker.sh" $(_dry_run_flag)
 fi
 
 if [ "$WITH_NVIDIA_CONTAINER" -eq 1 ]; then
   log "Running 25_nvidia_container.sh"
-  "${SCRIPT_DIR}/modules/25_nvidia_container.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/25_nvidia_container.sh" $(_dry_run_flag)
 fi
 
 GPU_DONE=0
 if [ "$WITH_GPU" -eq 1 ]; then
   log "Running 10_gpu_nvidia.sh (explicit)"
-  "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" $(_dry_run_flag)
   GPU_DONE=1
 fi
 
@@ -96,7 +99,7 @@ fi
 if [ "$GPU_DONE" -eq 0 ] && has_nvidia_gpu; then
   if confirm "NVIDIA GPU detected. Install driver/CUDA now?"; then
     log "Running 10_gpu_nvidia.sh (auto-detected)"
-    "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" ${DRY_RUN:+--dry-run}
+    "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" $(_dry_run_flag)
     GPU_DONE=1
   else
     warn "Skipped GPU installation despite detection"
@@ -105,17 +108,17 @@ fi
 
 if [ "$WITH_CLIS" -eq 1 ]; then
   log "Running 30_clis.sh"
-  "${SCRIPT_DIR}/modules/30_clis.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/30_clis.sh" $(_dry_run_flag)
 fi
 
 if [ "$WITH_DOTFILES" -eq 1 ]; then
   log "Running 40_dotfiles.sh"
-  "${SCRIPT_DIR}/modules/40_dotfiles.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/40_dotfiles.sh" $(_dry_run_flag)
 fi
 
 if [ "$WITH_CLEANUP" -eq 1 ]; then
   log "Running 99_cleanup.sh"
-  "${SCRIPT_DIR}/modules/99_cleanup.sh" ${DRY_RUN:+--dry-run}
+  "${SCRIPT_DIR}/modules/99_cleanup.sh" $(_dry_run_flag)
 fi
 
 log "Linux bootstrap finished."
