@@ -86,7 +86,7 @@ legacy_version_file = true
 plugin_autoupdate_last_check_duration = "7 days"
 
 [env]
-# Environment variables can be set here if needed
+GITHUB_TOKEN = "{{exec(command='GH=$(find ~/.local/share/mise/installs/gh -name gh -type f 2>/dev/null | head -1) && $GH auth token 2>/dev/null || true')}}"
 
 [tasks.claude-viewer]
 description = "Claude Code Viewer (port 50100)"
