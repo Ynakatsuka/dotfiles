@@ -118,7 +118,13 @@ alias dcps='docker compose ps'
 alias dcud='docker compose up -d'
 alias dcudf='docker compose up -d --force-recreate'
 alias dcudb='docker compose up -d --build'
-alias dce='docker compose exec $(docker compose ps --services)'
+dce() {
+  local service
+  service=$(docker compose ps --services 2>/dev/null | fzf --prompt="Service> " --height=40% --reverse)
+  if [[ -n "$service" ]]; then
+    docker compose exec "$service" "${@:-/bin/bash}"
+  fi
+}
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
 
