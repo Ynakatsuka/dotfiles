@@ -156,6 +156,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!bootstrap/lib/
 lib64/
 parts/
 sdist/
