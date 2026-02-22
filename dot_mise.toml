@@ -124,4 +124,4 @@ brew upgrade --cask && \
 brew cleanup -s && \
 brew autoremove
 """
-shell = ["zsh", "-c"]
+shell = "zsh -c"
