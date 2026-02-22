@@ -112,16 +112,20 @@ brew autoremove
 """
 
 [tasks.maintenance]
-description = "Update dotfiles, reload shell, and update Homebrew"
+description = "Update dotfiles, reload shell, and update Homebrew (macOS)"
 run = """
 chezmoi update -v && \
 mise up && \
 mise cache clean && \
 source ~/.zshrc && \
-brew update && \
-brew upgrade && \
-brew upgrade --cask && \
-brew cleanup -s && \
-brew autoremove
+if command -v brew >/dev/null 2>&1; then
+  brew update && \
+  brew upgrade && \
+  brew upgrade --cask && \
+  brew cleanup -s && \
+  brew autoremove
+else
+  echo "[INFO] brew not found, skipping Homebrew updates"
+fi
 """
 shell = "zsh -c"
