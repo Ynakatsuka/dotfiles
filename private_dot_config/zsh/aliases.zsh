@@ -21,6 +21,7 @@ alias dcl='docker compose logs'
 alias dcd='docker compose down'
 alias de='docker exec -it $(docker ps | fzf | awk "{print \$1}") /bin/bash'
 
+unalias dce 2>/dev/null
 dce() {
   local service
   service=$(docker compose ps --services 2>/dev/null | fzf --prompt="Service> " --height=40% --reverse)
