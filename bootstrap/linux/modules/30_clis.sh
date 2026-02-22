@@ -40,7 +40,7 @@ if confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; the
 fi
 
 if confirm "Install uv (via installer script)?"; then
-  run bash -lc 'curl -LsSf https://astral.sh/uv/install.sh | sh'
+  run bash -lc '_s=$(mktemp) && curl --fail -LsS https://astral.sh/uv/install.sh -o "$_s" && sh "$_s" && rm -f "$_s"'
   run bash -lc 'source "$HOME/.cargo/env" || true'
   run bash -lc 'uvx ruff || true'
   run bash -lc 'uvx mypy || true'
@@ -48,17 +48,17 @@ if confirm "Install uv (via installer script)?"; then
 fi
 
 if confirm "Install mise (via official installer)?"; then
-  run bash -lc 'curl https://mise.run | sh'
+  run bash -lc '_s=$(mktemp) && curl --fail -sS https://mise.run -o "$_s" && sh "$_s" && rm -f "$_s"'
   warn "Restart your shell or source the activation in your rc to use mise."
 fi
 
 if confirm "Install rye (optional)?"; then
-  run bash -lc 'curl -sSf https://rye.astral.sh/get | bash'
+  run bash -lc '_s=$(mktemp) && curl --fail -sS https://rye.astral.sh/get -o "$_s" && bash "$_s" && rm -f "$_s"'
   run bash -lc 'echo '"'"'source "$HOME/.rye/env"'"'"' >> "$HOME/.zshrc"'
 fi
 
 if confirm "Install direnv?"; then
-  run bash -lc 'curl -sfL https://direnv.net/install.sh | bash'
+  run bash -lc '_s=$(mktemp) && curl --fail -sL https://direnv.net/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
 fi
 
 if confirm "Install Google Cloud CLI?"; then
@@ -71,12 +71,12 @@ if confirm "Install Google Cloud CLI?"; then
 fi
 
 if confirm "Install Tailscale? (login needs manual 'tailscale up')"; then
-  run bash -lc 'curl -fsSL https://tailscale.com/install.sh | sh'
+  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://tailscale.com/install.sh -o "$_s" && sh "$_s" && rm -f "$_s"'
   warn "Run 'sudo tailscale up' manually after installation."
 fi
 
 if confirm "Install Claude Code (native installer)?"; then
-  run bash -lc 'curl -fsSL https://claude.ai/install.sh | bash'
+  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://claude.ai/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
 fi
 
 log "CLIs module completed"

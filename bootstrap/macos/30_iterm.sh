@@ -7,7 +7,10 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 echo "[INFO] Installing iTerm2 shell integration"
-curl -L https://iterm2.com/shell_integration/install_shell_integration.sh | bash
+_install_script=$(mktemp)
+trap 'rm -f "$_install_script"' EXIT
+curl --fail -L https://iterm2.com/shell_integration/install_shell_integration.sh -o "$_install_script"
+bash "$_install_script"
 
 if [ -f "$HOME/.iterm2_shell_integration.zsh" ]; then
   # shellcheck disable=SC1090
