@@ -35,6 +35,9 @@ typos = "latest"
 # Node.js - JavaScript runtime
 node = "24.9"
 
+# Volta - JavaScript tool manager
+"aqua:volta-cli/volta" = "latest"
+
 # Go - The Go programming language
 go = "latest"
 
@@ -58,6 +61,12 @@ eza = "latest"
 
 # ghq -
 ghq = "latest"
+
+# direnv - Directory-based environment management
+direnv = "latest"
+
+# k9s - Kubernetes CLI dashboard
+k9s = "latest"
 
 # dotenvx - Environment variable management
 dotenvx = "latest"

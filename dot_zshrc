@@ -889,10 +889,6 @@ fi
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOPATH/bin
 
-# volta
-export VOLTA_HOME="$HOME/.volta"
-export PATH="$VOLTA_HOME/bin:$PATH"
-
 # initialize runtime tools
 autoload -Uz add-zsh-hook
 
