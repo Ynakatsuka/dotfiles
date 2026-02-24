@@ -25,6 +25,7 @@ if ! grep -q "UseKeychain yes" "$CONFIG_FILE" 2>/dev/null; then
   {
     echo "Host *"
     echo "  AddKeysToAgent yes"
+    echo "  IgnoreUnknown UseKeychain"
     echo "  UseKeychain yes"
     echo "  IdentityFile ~/.ssh/id_rsa"
   } >> "$CONFIG_FILE"
