@@ -3,9 +3,11 @@
 #
 export LSCOLORS=gxfxcxdxbxegedabagacad
 
-# Google Cloud config info for prompt
-setopt PROMPT_SUBST  # Enable command substitution in prompts
+# Enable $EPOCHSECONDS and command substitution in prompts
+zmodload zsh/datetime
+setopt PROMPT_SUBST
 
+# Google Cloud config info for prompt
 gcloud_prompt_info() {
   local config_path="$HOME/.config/gcloud/active_config"
   [[ -r "$config_path" ]] || return
@@ -15,46 +17,45 @@ gcloud_prompt_info() {
   [[ -n "$config" ]] && print " [%F{220}$config%f]"
 }
 
-# Git branch info for prompt
+# Git branch info for prompt (with cache + fast diff-index)
+typeset -g _git_prompt_cache=""
+typeset -g _git_prompt_cache_time=0
+typeset -g _git_prompt_cache_dir=""
+
 git_prompt_info() {
+  local now=$EPOCHSECONDS
+  # Return cache if within 2 seconds and same directory
+  if (( now - _git_prompt_cache_time < 2 )) && [[ "$PWD" == "$_git_prompt_cache_dir" ]]; then
+    [[ -n "$_git_prompt_cache" ]] && print "$_git_prompt_cache"
+    return
+  fi
+
   local branch
-  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null) || return
+  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git rev-parse --short HEAD 2>/dev/null) || {
+    _git_prompt_cache=""
+    _git_prompt_cache_time=$now
+    _git_prompt_cache_dir="$PWD"
+    return
+  }
+
   local color="green"
-  if [[ -n $(git status --porcelain 2>/dev/null) ]]; then
+  # diff-index is significantly faster than status --porcelain
+  if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     color="yellow"
   fi
-  print " %F{${color}}🌿 ${branch}%f"
+
+  _git_prompt_cache=" %F{${color}}🌿 ${branch}%f"
+  _git_prompt_cache_time=$now
+  _git_prompt_cache_dir="$PWD"
+  print "$_git_prompt_cache"
 }
 
-# Fast custom prompt function to show truncated path with ellipsis
-custom_pwd() {
-  local pwd_length=3  # Number of directories to show
-  local current_dir="$PWD"
-
-  # Replace home directory with ~
-  if [[ "$current_dir" == "$HOME"* ]]; then
-    current_dir="~${current_dir#$HOME}"
-  fi
-
-  # Split path into array using zsh built-in
-  local -a path_parts
-  path_parts=(${(s:/:)current_dir})
-
-  # If path is short enough, return as is
-  if (( ${#path_parts} <= $((pwd_length + 1)) )); then
-    echo "$current_dir"
-  else
-    # Take last pwd_length parts using zsh array slicing
-    local short_path="${(j:/:)path_parts[-$pwd_length,-1]}"
-    echo "~/.../$short_path"
-  fi
-}
-
+# Use zsh built-in %(5~|~/.../%3~|%~) for truncated path (no fork)
 case "$OSTYPE" in
   linux*)
-    export PROMPT='%F{82}%n@%m%f:%F{63}$(custom_pwd)%f$(git_prompt_info)$(gcloud_prompt_info)$ '
+    export PROMPT='%F{82}%n@%m%f:%F{63}%(5~|~/.../%3~|%~)%f$(git_prompt_info)$(gcloud_prompt_info)$ '
     ;;
   *)
-    export PROMPT='%F{141}%n@%m%f:%F{39}$(custom_pwd)%f$(git_prompt_info)$(gcloud_prompt_info)$ '
+    export PROMPT='%F{141}%n@%m%f:%F{39}%(5~|~/.../%3~|%~)%f$(git_prompt_info)$(gcloud_prompt_info)$ '
     ;;
 esac

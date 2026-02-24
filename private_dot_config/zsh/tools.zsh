@@ -36,9 +36,9 @@ _initialize_runtime_tools() {
     source "$HOME/.rye/env"
   fi
 
-  # mise
+  # mise (--shims avoids precmd hook overhead on every Enter)
   if command -v mise > /dev/null 2>&1; then
-    eval "$(mise activate zsh)"
+    eval "$(mise activate zsh --shims)"
   fi
 
   # direnv
