@@ -28,7 +28,7 @@ run() {
 }
 
 if confirm "Install age (file encryption)?"; then
-  run bash -lc 'AGE_VERSION=$(curl -sL https://api.github.com/repos/FiloSottile/age/releases/latest | grep tag_name | cut -d\" -f4) && curl -sL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz" | sudo tar xz -C /usr/local/bin --strip-components=1 age/age age/age-keygen'
+  run sudo apt-get install -y age
 fi
 
 if confirm "Install GitHub CLI (gh)?"; then
