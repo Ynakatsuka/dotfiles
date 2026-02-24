@@ -99,8 +99,8 @@ env = { PORT = "50100" }
 [tasks.update-dotfile]
 description = "Update dotfiles and development environment"
 run = """
-chezmoi update -v && \
 mise up && \
+chezmoi update -v && \
 mise cache clean
 """
 
@@ -117,8 +117,8 @@ brew autoremove
 [tasks.maintenance]
 description = "Update dotfiles, mise tools, and Homebrew packages"
 run = """
-chezmoi update -v && \
 mise up && \
+chezmoi update -v && \
 mise cache clean && \
 if command -v brew >/dev/null 2>&1; then
   brew update && \
