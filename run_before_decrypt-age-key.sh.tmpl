@@ -15,18 +15,13 @@ if [ ! -f "$ENCRYPTED_KEY" ]; then
     exit 0
 fi
 
-AGE_CMD=""
-if command -v age >/dev/null 2>&1; then
-    AGE_CMD="age"
-elif [ -x "${HOME}/.local/share/mise/shims/age" ]; then
-    AGE_CMD="${HOME}/.local/share/mise/shims/age"
-else
-    echo "[WARN] age not found. Run 'mise install' first, then 'chezmoi apply'."
+if ! command -v age >/dev/null 2>&1; then
+    echo "[WARN] age not found. Install age first, then run 'chezmoi apply'."
     exit 0
 fi
 
 echo "[INFO] Decrypting age key (passphrase required once)..."
 mkdir -p "$(dirname "$KEY_PATH")"
-"$AGE_CMD" -d -o "$KEY_PATH" "$ENCRYPTED_KEY"
+age -d -o "$KEY_PATH" "$ENCRYPTED_KEY"
 chmod 600 "$KEY_PATH"
 echo "[INFO] Age key cached at $KEY_PATH"

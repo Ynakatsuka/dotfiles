@@ -142,17 +142,23 @@ chezmoi add --encrypt <file>
 **Setup on a new machine:**
 
 ```bash
-# 1. Install chezmoi and initialize
+# macOS
+brew install age
+
+# Linux (via bootstrap)
+make -C bootstrap linux  # includes age installation
+
+# Linux (manual)
+AGE_VERSION=$(curl -sL https://api.github.com/repos/FiloSottile/age/releases/latest | grep tag_name | cut -d\" -f4)
+curl -sL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSION}/age-${AGE_VERSION}-linux-amd64.tar.gz" \
+  | sudo tar xz -C /usr/local/bin --strip-components=1 age/age age/age-keygen
+```
+
+Then initialize chezmoi (passphrase is needed once to decrypt the age key):
+
+```bash
 chezmoi init https://github.com/Ynakatsuka/dotfiles.git
-
-# 2. Install mise tools (includes age)
-mise install
-
-# 3. Re-initialize chezmoi (picks up age path from mise)
-chezmoi init
-
-# 4. Apply (enter passphrase once to decrypt age key)
-chezmoi apply -v
+chezmoi apply -v  # enter passphrase once
 ```
 
 ### Force Sync
