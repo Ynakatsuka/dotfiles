@@ -3,4 +3,8 @@ encryption = "age"
 [age]
     identity = "~/.config/chezmoi/key.txt"
     recipient = "age1w5ek6kq90p7cgs3k4s47ug2lz8p82l5lnac8pckapv45zxyygvnq9ec0pe"
-    command = {{ output "mise" "which" "age" | trim | quote }}
+{{- if lookPath "age" }}
+    command = {{ lookPath "age" | quote }}
+{{- else if stat (joinPath .chezmoi.homeDir ".local/share/mise/shims/age") }}
+    command = {{ joinPath .chezmoi.homeDir ".local/share/mise/shims/age" | quote }}
+{{- end }}
