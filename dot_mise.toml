@@ -1,4 +1,7 @@
 [tools]
+# age - Simple, modern file encryption
+age = "latest"
+
 # Gemini CLI - Google AI CLI
 gemini-cli = "latest"
 

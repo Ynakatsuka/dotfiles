@@ -121,6 +121,40 @@ Installed plugins:
 | `chezmoi cd` | Go to chezmoi source directory |
 | `chezmoi update -v` | Pull and apply remote changes |
 
+### Encrypted Files
+
+Sensitive files (SSH config, gcloud configurations) are managed with [age](https://github.com/FiloSottile/age) passphrase encryption.
+
+**Encrypted files in this repo:**
+
+| File | Deployed to |
+|------|-------------|
+| `private_dot_ssh/encrypted_private_config.age` | `~/.ssh/config` |
+| `private_dot_config/gcloud/configurations/encrypted_config_*.age` | `~/.config/gcloud/configurations/` |
+
+**Adding a new encrypted file:**
+
+```bash
+chezmoi add --encrypt <file>
+# Enter passphrase when prompted
+```
+
+**Setup on a new machine:**
+
+```bash
+# 1. Install chezmoi and initialize
+chezmoi init https://github.com/Ynakatsuka/dotfiles.git
+
+# 2. Install mise tools (includes age)
+mise install
+
+# 3. Re-initialize chezmoi (picks up age path from mise)
+chezmoi init
+
+# 4. Apply (enter passphrase when prompted to decrypt files)
+chezmoi apply -v
+```
+
 ### Force Sync
 
 ```bash
