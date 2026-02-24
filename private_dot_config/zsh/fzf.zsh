@@ -54,7 +54,15 @@ function gcloud-fzf-activate-login() {
     config=$(gcloud config configurations list --format="value(NAME)" | fzf --prompt="GCloud Config> " --height=40% --reverse)
     if [ -n "$config" ]; then
         gcloud config configurations activate "$config"
-        gcloud auth application-default login
+        local login
+        login=$(printf "login\nskip" | fzf --prompt="Login? > " --height=20% --reverse)
+        if [ "$login" = "login" ]; then
+            if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] && [ "$(uname)" != "Darwin" ]; then
+                gcloud auth application-default login --no-browser
+            else
+                gcloud auth application-default login
+            fi
+        fi
     fi
 }
 zle -N gcloud-fzf-activate-login
