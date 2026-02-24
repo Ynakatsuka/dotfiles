@@ -123,7 +123,7 @@ Installed plugins:
 
 ### Encrypted Files
 
-Sensitive files (SSH config, gcloud configurations) are managed with [age](https://github.com/FiloSottile/age) passphrase encryption.
+Sensitive files (SSH config, gcloud configurations) are managed with [age](https://github.com/FiloSottile/age) key-file encryption. The age private key (`.age-key.age`) is stored passphrase-encrypted in the repo. On first `chezmoi apply`, the key is decrypted once and cached at `~/.config/chezmoi/key.txt`. No passphrase is needed after that.
 
 **Encrypted files in this repo:**
 
@@ -131,12 +131,12 @@ Sensitive files (SSH config, gcloud configurations) are managed with [age](https
 |------|-------------|
 | `private_dot_ssh/encrypted_private_config.age` | `~/.ssh/config` |
 | `private_dot_config/gcloud/configurations/encrypted_config_*.age` | `~/.config/gcloud/configurations/` |
+| `.age-key.age` | Decrypted to `~/.config/chezmoi/key.txt` on first run |
 
 **Adding a new encrypted file:**
 
 ```bash
 chezmoi add --encrypt <file>
-# Enter passphrase when prompted
 ```
 
 **Setup on a new machine:**
@@ -151,7 +151,7 @@ mise install
 # 3. Re-initialize chezmoi (picks up age path from mise)
 chezmoi init
 
-# 4. Apply (enter passphrase when prompted to decrypt files)
+# 4. Apply (enter passphrase once to decrypt age key)
 chezmoi apply -v
 ```
 

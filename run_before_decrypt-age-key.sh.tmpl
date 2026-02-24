@@ -1,0 +1,22 @@
+#!/bin/bash
+# Decrypt age private key on first run.
+# Prompts for passphrase once; subsequent chezmoi operations use the cached key.
+
+KEY_PATH="${HOME}/.config/chezmoi/key.txt"
+ENCRYPTED_KEY="{{ joinPath .chezmoi.sourceDir ".age-key.age" }}"
+
+if [ -f "$KEY_PATH" ]; then
+    exit 0
+fi
+
+if [ ! -f "$ENCRYPTED_KEY" ]; then
+    echo "[WARN] Encrypted age key not found: $ENCRYPTED_KEY"
+    echo "[WARN] Encrypted files will not be decrypted."
+    exit 0
+fi
+
+echo "[INFO] Decrypting age key (passphrase required once)..."
+mkdir -p "$(dirname "$KEY_PATH")"
+{{ output "mise" "which" "age" | trim }} -d -o "$KEY_PATH" "$ENCRYPTED_KEY"
+chmod 600 "$KEY_PATH"
+echo "[INFO] Age key cached at $KEY_PATH"
