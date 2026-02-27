@@ -1,3 +1,7 @@
+---
+paths: "**/*.sql"
+---
+
 ## BigQuery
 
 - Interact with BigQuery **exclusively** via the `bq` command-line tool.

@@ -1,3 +1,7 @@
+---
+paths: "**/*.py"
+---
+
 When applying this rule, prefix your response with the 🧩 emoji.
 
 ## GPU Usage
