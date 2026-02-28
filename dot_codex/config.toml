@@ -3,6 +3,7 @@ network_access = true
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 model = "gpt-5.3-codex"
+model_reasoning_effort = "xhigh"
 
 [tools]
 unified_exec = true
