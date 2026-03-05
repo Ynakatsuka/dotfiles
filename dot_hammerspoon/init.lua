@@ -326,3 +326,53 @@ hs.hotkey.bind(hyper, "J", function()
     local frame = targetScreen:frame()
     window:setFrame(frame, 0)
 end)
+
+-- Run a shell command in a new terminal surface within the current cmux workspace
+local function runInNewCmuxTerminalSurface(cmd)
+    local app = hs.application.frontmostApplication()
+    if not app or app:name() ~= "cmux" then
+        return
+    end
+
+    hs.eventtap.keyStroke({"cmd"}, "t")
+    hs.timer.doAfter(0.20, function()
+        hs.eventtap.keyStroke({"ctrl"}, "u")
+
+        local prevClipboard = hs.pasteboard.getContents()
+        hs.pasteboard.setContents(cmd)
+        hs.eventtap.keyStroke({"cmd"}, "v")
+
+        hs.timer.doAfter(0.05, function()
+            hs.eventtap.keyStroke({}, "return")
+            hs.timer.doAfter(0.05, function()
+                if prevClipboard then
+                    hs.pasteboard.setContents(prevClipboard)
+                end
+            end)
+        end)
+    end)
+end
+
+-- Launch difit web review for current working tree (no split)
+hs.hotkey.bind({"cmd", "shift"}, "G", function()
+    local cmd = "difit working --no-open >/tmp/difit.log 2>&1 & " ..
+        "for i in {1..20}; do nc -z localhost 4966 >/dev/null 2>&1 && break; sleep 0.05; done; " ..
+        "cmux new-surface --type browser --url http://localhost:4966"
+
+    runInNewCmuxTerminalSurface(cmd)
+end)
+
+-- Launch difit web review against fork base branch (no split)
+hs.hotkey.bind({"cmd", "shift"}, "H", function()
+    local cmd = "BASE_BRANCH=$(git config --get branch.$(git rev-parse --abbrev-ref HEAD).gh-merge-base); " ..
+        "if [ -z \"$BASE_BRANCH\" ]; then BASE_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed \"s#^origin/##\"); fi; " ..
+        "if [ -z \"$BASE_BRANCH\" ]; then BASE_BRANCH=main; fi; " ..
+        "if git show-ref --verify --quiet \"refs/remotes/origin/$BASE_BRANCH\"; then TARGET=\"origin/$BASE_BRANCH\"; " ..
+        "elif git show-ref --verify --quiet \"refs/heads/$BASE_BRANCH\"; then TARGET=\"$BASE_BRANCH\"; " ..
+        "else TARGET=\"origin/main\"; fi; " ..
+        "difit . \"$TARGET\" --no-open >/tmp/difit.log 2>&1 & " ..
+        "for i in {1..20}; do nc -z localhost 4966 >/dev/null 2>&1 && break; sleep 0.05; done; " ..
+        "cmux new-surface --type browser --url http://localhost:4966"
+
+    runInNewCmuxTerminalSurface(cmd)
+end)
