@@ -1,3 +1,9 @@
+font-family = Monaco
 font-size = 13
 window-padding-x = 4
 window-padding-y = 4
+window-save-state = always
+term = xterm-256color
+keybind = super+left=previous_tab
+keybind = super+right=next_tab
+keybind = super+g=text:difit\\x20working\\x20--tui\\x0d
