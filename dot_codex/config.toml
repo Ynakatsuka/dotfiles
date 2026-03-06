@@ -2,8 +2,8 @@ hide_agent_reasoning = true
 network_access = true
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
-model = "gpt-5.3-codex"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.4"
+model_reasoning_effort = "high"
 
 [tools]
 unified_exec = true
