@@ -6,4 +6,3 @@ window-save-state = always
 term = xterm-256color
 keybind = super+left=previous_tab
 keybind = super+right=next_tab
-keybind = super+g=text:difit\x20working\x20--tui\x0d
