@@ -43,5 +43,6 @@
   "dangerously-skip-permissions": true,
   "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
-  "autoUpdatesChannel": "latest"
+  "autoUpdatesChannel": "latest",
+  "model": "claude-opus-4-6"
 }
