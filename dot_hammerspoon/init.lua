@@ -27,7 +27,7 @@ local externalLayout = {
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
     leftBottom = "Google Chrome", -- Left bottom (45% x 80%)
-    rightTop = "ghostty",         -- Right top (55% x 20%)
+    rightTop = "cmux",            -- Right top (55% x 20%)
     rightBottom = "Cursor"        -- Right bottom (55% x 80%)
 }
 
@@ -38,7 +38,7 @@ local builtInLayout = {
 
     topApps = {
         "Sublime Text",
-        "ghostty"
+        "cmux"
     },
 
     fullscreenApps = {
@@ -56,7 +56,7 @@ local apps = {
     chrome = "Google Chrome",
     sublime = "Sublime Text",
     cursor = "Cursor",
-    ghostty = "ghostty"
+    cmux = "cmux"
 }
 
 -- Check if external display is connected
