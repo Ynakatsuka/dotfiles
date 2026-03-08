@@ -29,6 +29,16 @@ make -C bootstrap macos-dotfiles
 make -C bootstrap linux-dotfiles
 ```
 
+### Quick Setup (No Git Clone Required)
+
+Set up user-local environment with a single command. Requires `curl`, `git`, and `make`.
+
+```bash
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
+  "$HOME/.local/bin/chezmoi" init --apply Ynakatsuka/dotfiles && \
+  make -C ~/.local/share/chezmoi/bootstrap linux-user
+```
+
 ### Pre‑clone Setup (Fresh Machines)
 
 If the machine does not have Git yet, use one of these minimal flows to obtain this repository first.
