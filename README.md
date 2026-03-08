@@ -10,6 +10,14 @@ make -C bootstrap macos-dotfiles
 make -C bootstrap linux-dotfiles
 ```
 
+### One-liner Install (No Git Clone Required)
+
+```bash
+sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
+  "$HOME/.local/bin/chezmoi" init --apply Ynakatsuka/dotfiles && \
+  make -C ~/.local/share/chezmoi/bootstrap linux-user
+```
+
 ## Commands & Shortcuts
 
 ### Zsh Keybindings
