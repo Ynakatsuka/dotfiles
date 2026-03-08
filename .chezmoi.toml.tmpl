@@ -1,8 +1,8 @@
+{{- if and (lookPath "age") (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
 encryption = "age"
 
 [age]
     identity = "~/.config/chezmoi/key.txt"
     recipient = "age1w5ek6kq90p7cgs3k4s47ug2lz8p82l5lnac8pckapv45zxyygvnq9ec0pe"
-{{- with lookPath "age" }}
-    command = {{ . | quote }}
+    command = {{ lookPath "age" | quote }}
 {{- end }}

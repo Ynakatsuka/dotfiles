@@ -7,17 +7,18 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
 DRY_RUN=0
+SKIP_AGE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
+    --skip-age) SKIP_AGE=1 ;;
     *) warn "Unknown option: $1"; exit 1 ;;
   esac
   shift
 done
 
 require_ubuntu
-require_cmd apt-get
 
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -27,11 +28,13 @@ run() {
   fi
 }
 
-if confirm "Install age (file encryption)?"; then
+has_apt() { command -v apt-get >/dev/null 2>&1; }
+
+if [ "$SKIP_AGE" -eq 0 ] && has_apt && confirm "Install age (file encryption)?"; then
   run sudo apt-get install -y age
 fi
 
-if confirm "Install GitHub CLI (gh)?"; then
+if has_apt && confirm "Install GitHub CLI (gh)?"; then
   run sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059 || true
   run sudo apt-add-repository https://cli.github.com/packages || true
   run sudo apt update -y
@@ -39,7 +42,7 @@ if confirm "Install GitHub CLI (gh)?"; then
   warn "Run 'gh auth login' manually after installation."
 fi
 
-if confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
+if command -v gh >/dev/null 2>&1 && confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
   run gh extension install dlvhdr/gh-dash
 fi
 
@@ -65,7 +68,7 @@ if confirm "Install direnv?"; then
   run bash -lc '_s=$(mktemp) && curl --fail -sL https://direnv.net/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
 fi
 
-if confirm "Install Google Cloud CLI?"; then
+if has_apt && confirm "Install Google Cloud CLI?"; then
   run sudo apt-get install -y apt-transport-https ca-certificates gnupg curl sudo
   run bash -lc 'curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -'
   run bash -lc 'echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list'

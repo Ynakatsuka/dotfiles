@@ -1,3 +1,10 @@
 README.md
 .git/
 .age-key.age
+
+{{- if not (and (lookPath "age") (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt"))) }}
+.ssh/config
+.config/gcloud/configurations/config_grcp
+.config/gcloud/configurations/config_orange
+.config/gcloud/configurations/config_ix
+{{- end }}

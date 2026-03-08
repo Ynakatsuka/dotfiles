@@ -1,29 +1,32 @@
 SHELL := /bin/bash
 
-.PHONY: macos linux linux-user macos-dotfiles linux-dotfiles
+OS := $(shell uname -s)
 
-macos:
-	bash macos/00_xcode_brew.sh
-	@BREW=$$(if [ -x "/opt/homebrew/bin/brew" ]; then echo "/opt/homebrew/bin/brew"; elif [ -x "/usr/local/bin/brew" ]; then echo "/usr/local/bin/brew"; else echo "brew"; fi) && \
-	$$BREW bundle --file macos/Brewfile && \
-	bash macos/20_defaults.sh && \
-	bash macos/22_pointer.sh && \
-	bash macos/25_hotcorners.sh && \
-	bash macos/30_iterm.sh && \
-	bash macos/35_iterm_prefs.sh && \
-	bash macos/10_git.sh && \
-	bash macos/40_ssh.sh && \
-	bash macos/45_dotfiles.sh && \
-	$$BREW cleanup
+.PHONY: full standard minimal
 
-linux:
-	bash linux/main.sh --with-docker --with-clis --with-cleanup
+full:
+ifeq ($(OS),Darwin)
+	bash macos/main.sh --plan full
+else ifeq ($(OS),Linux)
+	bash linux/main.sh --plan full
+else
+	@echo "[ERROR] Unsupported OS: $(OS)" && exit 1
+endif
 
-macos-dotfiles:
-	bash macos/45_dotfiles.sh
+standard:
+ifeq ($(OS),Darwin)
+	bash macos/main.sh --plan standard
+else ifeq ($(OS),Linux)
+	bash linux/main.sh --plan standard
+else
+	@echo "[ERROR] Unsupported OS: $(OS)" && exit 1
+endif
 
-linux-user:
-	bash linux/main.sh --user-only
-
-linux-dotfiles:
-	bash linux/modules/40_dotfiles.sh
+minimal:
+ifeq ($(OS),Darwin)
+	bash macos/main.sh --plan minimal
+else ifeq ($(OS),Linux)
+	bash linux/main.sh --plan minimal
+else
+	@echo "[ERROR] Unsupported OS: $(OS)" && exit 1
+endif

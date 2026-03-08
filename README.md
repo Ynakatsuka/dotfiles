@@ -15,57 +15,35 @@ This repository bootstraps a working shell and development environment for macOS
 
 ## Quick Start
 
-### Dotfiles Only
+OS (macOS / Linux) is auto-detected. Choose a plan:
 
 ```bash
-# macOS
-make -C bootstrap macos-dotfiles
-
-# Ubuntu 22.04
-make -C bootstrap linux-dotfiles
-```
-
-### Full Bootstrap
-
-```bash
-# macOS
-make -C bootstrap macos
-
-# Ubuntu 22.04
-make -C bootstrap linux
-```
-
-### User-Local Linux Setup
-
-For machines without `sudo`, install user-local CLIs and dotfiles only:
-
-```bash
-make -C bootstrap linux-user
+make -C bootstrap full      # Everything: system packages, apps, CLIs, dotfiles, mise tools
+make -C bootstrap standard  # CLIs + dotfiles + mise tools (no sudo on Linux)
+make -C bootstrap minimal   # Dotfiles only (chezmoi apply)
 ```
 
 ### One-Liner Install
 
-No Git clone required. This is the fastest path for a user-local Linux setup.
+No Git clone required. Fastest path for a user-local Linux setup:
 
 ```bash
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
   "$HOME/.local/bin/chezmoi" init --apply Ynakatsuka/dotfiles && \
-  make -C ~/.local/share/chezmoi/bootstrap linux-user
+  make -C ~/.local/share/chezmoi/bootstrap standard
 ```
 
 Detailed bootstrap behavior lives in [bootstrap/README.md](bootstrap/README.md).
 
 ## Common Tasks
 
-### Bootstrap Targets
+### Bootstrap Plans
 
 | Command | Purpose |
 |---------|---------|
-| `make -C bootstrap macos` | Full macOS bootstrap |
-| `make -C bootstrap linux` | Full Ubuntu 22.04 bootstrap |
-| `make -C bootstrap linux-user` | User-local Linux bootstrap |
-| `make -C bootstrap macos-dotfiles` | Apply macOS dotfiles only |
-| `make -C bootstrap linux-dotfiles` | Apply Linux dotfiles only |
+| `make -C bootstrap full` | Full bootstrap (system packages + apps + CLIs + dotfiles + age + mise) |
+| `make -C bootstrap standard` | CLIs + dotfiles + mise (no sudo on Linux, no age encryption) |
+| `make -C bootstrap minimal` | Dotfiles only (chezmoi apply) |
 
 ### Chezmoi
 

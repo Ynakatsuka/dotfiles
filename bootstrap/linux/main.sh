@@ -13,9 +13,12 @@ WITH_NVIDIA_CONTAINER=0
 WITH_CLIS=0
 WITH_DOTFILES=0
 WITH_CLEANUP=0
+WITH_MISE_INSTALL=0
 XDG_ENGLISH_DIRS=0
 USER_ONLY=0
 DRY_RUN=0
+PLAN=""
+SKIP_AGE=0
 
 usage() {
   cat <<'USAGE'
@@ -25,6 +28,7 @@ Usage:
   main.sh [options]
 
 Options:
+  --plan <full|standard|minimal>  Deploy plan (auto-sets flags).
   --with-gpu                 Install NVIDIA driver/toolkit (guarded).
   --with-expressvpn          Install ExpressVPN (guarded).
   --with-docker              Install Docker CE + plugins.
@@ -37,12 +41,16 @@ Options:
   --dry-run                  Show planned actions only.
   -h, --help                 Show help.
 
-By default, only base packages and SSH/locale checks run.
+Plans:
+  full      Base packages (sudo) + Docker + CLIs (with age) + dotfiles + mise install
+  standard  CLIs (no age, no sudo) + dotfiles + mise install
+  minimal   Dotfiles only (chezmoi apply)
 USAGE
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --plan) shift; PLAN="$1" ;;
     --with-gpu) WITH_GPU=1 ;;
     --with-expressvpn) WITH_EXPRESSVPN=1 ;;
     --with-docker) WITH_DOCKER=1 ;;
@@ -58,6 +66,24 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# Apply plan presets (override individual flags)
+case "$PLAN" in
+  full)
+    WITH_DOCKER=1; WITH_CLIS=1; WITH_DOTFILES=1; WITH_CLEANUP=1; WITH_MISE_INSTALL=1
+    ;;
+  standard)
+    USER_ONLY=1; WITH_CLIS=1; WITH_DOTFILES=1; WITH_MISE_INSTALL=1; SKIP_AGE=1
+    ;;
+  minimal)
+    USER_ONLY=1; WITH_DOTFILES=1
+    ;;
+  "")
+    ;; # no plan specified, use individual flags
+  *)
+    warn "Unknown plan: $PLAN"; usage; exit 1
+    ;;
+esac
 
 if [ "$USER_ONLY" -eq 0 ]; then
   require_ubuntu_2204
@@ -119,12 +145,31 @@ fi
 
 if [ "$WITH_CLIS" -eq 1 ]; then
   log "Running 30_clis.sh"
-  "${SCRIPT_DIR}/modules/30_clis.sh" $(_dry_run_flag)
+  _skip_age_flag=""
+  [ "$SKIP_AGE" -eq 1 ] && _skip_age_flag="--skip-age"
+  "${SCRIPT_DIR}/modules/30_clis.sh" $(_dry_run_flag) $_skip_age_flag
 fi
 
 if [ "$WITH_DOTFILES" -eq 1 ]; then
   log "Running 40_dotfiles.sh"
   "${SCRIPT_DIR}/modules/40_dotfiles.sh" $(_dry_run_flag)
+fi
+
+if [ "$WITH_MISE_INSTALL" -eq 1 ]; then
+  # mise may have been just installed; try common paths
+  MISE_CMD=""
+  if command -v mise >/dev/null 2>&1; then
+    MISE_CMD="mise"
+  elif [ -x "$HOME/.local/bin/mise" ]; then
+    MISE_CMD="$HOME/.local/bin/mise"
+  fi
+
+  if [ -n "$MISE_CMD" ]; then
+    log "Running mise install"
+    run "$MISE_CMD" install
+  else
+    warn "mise not found. Skipping mise install."
+  fi
 fi
 
 if [ "$WITH_CLEANUP" -eq 1 ]; then

@@ -43,3 +43,13 @@ require_cmd() {
 has_nvidia_gpu() {
   lspci 2>/dev/null | grep -qi nvidia
 }
+
+require_macos() {
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "[ERROR] This script requires macOS." >&2
+    exit 1
+  fi
+}
+
+is_linux() { [[ "$(uname -s)" == "Linux" ]]; }
+is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }

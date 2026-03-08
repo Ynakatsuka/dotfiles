@@ -27,14 +27,12 @@ This is a **Chezmoi-based dotfiles management system** for macOS and Ubuntu 22.0
 
 ### Bootstrap
 
-```bash
-# Full setup
-make -C bootstrap macos           # macOS with apps
-make -C bootstrap linux           # Ubuntu 22.04
+OS is auto-detected via `uname`. Choose a plan:
 
-# Dotfiles only
-make -C bootstrap macos-dotfiles
-make -C bootstrap linux-dotfiles
+```bash
+make -C bootstrap full      # Everything: system packages, apps, CLIs, dotfiles, age, mise
+make -C bootstrap standard  # CLIs + dotfiles + mise (no sudo on Linux, no age)
+make -C bootstrap minimal   # Dotfiles only (chezmoi apply)
 ```
 
 ### Chezmoi Operations
