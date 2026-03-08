@@ -25,7 +25,7 @@ run() {
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "[DRY-RUN] $*"
   else
-    eval "$@"
+    "$@"
   fi
 }
 

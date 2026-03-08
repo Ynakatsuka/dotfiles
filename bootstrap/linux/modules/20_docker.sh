@@ -24,13 +24,13 @@ run() {
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "[DRY-RUN] $*"
   else
-    eval "$@"
+    "$@"
   fi
 }
 
 log "Configuring Docker APT repository"
 run sudo install -m 0755 -d /etc/apt/keyrings
-run curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+run bash -c 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg'
 run sudo chmod a+r /etc/apt/keyrings/docker.gpg
 run bash -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null'
 run sudo apt-get update -y

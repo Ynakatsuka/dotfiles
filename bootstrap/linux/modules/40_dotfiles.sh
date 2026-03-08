@@ -20,7 +20,7 @@ run() {
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "[DRY-RUN] $*"
   else
-    eval "$@"
+    "$@"
   fi
 }
 
@@ -39,7 +39,7 @@ if confirm "Install chezmoi and apply this dotfiles repo?"; then
 fi
 
 if confirm "Change login shell to zsh?"; then
-  run chsh -s "$(which zsh)"
+  run chsh -s "$(which zsh)" || warn "chsh failed (try manually: chsh -s $(which zsh))"
 fi
 
 log "Dotfiles module completed"

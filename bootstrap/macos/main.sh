@@ -45,7 +45,7 @@ run() {
   if [ "$DRY_RUN" -eq 1 ]; then
     echo "[DRY-RUN] $*"
   else
-    eval "$@"
+    "$@"
   fi
 }
 
@@ -66,7 +66,7 @@ install_chezmoi_standalone() {
     return 0
   fi
   log "Installing chezmoi via curl"
-  run 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
+  run bash -c 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
 }
 
 run_dotfiles() {
