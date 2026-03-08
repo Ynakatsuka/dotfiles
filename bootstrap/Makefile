@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: macos linux macos-dotfiles linux-dotfiles
+.PHONY: macos linux linux-user macos-dotfiles linux-dotfiles
 
 macos:
 	bash macos/00_xcode_brew.sh
@@ -21,6 +21,9 @@ linux:
 
 macos-dotfiles:
 	bash macos/45_dotfiles.sh
+
+linux-user:
+	bash linux/main.sh --user-only
 
 linux-dotfiles:
 	bash linux/modules/40_dotfiles.sh

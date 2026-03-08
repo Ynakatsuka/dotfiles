@@ -1,4 +1,4 @@
-## Bootstrap (Mac / Ubuntu 22.04)
+## Bootstrap (Mac / Ubuntu)
 
 Minimal, reproducible setup for new machines. Destructive actions always ask for confirmation.
 
@@ -18,8 +18,11 @@ Minimal, reproducible setup for new machines. Destructive actions always ask for
 
 ```bash
 # Full setups
-make -C bootstrap macos   # macOS full bootstrap (apps included)
-make -C bootstrap linux   # Ubuntu 22.04 full bootstrap
+make -C bootstrap macos        # macOS full bootstrap (apps included)
+make -C bootstrap linux        # Ubuntu 22.04 full bootstrap (requires sudo)
+
+# User-local setup (no sudo required)
+make -C bootstrap linux-user   # CLIs + dotfiles only, for non-admin users
 
 # Dotfiles only
 make -C bootstrap macos-dotfiles
@@ -55,10 +58,15 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
   - Binds iTerm2 prefs if `bootstrap/iterm2/com.googlecode.iterm2.plist` exists
   - Sets Git identity, SSH, dotfiles (prezto/tpm/chezmoi/mise), then cleanup
 
-- Ubuntu 22.04
+- Ubuntu 22.04 (full)
   - Validates OS version, installs base packages
   - Installs Docker + CLIs, cleans up
   - Detects NVIDIA GPU and offers driver/CUDA install with confirmation
+
+- Ubuntu (user-only, `--user-only`)
+  - Skips base packages and system-level setup (no sudo required)
+  - Installs user-local CLIs (uv, mise, direnv, Claude Code, etc.)
+  - Sets up dotfiles (prezto, tpm, chezmoi)
 
 ### Customize
 
@@ -75,7 +83,8 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 ### Support
 
 - macOS (Homebrew-based)
-- Ubuntu 22.04 LTS only
+- Ubuntu 22.04 LTS (full setup)
+- Ubuntu (any version, user-only mode)
 
 ## Troubleshooting
 

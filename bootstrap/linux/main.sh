@@ -14,6 +14,7 @@ WITH_CLIS=0
 WITH_DOTFILES=0
 WITH_CLEANUP=0
 XDG_ENGLISH_DIRS=0
+USER_ONLY=0
 DRY_RUN=0
 
 usage() {
@@ -32,6 +33,7 @@ Options:
   --with-dotfiles            Setup prezto/tpm/chezmoi (guarded).
   --with-cleanup             Run apt autoremove at the end.
   --xdg-english-dirs         Convert XDG user dirs to English (guarded).
+  --user-only                Skip base packages (no sudo). Run only CLIs + dotfiles.
   --dry-run                  Show planned actions only.
   -h, --help                 Show help.
 
@@ -49,6 +51,7 @@ while [ $# -gt 0 ]; do
     --with-dotfiles) WITH_DOTFILES=1 ;;
     --with-cleanup) WITH_CLEANUP=1 ;;
     --xdg-english-dirs) XDG_ENGLISH_DIRS=1 ;;
+    --user-only) USER_ONLY=1; WITH_CLIS=1; WITH_DOTFILES=1 ;;
     --dry-run) DRY_RUN=1 ;;
     -h|--help) usage; exit 0 ;;
     *) warn "Unknown option: $1"; usage; exit 1 ;;
@@ -56,8 +59,12 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-require_ubuntu_2204
-require_cmd apt-get
+if [ "$USER_ONLY" -eq 0 ]; then
+  require_ubuntu_2204
+  require_cmd apt-get
+else
+  require_ubuntu
+fi
 
 run() {
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -70,8 +77,12 @@ run() {
 _dry_run_flag() { [ "$DRY_RUN" -eq 1 ] && echo "--dry-run" || true; }
 _xdg_flag() { [ "$XDG_ENGLISH_DIRS" -eq 1 ] && echo "--xdg-english-dirs" || true; }
 
-log "Running 00_base.sh"
-"${SCRIPT_DIR}/modules/00_base.sh" $(_dry_run_flag) $(_xdg_flag)
+if [ "$USER_ONLY" -eq 0 ]; then
+  log "Running 00_base.sh"
+  "${SCRIPT_DIR}/modules/00_base.sh" $(_dry_run_flag) $(_xdg_flag)
+else
+  log "Skipping 00_base.sh (user-only mode)"
+fi
 
 if [ "$WITH_EXPRESSVPN" -eq 1 ]; then
   log "Running 05_expressvpn.sh"
