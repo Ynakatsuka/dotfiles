@@ -24,21 +24,29 @@ run() {
   fi
 }
 
-if confirm "Clone prezto?"; then
+if [ -d "${ZDOTDIR:-$HOME}/.zprezto" ]; then
+  log "prezto already installed, skipping"
+elif confirm "Clone prezto?"; then
   run git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"
 fi
 
-if confirm "Clone tmux plugin manager (tpm)?"; then
+if [ -d "$HOME/.tmux/plugins/tpm" ]; then
+  log "tpm already installed, skipping"
+elif confirm "Clone tmux plugin manager (tpm)?"; then
   run git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
 fi
 
-if confirm "Install chezmoi and apply this dotfiles repo?"; then
+if command -v chezmoi >/dev/null 2>&1 || [ -x "$HOME/.local/bin/chezmoi" ]; then
+  log "chezmoi already installed, skipping"
+elif confirm "Install chezmoi and apply this dotfiles repo?"; then
   run bash -lc 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
   run bash -lc '"$HOME/.local/bin/chezmoi" init --apply git@github.com:Ynakatsuka/dotfiles.git'
   run bash -lc 'source "$HOME/.zshrc" || true'
 fi
 
-if confirm "Change login shell to zsh?"; then
+if [ "$(getent passwd "$USER" | cut -d: -f7)" = "$(which zsh 2>/dev/null)" ]; then
+  log "Login shell already zsh, skipping"
+elif confirm "Change login shell to zsh?"; then
   run chsh -s "$(which zsh)" || warn "chsh failed (try manually: chsh -s $(which zsh))"
 fi
 
