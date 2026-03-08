@@ -1,6 +1,21 @@
 # dotfiles
 
+Personal dotfiles managed with `chezmoi`.
+
+This repository bootstraps a working shell and development environment for macOS and Ubuntu, with a bias toward fast terminal workflows and reproducible machine setup.
+
+## What This Repo Manages
+
+- Shell environment: `zsh`, `bash`, aliases, FZF helpers
+- Git workflow: aliases, worktree helpers
+- Terminal tools: `tmux`, `mise`, `direnv`, CLI setup
+- Desktop automation: Hammerspoon window layouts
+- AI tooling: Claude Code / Codex related config
+- Secrets with encryption: SSH and gcloud config via `age`
+
 ## Quick Start
+
+### Dotfiles Only
 
 ```bash
 # macOS
@@ -10,7 +25,27 @@ make -C bootstrap macos-dotfiles
 make -C bootstrap linux-dotfiles
 ```
 
-### One-liner Install (No Git Clone Required)
+### Full Bootstrap
+
+```bash
+# macOS
+make -C bootstrap macos
+
+# Ubuntu 22.04
+make -C bootstrap linux
+```
+
+### User-Local Linux Setup
+
+For machines without `sudo`, install user-local CLIs and dotfiles only:
+
+```bash
+make -C bootstrap linux-user
+```
+
+### One-Liner Install
+
+No Git clone required. This is the fastest path for a user-local Linux setup.
 
 ```bash
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
@@ -18,39 +53,62 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
   make -C ~/.local/share/chezmoi/bootstrap linux-user
 ```
 
-## Commands & Shortcuts
+Detailed bootstrap behavior lives in [bootstrap/README.md](bootstrap/README.md).
 
-### Zsh Keybindings
+## Common Tasks
 
-| Keybinding | Description |
-|------------|-------------|
+### Bootstrap Targets
+
+| Command | Purpose |
+|---------|---------|
+| `make -C bootstrap macos` | Full macOS bootstrap |
+| `make -C bootstrap linux` | Full Ubuntu 22.04 bootstrap |
+| `make -C bootstrap linux-user` | User-local Linux bootstrap |
+| `make -C bootstrap macos-dotfiles` | Apply macOS dotfiles only |
+| `make -C bootstrap linux-dotfiles` | Apply Linux dotfiles only |
+
+### Chezmoi
+
+| Command | Purpose |
+|---------|---------|
+| `chezmoi managed` | List managed files |
+| `chezmoi add <file>` | Add a file to management |
+| `chezmoi forget <file>` | Stop managing a file |
+| `chezmoi edit <file>` | Edit a managed file |
+| `chezmoi apply -v` | Apply local source changes |
+| `chezmoi update -v` | Pull remote changes and apply them |
+| `chezmoi cd` | Jump to the source directory |
+
+### Reload Config
+
+```bash
+source ~/.zshrc
+tmux source ~/.tmux.conf
+```
+
+For a forced re-init:
+
+```bash
+chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
+```
+
+## Shortcuts
+
+### Shell Keybindings
+
+| Keybinding | Action |
+|------------|--------|
 | `Ctrl+H` | FZF history search |
-| `Ctrl+F` | FZF recent directory navigation (cdr) |
+| `Ctrl+F` | FZF recent directory navigation (`cdr`) |
 | `Ctrl+G` | GCloud configuration selector with login |
-| `Ctrl+R` | FZF ghq repository search |
-| `Ctrl+O` | Copy last command output to clipboard |
-| `Ctrl+L` | FZF Claude Code session resume |
+| `Ctrl+R` | FZF `ghq` repository search |
+| `Ctrl+O` | Copy the last command output to the clipboard |
+| `Ctrl+L` | Resume a Claude Code session for the current directory |
 
-### Hammerspoon Window Management
+### Git
 
-| Keybinding | Description |
-|------------|-------------|
-| `Alt+Ctrl+H` | Smart layout (auto-detect display type) |
-| `Alt+Ctrl+E` | Force external display layout (4-split) |
-| `Alt+Ctrl+I` | Force built-in display layout |
-
-**External Display Layout:**
-- Left 45%: Sublime Text (top 20%) / Chrome (bottom 80%)
-- Right 55%: ghostty (top 25%) / Cursor (bottom 75%)
-
-**Built-in Display Layout:**
-- Top 40%: Sublime Text, ghostty
-- Fullscreen: Chrome, Cursor
-
-### Git Aliases
-
-| Alias | Command |
-|-------|---------|
+| Alias / Command | Action |
+|-----------------|--------|
 | `st` | `git status` |
 | `ch` | `git checkout` |
 | `chb` | `git checkout -b` |
@@ -59,38 +117,33 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
 | `ft` | `git fetch` |
 | `cm` | `git commit` |
 | `br` | `git branch` |
-| `lb` | Select branch with FZF |
-
-### Git Worktree Management
-
-| Command | Description |
-|---------|-------------|
-| `gw` | Smart worktree manager (create/switch with FZF) |
-| `gw <branch>` | Create or switch to worktree for branch |
-| `gwc` | Cleanup worktrees (FZF multi-select) |
+| `lb` | Select a branch with FZF |
+| `gw` | Create or switch a worktree with FZF |
+| `gw <branch>` | Open or create a worktree for a branch |
+| `gwc` | Remove worktrees with multi-select confirmation |
 | `gwt` | `git worktree` |
 | `gwta` | `git worktree add` |
 | `gwtl` | `git worktree list` |
 | `gwtr` | `git worktree remove` |
 
-### Docker Aliases
+### Docker
 
-| Alias | Command |
-|-------|---------|
+| Alias | Action |
+|-------|--------|
 | `dc` | `docker compose` |
 | `dcps` | `docker compose ps` |
 | `dcud` | `docker compose up -d` |
 | `dcudb` | `docker compose up -d --build` |
 | `dcudf` | `docker compose up -d --force-recreate` |
-| `dce` | `docker compose exec` (auto-select service) |
+| `dce` | `docker compose exec` with service selection |
 | `dcl` | `docker compose logs` |
 | `dcd` | `docker compose down` |
-| `de` | Interactive docker exec with FZF |
+| `de` | Interactive `docker exec` with FZF |
 
-### GCloud Aliases
+### GCloud
 
-| Alias | Command |
-|-------|---------|
+| Alias | Action |
+|-------|--------|
 | `gca` | `gcloud config configurations activate` |
 | `gcl` | `gcloud config configurations list` |
 | `gal` | `gcloud auth application-default login` |
@@ -98,115 +151,96 @@ sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
 
 ### Claude Code
 
-| Command | Description |
-|---------|-------------|
-| `cl` | Launch Claude Code with MCP config (auto-detect) |
+| Command | Action |
+|---------|--------|
+| `cl` | Launch Claude Code with repo-local MCP config when available |
+
+### Hammerspoon
+
+| Keybinding | Action |
+|------------|--------|
+| `Alt+Ctrl+H` | Apply the smart layout for the current display setup |
+| `Alt+Ctrl+E` | Force the external display layout |
+| `Alt+Ctrl+I` | Force the built-in display layout |
+
+External display layout:
+
+- Left 45%: Sublime Text (top 20%), Google Chrome (bottom 80%)
+- Right 55%: ghostty (top 25%), Cursor (bottom 75%)
+
+Built-in display layout:
+
+- Top 40%: Sublime Text, ghostty
+- Fullscreen: Google Chrome, Cursor
 
 ### Tmux
 
 Default prefix: `Ctrl+b`
 
-| Keybinding | Description |
-|------------|-------------|
-| `prefix + I` | Install plugins (TPM) |
+| Keybinding | Action |
+|------------|--------|
+| `prefix + I` | Install plugins with TPM |
 
 Installed plugins:
-- `tmux-plugins/tpm` - Plugin manager
-- `tmux-plugins/tmux-sensible` - Sensible defaults
-- `Morantron/tmux-fingers` - Copy text with hints
 
-## Chezmoi Usage
+- `tmux-plugins/tpm`
+- `tmux-plugins/tmux-sensible`
+- `Morantron/tmux-fingers`
 
-### Basic Operations
+## Encrypted Files
 
-| Command | Description |
-|---------|-------------|
-| `chezmoi managed` | List managed files |
-| `chezmoi add <file>` | Add file to management |
-| `chezmoi forget <file>` | Remove file from management |
-| `chezmoi edit <file>` | Edit a managed file |
-| `chezmoi apply -v` | Apply changes |
-| `chezmoi cd` | Go to chezmoi source directory |
-| `chezmoi update -v` | Pull and apply remote changes |
+Sensitive files are managed with [`age`](https://github.com/FiloSottile/age) encryption.
 
-### Encrypted Files
+The repository stores the `age` private key itself as a passphrase-protected file (`.age-key.age`). On the first `chezmoi apply`, that key is decrypted and cached at `~/.config/chezmoi/key.txt`. After that, the passphrase is not required again on the same machine.
 
-Sensitive files (SSH config, gcloud configurations) are managed with [age](https://github.com/FiloSottile/age) key-file encryption. The age private key (`.age-key.age`) is stored passphrase-encrypted in the repo. On first `chezmoi apply`, the key is decrypted once and cached at `~/.config/chezmoi/key.txt`. No passphrase is needed after that.
+### Encrypted Paths
 
-**Encrypted files in this repo:**
-
-| File | Deployed to |
-|------|-------------|
+| Source | Deployed To |
+|--------|-------------|
 | `private_dot_ssh/encrypted_private_config.age` | `~/.ssh/config` |
 | `private_dot_config/gcloud/configurations/encrypted_config_*.age` | `~/.config/gcloud/configurations/` |
-| `.age-key.age` | Decrypted to `~/.config/chezmoi/key.txt` on first run |
+| `.age-key.age` | `~/.config/chezmoi/key.txt` |
 
-**Adding a new encrypted file:**
+### Add a New Encrypted File
 
 ```bash
 chezmoi add --encrypt <file>
 ```
 
-**Setup on a new machine:**
+### Install `age`
 
 ```bash
 # macOS
 brew install age
 
-# Linux (via bootstrap)
-make -C bootstrap linux  # includes age installation
-
-# Linux (manual)
+# Ubuntu
 sudo apt-get install -y age
 ```
 
-Then initialize chezmoi (passphrase is needed once to decrypt the age key):
+Bootstrap on Linux also installs `age`.
+
+### First-Time Setup on a New Machine
 
 ```bash
 chezmoi init https://github.com/Ynakatsuka/dotfiles.git
-chezmoi apply -v  # enter passphrase once
+chezmoi apply -v
 ```
 
-### Force Sync
+You will be asked for the passphrase once to decrypt the repository key.
 
-```bash
-chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
-```
+## Notes
 
-### Reload Configs
-
-```bash
-source $HOME/.zshrc
-tmux source $HOME/.tmux.conf
-```
-
-## Other Dependencies
-
-### bash-completion (Ubuntu)
+### bash-completion on Ubuntu
 
 ```bash
 sudo apt-get update && sudo apt-get install -y bash-completion
 ```
 
-## Other Tricks
-
-### Change Default Shell
+### Change the Default Shell
 
 ```bash
-chsh -s $(which zsh)
+chsh -s "$(which zsh)"
 ```
-
-### Reload Tmux Config
-
-```bash
-tmux source ~/.tmux.conf
-```
-
-Then press `prefix + I` to install plugins.
-
-## Bootstrap (Linux/macOS)
-
-Please see `bootstrap/README.md` for complete, up‑to‑date bootstrap instructions for macOS and Ubuntu 22.04.
 
 ## References
 
