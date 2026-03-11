@@ -77,8 +77,11 @@ dotenvx = "latest"
 # gopls - Go language server
 "go:golang.org/x/tools/gopls" = { version = "latest" }
 
+# agent-browser - Browser automation CLI for AI agents
+"github:vercel-labs/agent-browser" = "latest"
+
 # sdf - SDF CLI
-"ubi:sdf-labs/sdf-cli" = { version = "latest", matching = "sdf-*.tar.gz", exe = "sdf" }
+"github:sdf-labs/sdf-cli" = { version = "latest", matching = "sdf-*.tar.gz", exe = "sdf" }
 
 [settings]
 experimental = true
@@ -90,6 +93,7 @@ plugin_autoupdate_last_check_duration = "7 days"
 
 [env]
 GITHUB_TOKEN = "{{exec(command='GH=$(find ~/.local/share/mise/installs/gh -name gh -type f 2>/dev/null | head -1) && $GH auth token 2>/dev/null || true')}}"
+AGENT_BROWSER_NATIVE = "1"
 
 [tasks.claude-viewer]
 description = "Claude Code Viewer (port 50100)"
