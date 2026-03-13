@@ -105,6 +105,7 @@ case "$PLAN" in
     run bash "${SCRIPT_DIR}/22_pointer.sh"
     run bash "${SCRIPT_DIR}/25_hotcorners.sh"
     run bash "${SCRIPT_DIR}/30_iterm.sh"
+    run bash "${SCRIPT_DIR}/31_cmux.sh"
     run bash "${SCRIPT_DIR}/35_iterm_prefs.sh"
     run bash "${SCRIPT_DIR}/10_git.sh"
     run bash "${SCRIPT_DIR}/40_ssh.sh"
