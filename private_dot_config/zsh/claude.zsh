@@ -91,7 +91,7 @@ function fzf-session-resume() {
         local tool=$(echo "$selected" | awk -F'\t' '{print $1}')
         local session_id=$(echo "$selected" | awk -F'\t' '{print $5}')
         if [[ "$tool" == "claude" ]]; then
-            BUFFER="cl -r $session_id"
+            BUFFER="cl --resume=$session_id"
         else
             BUFFER="codex resume $session_id"
         fi
