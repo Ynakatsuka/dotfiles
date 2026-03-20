@@ -1,1 +1,8 @@
-{{- include "AGENTS.md" -}}
+{{- include "AGENTS.md" }}
+
+## Codex-Specific Addendum
+
+- Codex does not auto-load path-based rule files.
+- If the task touches Python, follow the Python rules: use `uv`, prefer modern typing, use Ruff/Mypy/Pytest, and keep comments/docstrings/logs in English.
+- If the task touches BigQuery or `.sql`, use `bq`, show current project/account before execution, and run `--dry_run` before expensive queries.
+- If the task runs GPU-heavy Python code, check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
