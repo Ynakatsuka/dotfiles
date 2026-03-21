@@ -18,7 +18,6 @@ This is a **Chezmoi-based dotfiles management system** for macOS and Ubuntu 22.0
 ### Directory Structure
 
 - `bootstrap/` - Platform-specific setup scripts (modular, numbered 00-99)
-- `commands/` - Claude/Cursor command templates and skills
 - `dot_claude/` - Claude Code global configuration (deployed to `~/.claude/`)
 - `dot_cursor/` - Cursor editor configuration
 - `dot_hammerspoon/` - macOS window management (Lua)
@@ -87,7 +86,7 @@ Bootstrap scripts are numbered for execution order:
 The `dot_claude/` directory deploys as `~/.claude/`:
 - `CLAUDE.md.tmpl` → Global instructions (includes AGENTS.md)
 - `rules/` → Domain-specific rules (bigquery, python, gpu, git)
-- `commands/` → Skill definitions for Claude Code
+- `skills/` → Skill definitions for Claude Code
 
 ## Critical Rules
 
