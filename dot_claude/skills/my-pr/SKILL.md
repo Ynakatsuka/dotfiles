@@ -5,6 +5,7 @@ description: >-
   create/update GitHub PRs. Default runs full flow (review → fix → create).
   Subcommands: `create` (skip review), `review` (review only).
   Use when creating PRs, self-reviewing changes, or requesting "PR作成", "レビュー".
+  Do NOT use for responding to others' review comments or reviewing external repositories.
 argument-hint: "[create|review]"
 ---
 

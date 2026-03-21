@@ -1,12 +1,12 @@
 ---
 name: my-skill-creator
 description: >-
-  Interactive guide for creating and improving Claude Code skills.
-  Use when users want to create a new skill, update an existing skill,
-  improve skill quality, or fix triggering issues.
-  Also use when the user asks to "スキルを作って", "スキル作成", "create a skill",
-  "new skill", "build a skill", "improve this skill", or "fix my skill".
-  Do NOT use for general coding tasks unrelated to skill authoring.
+  Interactive guide for creating and improving Claude Code skills (SKILL.md files).
+  Use when the user explicitly asks to create, update, or fix a **skill definition**.
+  Triggers: "スキルを作って", "スキル作成", "create a skill", "new skill", "build a skill",
+  "improve this skill", "update skill", "fix my skill", "skill doesn't trigger".
+  Do NOT use for general coding tasks, PR creation, code review, or any task
+  that merely contains the word "create" without referring to skill authoring.
 license: Complete terms in LICENSE.txt
 argument-hint: "[skill-name]"
 ---

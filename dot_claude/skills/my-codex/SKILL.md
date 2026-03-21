@@ -1,6 +1,11 @@
 ---
 name: my-codex
-description: Delegate tasks to OpenAI Codex CLI. Use when the user wants to run a task with Codex, delegate coding work to Codex, get a second opinion from Codex, or explicitly mentions "codex". Triggers on requests like "codexで実行", "codexに聞いて", "codexでやって", "run with codex", "ask codex", or any task delegation to Codex CLI.
+description: >-
+  Delegate tasks to OpenAI Codex CLI for second opinions or parallel execution.
+  Use when the user explicitly mentions "codex" or asks to delegate work to Codex
+  (e.g., "codexで実行", "codexに聞いて", "run with codex", "ask codex").
+  Do NOT use for general coding tasks that don't mention Codex.
+argument-hint: "<task-description>"
 ---
 
 # Codex Runner

@@ -88,6 +88,10 @@ The `dot_claude/` directory deploys as `~/.claude/`:
 - `rules/` → Domain-specific rules (bigquery, python, gpu, git)
 - `skills/` → Skill definitions for Claude Code
 
+## Skill Authoring
+
+When creating or modifying skills (`dot_claude/skills/*/SKILL.md`), always use the `my-skill-creator` skill first to ensure compliance with the frontmatter spec and design guidelines.
+
 ## Critical Rules
 
 ### File Placement

@@ -1,6 +1,12 @@
 ---
 name: my-sdd
-description: Unified Spec-Driven Development workflow. Automatically detects current state (plan/tasks/impl) and routes to the appropriate phase. Use for planning features, breaking down tasks, and implementing code with test-first approach. Triggers on requests like "start a new feature", "plan implementation", "break down tasks", or "implement from spec".
+description: >-
+  Unified Spec-Driven Development workflow: plan → tasks → implement with test-first approach.
+  Automatically detects current phase and routes accordingly.
+  Use when the user asks to plan a feature, break down tasks from a spec, or implement from
+  requirements (e.g., "新機能を設計", "タスク分解", "specから実装", "SDD").
+  Do NOT use for simple bug fixes, refactoring, or tasks that don't need a spec-driven approach.
+argument-hint: "[feature-name]"
 ---
 
 # Spec-Driven Development (SDD) Unified Workflow
