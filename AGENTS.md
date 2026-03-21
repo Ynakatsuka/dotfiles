@@ -22,6 +22,13 @@ When instructions conflict, follow this order:
 - Verify important assumptions when being wrong would change the solution, cost, or risk.
 - Read call sites, tests, configs, or docs as needed to understand the real boundary of the change.
 
+## Workflow
+
+- For tasks with 3+ steps or architectural impact, start in Plan mode to align before implementing.
+- If an approach stalls, stop and re-plan rather than forcing through.
+- Delegate research, parallel analysis, and exploration to sub-agents. Keep the main context clean.
+- Assign one focused task per sub-agent.
+
 ## Behavior
 
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
@@ -32,6 +39,9 @@ When instructions conflict, follow this order:
 - Do not add silent fallbacks, broad refactors, or speculative cleanup without explicit approval.
 - When you notice a better approach, a hidden risk, or a design concern that the user has not asked about, raise it with evidence and a concrete recommendation. Keep it short. Do not lecture.
 - After presenting the recommendation, respect the user's decision.
+- Do not mark a task as complete until you can demonstrate it works (run tests, check logs, verify output).
+- When receiving a bug report, investigate and fix autonomously — read logs, errors, and failing tests without waiting for step-by-step guidance.
+- For significant changes, pause and ask: "Is there a more elegant approach?" Skip this for trivial fixes.
 
 ## Communication
 
