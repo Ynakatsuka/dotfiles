@@ -1,7 +1,14 @@
 ---
 name: my-skill-creator
-description: Interactive guide for creating and improving skills. Use when users want to create a new skill, update an existing skill, or improve skill quality. Triggers on requests like "create a skill", "new skill", "build a skill", "improve this skill", "update skill", "skill doesn't trigger", or "fix my skill".
+description: >-
+  Interactive guide for creating and improving Claude Code skills.
+  Use when users want to create a new skill, update an existing skill,
+  improve skill quality, or fix triggering issues.
+  Also use when the user asks to "スキルを作って", "スキル作成", "create a skill",
+  "new skill", "build a skill", "improve this skill", or "fix my skill".
+  Do NOT use for general coding tasks unrelated to skill authoring.
 license: Complete terms in LICENSE.txt
+argument-hint: "[skill-name]"
 ---
 
 # Skill Creator
@@ -43,19 +50,60 @@ skill-name/
 name: kebab-case-name       # Must match folder name, no spaces/capitals
 description: |               # Under 1024 chars, no XML tags (< >)
   What it does. Use when user asks to [specific phrases].
-  Triggers on [task types, file types, keywords].
+  Do NOT use for [negative triggers].
+argument-hint: "[arg-name]"  # Shown in autocomplete UI (optional)
 ---
 ```
 
-**Description is the primary triggering mechanism.** Structure: `[What it does] + [When to use it] + [Key capabilities/trigger phrases]`
+#### Required fields
+
+| Field | Rules |
+|---|---|
+| `name` | Lowercase, hyphens only. Max 64 chars. No reserved words (`anthropic`, `claude`). |
+| `description` | Max 1024 chars. No XML tags. Third-person voice. |
+
+#### Optional fields
+
+| Field | Purpose |
+|---|---|
+| `argument-hint` | Autocomplete hint (e.g., `[url]`, `<issue-number>`, `[create\|review]`) |
+| `disable-model-invocation` | `true` to prevent auto-triggering (manual `/name` only) |
+| `allowed-tools` | Restrict tools (e.g., `Read, Grep, Bash(gh *)`) |
+| `model` | Model override when skill is active |
+| `effort` | Effort level: `low`, `medium`, `high`, `max` |
+| `context` | `fork` to run in isolated subagent |
+| `agent` | Subagent type when `context: fork` (e.g., `Explore`, `Plan`) |
+| `license` | License identifier (e.g., `MIT`) |
+| `compatibility` | Environment requirements (1-500 chars) |
+| `metadata` | Custom key-value pairs (`author`, `version`, `mcp-server`) |
+
+#### Arguments in body
+
+Use these variables in skill body to reference user arguments:
+
+| Variable | Description |
+|---|---|
+| `$ARGUMENTS` | All arguments as a single string |
+| `$0`, `$1`, ... | Individual arguments by index |
+| `${CLAUDE_SKILL_DIR}` | Directory containing SKILL.md |
+
+If `$ARGUMENTS` is not referenced in the body, arguments are auto-appended as `ARGUMENTS: <value>`.
+
+**Description is the primary triggering mechanism.** Structure: `[What it does] + [When to use it] + [Negative triggers]`
 
 Good descriptions:
 ```yaml
-# Specific and actionable with trigger phrases
-description: Analyzes Figma design files and generates developer handoff documentation. Use when user uploads .fig files, asks for "design specs", "component documentation", or "design-to-code handoff".
+# Specific, actionable, with negative trigger
+description: >-
+  Analyze Figma design files and generate developer handoff documentation.
+  Use when user uploads .fig files or asks for "design specs" or "design-to-code handoff".
+  Do NOT use for general image editing or non-Figma design tools.
 
-# Clear value proposition with scope
-description: End-to-end customer onboarding workflow for PayFlow. Handles account creation, payment setup, and subscription management. Use when user says "onboard new customer", "set up subscription", or "create PayFlow account".
+# Clear scope with subcommands
+description: >-
+  Unified PR workflow: review, auto-fix, and create/update GitHub PRs.
+  Default runs full flow (review → fix → create). Subcommands: create, review.
+  Use when creating PRs or requesting "PR作成", "レビュー".
 ```
 
 Bad descriptions:
@@ -64,21 +112,6 @@ description: Helps with projects.  # Too vague, no triggers
 description: Creates sophisticated multi-page documentation systems.  # Missing triggers
 description: Implements the Project entity model with hierarchical relationships.  # Too technical
 ```
-
-Negative triggers (prevent misfires):
-```yaml
-# Good - includes negative triggers to prevent misfires
-description: |
-  Deploys applications to AWS ECS. Use when user says "deploy to ECS", "update service".
-  Do NOT use for Lambda deployments or local Docker builds.
-
-# Good - clear boundary setting
-description: |
-  Generates unit tests for Python code. Triggers on "write tests", "add test coverage".
-  Do NOT use for integration tests, E2E tests, or test infrastructure setup.
-```
-
-Optional fields: `license`, `compatibility` (1-500 chars, environment requirements), `allowed-tools`, `metadata` (author, version, mcp-server).
 
 ### Resource Guidelines
 
