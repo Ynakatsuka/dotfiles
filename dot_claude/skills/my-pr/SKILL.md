@@ -1,11 +1,11 @@
 ---
 name: my-pr
 description: >-
-  Pull request workflow: review, auto-fix, and create/update PRs.
-  Default (no args): review → auto-fix → create PR.
-  Subcommands: `create` (skip review), `review` (review only, no PR).
-  Triggers on "/pr", "PR作成", "プルリク", "create PR", "pull request",
-  "/review", "レビュー", "PRレビュー", "self-review", "セルフレビュー".
+  Unified pull request workflow: parallel review (Claude + Codex), auto-fix, and
+  create/update GitHub PRs. Default runs full flow (review → fix → create).
+  Subcommands: `create` (skip review), `review` (review only).
+  Use when creating PRs, self-reviewing changes, or requesting "PR作成", "レビュー".
+argument-hint: "[create|review]"
 ---
 
 # PR — Pull Request Workflow
@@ -14,13 +14,13 @@ description: >-
 
 ## サブコマンド（最初に判定）
 
-$ARGUMENTS を確認する:
+`$ARGUMENTS` を確認する:
 
 | 引数 | 動作 |
 |---|---|
-| **なし（デフォルト）** | レビュー → 自動修正 → PR作成 |
-| **`create`** | レビューなしでPR作成のみ |
-| **`review`** | レビュー + 自動修正のみ（PR作成しない） |
+| `$ARGUMENTS` が空（デフォルト） | レビュー → 自動修正 → PR作成 |
+| `$0` = `create` | レビューなしでPR作成のみ |
+| `$0` = `review` | レビュー + 自動修正のみ（PR作成しない） |
 
 ---
 

@@ -2,8 +2,9 @@
 name: my-release-note
 description: >-
   Generate release notes from merged PR history and commits.
-  Categorizes changes and creates GitHub releases.
-  Triggers on "/release-note", "リリースノート", "release note", "リリース作成".
+  Categorizes changes by type and creates GitHub releases with semantic versioning.
+  Use when creating releases, requesting "リリースノート", or "release note".
+argument-hint: "[version]"
 ---
 
 # Release Note — Release Note Generator

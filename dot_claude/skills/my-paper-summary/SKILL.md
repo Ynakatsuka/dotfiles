@@ -1,9 +1,10 @@
 ---
 name: my-paper-summary
 description: >-
-  Analyze academic papers and generate comprehensive Japanese summaries.
+  Analyze academic papers and generate structured Japanese summaries.
   Saves output as markdown to z/paper/ directory.
-  Triggers on "/paper-summary", "論文要約", "論文まとめ", "paper summary".
+  Use when summarizing papers, requesting "論文要約", or "paper summary".
+argument-hint: "<url-or-filepath>"
 ---
 
 # Paper Summary — Academic Paper Analyzer

@@ -5,8 +5,9 @@ description: >-
   Shows recent commits, staged/unstaged changes, and related SDD documents.
   When conversation has progressed, generates a handoff context and saves it to `.tmp/wip/`.
   Use `/wip resume` to load the previous session's handoff context and resume work.
-  Triggers on "/wip", "進捗確認", "ブランチの状況", "今どこまで進んだ？", "WIP report".
+  Use for "進捗確認", "ブランチの状況", or "WIP report".
   Do NOT use for commit operations, PR creation, or branch management.
+argument-hint: "[resume]"
 ---
 
 # WIP — Branch Progress Reporter
