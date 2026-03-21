@@ -24,7 +24,6 @@ When instructions conflict, follow this order:
 
 ## Behavior
 
-- Think through ambiguous requests and act on your best judgment. Only ask when the decision is hard to reverse or has multiple valid approaches with meaningful trade-offs. When you do ask, bundle related questions into one.
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
 - Prefer fixing the source of a problem. Do not hide it with retries, defaults, or broad exception handling unless the user asked for that trade-off.
 - If a change can cause regressions, name the most likely regression and how you checked for it.
