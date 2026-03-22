@@ -8,3 +8,13 @@ model_reasoning_effort = "high"
 [tools]
 unified_exec = true
 streamable_shell = true
+
+{{- if lookPath "ghq" }}
+{{- range $repo := (splitList "\n" (trim (output "ghq" "list" "-p"))) }}
+{{- if $repo }}
+[projects.{{ $repo | quote }}]
+trust_level = "trusted"
+
+{{- end }}
+{{- end }}
+{{- end }}
