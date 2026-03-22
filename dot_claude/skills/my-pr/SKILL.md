@@ -19,9 +19,9 @@ argument-hint: "[create|review]"
 
 | 引数 | 動作 |
 |---|---|
-| `$ARGUMENTS` が空（デフォルト） | レビュー → 自動修正 → PR作成 |
-| `$0` = `create` | レビューなしでPR作成のみ |
-| `$0` = `review` | レビュー + 自動修正のみ（PR作成しない） |
+| `$ARGUMENTS` が空（デフォルト） | 簡素化 → レビュー → 自動修正 → PR作成 |
+| `$0` = `create` | 簡素化 → PR作成 |
+| `$0` = `review` | 簡素化 → レビュー → 自動修正（PR作成・push しない） |
 
 ---
 
@@ -29,32 +29,64 @@ argument-hint: "[create|review]"
 
 ```bash
 CURRENT_BRANCH=$(git branch --show-current)
-if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "staging" ]; then
-  echo "ERROR: main/staging ブランチでは実行できません"
-  exit 1
+PROTECTED_BRANCHES="main master staging production"
+
+# 現在のブランチが保護ブランチでないことを確認
+for b in $PROTECTED_BRANCHES; do
+  if [ "$CURRENT_BRANCH" = "$b" ]; then
+    echo "ERROR: $b ブランチでは実行できません"
+    exit 1
+  fi
+done
+
+# 上流ブランチ（push 先）が保護ブランチでないことを確認
+UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null || true)
+if [ -n "$UPSTREAM" ]; then
+  UPSTREAM_BRANCH="${UPSTREAM#origin/}"
+  for b in $PROTECTED_BRANCHES; do
+    if [ "$UPSTREAM_BRANCH" = "$b" ]; then
+      echo "ERROR: 上流ブランチが $b に設定されています。push すると $b に直接反映されます"
+      exit 1
+    fi
+  done
 fi
 
 git status --short
-git fetch origin main:main 2>/dev/null || true
 ```
 
 未コミットの変更がある場合はユーザーに確認する。
 
-## Phase 2: 変更内容の把握
+## Phase 2: 変更内容の把握（全サブコマンド共通）
 
 ```bash
-git diff main..HEAD --stat
-git log main..HEAD --oneline
+# Detect base branch dynamically
+BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || echo "main")
+git fetch origin "$BASE_BRANCH:$BASE_BRANCH" 2>/dev/null || true
 
-# Check if PR already exists
+git diff "$BASE_BRANCH"..HEAD --stat
+git log "$BASE_BRANCH"..HEAD --oneline
+
+# Check if PR already exists (used in Phase 6 to decide create vs update)
 gh pr view --json number,title,state 2>/dev/null
 ```
 
+以降のフェーズでは `$BASE_BRANCH` をベースブランチとして使用する。
+
 ---
 
-## Phase 3: レビュー（`create` の場合はスキップ）
+## Phase 3: コード簡素化（全サブコマンド共通）
 
-### 3-1: 並列レビューの実行
+`/simplify` スキルを実行する。
+
+- `/simplify` が利用可能かどうかを確認し、利用可能な場合のみ実行する
+- `/simplify` による指摘があり修正した場合は、別のコミットとしてコミットする（Conventional Commits 形式、英語）
+- `/simplify` が利用できない場合はこのフェーズをスキップする
+
+---
+
+## Phase 4: レビュー（`create` の場合はスキップ）
+
+### 4-1: 並列レビューの実行
 
 **Claude Code と Codex の 2つの Agent を同時に起動する（必ず並列実行）。**
 
@@ -66,17 +98,15 @@ Agent ツールで以下のプロンプトを渡す:
 以下のブランチの変更をレビューしてください。
 
 ブランチ: <BRANCH>
-ベース: main
+ベース: <BASE_BRANCH>
 
 変更ファイル:
-<FILE_LIST from git diff --name-only main..HEAD>
+<FILE_LIST from git diff --name-only $BASE_BRANCH..HEAD>
 
-レビュー観点:
+レビュー観点（コード品質・効率は /simplify で対応済みなので除外）:
 1. ロジックの正しさ（バグ、エッジケース、データ漏れ）
-2. 設計（責務分離、抽象化レベル、DRY）
-3. パフォーマンス（不要なループ、N+1、メモリ使用）
-4. セキュリティ（ハードコード秘密情報、インジェクション）
-5. テスト（カバレッジ、エッジケース）
+2. セキュリティ（ハードコード秘密情報、インジェクション）
+3. テスト（カバレッジ、エッジケース）
 
 各ファイルの変更差分を読み、問題を以下の形式で報告してください:
 
@@ -94,13 +124,16 @@ Agent ツールで以下のプロンプトを渡す:
 
 #### Agent 2: Codex レビュー（Bash ツール）
 
-```bash
-codex exec "Review the diff below. Focus on bugs, logic errors, security issues, and performance problems. For each issue, specify the file path and line number, severity (critical/warning), and a concrete fix suggestion. Output in markdown format.
+diff を一時ファイル経由で渡す（大きな diff でもシェル引数長制限に引っかからないようにする）。
 
-$(git diff main..HEAD)"
+```bash
+DIFF_FILE=$(mktemp)
+git diff "$BASE_BRANCH"..HEAD > "$DIFF_FILE"
+codex exec "Review the diff in the file $DIFF_FILE. Focus on bugs, logic errors, and security issues. Code quality and efficiency have already been reviewed separately, so skip those. For each issue, specify the file path and line number, severity (critical/warning), and a concrete fix suggestion. Output in markdown format."
+rm -f "$DIFF_FILE"
 ```
 
-### 3-2: レビュー結果の統合
+### 4-2: レビュー結果の統合
 
 両方の結果を受け取ったら:
 
@@ -111,7 +144,7 @@ $(git diff main..HEAD)"
    - ℹ️ **参考**: 好みの問題、将来的な検討事項
 3. **フィルタリング**: 好みの問題や過剰な指摘は除外する
 
-### 3-3: 統合結果の報告
+### 4-3: 統合結果の報告
 
 ```markdown
 # レビュー結果: <BRANCH>
@@ -129,7 +162,7 @@ $(git diff main..HEAD)"
 
 ---
 
-## Phase 4: 自動修正（`create` の場合はスキップ）
+## Phase 5: 自動修正（`create` の場合はスキップ）
 
 レビューで見つかった問題を修正する。
 
@@ -153,11 +186,11 @@ $(git diff main..HEAD)"
 
 ---
 
-## Phase 5: PR 作成 / 更新（`review` の場合はスキップ）
+## Phase 6: PR 作成 / 更新（`review` の場合はスキップ）
 
 ### PR 内容の生成
 
-`git diff main..HEAD` を分析し、以下のテンプレートで日本語記述する。
+`git diff $BASE_BRANCH..HEAD` を分析し、以下のテンプレートで日本語記述する。
 
 ```markdown
 ## 概要
@@ -189,11 +222,15 @@ $(git diff main..HEAD)"
 
 ### 新規作成
 
+Phase 2 で PR が存在しなかった場合:
+
 ```bash
 gh pr create --draft --title "タイトル" --body "内容" --assignee @me
 ```
 
 ### 既存 PR の更新
+
+Phase 2 で PR が既に存在していた場合:
 
 ```bash
 gh pr edit --body "更新内容"
