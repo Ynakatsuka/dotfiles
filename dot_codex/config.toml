@@ -8,7 +8,3 @@ model_reasoning_effort = "high"
 [tools]
 unified_exec = true
 streamable_shell = true
-
-[mcp_servers.context7]
-command = "npx"
-args = ["-y", "@upstash/context7-mcp@latest"]
