@@ -78,15 +78,16 @@ gh pr view --json number,title,state 2>/dev/null
 
 `/simplify` スキルを実行する。
 
-- `/simplify` が利用可能かどうかを確認し、利用可能な場合のみ実行する
+- `/simplify` スキルを必ず実行する（スキップ不可）
 - `/simplify` による指摘があり修正した場合は、別のコミットとしてコミットする（Conventional Commits 形式、英語）
-- `/simplify` が利用できない場合はこのフェーズをスキップする
 
 ---
 
 ## Phase 4: レビュー（`create` の場合はスキップ）
 
 ### 4-1: 並列レビューの実行
+
+**レビュー対象は PR 全体の変更（`$BASE_BRANCH..HEAD`）である。Phase 3 の simplify による変更だけをレビューするのではない。**
 
 **Claude Code と Codex の 2つの Agent を同時に起動する（必ず並列実行）。**
 
@@ -246,6 +247,6 @@ gh pr edit --body "更新内容"
 - タイトルは簡潔に（70文字以内）
 - コミットメッセージは Conventional Commits 形式（英語）
 - 2つのレビューは **必ず並列実行** する
-- Codex が利用できない場合は Claude Code のみでレビューを完了する
+- Codex レビューは必ず実行する（スキップ不可）。`codex` コマンドが見つからない場合はユーザーに報告して対処を求める
 - 好みの問題（フォーマット、命名の趣味）は指摘しない
 - テストが壊れる修正はしない
