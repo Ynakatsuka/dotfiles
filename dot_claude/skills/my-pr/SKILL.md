@@ -129,7 +129,7 @@ diff を一時ファイル経由で渡す（大きな diff でもシェル引数
 
 ```bash
 DIFF_FILE=$(mktemp)
-git diff "$BASE_BRANCH"..HEAD > "$DIFF_FILE"
+git diff "$BASE_BRANCH"..HEAD >| "$DIFF_FILE"
 codex exec "Review the diff in the file $DIFF_FILE. Focus on bugs, logic errors, and security issues. Code quality and efficiency have already been reviewed separately, so skip those. For each issue, specify the file path and line number, severity (critical/warning), and a concrete fix suggestion. Output in markdown format."
 rm -f "$DIFF_FILE"
 ```
