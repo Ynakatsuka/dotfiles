@@ -31,6 +31,10 @@ When instructions conflict, follow this order:
 
 ## Behavior
 
+- When the spec, acceptance criteria, or task scope is ambiguous, stop and ask the user before proceeding. Do not guess requirements — a wrong assumption costs more than a short question. Specifically ask when:
+  - The desired behavior has multiple reasonable interpretations.
+  - Edge cases or error handling are unspecified and the choice matters.
+  - The task boundary is unclear (what is in scope vs. out of scope).
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
 - Prefer fixing the source of a problem. Do not hide it with retries, defaults, or broad exception handling unless the user asked for that trade-off.
 - If a change can cause regressions, name the most likely regression and how you checked for it.
