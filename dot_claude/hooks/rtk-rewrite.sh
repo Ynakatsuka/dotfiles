@@ -13,6 +13,9 @@
 #   2           Deny rule matched → pass through (Claude Code native deny handles it)
 #   3 + stdout  Ask rule matched → rewrite but let Claude Code prompt the user
 
+# Ensure mise shims are on PATH so that tools installed via mise (like rtk) are found.
+export PATH="${HOME}/.local/share/mise/shims:${PATH}"
+
 if ! command -v jq &>/dev/null; then
   echo "[rtk] WARNING: jq is not installed. Hook cannot rewrite commands. Install jq: https://jqlang.github.io/jq/download/" >&2
   exit 0
