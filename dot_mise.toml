@@ -1,4 +1,7 @@
 [tools]
+# RTK - Rust Token Killer (reduces LLM token consumption)
+"github:rtk-ai/rtk" = "latest"
+
 # Gemini CLI - Google AI CLI
 gemini-cli = "latest"
 
