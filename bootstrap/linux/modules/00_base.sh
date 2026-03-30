@@ -41,6 +41,9 @@ else
   warn "systemctl not found; skipping sshd status check"
 fi
 
+log "Enabling linger for user services to survive logout"
+run sudo loginctl enable-linger "$USER"
+
 log "Locale configuration"
 if confirm "Set locale to en_US.UTF-8?"; then
   run sudo localectl set-locale LANG=en_US.UTF-8 || true
