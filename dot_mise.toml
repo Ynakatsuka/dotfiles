@@ -5,6 +5,9 @@ gemini-cli = "latest"
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
+# vite-plus - VoidZero unified web toolchain (vp, oxfmt, oxlint)
+"npm:vite-plus" = "latest"
+
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
