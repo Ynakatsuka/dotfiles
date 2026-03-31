@@ -1,8 +1,15 @@
-{{- if and (lookPath "age") (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
+{{- $ageCmd := lookPath "age" -}}
+{{- if not $ageCmd -}}
+{{-   $misePath := joinPath .chezmoi.homeDir ".local/share/mise/shims/age" -}}
+{{-   if stat $misePath -}}
+{{-     $ageCmd = $misePath -}}
+{{-   end -}}
+{{- end -}}
+{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
 encryption = "age"
 
 [age]
     identity = "~/.config/chezmoi/key.txt"
     recipient = "age1w5ek6kq90p7cgs3k4s47ug2lz8p82l5lnac8pckapv45zxyygvnq9ec0pe"
-    command = {{ lookPath "age" | quote }}
+    command = {{ $ageCmd | quote }}
 {{- end }}
