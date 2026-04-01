@@ -4,9 +4,9 @@
 function cl() {
     git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     if [ -f "$git_root/.claude/mcp.json" ]; then
-        ENABLE_TOOL_SEARCH=true claude --mcp-config="$git_root/.claude/mcp.json" "$@" --dangerously-skip-permissions
+        claude --mcp-config="$git_root/.claude/mcp.json" "$@" --dangerously-skip-permissions
     else
-        ENABLE_TOOL_SEARCH=true claude "$@" --dangerously-skip-permissions
+        claude "$@" --dangerously-skip-permissions
     fi
 }
 
