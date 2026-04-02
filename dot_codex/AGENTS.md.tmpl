@@ -6,3 +6,28 @@
 - If the task touches Python, follow the Python rules: use `uv`, prefer modern typing, use Ruff/Mypy/Pytest, and keep comments/docstrings/logs in English.
 - If the task touches BigQuery or `.sql`, use `bq`, show current project/account before execution, and run `--dry_run` before expensive queries.
 - If the task runs GPU-heavy Python code, check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
+
+## Output Format
+
+Always end your response with a structured summary section in the following format:
+
+```
+## まとめ
+
+### 実装内容
+- (What was implemented or changed — one bullet per logical unit)
+
+### 課題・注意点
+- (Issues found, limitations, risks, or things that need attention)
+- (Omit this section if there are none)
+
+### Next Steps
+- (Concrete next actions the user should take or consider)
+- (Omit this section if there are none)
+```
+
+Rules for the summary:
+- Write the summary in Japanese (except technical terms and code references).
+- Keep each bullet concise — one line per item.
+- Include file paths, function names, or commands where relevant.
+- If the task was a single short answer (e.g., one-line question, yes/no, simple definition), skip the summary.
