@@ -39,6 +39,14 @@ function gw() {
         return 1
     fi
 
+    # Resolve to the main (non-worktree) repository root
+    local original_root=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+    if [ "$git_root" != "$original_root" ]; then
+        echo "Currently in worktree. Switching to main repository: $original_root"
+        cd "$original_root"
+        git_root="$original_root"
+    fi
+
     local repo_name=$(basename "$git_root")
     local worktree_base="${git_root}-worktree"
 
