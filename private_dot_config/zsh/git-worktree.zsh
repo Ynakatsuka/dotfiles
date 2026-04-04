@@ -10,14 +10,6 @@ _gw_setup_direnv() {
     fi
 }
 
-# Helper function to open Cursor if available
-_gw_open_cursor() {
-    if command -v cursor >/dev/null 2>&1; then
-        echo "Opening Cursor..."
-        cursor .
-    fi
-}
-
 # Helper function to copy .env file from original repository
 _gw_copy_env() {
     local original_git_root="$1"
@@ -65,7 +57,7 @@ function gw() {
 
             _gw_copy_env "$git_root"
             _gw_setup_direnv
-            _gw_open_cursor
+
             return 0
         else
             echo "No worktree selected"
@@ -155,7 +147,7 @@ function gw() {
 
             _gw_copy_env "$git_root"
             _gw_setup_direnv
-            _gw_open_cursor
+
             return 0
         fi
     fi
@@ -230,11 +222,6 @@ EOF
         fi
 
         echo "🎨 Branch: $branch_name | Color: $color"
-
-        if command -v cursor >/dev/null 2>&1; then
-            echo "Opening Cursor with workspace file..."
-            cursor "$workspace_file"
-        fi
     fi
 }
 
