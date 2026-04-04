@@ -46,7 +46,10 @@ When instructions conflict, follow this order:
 - Do not mark a task as complete until you can demonstrate it works (run tests, check logs, verify output).
 - When receiving a bug report, investigate and fix autonomously — read logs, errors, and failing tests without waiting for step-by-step guidance.
 - For significant changes, pause and ask: "Is there a more elegant approach?" Skip this for trivial fixes.
-- When you encounter an unfamiliar term, tool name, library, or concept in the user's message or codebase, search the web or documentation first to understand it. If the search does not resolve the ambiguity, ask the user for clarification before proceeding.
+- When you encounter an unfamiliar term, tool name, library, or concept in the user's message or codebase:
+  1. Search the web or documentation first to understand it.
+  2. Summarize what you found and ask the user to confirm your understanding is correct before proceeding.
+  3. If the search does not yield useful results, tell the user what you searched for and ask for clarification.
 
 ## Communication
 
