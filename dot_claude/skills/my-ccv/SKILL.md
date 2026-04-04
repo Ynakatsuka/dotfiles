@@ -1,13 +1,13 @@
 ---
 name: my-ccv
 description: >-
-  Manage Claude Code Viewer (CCV): register HTML artifacts or schedule remote agent jobs.
+  Manage Claude Code Viewer (CCV): register HTML artifacts or schedule jobs via CCV local API.
   Use when user asks to create dashboards, register artifacts to CCV, manage CCV artifacts,
-  schedule remote agents, or create CCV triggers
+  schedule CCV jobs, or manage CCV scheduler
   (e.g., "CCVに登録", "アーティファクト作成", "CCV artifact", "定性評価を登録",
-  "スケジュール登録", "定期実行", "トリガー作成", "CCV schedule").
-  Do NOT use for general HTML creation, static site generation, or local cron jobs (use CronCreate for local).
-argument-hint: "[artifact [name] | schedule [list|create|run|get|update]]"
+  "スケジュール登録", "定期実行", "CCV schedule").
+  Do NOT use for general HTML creation, static site generation, or Anthropic remote triggers.
+argument-hint: "[artifact [name] | schedule [list|create|delete|update]]"
 ---
 
 # CCV — Claude Code Viewer Management
@@ -119,9 +119,9 @@ curl -s -X POST "http://localhost:3434/api/projects/{projectId}/artifacts" \
 
 # Schedule Workflow
 
-`RemoteTrigger` ツールでリモートエージェントのスケジュールジョブを管理する。
+CCV ローカル API (`http://localhost:3434/api/scheduler/jobs`) でスケジュールジョブを管理する。
 
-**重要**: リモートエージェントは Anthropic クラウド上で実行される。ローカルマシンのファイルや環境変数にはアクセスできない。
+ジョブは CCV サーバー上でローカル実行される。ローカルマシンのファイルや環境にフルアクセスできる。
 
 ## Schedule Sub-routing
 
@@ -129,112 +129,132 @@ Route based on sub-argument after `schedule`:
 
 | Sub-argument | Action |
 |-------------|--------|
-| (none) / `list` | 登録済みトリガー一覧を表示 |
-| `create` | 新しいトリガーを作成 |
-| `run [id]` | トリガーを即時実行 |
-| `get [id]` | トリガーの詳細を取得 |
-| `update [id]` | トリガーを更新 |
+| (none) / `list` | 登録済みジョブ一覧を表示 |
+| `create` | 新しいジョブを作成 |
+| `delete [id]` | ジョブを削除 |
+| `update [id]` | ジョブを更新 |
 
 ## Schedule: List
 
-1. `RemoteTrigger` ツールを `{action: "list"}` で呼び出す
-2. 見やすい形式で表示: 名前、スケジュール（人間が読める形式）、有効/無効、リポジトリ
-3. トリガーが0件なら「登録済みのスケジュールジョブはありません」と表示
+```bash
+curl -s http://localhost:3434/api/scheduler/jobs | jq .
+```
+
+見やすい形式で表示: 名前、スケジュール（cron式 + 人間が読める形式）、有効/無効、最終実行状況。
+ジョブが0件なら「登録済みのスケジュールジョブはありません」と表示。
 
 ## Schedule: Create
 
-### Step 1: Understand the goal
+### Step 1: Identify the project
+
+```bash
+curl -s http://localhost:3434/api/projects | jq .
+```
+
+`meta.projectPath` で対象プロジェクトの `id` を特定する。
+
+### Step 2: Understand the goal
 
 ユーザーに以下を確認する:
-- リモートエージェントに何をさせたいか
-- 対象リポジトリ（デフォルト: `https://github.com/Ynakatsuka/dotfiles`）
-- リモート実行であることを伝える（ローカルファイルにはアクセスできない）
-
-### Step 2: Craft the prompt
-
-効果的なプロンプトを一緒に作成する:
-- 何をするか具体的に
-- 成功の定義を明確に
-- 対象ファイル・領域を明示
-- 取るべきアクション（PR作成、コミット、分析のみ等）を指定
+- 何をさせたいか（プロンプト内容）
+- 実行スケジュール（cron式 or 一回限りの予約実行）
+- 既存セッションの続行か新規セッションか
 
 ### Step 3: Set the schedule
 
-- ユーザーのタイムゾーンは **Asia/Tokyo**
-- cron式は **UTC** で指定する必要がある（JST - 9時間）
-- 変換を必ず確認する（例: 「JST 9:00 = UTC 0:00 なので `0 0 * * 1-5`」）
-- 最小間隔は **1時間**
-- `:00` や `:30` は避け、少しずらす（例: `57 23 * * *` for JST 8:57am）
+**cron ジョブの場合:**
+- 標準5フィールド cron 式（分 時 日 月 曜日）
+- CCV サーバーのローカルタイムゾーンで解釈される
+- 同時実行ポリシー: `"skip"`（実行中ならスキップ）or `"run"`（並行実行）
 
-### Step 4: Choose the model
+**予約実行の場合:**
+- ISO 8601 形式で日時を指定
+- 実行後に自動削除される
 
-デフォルト: `claude-sonnet-4-6`。ユーザーに確認し、希望があれば変更する。
-
-### Step 5: Build and confirm
+### Step 4: Build and confirm
 
 設定全体をユーザーに提示し、確認を得る。
 
-### Step 6: Create the trigger
+### Step 5: Create the job
 
-`RemoteTrigger` ツールで作成する。ボディの構造:
-
-```json
-{
-  "name": "AGENT_NAME",
-  "cron_expression": "CRON_EXPR_IN_UTC",
-  "enabled": true,
-  "job_config": {
-    "ccr": {
-      "environment_id": "env_01KVzCYJ8EWndiXmzCoYFn8V",
-      "session_context": {
-        "model": "claude-sonnet-4-6",
-        "sources": [
-          {"git_repository": {"url": "https://github.com/USER/REPO"}}
-        ],
-        "allowed_tools": ["Bash", "Read", "Write", "Edit", "Glob", "Grep"]
-      },
-      "events": [
-        {"data": {
-          "uuid": "<generate a lowercase v4 UUID>",
-          "session_id": "",
-          "type": "user",
-          "parent_tool_use_id": null,
-          "message": {"content": "PROMPT_HERE", "role": "user"}
-        }}
-      ]
-    }
-  }
-}
+**cron ジョブ:**
+```bash
+curl -s -X POST http://localhost:3434/api/scheduler/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "JOB_NAME",
+    "schedule": {
+      "type": "cron",
+      "expression": "CRON_EXPRESSION",
+      "concurrencyPolicy": "skip"
+    },
+    "message": {
+      "content": "PROMPT_HERE",
+      "projectId": "PROJECT_ID",
+      "baseSessionId": null
+    },
+    "enabled": true
+  }'
 ```
 
-UUID は自分で生成する（`uuidgen | tr '[:upper:]' '[:lower:]'` で取得可能）。
+**予約実行:**
+```bash
+curl -s -X POST http://localhost:3434/api/scheduler/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "JOB_NAME",
+    "schedule": {
+      "type": "reserved",
+      "reservedExecutionTime": "2025-10-25T00:00:00Z"
+    },
+    "message": {
+      "content": "PROMPT_HERE",
+      "projectId": "PROJECT_ID",
+      "baseSessionId": null
+    },
+    "enabled": true
+  }'
+```
 
-### Step 7: Report
+- `baseSessionId`: 既存セッションを続行する場合にセッションIDを指定。新規セッションなら `null`。
+
+### Step 6: Report
 
 作成成功後:
-1. トリガー ID
-2. 管理 URL: `https://claude.ai/code/scheduled/{TRIGGER_ID}`
-3. スケジュールの要約（人間が読める形式 + UTC/JST 両方）
+1. ジョブ ID
+2. スケジュールの要約（人間が読める形式）
+3. CCV UI で確認できることを案内: `http://localhost:3434`
 
-## Schedule: Run
+## Schedule: Update
 
-1. ID が指定されていなければ一覧を表示してユーザーに選択を求める
-2. 確認後、`{action: "run", trigger_id: "..."}` で実行
-3. 結果を報告
+```bash
+curl -s -X PATCH "http://localhost:3434/api/scheduler/jobs/{id}" \
+  -H 'Content-Type: application/json' \
+  -d '{ "enabled": false }'
+```
 
-## Schedule: Get / Update
-
-- **get**: `{action: "get", trigger_id: "..."}` で詳細を取得し、見やすく表示
-- **update**: 変更前後を提示して確認を得てから `{action: "update", trigger_id: "...", body: {...}}` で更新
+更新可能なフィールド: `name`, `schedule`, `message`, `enabled`。
+変更前後を提示して確認を得てから実行する。
 
 ## Schedule: Delete
 
-API ではトリガーを削除できない。ユーザーに以下を案内する:
-- 管理画面: https://claude.ai/code/scheduled
-- 代替: `enabled: false` で無効化できる
+```bash
+curl -s -X DELETE "http://localhost:3434/api/scheduler/jobs/{id}"
+```
+
+削除前に確認を得る。
+
+## Schedule API Reference
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/scheduler/jobs` | ジョブ一覧 |
+| POST | `/api/scheduler/jobs` | 新規作成 |
+| PATCH | `/api/scheduler/jobs/:id` | 更新（部分更新） |
+| DELETE | `/api/scheduler/jobs/:id` | 削除 |
 
 ## Schedule Notes
 
-- 環境 ID: `env_01KVzCYJ8EWndiXmzCoYFn8V`（Anthropic Cloud デフォルト）
-- MCP コネクタが必要な場合: https://claude.ai/settings/connectors で事前に接続が必要
-- プロンプトはリモートエージェントの唯一のコンテキスト。自己完結した内容にする
+- ジョブは CCV サーバーが起動している間だけ実行される
+- 設定は `~/.claude-code-viewer/scheduler/schedules.json` に永続化される
+- 予約実行ジョブは実行後に自動削除される
