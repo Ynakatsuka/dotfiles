@@ -131,7 +131,7 @@ cs() {
 # Kill running code-server instances via fzf
 csc() {
   local lines
-  lines=$(ps aux | grep '[c]ode-server' | grep -v 'grep')
+  lines=$(ps aux | grep '[c]ode-server --bind-addr')
 
   if [[ -z "$lines" ]]; then
     echo "No running code-server instances found."
