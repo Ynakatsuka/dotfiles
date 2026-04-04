@@ -31,6 +31,9 @@ _cs-ensure-settings() {
     "window.restoreWindows": "none",
     "chat.commandCenter.enabled": false,
     "chat.experimental.enabled": false,
+    "update.mode": "none",
+    "extensions.autoCheckUpdates": false,
+    "scm.defaultViewMode": "tree",
     "[python]": {
         "editor.tabSize": 4
     }
