@@ -21,14 +21,14 @@ local externalLayout = {
     rightWidth = 0.5,  -- Right side: 50%
     leftTopHeight = 0.2,     -- Left top area: 20%
     leftBottomHeight = 0.8,  -- Left bottom area: 80%
-    rightTopHeight = 0.45,   -- Right top area: 45%
+    rightTopHeight = 1.0,    -- Right top area: 100% (cmux full height)
     rightBottomHeight = 0.55, -- Right bottom area: 55%
 
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
     leftBottom = "Google Chrome", -- Left bottom (45% x 80%)
-    rightTop = "cmux",            -- Right top (55% x 20%)
-    rightBottom = "Cursor"        -- Right bottom (55% x 80%)
+    rightTop = "cmux",            -- Right full height
+    rightBottom = "Cursor"        -- Right bottom (behind cmux)
 }
 
 -- Built-in Display Layout
