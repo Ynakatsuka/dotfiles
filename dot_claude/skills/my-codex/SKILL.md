@@ -79,6 +79,10 @@ User's Codex config (`~/.codex/config.toml`) controls defaults:
 
 These settings mean Codex runs without approval prompts and uses the configured default model.
 
+## Execution
+
+- Always use the Bash tool with `timeout: 600000` (10 minutes) when running `codex exec`, as tasks may take significant time.
+
 ## Notes
 
 - Always use `exec` mode (non-interactive) since Claude cannot interact with Codex's TUI
