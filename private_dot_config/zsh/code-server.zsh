@@ -8,6 +8,20 @@ _CS_SETTINGS_FILE="$_CS_SETTINGS_DIR/settings.json"
 
 # Ensure dark theme and Cursor-like settings on first run
 _cs-ensure-settings() {
+  # Ensure keybindings (Ctrl+W → close editor for cmux browser compatibility)
+  local keybindings_file="$_CS_SETTINGS_DIR/keybindings.json"
+  if [[ ! -f "$keybindings_file" ]]; then
+    mkdir -p "$_CS_SETTINGS_DIR"
+    cat > "$keybindings_file" << 'KEYBINDINGS'
+[
+    {
+        "key": "ctrl+w",
+        "command": "workbench.action.closeActiveEditor"
+    }
+]
+KEYBINDINGS
+  fi
+
   if [[ ! -f "$_CS_SETTINGS_FILE" ]] || ! grep -q "GitHub Dark" "$_CS_SETTINGS_FILE" 2>/dev/null; then
     mkdir -p "$_CS_SETTINGS_DIR"
     cat > "$_CS_SETTINGS_FILE" << 'SETTINGS'
