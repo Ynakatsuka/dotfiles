@@ -353,53 +353,43 @@ local function runInNewCmuxTerminalSurface(cmd)
     end)
 end
 
--- ============================================================================
--- CMUX BROWSER KEY OVERRIDES
--- ============================================================================
-
--- Intercept Cmd+W in cmux browser surfaces to close the VS Code editor tab
--- instead of closing the browser surface itself.
--- Requires code-server keybindings.json: {"key":"ctrl+w","command":"workbench.action.closeActiveEditor"}
-local cmuxBrowserKeyOverride = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
+-- Run a shell command in the current cmux terminal surface (no new tab)
+local function runInCurrentCmuxTerminal(cmd)
     local app = hs.application.frontmostApplication()
     if not app or app:name() ~= "cmux" then
-        return false
+        return
     end
 
-    local flags = event:getFlags()
-    local keyCode = event:getKeyCode()
+    hs.eventtap.keyStroke({"ctrl"}, "u")
 
-    -- Cmd+W (keyCode 13 = W)
-    if flags.cmd and not flags.alt and not flags.ctrl and not flags.shift and keyCode == 13 then
-        local output = hs.execute("/opt/homebrew/bin/cmux identify --no-caller 2>/dev/null")
-        if output then
-            local data = hs.json.decode(output)
-            if data and data.focused and data.focused.is_browser_surface then
-                local ref = data.focused.surface_ref
-                hs.execute("/opt/homebrew/bin/cmux browser press --surface " .. ref .. " 'Control+w' 2>/dev/null")
-                return true -- consume the event
+    local prevClipboard = hs.pasteboard.getContents()
+    hs.pasteboard.setContents(cmd)
+    hs.eventtap.keyStroke({"cmd"}, "v")
+
+    hs.timer.doAfter(0.05, function()
+        hs.eventtap.keyStroke({}, "return")
+        hs.timer.doAfter(0.05, function()
+            if prevClipboard then
+                hs.pasteboard.setContents(prevClipboard)
             end
-        end
-    end
-
-    return false
-end)
-cmuxBrowserKeyOverride:start()
+        end)
+    end)
+end
 
 -- ============================================================================
 -- DIFIT INTEGRATION
 -- ============================================================================
 
--- Launch difit web review for current working tree (no split)
+-- Launch difit web review for current working tree (browser tab in same pane)
 hs.hotkey.bind({"cmd", "shift"}, "G", function()
     local cmd = "difit working --no-open >/tmp/difit.log 2>&1 & " ..
         "for i in {1..20}; do nc -z localhost 4966 >/dev/null 2>&1 && break; sleep 0.05; done; " ..
         "cmux new-surface --type browser --url http://localhost:4966"
 
-    runInNewCmuxTerminalSurface(cmd)
+    runInCurrentCmuxTerminal(cmd)
 end)
 
--- Launch difit web review against fork base branch (no split)
+-- Launch difit web review against fork base branch (browser tab in same pane)
 hs.hotkey.bind({"cmd", "shift"}, "H", function()
     local cmd = "BASE_BRANCH=$(git config --get branch.$(git rev-parse --abbrev-ref HEAD).gh-merge-base); " ..
         "if [ -z \"$BASE_BRANCH\" ]; then BASE_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed \"s#^origin/##\"); fi; " ..
@@ -411,5 +401,5 @@ hs.hotkey.bind({"cmd", "shift"}, "H", function()
         "for i in {1..20}; do nc -z localhost 4966 >/dev/null 2>&1 && break; sleep 0.05; done; " ..
         "cmux new-surface --type browser --url http://localhost:4966"
 
-    runInNewCmuxTerminalSurface(cmd)
+    runInCurrentCmuxTerminal(cmd)
 end)
