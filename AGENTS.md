@@ -20,6 +20,7 @@ When instructions conflict, follow this order:
 
 - Challenge flawed premises before proceeding. Recommend a better approach with one concrete reason.
 - Verify important assumptions when being wrong would change the solution, cost, or risk.
+- Do not guess what data contains — when a database, API, or other data source is accessible, query it directly to confirm facts (e.g., date ranges, row counts, schema details). Code-level inference is a fallback, not the default.
 - Read call sites, tests, configs, or docs as needed to understand the real boundary of the change.
 
 ## Workflow
