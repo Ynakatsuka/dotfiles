@@ -28,7 +28,7 @@ local externalLayout = {
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
     leftBottom = "Google Chrome", -- Left bottom (45% x 80%)
     rightTop = "cmux",            -- Right full height
-    rightBottom = "Cursor"        -- Right bottom (behind cmux)
+    rightBottom = "Cursor"        -- Right bottom (overlaps cmux)
 }
 
 -- Built-in Display Layout
@@ -191,7 +191,7 @@ local function layoutExternalDisplay()
     local rightTopHeight = frame.h * externalLayout.rightTopHeight
     local rightBottomHeight = frame.h * externalLayout.rightBottomHeight
 
-    -- Define 4-split layout positions
+    -- Define layout positions for external display
     local layouts = {
         -- Left top: Sublime Text
         [externalLayout.leftTop] = {
@@ -207,17 +207,17 @@ local function layoutExternalDisplay()
             w = leftWidth,
             h = leftBottomHeight
         },
-        -- Right top: ghostty
+        -- Right: cmux (full height)
         [externalLayout.rightTop] = {
             x = frame.x + leftWidth,
             y = frame.y,
             w = rightWidth,
             h = rightTopHeight
         },
-        -- Right bottom: Cursor
+        -- Right bottom: Cursor (overlaps cmux)
         [externalLayout.rightBottom] = {
             x = frame.x + leftWidth,
-            y = frame.y + rightTopHeight,
+            y = frame.y + frame.h - rightBottomHeight,
             w = rightWidth,
             h = rightBottomHeight
         }
@@ -352,6 +352,43 @@ local function runInNewCmuxTerminalSurface(cmd)
         end)
     end)
 end
+
+-- ============================================================================
+-- CMUX BROWSER KEY OVERRIDES
+-- ============================================================================
+
+-- Intercept Cmd+W in cmux browser surfaces to close the VS Code editor tab
+-- instead of closing the browser surface itself.
+-- Requires code-server keybindings.json: {"key":"ctrl+w","command":"workbench.action.closeActiveEditor"}
+local cmuxBrowserKeyOverride = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
+    local app = hs.application.frontmostApplication()
+    if not app or app:name() ~= "cmux" then
+        return false
+    end
+
+    local flags = event:getFlags()
+    local keyCode = event:getKeyCode()
+
+    -- Cmd+W (keyCode 13 = W)
+    if flags.cmd and not flags.alt and not flags.ctrl and not flags.shift and keyCode == 13 then
+        local output = hs.execute("/opt/homebrew/bin/cmux identify --no-caller 2>/dev/null")
+        if output then
+            local data = hs.json.decode(output)
+            if data and data.focused and data.focused.is_browser_surface then
+                local ref = data.focused.surface_ref
+                hs.execute("/opt/homebrew/bin/cmux browser press --surface " .. ref .. " 'Control+w' 2>/dev/null")
+                return true -- consume the event
+            end
+        end
+    end
+
+    return false
+end)
+cmuxBrowserKeyOverride:start()
+
+-- ============================================================================
+-- DIFIT INTEGRATION
+-- ============================================================================
 
 -- Launch difit web review for current working tree (no split)
 hs.hotkey.bind({"cmd", "shift"}, "G", function()
