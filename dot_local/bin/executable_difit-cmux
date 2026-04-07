@@ -16,7 +16,14 @@
 set -euo pipefail
 
 CMUX="/Applications/cmux.app/Contents/Resources/bin/cmux"
-DIFIT_PORT=4966
+
+# Pick a free TCP port dynamically so concurrent invocations don't collide
+# and stale processes on a fixed port can't shadow this run.
+DIFIT_PORT=$(python3 -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
 
 if [[ ! -x "$CMUX" ]]; then
     echo "Error: cmux not found at $CMUX" >&2
@@ -28,8 +35,12 @@ if ! command -v difit &>/dev/null; then
     exit 1
 fi
 
-# Get the working directory of the currently focused cmux pane
+# Get the working directory of the currently focused cmux surface
 targetDir=$("$CMUX" sidebar-state | awk -F= '/^focused_cwd=/{print $2}')
+# `focused_panel` from sidebar-state is a panel UUID, not a pane id, so it
+# can't be passed to `new-surface --pane`. Resolve the focused pane via
+# `list-panes` instead (the line marked `[focused]`).
+focusedPane=$("$CMUX" list-panes 2>/dev/null | awk '/\[focused\]/{for(i=1;i<=NF;i++) if($i ~ /^pane:/){print $i; exit}}')
 
 if [[ -z "$targetDir" ]]; then
     echo "Error: Could not detect focused_cwd from cmux sidebar-state" >&2
@@ -77,19 +88,31 @@ else
     fi
 fi
 
-# Wait until the difit server is ready
-while ! curl -s "http://localhost:${DIFIT_PORT}/" >/dev/null 2>&1; do
-    sleep 0.5
+# Wait until the difit server is ready (tighter interval than the original
+# 0.5s loop to shave visible latency).
+while ! curl -sf "http://localhost:${DIFIT_PORT}/" >/dev/null 2>&1; do
+    sleep 0.05
 done
 
-# Open in a cmux browser split and get the surface ID
-browserSurface=$("$CMUX" --json browser open-split "http://localhost:${DIFIT_PORT}/" | grep -o '"ref" *: *"surface:[^"]*"' | head -1 | grep -o 'surface:[0-9]*')
+# Open the difit URL as a new browser surface inside the focused pane,
+# so it appears as a tab in the same pane that triggered this command
+# (instead of being placed in a separate split/tab).
+newSurfaceArgs=(--type browser --url "http://localhost:${DIFIT_PORT}/")
+if [[ -n "$focusedPane" ]]; then
+    newSurfaceArgs+=(--pane "$focusedPane")
+fi
+browserSurface=$("$CMUX" --json new-surface "${newSurfaceArgs[@]}" | grep -o '"surface_ref" *: *"surface:[^"]*"' | head -1 | grep -o 'surface:[0-9]*')
 
 if [[ -z "$browserSurface" ]]; then
     echo "Warning: Could not get browser surface ID, difit server running in background" >&2
     wait
     exit 0
 fi
+
+# Bring the new browser tab to the foreground (cmux doesn't auto-focus
+# surfaces created via `new-surface`, so without this it sits as a
+# background tab in the same pane).
+"$CMUX" rpc surface.focus "{\"surface_id\":\"${browserSurface}\"}" >/dev/null 2>&1 || true
 
 # Wait until the browser pane is closed, then shut down the server
 while "$CMUX" surface-health 2>&1 | grep -q "$browserSurface"; do
