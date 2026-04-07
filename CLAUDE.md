@@ -114,6 +114,27 @@ Contains extensive FZF integrations, git worktree management, and tool initializ
 
 After editing, run `mise install` to install new tools.
 
+### Hammerspoon (`dot_hammerspoon/init.lua`)
+
+After editing, the config must be reloaded inside the running Hammerspoon app. The repo enables both reload paths via `require("hs.ipc")` and `hs.allowAppleScript(true)`:
+
+```bash
+hs -c "hs.reload()"
+# or
+osascript -e 'tell application "Hammerspoon" to execute lua code "hs.reload()"'
+```
+
+Note: after a fresh install you must Reload Config **once manually** from the Hammerspoon menu bar before the CLI/AppleScript paths work.
+
+### Chezmoi Source vs ghq Clone
+
+The chezmoi source dir (`~/.local/share/chezmoi/`) is a separate git clone from the authoritative ghq dir. `chezmoi apply` reads from the chezmoi source, NOT the ghq dir. After committing in ghq, sync the chezmoi source before applying:
+
+```bash
+git -C ~/.local/share/chezmoi pull
+chezmoi apply -v
+```
+
 ### Modifying Bootstrap Scripts
 
 Test with `--dry-run` flag when available. Scripts use confirmation prompts for destructive actions.
