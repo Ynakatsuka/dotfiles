@@ -4,6 +4,10 @@
 -- Enable Spotlight for better application name matching
 hs.application.enableSpotlightForNameSearches(true)
 
+-- Enable external reload via `hs` CLI and AppleScript
+require("hs.ipc")
+hs.allowAppleScript(true)
+
 -- Hotkey modifier
 local hyper = {"alt", "ctrl"}
 
