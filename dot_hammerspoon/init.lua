@@ -300,6 +300,16 @@ hs.hotkey.bind(hyper, "I", function()
     layoutBuiltInDisplay()
 end)
 
+-- Launch difit-cmux (only meaningful while cmux is frontmost)
+hs.hotkey.bind({"cmd", "shift"}, "G", function()
+    local difit = os.getenv("HOME") .. "/.local/bin/difit-cmux"
+    hs.task.new("/bin/zsh", function(exitCode, stdOut, stdErr)
+        if exitCode ~= 0 then
+            hs.alert.show("difit-cmux failed: " .. (stdErr or ""))
+        end
+    end, {"-lc", difit}):start()
+end)
+
 -- Toggle active window between external and built-in display (maximized)
 hs.hotkey.bind(hyper, "J", function()
     local window = hs.window.focusedWindow()
