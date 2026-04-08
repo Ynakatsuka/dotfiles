@@ -305,7 +305,7 @@ hs.hotkey.bind(hyper, "I", function()
 end)
 
 -- Launch difit-cmux (only meaningful while cmux is frontmost)
-hs.hotkey.bind({"cmd", "shift"}, "G", function()
+hs.hotkey.bind({"cmd", "shift"}, "I", function()
     local log = "/tmp/difit-cmux.log"
     local home = os.getenv("HOME")
     local cmd = "exec >" .. log .. " 2>&1; "
