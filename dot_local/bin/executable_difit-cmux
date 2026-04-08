@@ -81,7 +81,7 @@ else
         difit working "${difitArgs[@]}" &
     else
         echo "Branch: $currentBranch (base: ${defaultBranch#origin/})"
-        difit "$mergeBase" . "${difitArgs[@]}" &
+        difit . "$mergeBase" "${difitArgs[@]}" &
     fi
 fi
 
