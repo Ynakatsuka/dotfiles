@@ -50,9 +50,6 @@ fi
 
 cd "$targetDir" || exit 1
 
-# Provide immediate feedback
-"$CMUX" notify --title "Difit" --body "Loading diff: $targetDir"
-
 currentBranch=$(git rev-parse --abbrev-ref HEAD)
 
 # Detect default branch (origin/HEAD -> origin/main -> origin/master)
