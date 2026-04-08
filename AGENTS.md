@@ -32,10 +32,10 @@ When instructions conflict, follow this order:
 
 ## Behavior
 
-- When the spec, acceptance criteria, or task scope is ambiguous, stop and ask the user before proceeding. Do not guess requirements — a wrong assumption costs more than a short question. Specifically ask when:
-  - The desired behavior has multiple reasonable interpretations.
-  - Edge cases or error handling are unspecified and the choice matters.
-  - The task boundary is unclear (what is in scope vs. out of scope).
+- When the spec, acceptance criteria, or task scope is ambiguous, first investigate autonomously: read the code, tests, configs, docs, and git history. Only ask the user when investigation cannot resolve the ambiguity. Ask when:
+  - The desired behavior has multiple reasonable interpretations that code and docs do not resolve.
+  - Edge cases or error handling are unspecified, the choice matters, and no existing pattern covers it.
+  - The task boundary is unclear after reviewing context.
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
 - Prefer fixing the source of a problem. Do not hide it with retries, defaults, or broad exception handling unless the user asked for that trade-off.
 - If a change can cause regressions, name the most likely regression and how you checked for it.
@@ -47,10 +47,7 @@ When instructions conflict, follow this order:
 - Do not mark a task as complete until you can demonstrate it works (run tests, check logs, verify output).
 - When receiving a bug report, investigate and fix autonomously — read logs, errors, and failing tests without waiting for step-by-step guidance.
 - For significant changes, pause and ask: "Is there a more elegant approach?" Skip this for trivial fixes.
-- When you encounter an unfamiliar term, tool name, library, or concept in the user's message or codebase:
-  1. Search the web or documentation first to understand it.
-  2. Summarize what you found and ask the user to confirm your understanding is correct before proceeding.
-  3. If the search does not yield useful results, tell the user what you searched for and ask for clarification.
+- When you encounter an unfamiliar term, tool name, library, or concept, search the web or documentation first. If the search gives a clear answer, proceed without asking. Only ask the user when the search is inconclusive or when acting on a wrong understanding would be costly.
 
 ## Communication
 
