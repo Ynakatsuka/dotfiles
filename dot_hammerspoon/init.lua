@@ -314,7 +314,19 @@ hs.hotkey.bind({"cmd", "shift"}, "I", function()
         .. home .. "/.local/bin/difit-cmux"
     hs.task.new("/bin/zsh", function(exitCode, _, _)
         if exitCode ~= 0 then
-            hs.alert.show("difit-cmux failed (see " .. log .. ")")
+            local title = "difit-cmux failed (exit " .. tostring(exitCode) .. ")"
+            local detail = ""
+            local f = io.open(log, "r")
+            if f then
+                local content = f:read("*a")
+                f:close()
+                content = content:match("^%s*(.-)%s*$") or ""
+                if #content > 500 then
+                    content = content:sub(1, 500) .. "\n…(truncated, see " .. log .. ")"
+                end
+                detail = content
+            end
+            hs.dialog.alert(-1, -1, function() end, title, detail, "OK", nil, "critical")
         end
     end, {"-lc", cmd}):start()
 end)
