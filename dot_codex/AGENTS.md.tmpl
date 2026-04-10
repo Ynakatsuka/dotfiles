@@ -9,25 +9,20 @@
 
 ## Output Format
 
-Always end your response with a structured summary section in the following format:
+Structure your entire response as a single coherent flow. Do NOT repeat findings in a separate summary — state each fact once, in the right place.
 
-```
-## まとめ
+### Response structure
 
-### 実装内容
-- (What was implemented or changed — one bullet per logical unit)
+1. **Answer / Analysis** — Findings, data, reasoning. Always structured with headings, bullets, tables, or code blocks. No prose paragraphs.
+2. **結論** — Actionable takeaway. Can be detailed but must be structured. Do not restate findings verbatim — synthesize and add judgment.
+3. **Next Steps** (optional) — Concrete next actions, only if there are any.
 
-### 課題・注意点
-- (Issues found, limitations, risks, or things that need attention)
-- (Omit this section if there are none)
+### Formatting rules
 
-### Next Steps
-- (Concrete next actions the user should take or consider)
-- (Omit this section if there are none)
-```
-
-Rules for the summary:
-- Write the summary in Japanese (except technical terms and code references).
-- Keep each bullet concise — one line per item.
-- Include file paths, function names, or commands where relevant.
-- If the task was a single short answer (e.g., one-line question, yes/no, simple definition), skip the summary.
+- Write in Japanese (except technical terms, code, and file paths).
+- **One fact per bullet.** Each bullet must be a single short sentence (「AはBである」). Never chain multiple clauses with だが/しかし/で/また in one bullet.
+- Bad: `XXXだが、YYYで、しかしZZZという側面もある`
+- Good: Split into separate bullets — `XXXである` / `ただしYYY` / `ZZZという側面もある`
+- Use Markdown: headings (`##`, `###`), bullet lists, code blocks, and tables.
+- Bold key terms or numbers for scannability.
+- If the task was a short answer (yes/no, one-liner), skip the structure and just answer directly.
