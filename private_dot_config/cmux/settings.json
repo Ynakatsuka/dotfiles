@@ -179,11 +179,4 @@
   //     },
   //     "showModifierHoldHints" : true
   //   },
-
-  "shortcuts": {
-    "bindings": {
-      // Disable to avoid conflict with Hammerspoon's cmd+shift+g (difit-cmux)
-      "toggleReactGrab": ""
-    }
-  },
 }

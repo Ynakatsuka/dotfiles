@@ -116,7 +116,7 @@ After editing, run `mise install` to install new tools.
 
 ### Hammerspoon (`dot_hammerspoon/init.lua`)
 
-After editing, the config must be reloaded inside the running Hammerspoon app. The repo enables both reload paths via `require("hs.ipc")` and `hs.allowAppleScript(true)`:
+After editing, the config must be reloaded inside the running Hammerspoon app (see reload commands below). The repo enables both reload paths via `require("hs.ipc")` and `hs.allowAppleScript(true)`:
 
 ```bash
 hs -c "hs.reload()"
