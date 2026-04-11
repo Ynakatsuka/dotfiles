@@ -56,9 +56,10 @@ git status --short
 1. **ブランチ名を決める**: 変更内容に基づいた説明的な名前（例: `feat/improve-pr-skill`）
 2. **関連する変更のパッチを作成する**:
    ```bash
-   # tracked ファイルの変更をパッチ化
-   git diff -- <related_files...> > /tmp/pr-changes.patch
-   git diff --cached -- <related_files...> >> /tmp/pr-changes.patch
+   # tracked ファイルの変更をパッチ化（前回の残りがあると noclobber で失敗するため事前削除）
+   PATCH_FILE="/tmp/pr-changes-$$-$RANDOM.patch"
+   git diff -- <related_files...> > "$PATCH_FILE"
+   git diff --cached -- <related_files...> >> "$PATCH_FILE"
    ```
    未追跡ファイル（新規作成）はパッチに含められないため、パスを控えておく
 3. **保護ブランチの作業ツリーを元に戻す**:
@@ -73,7 +74,7 @@ git status --short
 5. **ワークツリーでパッチを適用する**:
    ```bash
    cd /tmp/pr-worktree-<branch>
-   git apply /tmp/pr-changes.patch
+   git apply "$PATCH_FILE"
    # 未追跡ファイルは元のリポジトリからコピー
    cp <original_repo>/<new_file> ./<new_file>
    ```
@@ -171,8 +172,10 @@ Agent ツールで以下のプロンプトを渡す:
 diff を一時ファイル経由で渡す（大きな diff でもシェル引数長制限に引っかからないようにする）。
 
 ```bash
-DIFF_FILE=$(mktemp)
-git diff "$BASE_BRANCH"..HEAD >| "$DIFF_FILE"
+# mktemp はファイルを事前作成するため noclobber 環境で > が失敗する。
+# 代わりに未作成のユニークパスを使う。
+DIFF_FILE="/tmp/pr-diff-$(git rev-parse --short HEAD)-$$-$RANDOM.patch"
+git diff "$BASE_BRANCH"..HEAD > "$DIFF_FILE"
 codex exec "Review the diff in the file $DIFF_FILE. Focus on bugs, logic errors, and security issues. Code quality and efficiency have already been reviewed separately, so skip those. For each issue, specify the file path and line number, severity (critical/warning), and a concrete fix suggestion. Output in markdown format."
 rm -f "$DIFF_FILE"
 ```
