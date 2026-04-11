@@ -25,36 +25,79 @@ argument-hint: "[create|review]"
 
 ---
 
-## Phase 1: ブランチ検証（全サブコマンド共通）
+## Phase 1: ブランチ検証と準備（全サブコマンド共通）
+
+### 1-1: 現在の状態を確認
 
 ```bash
 CURRENT_BRANCH=$(git branch --show-current)
-PROTECTED_BRANCHES="main master staging production"
+git status --short
+```
 
-# 現在のブランチが保護ブランチでないことを確認
-for b in $PROTECTED_BRANCHES; do
-  if [ "$CURRENT_BRANCH" = "$b" ]; then
-    echo "ERROR: $b ブランチでは実行できません"
-    exit 1
-  fi
-done
+保護ブランチ: `main`, `master`, `staging`, `production`
 
-# 上流ブランチ（push 先）が保護ブランチでないことを確認
+### 1-2: 未コミットの変更の整理
+
+未コミットの変更（staged / unstaged / untracked）がある場合、これまでの会話で行った変更を特定する。
+
+**コミットルール:**
+
+1. **対象の判断**: 会話の中で作成・変更したファイルのみを対象とする。無関係な変更はコミットしない
+2. **論理的なまとまりでコミット**: 1つの目的 = 1コミット。機能追加と設定変更など性質が異なる変更は別コミットにする
+3. **Conventional Commits 形式**（英語）でコミットメッセージを書く
+4. **コミット前に `git diff --cached` で内容を確認する**
+
+### 1-3: ブランチ戦略
+
+#### 保護ブランチにいる場合
+
+保護ブランチに直接コミット・push してはならない。ワークツリーを使って別ブランチで作業する。
+
+1. **ブランチ名を決める**: 変更内容に基づいた説明的な名前（例: `feat/improve-pr-skill`）
+2. **関連する変更のパッチを作成する**:
+   ```bash
+   # tracked ファイルの変更をパッチ化
+   git diff -- <related_files...> > /tmp/pr-changes.patch
+   git diff --cached -- <related_files...> >> /tmp/pr-changes.patch
+   ```
+   未追跡ファイル（新規作成）はパッチに含められないため、パスを控えておく
+3. **保護ブランチの作業ツリーを元に戻す**:
+   ```bash
+   git checkout -- <modified_files...>      # unstaged 変更を戻す
+   git reset HEAD -- <staged_files...>      # staged を解除
+   ```
+4. **ワークツリーを作成する**:
+   ```bash
+   git worktree add /tmp/pr-worktree-<branch> -b <branch> HEAD
+   ```
+5. **ワークツリーでパッチを適用する**:
+   ```bash
+   cd /tmp/pr-worktree-<branch>
+   git apply /tmp/pr-changes.patch
+   # 未追跡ファイルは元のリポジトリからコピー
+   cp <original_repo>/<new_file> ./<new_file>
+   ```
+6. **コミットルールに従ってコミットする**
+7. **以降の Phase はすべてワークツリー内で実行する**
+
+#### 保護ブランチでない場合
+
+その場でコミットルールに従ってコミットする。
+
+上流ブランチが保護ブランチでないことも確認する:
+
+```bash
 UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null || true)
 if [ -n "$UPSTREAM" ]; then
   UPSTREAM_BRANCH="${UPSTREAM#origin/}"
   for b in $PROTECTED_BRANCHES; do
     if [ "$UPSTREAM_BRANCH" = "$b" ]; then
-      echo "ERROR: 上流ブランチが $b に設定されています。push すると $b に直接反映されます"
+      echo "ERROR: 上流ブランチが $b に設定されています"
       exit 1
     fi
   done
 fi
-
-git status --short
 ```
-
-未コミットの変更がある場合はここまだの会話の流れでコミットすべきものはコミットする。
 
 ## Phase 2: 変更内容の把握（全サブコマンド共通）
 
@@ -250,3 +293,4 @@ gh pr edit --body "更新内容"
 - Codex レビューは必ず実行する（スキップ不可）。`codex` コマンドが見つからない場合は、mise が管理するパス（`~/.local/share/mise/installs/` 以下）を確認し、フルパスで実行を試みる。それでも見つからない場合はユーザーに報告して対処を求める
 - 好みの問題（フォーマット、命名の趣味）は指摘しない
 - テストが壊れる修正はしない
+- ワークツリー使用時は、ワークツリー内で作業を続ける。PR 作成後も修正が必要になる場合があるため、ワークツリーは自動削除しない
