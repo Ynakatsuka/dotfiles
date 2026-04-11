@@ -55,7 +55,8 @@
     "type": "command",
     "command": "npx -y ccusage statusline"
   },
-  "defaultMode": "acceptEdits",
+  "defaultMode": "bypassPermissions",
+  "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
   "model": "opus[1m]"
