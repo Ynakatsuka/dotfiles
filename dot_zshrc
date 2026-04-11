@@ -20,6 +20,7 @@ if [[ -d "$_zsh_config_dir" ]]; then
   for _zsh_config_file in \
     "$_zsh_config_dir/prompt.zsh" \
     "$_zsh_config_dir/aliases.zsh" \
+    "$_zsh_config_dir/keybindings.zsh" \
     "$_zsh_config_dir/git-worktree.zsh" \
     "$_zsh_config_dir/codex.zsh" \
     "$_zsh_config_dir/fzf.zsh" \
