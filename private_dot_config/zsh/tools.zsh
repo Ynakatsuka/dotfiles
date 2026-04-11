@@ -31,10 +31,6 @@ autoload -Uz add-zsh-hook
 
 _initialize_runtime_tools() {
   add-zsh-hook -d precmd _initialize_runtime_tools
-  # rye
-  if [[ -f "$HOME/.rye/env" ]]; then
-    source "$HOME/.rye/env"
-  fi
 
   # mise (--shims avoids precmd hook overhead on every Enter)
   if command -v mise > /dev/null 2>&1; then
