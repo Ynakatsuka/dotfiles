@@ -36,21 +36,8 @@ elif [ "$SKIP_AGE" -eq 0 ] && has_apt && confirm "Install age (file encryption)?
   run sudo apt-get install -y age
 fi
 
-if command -v gh >/dev/null 2>&1; then
-  log "gh already installed, skipping"
-elif has_apt && confirm "Install GitHub CLI (gh)?"; then
-  run sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059 || true
-  run sudo apt-add-repository https://cli.github.com/packages || true
-  run sudo apt update -y
-  run sudo apt install -y gh
-  warn "Run 'gh auth login' manually after installation."
-fi
-
-if command -v gh >/dev/null 2>&1 && gh extension list 2>/dev/null | grep -q dlvhdr/gh-dash; then
-  log "gh-dash already installed, skipping"
-elif command -v gh >/dev/null 2>&1 && confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
-  run gh extension install dlvhdr/gh-dash
-fi
+# gh is managed by mise (see dot_mise.toml). gh-dash extension is installed
+# from main.sh after `mise install` completes.
 
 if command -v uv >/dev/null 2>&1; then
   log "uv already installed, skipping"
@@ -69,29 +56,7 @@ elif confirm "Install mise (via official installer)?"; then
   warn "Restart your shell or source the activation in your rc to use mise."
 fi
 
-if command -v rye >/dev/null 2>&1; then
-  log "rye already installed, skipping"
-elif confirm "Install rye (optional)?"; then
-  run bash -lc '_s=$(mktemp) && curl --fail -sS https://rye.astral.sh/get -o "$_s" && bash "$_s" && rm -f "$_s"'
-  run bash -lc 'echo '"'"'source "$HOME/.rye/env"'"'"' >> "$HOME/.zshrc"'
-fi
-
-if command -v direnv >/dev/null 2>&1; then
-  log "direnv already installed, skipping"
-elif confirm "Install direnv?"; then
-  run bash -lc '_s=$(mktemp) && curl --fail -sL https://direnv.net/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
-fi
-
-if command -v gcloud >/dev/null 2>&1; then
-  log "gcloud already installed, skipping"
-elif has_apt && confirm "Install Google Cloud CLI?"; then
-  run sudo apt-get install -y apt-transport-https ca-certificates gnupg curl sudo
-  run bash -lc 'curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -'
-  run bash -lc 'echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list'
-  run bash -lc 'curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -'
-  run sudo apt-get update -y
-  run sudo apt-get install -y google-cloud-cli
-fi
+# rye, direnv, and gcloud are managed by mise (see dot_mise.toml).
 
 if command -v tailscale >/dev/null 2>&1; then
   log "tailscale already installed, skipping"

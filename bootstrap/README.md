@@ -75,7 +75,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 
 - Ubuntu (user-only, `--user-only`)
   - Skips base packages and system-level setup (no sudo required)
-  - Installs user-local CLIs (uv, mise, direnv, Claude Code, etc.)
+  - Installs user-local CLIs (uv, mise, Claude Code, etc.); gh/gcloud/direnv/rye come from `mise install`
   - Sets up dotfiles (prezto, tpm, chezmoi)
 
 ### Customize
