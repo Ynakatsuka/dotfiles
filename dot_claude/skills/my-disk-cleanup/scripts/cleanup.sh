@@ -10,19 +10,28 @@ OS_TYPE="$(uname -s)"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run) DRY_RUN=true; shift ;;
-    --category) CATEGORY="$2"; shift 2 ;;
-    *) echo "Unknown option: $1"; exit 1 ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --category)
+      CATEGORY="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
   esac
 done
 
 bytes_to_human() {
   local bytes=$1
-  if (( bytes >= 1073741824 )); then
+  if ((bytes >= 1073741824)); then
     printf "%.1f GB" "$(echo "scale=1; $bytes / 1073741824" | bc)"
-  elif (( bytes >= 1048576 )); then
+  elif ((bytes >= 1048576)); then
     printf "%.1f MB" "$(echo "scale=1; $bytes / 1048576" | bc)"
-  elif (( bytes >= 1024 )); then
+  elif ((bytes >= 1024)); then
     printf "%.1f KB" "$(echo "scale=1; $bytes / 1024" | bc)"
   else
     printf "%d B" "$bytes"
@@ -57,7 +66,7 @@ run_or_dry() {
   if $DRY_RUN; then
     echo "  [dry-run] $*"
   else
-    eval "$@" 2>/dev/null || true
+    eval "$*" 2>/dev/null || true
   fi
 }
 
@@ -170,12 +179,13 @@ cleanup_tmp() {
     local user_cache="$HOME/Library/Caches"
     local size
     size=$(dir_size_bytes "$user_cache")
-    report_category "~/Library/Caches" "$size"
+    # shellcheck disable=SC2088 # display label, not a path
+    report_category '~/Library/Caches' "$size"
     total=$((total + size))
 
     local xcode_dd="$HOME/Library/Developer/Xcode/DerivedData"
     size=$(dir_size_bytes "$xcode_dd")
-    if (( size > 0 )); then
+    if ((size > 0)); then
       report_category "Xcode DerivedData" "$size"
       total=$((total + size))
       run_or_dry "rm -rf '$xcode_dd'/*"
@@ -199,7 +209,7 @@ cleanup_tmp() {
     s=$(dir_size_bytes "$d")
     pycache_size=$((pycache_size + s))
   done < <(find "$HOME" -maxdepth 4 -name "__pycache__" -type d -print0 2>/dev/null)
-  if (( pycache_size > 0 )); then
+  if ((pycache_size > 0)); then
     report_category "__pycache__ (depth 4)" "$pycache_size"
     if ! $DRY_RUN; then
       find "$HOME" -maxdepth 4 -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -213,7 +223,7 @@ cleanup_tmp() {
     s=$(dir_size_bytes "$d")
     mypy_size=$((mypy_size + s))
   done < <(find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -print0 2>/dev/null)
-  if (( mypy_size > 0 )); then
+  if ((mypy_size > 0)); then
     report_category ".mypy_cache (depth 4)" "$mypy_size"
     if ! $DRY_RUN; then
       find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -exec rm -rf {} + 2>/dev/null || true
@@ -239,19 +249,19 @@ categories=()
 if [[ "$CATEGORY" == "all" ]]; then
   categories=(docker brew apt pip npm yarn tmp)
 else
-  IFS=',' read -ra categories <<< "$CATEGORY"
+  IFS=',' read -ra categories <<<"$CATEGORY"
 fi
 
 for cat in "${categories[@]}"; do
   echo "── $cat ──"
   case "$cat" in
     docker) cleanup_docker ;;
-    brew)   cleanup_brew ;;
-    apt)    cleanup_apt ;;
-    pip)    cleanup_pip ;;
-    npm)    cleanup_npm ;;
-    yarn)   cleanup_yarn ;;
-    tmp)    cleanup_tmp ;;
+    brew) cleanup_brew ;;
+    apt) cleanup_apt ;;
+    pip) cleanup_pip ;;
+    npm) cleanup_npm ;;
+    yarn) cleanup_yarn ;;
+    tmp) cleanup_tmp ;;
     *) echo "  Unknown category: $cat" ;;
   esac
   echo ""
@@ -261,7 +271,7 @@ AFTER=$(get_disk_available)
 FREED=$((AFTER - BEFORE))
 echo "========================================="
 echo "  Disk available after:  $(bytes_to_human "$AFTER")"
-if (( FREED > 0 )); then
+if ((FREED > 0)); then
   echo "  Space freed:           $(bytes_to_human "$FREED")"
 else
   echo "  Space freed:           (negligible or N/A)"

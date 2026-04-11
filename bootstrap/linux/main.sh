@@ -50,7 +50,10 @@ USAGE
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --plan) shift; PLAN="$1" ;;
+    --plan)
+      shift
+      PLAN="$1"
+      ;;
     --with-gpu) WITH_GPU=1 ;;
     --with-expressvpn) WITH_EXPRESSVPN=1 ;;
     --with-docker) WITH_DOCKER=1 ;;
@@ -59,10 +62,21 @@ while [ $# -gt 0 ]; do
     --with-dotfiles) WITH_DOTFILES=1 ;;
     --with-cleanup) WITH_CLEANUP=1 ;;
     --xdg-english-dirs) XDG_ENGLISH_DIRS=1 ;;
-    --user-only) USER_ONLY=1; WITH_CLIS=1; WITH_DOTFILES=1 ;;
+    --user-only)
+      USER_ONLY=1
+      WITH_CLIS=1
+      WITH_DOTFILES=1
+      ;;
     --dry-run) DRY_RUN=1 ;;
-    -h|--help) usage; exit 0 ;;
-    *) warn "Unknown option: $1"; usage; exit 1 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      warn "Unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
   shift
 done
@@ -70,18 +84,29 @@ done
 # Apply plan presets (override individual flags)
 case "$PLAN" in
   full)
-    WITH_DOCKER=1; WITH_CLIS=1; WITH_DOTFILES=1; WITH_CLEANUP=1; WITH_MISE_INSTALL=1
+    WITH_DOCKER=1
+    WITH_CLIS=1
+    WITH_DOTFILES=1
+    WITH_CLEANUP=1
+    WITH_MISE_INSTALL=1
     ;;
   standard)
-    USER_ONLY=1; WITH_CLIS=1; WITH_DOTFILES=1; WITH_MISE_INSTALL=1; SKIP_AGE=1
+    USER_ONLY=1
+    WITH_CLIS=1
+    WITH_DOTFILES=1
+    WITH_MISE_INSTALL=1
+    SKIP_AGE=1
     ;;
   minimal)
-    USER_ONLY=1; WITH_DOTFILES=1
+    USER_ONLY=1
+    WITH_DOTFILES=1
     ;;
   "")
     ;; # no plan specified, use individual flags
   *)
-    warn "Unknown plan: $PLAN"; usage; exit 1
+    warn "Unknown plan: $PLAN"
+    usage
+    exit 1
     ;;
 esac
 
@@ -100,35 +125,41 @@ run() {
   fi
 }
 
-_dry_run_flag() { [ "$DRY_RUN" -eq 1 ] && echo "--dry-run" || true; }
-_xdg_flag() { [ "$XDG_ENGLISH_DIRS" -eq 1 ] && echo "--xdg-english-dirs" || true; }
+# Build flag arrays up-front so module invocations can pass them quoted.
+# Arrays let us avoid SC2046 word-splitting warnings without disabling the check.
+DRY_RUN_ARGS=()
+if [ "$DRY_RUN" -eq 1 ]; then DRY_RUN_ARGS=(--dry-run); fi
+XDG_ARGS=()
+if [ "$XDG_ENGLISH_DIRS" -eq 1 ]; then XDG_ARGS=(--xdg-english-dirs); fi
+SKIP_AGE_ARGS=()
+if [ "$SKIP_AGE" -eq 1 ]; then SKIP_AGE_ARGS=(--skip-age); fi
 
 if [ "$USER_ONLY" -eq 0 ]; then
   log "Running 00_base.sh"
-  "${SCRIPT_DIR}/modules/00_base.sh" $(_dry_run_flag) $(_xdg_flag)
+  "${SCRIPT_DIR}/modules/00_base.sh" "${DRY_RUN_ARGS[@]}" "${XDG_ARGS[@]}"
 else
   log "Skipping 00_base.sh (user-only mode)"
 fi
 
 if [ "$WITH_EXPRESSVPN" -eq 1 ]; then
   log "Running 05_expressvpn.sh"
-  "${SCRIPT_DIR}/modules/05_expressvpn.sh" $(_dry_run_flag)
+  "${SCRIPT_DIR}/modules/05_expressvpn.sh" "${DRY_RUN_ARGS[@]}"
 fi
 
 if [ "$WITH_DOCKER" -eq 1 ]; then
   log "Running 20_docker.sh"
-  "${SCRIPT_DIR}/modules/20_docker.sh" $(_dry_run_flag)
+  "${SCRIPT_DIR}/modules/20_docker.sh" "${DRY_RUN_ARGS[@]}"
 fi
 
 if [ "$WITH_NVIDIA_CONTAINER" -eq 1 ]; then
   log "Running 25_nvidia_container.sh"
-  "${SCRIPT_DIR}/modules/25_nvidia_container.sh" $(_dry_run_flag)
+  "${SCRIPT_DIR}/modules/25_nvidia_container.sh" "${DRY_RUN_ARGS[@]}"
 fi
 
 GPU_DONE=0
 if [ "$WITH_GPU" -eq 1 ]; then
   log "Running 10_gpu_nvidia.sh (explicit)"
-  "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" $(_dry_run_flag)
+  "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" "${DRY_RUN_ARGS[@]}"
   GPU_DONE=1
 fi
 
@@ -136,7 +167,7 @@ fi
 if [ "$GPU_DONE" -eq 0 ] && has_nvidia_gpu; then
   if confirm "NVIDIA GPU detected. Install driver/CUDA now?"; then
     log "Running 10_gpu_nvidia.sh (auto-detected)"
-    "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" $(_dry_run_flag)
+    "${SCRIPT_DIR}/modules/10_gpu_nvidia.sh" "${DRY_RUN_ARGS[@]}"
     GPU_DONE=1
   else
     warn "Skipped GPU installation despite detection"
@@ -145,14 +176,12 @@ fi
 
 if [ "$WITH_CLIS" -eq 1 ]; then
   log "Running 30_clis.sh"
-  _skip_age_flag=""
-  [ "$SKIP_AGE" -eq 1 ] && _skip_age_flag="--skip-age"
-  "${SCRIPT_DIR}/modules/30_clis.sh" $(_dry_run_flag) $_skip_age_flag
+  "${SCRIPT_DIR}/modules/30_clis.sh" "${DRY_RUN_ARGS[@]}" "${SKIP_AGE_ARGS[@]}"
 fi
 
 if [ "$WITH_DOTFILES" -eq 1 ]; then
   log "Running 40_dotfiles.sh"
-  "${SCRIPT_DIR}/modules/40_dotfiles.sh" $(_dry_run_flag)
+  "${SCRIPT_DIR}/modules/40_dotfiles.sh" "${DRY_RUN_ARGS[@]}"
 fi
 
 if [ "$WITH_MISE_INSTALL" -eq 1 ]; then
@@ -195,7 +224,7 @@ fi
 
 if [ "$WITH_CLEANUP" -eq 1 ]; then
   log "Running 99_cleanup.sh"
-  "${SCRIPT_DIR}/modules/99_cleanup.sh" $(_dry_run_flag)
+  "${SCRIPT_DIR}/modules/99_cleanup.sh" "${DRY_RUN_ARGS[@]}"
 fi
 
 log "Linux bootstrap finished."
