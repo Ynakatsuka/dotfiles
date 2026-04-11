@@ -1,0 +1,14 @@
+# yazi main configuration.
+# Only plugin fetchers are configured here; everything else uses defaults.
+
+# git.yazi: run the git plugin as a fetcher so it populates git status
+# information for every file visible in the current directory.
+[[plugin.prepend_fetchers]]
+id  = "git"
+url = "*"
+run = "git"
+
+[[plugin.prepend_fetchers]]
+id  = "git"
+url = "*/"
+run = "git"
