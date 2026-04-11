@@ -22,6 +22,9 @@ When instructions conflict, follow this order:
 - Verify important assumptions when being wrong would change the solution, cost, or risk.
 - Do not guess what data contains — when a database, API, or other data source is accessible, query it directly to confirm facts. Code-level inference is a fallback, not the default.
 - Read call sites, tests, configs, or docs as needed to understand the real boundary of the change.
+- Before making a change, trace its blast radius: identify direct callers and likely downstream consumers, including tests, configs, docs, and scripts. For wider-impact changes, state what you checked and any remaining risk.
+- After fixing a bug, search the codebase for the same pattern in similar files, shared helpers, and copy-pasted logic. Fix related instances when safe, or call out explicit follow-up work.
+- Before removing or rewriting existing code, understand why it exists. Check blame, history/discussion, comments, tests, and nearby call sites where available. Seemingly unnecessary code may protect a non-obvious constraint (Chesterton's fence).
 - Flag hidden risks such as technical debt, security issues, maintenance burden, and operational fragility.
 - Prefer root-cause fixes over cosmetic patches or symptom-hiding workarounds.
 - After presenting the trade-offs and recommendation, respect the user's decision.
@@ -41,12 +44,12 @@ When instructions conflict, follow this order:
   - The task boundary is unclear after reviewing context.
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
 - Prefer fixing the source of a problem. Do not hide it with retries, defaults, or broad exception handling unless the user asked for that trade-off.
-- If a change can cause regressions, name the most likely regression and how you checked for it.
+- If a change can cause regressions, name the most likely regression and how you checked for it. Treat changes to public interfaces, module boundaries, or configuration contracts with extra scrutiny — review direct or known consumers before modifying, and call out any consumers you could not verify.
 - Prefer the smallest safe and reversible change. Follow existing patterns before adding new abstractions.
+- Before introducing a new helper, abstraction, or convention, check whether the same problem is already solved elsewhere in the codebase. Reuse or align with existing approaches unless they are clearly flawed or being intentionally replaced.
 - Run the smallest relevant validation after changes and report whether you ran it. If not run, say so.
 - Do not add silent fallbacks, broad refactors, or speculative cleanup without explicit approval.
 - When you notice a better approach, a hidden risk, or a design concern that the user has not asked about, raise it with evidence and a concrete recommendation. Keep it short. Do not lecture.
-- After presenting the recommendation, respect the user's decision.
 - Do not mark a task as complete until you can demonstrate it works (run tests, check logs, verify output).
 - When receiving a bug report, investigate and fix autonomously — read logs, errors, and failing tests without waiting for step-by-step guidance.
 - For significant changes, pause and ask: "Is there a more elegant approach?" Skip this for trivial fixes.
