@@ -79,10 +79,12 @@ curl -s -X POST "http://localhost:3434/api/projects/{projectId}/artifacts" \
 HTML が大きい場合は必ず一時ファイル経由で送信する。JSON の構築には `jq` を使い、エスケープ漏れを防ぐ:
 
 ```bash
+CCV_JSON="/tmp/ccv-artifact-$$-$RANDOM.json"
 jq -n --arg name "$NAME" --arg fileName "$FILENAME" --arg html "$(cat /tmp/artifact.html)" \
-  '{name: $name, fileName: $fileName, html: $html}' > /tmp/ccv-artifact.json
+  '{name: $name, fileName: $fileName, html: $html}' > "$CCV_JSON"
 curl -s -X POST "http://localhost:3434/api/projects/{projectId}/artifacts" \
-  -H 'Content-Type: application/json' -d @/tmp/ccv-artifact.json
+  -H 'Content-Type: application/json' -d @"$CCV_JSON"
+rm -f "$CCV_JSON"
 ```
 
 ## Step 4: Confirm and report
