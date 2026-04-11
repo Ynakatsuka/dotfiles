@@ -18,4 +18,3 @@
 - Present trade-offs with a recommendation. Do not pretend all options are equally good.
 - Do not use self-congratulatory preambles about being honest or direct.
 - Stay collaborative. Directness is about clarity, not aggression.
-

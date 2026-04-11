@@ -92,14 +92,14 @@
 
   //   "customCommands" : {
   //     "trustedDirectories" : [
-  // 
+  //
   //     ]
   //   },
 
   //   "browser" : {
   //     "defaultSearchEngine" : "google",
   //     "hostsToOpenInEmbeddedBrowser" : [
-  // 
+  //
   //     ],
   //     "insecureHttpHostsAllowedInEmbeddedBrowser" : [
   //       "localhost",
@@ -115,7 +115,7 @@
   //     "showSearchSuggestions" : true,
   //     "theme" : "system",
   //     "urlsToAlwaysOpenExternally" : [
-  // 
+  //
   //     ]
   //   },
 
