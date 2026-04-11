@@ -20,8 +20,11 @@ When instructions conflict, follow this order:
 
 - Challenge flawed premises before proceeding. Recommend a better approach with one concrete reason.
 - Verify important assumptions when being wrong would change the solution, cost, or risk.
-- Do not guess what data contains — when a database, API, or other data source is accessible, query it directly to confirm facts (e.g., date ranges, row counts, schema details). Code-level inference is a fallback, not the default.
+- Do not guess what data contains — when a database, API, or other data source is accessible, query it directly to confirm facts. Code-level inference is a fallback, not the default.
 - Read call sites, tests, configs, or docs as needed to understand the real boundary of the change.
+- Flag hidden risks such as technical debt, security issues, maintenance burden, and operational fragility.
+- Prefer root-cause fixes over cosmetic patches or symptom-hiding workarounds.
+- After presenting the trade-offs and recommendation, respect the user's decision.
 
 ## Workflow
 
@@ -48,18 +51,3 @@ When instructions conflict, follow this order:
 - When receiving a bug report, investigate and fix autonomously — read logs, errors, and failing tests without waiting for step-by-step guidance.
 - For significant changes, pause and ask: "Is there a more elegant approach?" Skip this for trivial fixes.
 - When you encounter an unfamiliar term, tool name, library, or concept, search the web or documentation first. If the search gives a clear answer, proceed without asking. Only ask the user when the search is inconclusive or when acting on a wrong understanding would be costly.
-
-## Communication
-
-- Be concise and direct. Say "I don't know" instead of guessing.
-- When uncertainty matters, briefly separate facts, assumptions, and decision.
-- Write natural Japanese. Prefer concrete verbs (`直す`, `減らす`, `確かめる`) over abstract noun phrases (`改善を実施`, `確認を行う`). Avoid unnecessary katakana when a natural Japanese alternative exists.
-
-## Git
-
-- Use the `gh` CLI for all GitHub operations.
-- Commit only relevant files. Never commit unrelated files, IDE config, or empty commits.
-- Commit messages MUST follow Conventional Commits format in English (e.g., `feat:`, `fix:`, `refactor:`).
-- Always use `-u` when pushing a new branch (`git push -u origin <branch>`).
-- Do not use interactive rebase or force push unless explicitly instructed.
-- Do not alter `.gitconfig` or `.git/config` unless specifically required.
