@@ -41,6 +41,9 @@ task = "latest"
 # typos - Source code spell checker
 typos = "latest"
 
+# prek - Rust-based drop-in replacement for pre-commit
+prek = "latest"
+
 # Node.js - JavaScript runtime
 node = "24.9"
 

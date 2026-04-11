@@ -1,0 +1,86 @@
+# Managed by prek (https://prek.j178.dev/), a Rust-based drop-in replacement
+# for pre-commit. After editing this file, run `prek install` once to enable
+# git hooks and `prek run --all-files` to check the whole tree.
+#
+# Notes for this repo:
+# - Age-encrypted and plist files are globally excluded — text hooks must not
+#   touch their bytes.
+# - .tmpl files are chezmoi Go templates and are excluded from syntax parsers
+#   (check-yaml/toml/json, shellcheck, shfmt).
+# - Shell hooks match only `*.sh` so extensionless files such as dot_zshrc
+#   (zsh syntax, not well supported by shellcheck) are skipped.
+# - avgtime_zsh.sh is a zsh script saved with a .sh suffix; excluded explicitly.
+# - shfmt runs in write mode (`-w`). It rewrites files in place; review the
+#   diff before committing.
+
+default_stages: [pre-commit]
+
+exclude: |
+  (?x)^(
+      \.git/.*|
+      .*\.age$|
+      .*\.plist$|
+      .*/encrypted_.*|
+      avgtime_zsh\.sh
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+        exclude: \.tmpl$
+      - id: check-shebang-scripts-are-executable
+        # `executable_*` files get their exec bit from chezmoi at apply time
+        # regardless of the source git mode, so we skip this hook for them.
+        # The listed .sh files are sourced or invoked via `bash <path>`, so
+        # their shebangs are shellcheck/editor hints only.
+        exclude: |
+          (?x)^(
+              .*\.tmpl|
+              .*/executable_.*|
+              bootstrap/lib/common\.sh|
+              bootstrap/macos/22_pointer\.sh|
+              bootstrap/macos/pointer/prefs/pointer_values\.sh
+          )$
+      - id: check-yaml
+        exclude: \.tmpl$
+      - id: check-toml
+        exclude: \.tmpl$
+      - id: check-json
+        # cmux/settings.json is JSONC (JSON with comments) per its own header,
+        # so strict JSON parsing must skip it.
+        exclude: |
+          (?x)^(
+              .*\.tmpl|
+              private_dot_config/cmux/settings\.json
+          )$
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.45.0
+    hooks:
+      - id: typos
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        files: \.sh$
+        exclude: \.tmpl$
+        args: [--severity=warning]
+
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        files: \.sh$
+        exclude: \.tmpl$
+        args: [-i, "2", -ci, -w]

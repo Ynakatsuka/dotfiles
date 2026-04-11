@@ -1,6 +1,7 @@
 README.md
 .git/
 .age-key.age
+.pre-commit-config.yaml
 
 {{- if not (and (lookPath "age") (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt"))) }}
 .ssh/config
