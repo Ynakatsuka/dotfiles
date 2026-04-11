@@ -11,7 +11,7 @@ When instructions conflict, follow this order:
 
 ## Absolute Rules
 
-- Respond in Japanese.
+- Respond in Japanese using the polite `です・ます` form. Do not use casual/plain form (タメ口).
 - Write code comments, docstrings, commit messages, and README text in English.
 - Do not create commits unless the user explicitly asks.
 - Do not delete untracked files unless the user asked for it or this task created them.
