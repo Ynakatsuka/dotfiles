@@ -32,4 +32,3 @@ killall cfprefsd || true
 
 echo "[INFO] macOS defaults applied"
 echo "[INFO] You may need to log out and log back in for all changes to take effect"
-

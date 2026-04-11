@@ -22,4 +22,3 @@ defaults write -g com.apple.trackpad.scaling -float 3
 
 # com.apple.universalaccess
 # defaults write com.apple.universalaccess mouseDriverCursorSize -float 1.0
-

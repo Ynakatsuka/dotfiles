@@ -28,7 +28,7 @@ if ! grep -q "UseKeychain yes" "$CONFIG_FILE" 2>/dev/null; then
     echo "  IgnoreUnknown UseKeychain"
     echo "  UseKeychain yes"
     echo "  IdentityFile ~/.ssh/id_rsa"
-  } >> "$CONFIG_FILE"
+  } >>"$CONFIG_FILE"
   chmod 600 "$CONFIG_FILE"
   echo "[INFO] Appended default SSH config to $CONFIG_FILE"
 else
@@ -36,4 +36,3 @@ else
 fi
 
 echo "[INFO] To copy your key to a server: brew install ssh-copy-id && ssh-copy-id user@host"
-

@@ -25,10 +25,20 @@ USAGE
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --plan) shift; PLAN="$1" ;;
+    --plan)
+      shift
+      PLAN="$1"
+      ;;
     --dry-run) DRY_RUN=1 ;;
-    -h|--help) usage; exit 0 ;;
-    *) warn "Unknown option: $1"; usage; exit 1 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      warn "Unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
   shift
 done

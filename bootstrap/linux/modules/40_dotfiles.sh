@@ -11,7 +11,10 @@ DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
-    *) warn "Unknown option: $1"; exit 1 ;;
+    *)
+      warn "Unknown option: $1"
+      exit 1
+      ;;
   esac
   shift
 done
@@ -51,4 +54,3 @@ elif confirm "Change login shell to zsh?"; then
 fi
 
 log "Dotfiles module completed"
-

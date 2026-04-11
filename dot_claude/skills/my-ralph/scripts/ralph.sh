@@ -37,7 +37,7 @@ touch "$PROGRESS_FILE"
 
 # --- Main loop -------------------------------------------------------------
 iteration=0
-while (( iteration < MAX_ITERATIONS )); do
+while ((iteration < MAX_ITERATIONS)); do
   iteration=$((iteration + 1))
   echo ""
   echo "=========================================="

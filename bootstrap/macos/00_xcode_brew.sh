@@ -17,18 +17,18 @@ fi
 if ! command -v brew >/dev/null 2>&1; then
   echo "[INFO] Installing Homebrew..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  
+
   # Add Homebrew to PATH for both Apple Silicon and Intel Macs
   if [ -d /opt/homebrew/bin ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
     # Add to shell profile files
-    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.zprofile"
-    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.bash_profile"
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >>"$HOME/.zprofile"
+    echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >>"$HOME/.bash_profile"
   elif [ -d /usr/local/bin/brew ]; then
     eval "$(/usr/local/bin/brew shellenv)"
     # Add to shell profile files
-    echo 'eval "$(/usr/local/bin/brew shellenv)"' >> "$HOME/.zprofile"
-    echo 'eval "$(/usr/local/bin/brew shellenv)"' >> "$HOME/.bash_profile"
+    echo 'eval "$(/usr/local/bin/brew shellenv)"' >>"$HOME/.zprofile"
+    echo 'eval "$(/usr/local/bin/brew shellenv)"' >>"$HOME/.bash_profile"
   fi
 else
   echo "[INFO] Homebrew already installed"

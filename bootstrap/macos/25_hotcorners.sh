@@ -14,4 +14,3 @@ echo "[INFO] Restarting Dock"
 killall Dock || true
 
 echo "[INFO] Hot Corners configured"
-

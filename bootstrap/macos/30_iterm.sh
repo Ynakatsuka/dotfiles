@@ -18,4 +18,3 @@ if [ -f "$HOME/.iterm2_shell_integration.zsh" ]; then
 fi
 
 echo "[INFO] iTerm2 integration done"
-

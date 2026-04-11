@@ -4,7 +4,7 @@
 [[ -n "${_COMMON_SH_LOADED:-}" ]] && return 0
 _COMMON_SH_LOADED=1
 
-log()  { printf '[INFO] %s\n' "$*"; }
+log() { printf '[INFO] %s\n' "$*"; }
 warn() { printf '[WARN] %s\n' "$*" >&2; }
 
 confirm() {

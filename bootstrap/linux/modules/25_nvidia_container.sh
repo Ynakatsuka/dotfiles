@@ -11,7 +11,10 @@ DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
-    *) warn "Unknown option: $1"; exit 1 ;;
+    *)
+      warn "Unknown option: $1"
+      exit 1
+      ;;
   esac
   shift
 done
@@ -35,4 +38,3 @@ run sudo apt update -y
 run sudo apt install -y nvidia-container-toolkit
 
 log "NVIDIA Container Toolkit module completed"
-

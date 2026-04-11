@@ -11,7 +11,10 @@ DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
-    *) warn "Unknown option: $1"; exit 1 ;;
+    *)
+      warn "Unknown option: $1"
+      exit 1
+      ;;
   esac
   shift
 done
@@ -42,4 +45,3 @@ if confirm "Add current user to docker group (requires re-login)?"; then
 fi
 
 log "Docker module completed"
-
