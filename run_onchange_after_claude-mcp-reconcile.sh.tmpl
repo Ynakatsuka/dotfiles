@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Reconcile Claude Code user-scope MCP servers from the canonical manifest (mcp.json).
+#
+# Why this script exists:
+#   Claude Code stores user-scope MCP servers in ~/.claude.json, which is a state
+#   file that also holds auth tokens, caches, and per-project data. Tracking that
+#   file directly in dotfiles is unsafe. Instead, we keep the declarative manifest
+#   in mcp.json (at the dotfiles source root) and use `claude mcp add` to reconcile
+#   ~/.claude.json through the official CLI.
+#
+# Scope:
+#   - Adds / updates user-scope MCP server registrations only.
+#   - OAuth authentication is NOT handled here. After this script runs, open a new
+#     Claude Code session and run `/mcp` to authenticate each server once per
+#     machine.
+#
+# Trigger:
+#   The `run_onchange_` prefix makes chezmoi re-run this script whenever the
+#   rendered output changes. Since the manifest is inlined via `include` below,
+#   any edit to mcp.json changes the rendered script and triggers re-reconciliation.
+
+set -euo pipefail
+
+if ! command -v claude >/dev/null 2>&1; then
+  echo "claude CLI not found; skipping Claude Code MCP reconcile" >&2
+  exit 0
+fi
+
+{{- $manifest := (include "mcp.json" | fromJson) }}
+{{- range $name, $cfg := $manifest.mcpServers }}
+
+echo "Reconciling MCP server: {{ $name }}"
+claude mcp remove {{ $name | quote }} -s user >/dev/null 2>&1 || true
+{{- if eq $cfg.type "http" }}
+claude mcp add --scope user --transport http \
+  {{- if $cfg.oauth }}
+  --client-id {{ $cfg.oauth.clientId | quote }} \
+  --callback-port {{ $cfg.oauth.callbackPort }} \
+  {{- end }}
+  {{ $name | quote }} {{ $cfg.url | quote }}
+{{- else }}
+echo "Unsupported transport '{{ $cfg.type }}' for MCP server '{{ $name }}'; skipping" >&2
+{{- end }}
+{{- end }}
+
+echo ""
+echo "Claude Code MCP reconciliation complete."
+echo "Run '/mcp' inside a new Claude Code session to authenticate each server."
