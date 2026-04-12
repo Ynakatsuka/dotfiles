@@ -40,6 +40,10 @@ git status --short
 
 未コミットの変更（staged / unstaged / untracked）がある場合、これまでの会話で行った変更を特定する。
 
+**無関係な変更の分離:**
+
+今回の作業と無関係な変更が混ざっていないか確認する。各ファイルの変更内容を見て、今回の目的に関連するかどうかを判断する。無関係な変更は対象ファイルリストから除外する。
+
 **コミットルール:**
 
 1. **対象の判断**: 会話の中で作成・変更したファイルのみを対象とする。無関係な変更はコミットしない
@@ -54,32 +58,42 @@ git status --short
 保護ブランチに直接コミット・push してはならない。ワークツリーを使って別ブランチで作業する。
 
 1. **ブランチ名を決める**: 変更内容に基づいた説明的な名前（例: `feat/improve-pr-skill`）
-2. **関連する変更のパッチを作成する**:
+2. **変更ファイルを特定する**:
    ```bash
-   # tracked ファイルの変更をパッチ化（前回の残りがあると noclobber で失敗するため事前削除）
-   PATCH_FILE="/tmp/pr-changes-$$-$RANDOM.patch"
-   git diff -- <related_files...> > "$PATCH_FILE"
-   git diff --cached -- <related_files...> >> "$PATCH_FILE"
+   # 関連する変更ファイルの一覧（無関係なファイルは除外）
+   CHANGED_FILES=$(git diff --name-only -- <related_files...>)
+   STAGED_FILES=$(git diff --cached --name-only -- <related_files...>)
    ```
-   未追跡ファイル（新規作成）はパッチに含められないため、パスを控えておく
-3. **保護ブランチの作業ツリーを元に戻す**:
+   未追跡ファイル（新規作成）のパスも控えておく
+3. **元リポジトリのパスを保存する**:
+   ```bash
+   ORIG_REPO=$(pwd)
+   ```
+4. **保護ブランチの作業ツリーを元に戻す**:
    ```bash
    git checkout -- <modified_files...>      # unstaged 変更を戻す
    git reset HEAD -- <staged_files...>      # staged を解除
    ```
-4. **ワークツリーを作成する**:
+5. **ワークツリーを作成する**:
    ```bash
    git worktree add /tmp/pr-worktree-<branch> -b <branch> HEAD
    ```
-5. **ワークツリーでパッチを適用する**:
+6. **変更ファイルをワークツリーに直接コピーする**:
    ```bash
    cd /tmp/pr-worktree-<branch>
-   git apply "$PATCH_FILE"
-   # 未追跡ファイルは元のリポジトリからコピー
-   cp <original_repo>/<new_file> ./<new_file>
+   # 変更ファイル・未追跡ファイルをすべてコピー（ディレクトリ構造を維持）
+   for f in <all_changed_and_new_files>; do
+     mkdir -p "$(dirname "$f")"
+     cp "$ORIG_REPO/$f" "./$f"
+   done
    ```
-6. **コミットルールに従ってコミットする**
-7. **以降の Phase はすべてワークツリー内で実行する**
+   注意: パッチ（`git diff > file && git apply`）は差分形式の不一致や空パッチで壊れやすいため使わない
+7. **`git diff` でコピー結果を確認する**:
+   ```bash
+   git diff --stat
+   ```
+8. **コミットルールに従ってコミットする**
+9. **以降の Phase はすべてワークツリー内で実行する**
 
 #### 保護ブランチでない場合
 
@@ -172,9 +186,10 @@ Agent ツールで以下のプロンプトを渡す:
 diff を一時ファイル経由で渡す（大きな diff でもシェル引数長制限に引っかからないようにする）。
 
 ```bash
-# mktemp はファイルを事前作成するため noclobber 環境で > が失敗する。
-# 代わりに未作成のユニークパスを使う。
-DIFF_FILE="/tmp/pr-diff-$(git rev-parse --short HEAD)-$$-$RANDOM.patch"
+# 一時ファイル名は単一の Bash 呼び出し内で作成から削除まで完結させる。
+# $$ や $RANDOM は Bash ツールの呼び出しごとに変わるため、複数コマンドをまたいで参照してはならない。
+DIFF_FILE="/tmp/pr-diff-$(git rev-parse --short HEAD).patch"
+rm -f "$DIFF_FILE"
 git diff "$BASE_BRANCH"..HEAD > "$DIFF_FILE"
 codex exec "Review the diff in the file $DIFF_FILE. Focus on bugs, logic errors, and security issues. Code quality and efficiency have already been reviewed separately, so skip those. For each issue, specify the file path and line number, severity (critical/warning), and a concrete fix suggestion. Output in markdown format."
 rm -f "$DIFF_FILE"
