@@ -9,11 +9,13 @@ setopt PROMPT_SUBST
 
 # Google Cloud config info for prompt
 gcloud_prompt_info() {
-  local config_path="$HOME/.config/gcloud/active_config"
-  [[ -r "$config_path" ]] || return
-  local config
-  config=$(<"$config_path") || return
-  config=${config//$'\n'/}
+  local config="${CLOUDSDK_ACTIVE_CONFIG_NAME:-}"
+  if [[ -z "$config" ]]; then
+    local config_path="$HOME/.config/gcloud/active_config"
+    [[ -r "$config_path" ]] || return
+    config=$(<"$config_path") || return
+    config=${config//$'\n'/}
+  fi
   [[ -n "$config" ]] && print " [%F{220}$config%f]"
 }
 

@@ -10,14 +10,16 @@ _gw_setup_direnv() {
     fi
 }
 
-# Helper function to copy .env file from original repository
+# Helper function to copy .env / .envrc from original repository
 _gw_copy_env() {
     local original_git_root="$1"
-
-    if [ -f "$original_git_root/.env" ] && [ ! -f ".env" ]; then
-        echo "Found .env file in original repository. Copying to worktree..."
-        cp "$original_git_root/.env" .
-    fi
+    local file
+    for file in .env .envrc; do
+        if [ -f "$original_git_root/$file" ] && [ ! -f "$file" ]; then
+            echo "Found $file in original repository. Copying to worktree..."
+            cp "$original_git_root/$file" .
+        fi
+    done
 }
 
 # Smart git worktree function for InsightX

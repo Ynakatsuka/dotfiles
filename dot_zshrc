@@ -26,6 +26,7 @@ if [[ -d "$_zsh_config_dir" ]]; then
     "$_zsh_config_dir/fzf.zsh" \
     "$_zsh_config_dir/copy-last-output.zsh" \
     "$_zsh_config_dir/claude.zsh" \
+    "$_zsh_config_dir/gcloud.zsh" \
     "$_zsh_config_dir/tools.zsh" \
     "$_zsh_config_dir/yazi.zsh"; do
     [[ -f "$_zsh_config_file" ]] && source "$_zsh_config_file"
