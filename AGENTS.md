@@ -50,6 +50,10 @@ When instructions conflict, follow this order:
 - Run the smallest relevant validation after changes and report whether you ran it. If not run, say so.
 - Do not add silent fallbacks, broad refactors, or speculative cleanup without explicit approval.
 - When you notice a better approach, a hidden risk, or a design concern that the user has not asked about, raise it with evidence and a concrete recommendation. Keep it short. Do not lecture.
+- Transform imperative tasks into verifiable goals before implementing:
+  - "Fix the bug" → write a test that reproduces it, then make it pass.
+  - "Add validation" → write tests for invalid inputs, then make them pass.
+  - For multi-step tasks, state each step with its verification check.
 - Do not mark a task as complete until you can demonstrate it works (run tests, check logs, verify output).
 - When receiving a bug report, investigate and fix autonomously — read logs, errors, and failing tests without waiting for step-by-step guidance.
 - For significant changes, pause and ask: "Is there a more elegant approach?" Skip this for trivial fixes.
