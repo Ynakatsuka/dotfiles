@@ -23,14 +23,23 @@ typeset -ga _gcloud_config_rules=()
 (( ${#_gcloud_config_rules} )) || return
 
 _auto_gcloud_config() {
-    local rule
+    local rule config_name adc_file
+    local gcloud_dir="${XDG_CONFIG_HOME:-$HOME/.config}/gcloud"
     for rule in "${_gcloud_config_rules[@]}"; do
         if [[ "$PWD" == *"${rule%%:*}"* ]]; then
-            export CLOUDSDK_ACTIVE_CONFIG_NAME="${rule#*:}"
+            config_name="${rule#*:}"
+            export CLOUDSDK_ACTIVE_CONFIG_NAME="$config_name"
+            adc_file="$gcloud_dir/adc_${config_name}.json"
+            if [[ -f "$adc_file" ]]; then
+                export GOOGLE_APPLICATION_CREDENTIALS="$adc_file"
+            else
+                unset GOOGLE_APPLICATION_CREDENTIALS
+            fi
             return
         fi
     done
     unset CLOUDSDK_ACTIVE_CONFIG_NAME
+    unset GOOGLE_APPLICATION_CREDENTIALS
 }
 
 autoload -Uz add-zsh-hook

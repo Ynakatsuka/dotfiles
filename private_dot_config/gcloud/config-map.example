@@ -7,5 +7,13 @@
 # Copy this file to config-map and edit:
 #   cp ~/.config/gcloud/config-map.example ~/.config/gcloud/config-map
 #
+# ADC (Application Default Credentials) auto-switch:
+#   If ~/.config/gcloud/adc_<config-name>.json exists, GOOGLE_APPLICATION_CREDENTIALS
+#   is set to that file when the config is activated.
+#
+#   To create per-config ADC files:
+#     gcloud auth application-default login --project <project-id>
+#     cp ~/.config/gcloud/application_default_credentials.json ~/.config/gcloud/adc_<config-name>.json
+#
 # Example:
 # my-org/my-repo:my-config
