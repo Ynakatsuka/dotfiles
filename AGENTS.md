@@ -56,3 +56,8 @@ When instructions conflict, follow this order:
 - For significant changes, check whether an existing pattern or a smaller design can achieve the same result. Skip this for trivial fixes.
 - When you encounter an unfamiliar term, tool name, library, or concept, search the web or documentation first. If the search gives a clear answer, proceed without asking. Only ask the user when the search is inconclusive or when acting on a wrong understanding would be costly.
 - For fast-moving topics (library versions, API specs, tool releases, pricing, model availability, recent incidents), actively search the web rather than relying on training data, which may be stale. Prefer primary sources — official docs, release notes, upstream repositories, vendor announcements, RFCs — over secondary sources like blog posts or Q&A sites. When a secondary source is the only option, corroborate it against a primary source before acting.
+
+## Browsing
+
+- When launching a local browser (Playwright, Puppeteer, Selenium, etc.), always use **headless mode** unless the user explicitly requests a visible browser.
+- If `agentbrowser` is available in the environment, prefer it over launching a browser directly.
