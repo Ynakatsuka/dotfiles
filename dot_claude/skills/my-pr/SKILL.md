@@ -57,43 +57,43 @@ git status --short
 
 保護ブランチに直接コミット・push してはならない。ワークツリーを使って別ブランチで作業する。
 
+**順序厳守**: 「ワークツリー作成 → コピー → 元ブランチを戻す → 確認」の順で実行する。先に元ブランチを戻すとコピー元が消える。戻す処理を忘れると元ブランチに差分が残る。
+
 1. **ブランチ名を決める**: 変更内容に基づいた説明的な名前（例: `feat/improve-pr-skill`）
-2. **変更ファイルを特定する**:
-   ```bash
-   # 関連する変更ファイルの一覧（無関係なファイルは除外）
-   CHANGED_FILES=$(git diff --name-only -- <related_files...>)
-   STAGED_FILES=$(git diff --cached --name-only -- <related_files...>)
-   ```
-   未追跡ファイル（新規作成）のパスも控えておく
-3. **元リポジトリのパスを保存する**:
+2. **変更ファイルを特定する**（元ブランチを触らない）:
    ```bash
    ORIG_REPO=$(pwd)
+   CHANGED_FILES=$(git diff --name-only -- <related_files...>)          # unstaged 変更
+   STAGED_FILES=$(git diff --cached --name-only -- <related_files...>)  # staged 変更
+   # 未追跡ファイル（新規作成）のパスも別途控えておく: UNTRACKED_FILES
    ```
-4. **保護ブランチの作業ツリーを元に戻す**:
-   ```bash
-   git checkout -- <modified_files...>      # unstaged 変更を戻す
-   git reset HEAD -- <staged_files...>      # staged を解除
-   ```
-5. **ワークツリーを作成する**:
+3. **ワークツリーを作成する**:
    ```bash
    git worktree add /tmp/pr-worktree-<branch> -b <branch> HEAD
    ```
-6. **変更ファイルをワークツリーに直接コピーする**:
+4. **変更ファイルをワークツリーにコピーする**（元ブランチは未変更のまま）:
    ```bash
    cd /tmp/pr-worktree-<branch>
-   # 変更ファイル・未追跡ファイルをすべてコピー（ディレクトリ構造を維持）
-   for f in <all_changed_and_new_files>; do
+   for f in $CHANGED_FILES $STAGED_FILES $UNTRACKED_FILES; do
      mkdir -p "$(dirname "$f")"
      cp "$ORIG_REPO/$f" "./$f"
    done
+   git diff --stat  # コピー結果を確認
    ```
    注意: パッチ（`git diff > file && git apply`）は差分形式の不一致や空パッチで壊れやすいため使わない
-7. **`git diff` でコピー結果を確認する**:
+5. **元ブランチの作業ツリーを戻す**（コピー完了後に必ず実行）:
    ```bash
-   git diff --stat
+   git -C "$ORIG_REPO" reset HEAD -- $STAGED_FILES                       # staged 解除
+   git -C "$ORIG_REPO" checkout -- $CHANGED_FILES $STAGED_FILES          # 変更を戻す
+   for f in $UNTRACKED_FILES; do rm -f "$ORIG_REPO/$f"; done             # 未追跡は rm で削除
    ```
-8. **コミットルールに従ってコミットする**
-9. **以降の Phase はすべてワークツリー内で実行する**
+6. **元ブランチに差分が残っていないことを確認する**（必須・スキップ不可）:
+   ```bash
+   git -C "$ORIG_REPO" status --short
+   ```
+   出力が空でない場合は原因を調査して手動で処理する。空になるまで次に進まない。
+7. **コミットルールに従ってワークツリー内でコミットする**
+8. **以降の Phase はすべてワークツリー内で実行する**
 
 #### 保護ブランチでない場合
 
