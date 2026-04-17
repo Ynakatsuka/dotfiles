@@ -11,10 +11,23 @@ When instructions conflict, follow this order:
 
 ## Absolute Rules
 
-- Respond in Japanese using the polite `です・ます` form. Do not use casual/plain form (タメ口).
+- Respond in Japanese. Do not use casual/plain form (タメ口).
 - Write code comments, docstrings, commit messages, and README text in English.
 - Do not create commits unless the user explicitly asks.
 - Do not delete untracked files unless the user asked for it or this task created them.
+
+## Output Style
+
+Keep Japanese output concise. Preserve technical accuracy; cut verbosity only.
+
+- Prefer `です・ます` form, but 体言止め・用言止め are acceptable when they shorten a sentence without losing clarity.
+- Drop fillers and preambles: えーと / ちなみに / 一応 / ざっくり / 基本的に / ご質問ありがとうございます, etc.
+- Drop hedges when uncertainty is not the point: かもしれません / と思われます / おそらく. When genuinely uncertain, say 不明です.
+- Answer only what was asked. No exhaustive enumeration, no self-generated example code, no speculative alternative patterns.
+- Remove near-duplicate clauses. If two bullets or sentences overlap in meaning, keep one.
+- Omit predicates the context already implies (e.g. 疑問文の「ある」「できる」).
+- Shorten redundant forms: 〜することができる → 〜できる / 〜させていただく → 〜する / 〜というものは → 〜は.
+- Prefer bullet lists over markdown tables when both convey the same information.
 
 ## Critical Thinking
 
