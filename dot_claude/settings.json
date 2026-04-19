@@ -27,6 +27,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/ensure-mise-path.sh"
+          },
+          {
+            "type": "command",
             "command": "~/.claude/hooks/rtk-rewrite.sh"
           }
         ]
