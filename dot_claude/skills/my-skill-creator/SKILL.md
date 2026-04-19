@@ -70,7 +70,7 @@ argument-hint: "[arg-name]"  # Shown in autocomplete UI (optional)
 | `disable-model-invocation` | `true` to prevent auto-triggering (manual `/name` only) |
 | `allowed-tools` | Restrict tools (e.g., `Read, Grep, Bash(gh *)`) |
 | `model` | Model override when skill is active |
-| `effort` | Effort level: `low`, `medium`, `high`, `max` |
+| `effort` | Effort level: `low`, `medium`, `high`, `xhigh`, `max` |
 | `context` | `fork` to run in isolated subagent |
 | `agent` | Subagent type when `context: fork` (e.g., `Explore`, `Plan`) |
 | `license` | License identifier (e.g., `MIT`) |
