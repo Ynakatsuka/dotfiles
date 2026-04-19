@@ -70,7 +70,9 @@ kill_difit() {
 
 trap kill_difit EXIT INT TERM
 
-difitArgs=(--mode unified --no-open --clean --include-untracked --port "$DIFIT_PORT")
+# Keep the difit server alive across browser refreshes; this wrapper
+# still terminates it when the cmux browser surface is closed.
+difitArgs=(--mode unified --no-open --clean --include-untracked --keep-alive --port "$DIFIT_PORT")
 
 if [[ -z "$defaultBranch" ]] || [[ "$currentBranch" == "${defaultBranch#origin/}" ]]; then
     # On the default branch or no remote -- diff working directory against HEAD
