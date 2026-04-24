@@ -15,7 +15,7 @@ Delegate tasks to OpenAI Codex CLI from within Claude Code.
 ## Model Selection
 
 - **Default**: Do NOT specify `--model`. The model configured in `~/.codex/config.toml` is used automatically.
-- **User-specified model**: Only add `--model <MODEL>` when the user explicitly requests a specific model (e.g., "o3で実行して", "use gpt-5.3-codex").
+- **User-specified model**: Only add `--model <MODEL>` when the user explicitly requests a specific model (e.g., "gpt-5.4で実行して", "use gpt-5.3-codex").
 
 ## Invocation
 
@@ -66,7 +66,7 @@ codex exec "Review the changes in the current branch compared to main. Focus on 
 
 **With explicit model:**
 ```bash
-codex exec --model o3 "Analyze the architecture of this project"
+codex exec --model gpt-5.4 "Analyze the architecture of this project"
 ```
 
 ## Configuration

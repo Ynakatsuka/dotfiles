@@ -40,7 +40,7 @@ Always edit in the ghq repo, never in `~/`.
 |---|---|---|---|
 | `dot_claude/settings.json` | top-level `model` | `"opus[1m]"` | Default Claude Code model. `[1m]` is the effort suffix — preserve unless the user asks to change it. |
 | `dot_claude/settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
-| `dot_codex/config.toml.tmpl` | `model` | `"gpt-5.4"` | Codex CLI default model (full ID, not an alias). |
+| `dot_codex/config.toml.tmpl` | `model` | `"gpt-5.5"` | Codex CLI default model (full ID, not an alias). |
 | `dot_gemini/settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
 
 Do NOT modify model IDs that appear inside skill examples
