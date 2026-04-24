@@ -12,6 +12,27 @@ argument-hint: "<task-description>"
 
 Delegate tasks to Google Gemini CLI from within Claude Code.
 
+## Preflight (run BEFORE every `gemini -p` invocation)
+
+Auth failures in headless mode hang silently with zero output. Always run these checks first; if any fails, STOP and surface the issue to the user instead of calling `gemini -p`.
+
+1. **OAuth credential expiry** (`~/.gemini/oauth_creds.json`, `selectedType: oauth-personal`):
+
+   ```bash
+   python3 -c "import json,time; d=json.load(open('$HOME/.gemini/oauth_creds.json')); exp=d.get('expiry_date',0)/1000; print('EXPIRED' if exp < time.time() else 'ok', int(exp-time.time()),'s')"
+   ```
+
+   If `EXPIRED`, do NOT run `gemini -p`. Instruct the user to re-authenticate in a TTY:
+
+   ```bash
+   mv ~/.gemini/oauth_creds.json ~/.gemini/oauth_creds.json.bak
+   gemini   # then run /auth inside the TUI
+   ```
+
+2. **Short model alias in `~/.gemini/settings.json`**:
+
+   If `model.name` is a short alias (e.g., `"pro"`, `"flash"` — anything not starting with `gemini-`), warn the user. Suggest removing the `model` block or using a full name like `"gemini-2.5-pro"`. Short aliases have been seen to stall initialization in headless mode.
+
 ## Model Selection
 
 - **Default**: Do NOT specify `-m`. The default model configured by the Gemini CLI is used.
@@ -98,6 +119,7 @@ gemini -y -m gemini-2.5-pro -p "Analyze the architecture of this project"
 ## Execution
 
 - Always use the Bash tool with `timeout: 600000` (10 minutes) when running `gemini -p`, as tasks may take significant time.
+- **Zero-output hang**: If `gemini -p` is killed by timeout AND both stdout and stderr are 0 byte, classify as an auth / headless-init hang. Do NOT retry with the same credentials — re-run the Preflight checks and surface the finding to the user.
 
 ## Notes
 
