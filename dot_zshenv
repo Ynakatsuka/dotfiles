@@ -15,3 +15,8 @@ fi
 if [[ -d "$HOME/.local/share/mise/shims" ]]; then
   export PATH="$HOME/.local/share/mise/shims:$PATH"
 fi
+
+# Gemini CLI: skip keytar/Secret Service to prevent indefinite hangs on
+# headless SSH-only servers where the GNOME Keyring is locked. Tokens are
+# stored in an encrypted FileKeychain at ~/.gemini/gemini-credentials.json.
+export GEMINI_FORCE_FILE_STORAGE=true

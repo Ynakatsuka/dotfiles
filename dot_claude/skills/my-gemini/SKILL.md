@@ -14,20 +14,15 @@ Delegate tasks to Google Gemini CLI from within Claude Code.
 
 ## Preflight (run BEFORE every `gemini -p` invocation)
 
-Auth failures in headless mode hang silently with zero output. Always run these checks first; if any fails, STOP and surface the issue to the user instead of calling `gemini -p`.
+This environment exports `GEMINI_FORCE_FILE_STORAGE=true` in `~/.zshenv` so that `@github/keytar` is bypassed and OAuth tokens live in an encrypted FileKeychain at `~/.gemini/gemini-credentials.json`. Without this, headless invocations can hang indefinitely on a locked GNOME Keyring (Secret Service over D-Bus) on SSH-only servers.
 
-1. **OAuth credential expiry** (`~/.gemini/oauth_creds.json`, `selectedType: oauth-personal`):
-
-   ```bash
-   python3 -c "import json,time; d=json.load(open('$HOME/.gemini/oauth_creds.json')); exp=d.get('expiry_date',0)/1000; print('EXPIRED' if exp < time.time() else 'ok', int(exp-time.time()),'s')"
-   ```
-
-   If `EXPIRED`, do NOT run `gemini -p`. Instruct the user to re-authenticate in a TTY:
+1. **Confirm the env var is exported and the credential file exists:**
 
    ```bash
-   mv ~/.gemini/oauth_creds.json ~/.gemini/oauth_creds.json.bak
-   gemini   # then run /auth inside the TUI
+   test "$GEMINI_FORCE_FILE_STORAGE" = "true" && test -f "$HOME/.gemini/gemini-credentials.json" && echo ok
    ```
+
+   If `GEMINI_FORCE_FILE_STORAGE` is missing, source `~/.zshenv` or export it before invoking `gemini -p`. If `gemini-credentials.json` is missing, the user has not authenticated yet — instruct them to run `gemini` once in a TTY to complete the OAuth flow. Do NOT run `gemini -p` in either case.
 
 ## Model Selection
 
@@ -115,7 +110,7 @@ gemini -y -m gemini-2.5-pro -p "Analyze the architecture of this project"
 ## Execution
 
 - Always use the Bash tool with `timeout: 600000` (10 minutes) when running `gemini -p`, as tasks may take significant time.
-- **Zero-output hang**: If `gemini -p` is killed by timeout AND both stdout and stderr are 0 byte, classify as an auth / headless-init hang. Do NOT retry with the same credentials — re-run the Preflight checks and surface the finding to the user.
+- **Zero-output hang**: If `gemini -p` is killed by timeout AND both stdout and stderr are 0 byte, the most likely cause is that `GEMINI_FORCE_FILE_STORAGE=true` was not inherited by the calling shell, so keytar tried to read from a locked GNOME Keyring over D-Bus and stalled. Verify the env var is exported in the invoking shell, then retry. Do NOT retry blindly with the same environment.
 
 ## Notes
 
