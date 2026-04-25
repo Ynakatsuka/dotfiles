@@ -29,10 +29,6 @@ Auth failures in headless mode hang silently with zero output. Always run these 
    gemini   # then run /auth inside the TUI
    ```
 
-2. **Short model alias in `~/.gemini/settings.json`**:
-
-   If `model.name` is a short alias (e.g., `"pro"`, `"flash"` — anything not starting with `gemini-`), warn the user. Suggest removing the `model` block or using a full name like `"gemini-2.5-pro"`. Short aliases have been seen to stall initialization in headless mode.
-
 ## Model Selection
 
 - **Default**: Do NOT specify `-m`. The default model configured by the Gemini CLI is used.
