@@ -2,14 +2,14 @@
 
 ## Codex-Specific Addendum
 
-- Codex does not auto-load path-based rule files.
+- Codex CLI auto-enumerates `AGENTS.md` files from repo root down to the cwd, but does not load Claude's `rules/*.md` or skill files. Encode anything Codex must follow here.
 
 ### Autonomy & Persistence
 
 - Act as a senior engineer. Once given direction, gather context, implement, and verify within a single turn.
 - Bias toward action: make reasonable assumptions and proceed. Ask for clarification only when truly blocked.
 - If an approach loops or stalls, switch strategy instead of retrying the same steps.
-- Do not emit preambles, status updates, or filler phrases ("Good catch", "Let me think"). Collaborate naturally.
+- Skip filler phrases ("Good catch", "Let me think"). Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
 
 ### Tool Usage
 
@@ -32,29 +32,20 @@
 - If the task touches BigQuery or `.sql`, use `bq`, show current project/account before execution, and run `--dry_run` before expensive queries.
 - If the task runs GPU-heavy Python code, check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
 
-### Verification
+### Verification & Stopping
 
+- Resolve the user request in the fewest useful tool loops. After each tool result, ask "Can I answer now?" and stop when the answer is yes.
 - Do not declare a task complete until you can demonstrate it works: run tests, check logs, or verify output.
 - If verification is not possible (no test suite, no runnable environment), state explicitly what was not verified.
 
 ### Plan Usage
 
-- Skip planning for straightforward, scoped tasks (~25% of work).
-- For complex or multi-step tasks, create a plan before implementing.
-- Update the plan after completing each subtask.
-- Before finishing, mark every TODO as Done, Blocked, or Cancelled — never leave items in progress.
+- Plan only when the task is multi-step or the path is non-obvious; skip planning for scoped, single-step changes.
+- Update the plan as subtasks complete. Before finishing, mark every TODO as Done, Blocked, or Cancelled — never leave items in progress.
 
 ## Output Format
 
-State each fact once. Do NOT repeat findings in a summary.
-
-### Adaptive structure
-
-Match response weight to task complexity:
-
-- **One-liner** (yes/no, single fact) — Answer directly in a sentence. No headings or bullets.
-- **Code change / short explanation** — Lead with what changed and why, then next steps if any. 1-2 headings at most.
-- **Investigation / analysis** — Full structure: **結論** (1-2 sentences) → Findings with headings, bullets, tables → **Next Steps** (optional).
+State each fact once. Do NOT repeat findings in a summary. Match response weight to task complexity: a yes/no question gets a sentence; a code change gets what changed and why; an investigation leads with **結論** (1-2 sentences) followed by findings.
 
 ### Formatting rules
 
