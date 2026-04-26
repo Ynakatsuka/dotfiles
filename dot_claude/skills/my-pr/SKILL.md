@@ -68,12 +68,17 @@ git status --short
    # 未追跡ファイル（新規作成）のパスも別途控えておく: UNTRACKED_FILES
    ```
 3. **ワークツリーを作成する**:
+
+   パス規約は `<repo_root>-worktree/<sanitized_branch>` に揃える（既存 `gw` 関数および CCV の親プロジェクト紐付けと整合させるため）。ブランチ名のスラッシュはハイフンに置換する。
+
    ```bash
-   git worktree add /tmp/pr-worktree-<branch> -b <branch> HEAD
+   SANITIZED_BRANCH="${BRANCH//\//-}"
+   WORKTREE_DIR="${ORIG_REPO}-worktree/${SANITIZED_BRANCH}"
+   git worktree add "$WORKTREE_DIR" -b "$BRANCH" HEAD
    ```
 4. **変更ファイルをワークツリーにコピーする**（元ブランチは未変更のまま）:
    ```bash
-   cd /tmp/pr-worktree-<branch>
+   cd "$WORKTREE_DIR"
    for f in $CHANGED_FILES $STAGED_FILES $UNTRACKED_FILES; do
      mkdir -p "$(dirname "$f")"
      cp "$ORIG_REPO/$f" "./$f"
