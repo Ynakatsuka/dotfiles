@@ -14,15 +14,19 @@ Delegate tasks to Google Gemini CLI from within Claude Code.
 
 ## Preflight (run BEFORE every `gemini -p` invocation)
 
-This environment exports `GEMINI_FORCE_FILE_STORAGE=true` in `~/.zshenv` so that `@github/keytar` is bypassed and OAuth tokens live in an encrypted FileKeychain at `~/.gemini/gemini-credentials.json`. Without this, headless invocations can hang indefinitely on a locked GNOME Keyring (Secret Service over D-Bus) on SSH-only servers.
+This environment exports `GEMINI_FORCE_FILE_STORAGE=true` in `~/.zshenv` so that `@github/keytar` is bypassed and OAuth tokens live in a file under `~/.gemini/`. Without this, headless invocations can hang indefinitely on a locked GNOME Keyring (Secret Service over D-Bus) on SSH-only servers. The actual filename varies by platform/backend: `oauth_creds.json` (default OAuth flow) or `gemini-credentials.json` (FileKeychain).
 
-1. **Confirm the env var is exported and the credential file exists:**
+1. **Confirm the env var is exported and at least one credential file exists:**
 
    ```bash
-   test "$GEMINI_FORCE_FILE_STORAGE" = "true" && test -f "$HOME/.gemini/gemini-credentials.json" && echo ok
+   test "$GEMINI_FORCE_FILE_STORAGE" = "true" \
+     && { test -f "$HOME/.gemini/oauth_creds.json" || test -f "$HOME/.gemini/gemini-credentials.json"; } \
+     && echo ok
    ```
 
-   If `GEMINI_FORCE_FILE_STORAGE` is missing, source `~/.zshenv` or export it before invoking `gemini -p`. If `gemini-credentials.json` is missing, the user has not authenticated yet — instruct them to run `gemini` once in a TTY to complete the OAuth flow. Do NOT run `gemini -p` in either case.
+   If `GEMINI_FORCE_FILE_STORAGE` is missing, source `~/.zshenv` or export it before invoking `gemini -p`. If neither credential file exists, the user has not authenticated yet — instruct them to run `gemini` once in a TTY to complete the OAuth flow. Do NOT run `gemini -p` in either case.
+
+2. **Always pass `--skip-trust`.** Gemini CLI 0.39+ refuses to run headlessly in directories that are not registered as trusted ("Gemini CLI is not running in a trusted directory"). Since Claude Code invokes Gemini from arbitrary working directories, every `gemini -p` call MUST include `--skip-trust` (or set `GEMINI_CLI_TRUST_WORKSPACE=true` for the call). Omitting this is the most common cause of immediate failure.
 
 ## Model Selection
 
@@ -31,14 +35,14 @@ This environment exports `GEMINI_FORCE_FILE_STORAGE=true` in `~/.zshenv` so that
 
 ## Invocation
 
-Run Gemini in non-interactive (headless) mode with `-p`/`--prompt`:
+Run Gemini in non-interactive (headless) mode with `-p`/`--prompt`. `--skip-trust` is required (see Preflight #2):
 
 ```bash
 # Default (uses configured default model)
-gemini -p "<PROMPT>"
+gemini --skip-trust -p "<PROMPT>"
 
 # With explicit model override (only when user specifies)
-gemini -m <MODEL> -p "<PROMPT>"
+gemini --skip-trust -m <MODEL> -p "<PROMPT>"
 ```
 
 ### Approval mode
@@ -47,13 +51,13 @@ Gemini prompts for approval by default. For fully autonomous delegation, pass `-
 
 ```bash
 # Auto-approve all tool actions
-gemini -y -p "<PROMPT>"
+gemini --skip-trust -y -p "<PROMPT>"
 
 # Read-only (plan mode) — safe for analysis tasks
-gemini --approval-mode plan -p "<PROMPT>"
+gemini --skip-trust --approval-mode plan -p "<PROMPT>"
 
 # Auto-approve edits only
-gemini --approval-mode auto_edit -p "<PROMPT>"
+gemini --skip-trust --approval-mode auto_edit -p "<PROMPT>"
 ```
 
 Default to `-y` for delegated execution unless the user asks for planning/analysis, in which case use `--approval-mode plan`.
@@ -61,7 +65,7 @@ Default to `-y` for delegated execution unless the user asks for planning/analys
 ### Include extra directories
 
 ```bash
-gemini -y --include-directories path/to/dir1,path/to/dir2 -p "<PROMPT>"
+gemini --skip-trust -y --include-directories path/to/dir1,path/to/dir2 -p "<PROMPT>"
 ```
 
 ### Resume previous session
@@ -75,8 +79,8 @@ gemini --list-sessions # Show available sessions
 ### Structured output
 
 ```bash
-gemini -y -o json -p "<PROMPT>"          # JSON output
-gemini -y -o stream-json -p "<PROMPT>"   # Streaming JSON
+gemini --skip-trust -y -o json -p "<PROMPT>"          # JSON output
+gemini --skip-trust -y -o stream-json -p "<PROMPT>"   # Streaming JSON
 ```
 
 ## Prompt Construction
@@ -89,27 +93,28 @@ gemini -y -o stream-json -p "<PROMPT>"   # Streaming JSON
 
 **Simple task:**
 ```bash
-gemini -y -p "Fix the type error in src/utils.ts"
+gemini --skip-trust -y -p "Fix the type error in src/utils.ts"
 ```
 
 **With context:**
 ```bash
-gemini -y -p "Add input validation to the login handler in src/auth/handler.py. Validate email format and password length (min 8 chars)."
+gemini --skip-trust -y -p "Add input validation to the login handler in src/auth/handler.py. Validate email format and password length (min 8 chars)."
 ```
 
 **Code review (read-only):**
 ```bash
-gemini --approval-mode plan -p "Review the changes in the current branch compared to main. Focus on security issues and performance."
+gemini --skip-trust --approval-mode plan -p "Review the changes in the current branch compared to main. Focus on security issues and performance."
 ```
 
 **With explicit model:**
 ```bash
-gemini -y -m gemini-2.5-pro -p "Analyze the architecture of this project"
+gemini --skip-trust -y -m gemini-2.5-pro -p "Analyze the architecture of this project"
 ```
 
 ## Execution
 
 - Always use the Bash tool with `timeout: 600000` (10 minutes) when running `gemini -p`, as tasks may take significant time.
+- **Trusted-folder error**: If stderr contains `Gemini CLI is not running in a trusted directory`, you forgot `--skip-trust`. Re-run with the flag.
 - **Zero-output hang**: If `gemini -p` is killed by timeout AND both stdout and stderr are 0 byte, the most likely cause is that `GEMINI_FORCE_FILE_STORAGE=true` was not inherited by the calling shell, so keytar tried to read from a locked GNOME Keyring over D-Bus and stalled. Verify the env var is exported in the invoking shell, then retry. Do NOT retry blindly with the same environment.
 
 ## Notes

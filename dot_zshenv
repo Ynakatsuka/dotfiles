@@ -17,6 +17,8 @@ if [[ -d "$HOME/.local/share/mise/shims" ]]; then
 fi
 
 # Gemini CLI: skip keytar/Secret Service to prevent indefinite hangs on
-# headless SSH-only servers where the GNOME Keyring is locked. Tokens are
-# stored in an encrypted FileKeychain at ~/.gemini/gemini-credentials.json.
+# headless SSH-only servers where the GNOME Keyring is locked. With this set,
+# tokens live in a file under ~/.gemini/ (oauth_creds.json or
+# gemini-credentials.json depending on the active backend) instead of the OS
+# keychain.
 export GEMINI_FORCE_FILE_STORAGE=true
