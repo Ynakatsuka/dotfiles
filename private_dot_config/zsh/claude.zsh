@@ -145,4 +145,8 @@ function fzf-session-resume() {
     zle reset-prompt
 }
 zle -N fzf-session-resume
-bindkey '^l' fzf-session-resume
+# Bind to Ctrl-K and restore Ctrl-L to clear-screen.
+# fzf-session-resume forks head+jq per session file (~100s), which made
+# the previous Ctrl-L binding feel >1s slow before fzf appeared.
+bindkey '^K' fzf-session-resume
+bindkey '^L' clear-screen

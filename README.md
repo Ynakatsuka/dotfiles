@@ -77,11 +77,12 @@ chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 | Keybinding | Action |
 |------------|--------|
 | `Ctrl+H` | FZF history search |
+| `Ctrl+B` | FZF git branch checkout |
 | `Ctrl+F` | FZF recent directory navigation (`cdr`) |
 | `Ctrl+G` | GCloud configuration selector with login |
 | `Ctrl+R` | FZF `ghq` repository search |
 | `Ctrl+O` | Copy the last command output to the clipboard |
-| `Ctrl+L` | Resume a Claude Code session for the current directory |
+| `Ctrl+K` | Resume a Claude Code or Codex session for the current directory |
 
 ### Git
 
