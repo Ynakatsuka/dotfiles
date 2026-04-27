@@ -38,6 +38,32 @@ Write natural, concise Japanese. Cut verbosity, not accuracy.
 
 </output_style>
 
+## No Implicit Fallbacks
+
+<no_implicit_fallbacks>
+
+Unintended fallbacks are a common source of silent bugs and hard-to-debug regressions. Default to letting failures surface as errors. This rule is about *fallbacks* (substituting a value or behavior to mask a failure), not about legitimate error handling at system boundaries.
+
+- Do not add a fallback unless **one** of the following is true:
+  1. The user explicitly requested it.
+  2. It is part of a documented contract (spec, ADR, type signature, schema, public API doc) that already prescribes the fallback.
+  3. You proposed it for this change and received explicit approval.
+- Common patterns to avoid by default:
+  - Substituting `0` / `""` / `[]` / `null` for missing or invalid data.
+  - `value || default` / `value ?? default` that hides schema drift or required-field absence.
+  - `catch { return null }`, `except: pass`, or broad `try`/`except` that swallows the cause.
+  - Optional chaining used to hide *required* fields (genuinely optional fields are fine).
+  - Continuing with mock / stub / cached data when an external API or dependency fails.
+  - Inferring a missing config value from the environment instead of failing loudly.
+  - Silently skipping unexpected items in a loop or stream.
+  - Type coercions that paper over schema mismatches.
+- Let errors propagate. Raise invalid input, missing fields, network failures, and unexpected state at the boundary closest to the cause so the failure is visible in logs, tests, and traces. **Boundary validation that fails fast is not a fallback** — it is the correct behavior.
+- `retry` is not banned, but it counts as a fallback unless it satisfies *all* of: idempotent operation, bounded attempt count, exponential backoff (or equivalent), explicit logging of each retry, and the final failure surfaces an error. Otherwise propose first.
+- If a fallback genuinely improves correctness, UX, or robustness, **propose it first** — name the concrete failure mode it covers, the trade-off, and what erroring out would look like — then wait for explicit approval before implementing. "Better UX" alone is not sufficient justification; describe the user-visible failure.
+- When tempted to "make it work" by inserting a default or retry, stop and ask: would the system be more correct if it errored here? In most software-engineering contexts, the answer is yes.
+
+</no_implicit_fallbacks>
+
 ## Critical Thinking
 
 <critical_thinking>
@@ -89,7 +115,7 @@ Write natural, concise Japanese. Cut verbosity, not accuracy.
 - When asking does warrant, lead with your chosen option and one sentence of rationale. Offer alternatives only if genuinely comparable.
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
 - Prefer the smallest safe and reversible change. Before introducing a new helper, abstraction, or convention, check whether the same problem is already solved elsewhere and reuse or align with it.
-- Prefer root-cause fixes. Surface problems instead of hiding them with retries, defaults, or broad exception handling. Avoid silent fallbacks, speculative cleanup, and broad refactors without explicit approval.
+- Prefer root-cause fixes. Surface problems instead of hiding them. For anything that masks a failure (defaults, retries, broad exception handling, silent skips, etc.), follow the **No Implicit Fallbacks** section. Avoid speculative cleanup and broad refactors without explicit approval.
 - If a change can cause regressions, name the most likely regression and how you checked. For public interfaces, module boundaries, or configuration contracts, explicitly report verified and unverified blast-radius coverage.
 - Raise unrequested concerns only when they affect correctness, cost, security, or maintenance — including technical debt, operational fragility. Keep the note to 2-3 bullets with evidence.
 - Transform imperative tasks into verifiable goals: "Fix the bug" → write a reproducer test, then make it pass. "Add validation" → write tests for invalid inputs, then make them pass. For multi-step tasks, state each step with its verification check.
