@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Mirror Claude Code user skills into ~/.codex/skills via symlinks.
+#
+# Why this script exists:
+#   Codex CLI (>= 0.125.0) honors the same SKILL.md frontmatter format as
+#   Claude Code, but reads from ~/.codex/skills/ instead of ~/.claude/skills/.
+#   Maintaining a duplicate copy in dot_codex/skills/ would drift; instead we
+#   keep dot_claude/skills/ as the single source and link each user skill into
+#   the Codex skills directory.
+#
+# Scope:
+#   - Links every directory under dot_claude/skills/ that ships a SKILL.md.
+#   - Never touches ~/.codex/skills/.system/ (Codex-managed system skills).
+#   - Prunes stale symlinks that previously pointed into ~/.claude/skills/ but
+#     whose source skill no longer exists.
+#
+# Trigger:
+#   The run_onchange_ prefix re-runs this script whenever the inlined skill
+#   name list changes (i.e. when a skill directory is added or removed).
+
+set -euo pipefail
+
+CLAUDE_SKILLS="${HOME}/.claude/skills"
+CODEX_SKILLS="${HOME}/.codex/skills"
+
+mkdir -p "${CODEX_SKILLS}"
+
+# Inlined list of skill names. Adding or removing a skill changes this list,
+# which changes the rendered script and re-triggers run_onchange_.
+skills=(
+{{- range $path := glob (joinPath .chezmoi.sourceDir "dot_claude/skills/*/SKILL.md") }}
+  {{ $path | dir | base | quote }}
+{{- end }}
+)
+
+for skill in "${skills[@]}"; do
+  src="${CLAUDE_SKILLS}/${skill}"
+  dst="${CODEX_SKILLS}/${skill}"
+  if [[ ! -d "${src}" ]]; then
+    echo "Source skill missing, skipping: ${src}" >&2
+    continue
+  fi
+  ln -sfn "${src}" "${dst}"
+  echo "Linked ${dst} -> ${src}"
+done
+
+# Prune stale symlinks under ~/.codex/skills/ that point back into
+# ~/.claude/skills/ but whose source skill is no longer in the inlined list.
+shopt -s nullglob
+for entry in "${CODEX_SKILLS}"/*; do
+  [[ -L "${entry}" ]] || continue
+  target="$(readlink "${entry}")"
+  case "${target}" in
+    "${CLAUDE_SKILLS}/"*) ;;
+    *) continue ;;
+  esac
+  name="$(basename "${entry}")"
+  found=0
+  for keep in "${skills[@]}"; do
+    if [[ "${name}" == "${keep}" ]]; then
+      found=1
+      break
+    fi
+  done
+  if [[ "${found}" -eq 0 ]]; then
+    echo "Pruning stale symlink: ${entry}"
+    rm -f "${entry}"
+  fi
+done
+shopt -u nullglob
+
+echo ""
+echo "Codex skills sync complete (${#skills[@]} skill(s) linked)."
