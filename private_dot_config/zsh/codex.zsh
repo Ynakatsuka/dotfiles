@@ -2,6 +2,11 @@
 # Codex Integration
 #
 
+# Codex launcher (mirrors `cl` for claude)
+function cdx() {
+    codex --dangerously-bypass-approvals-and-sandbox "$@"
+}
+
 # Internal helper: portable dev:inode fetch
 _codex_devino() {
   if stat -c '%d:%i' "$1" >/dev/null 2>&1; then

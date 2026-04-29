@@ -227,6 +227,77 @@ EOF
     fi
 }
 
+# AI-assisted worktree creation: prompt -> branch name (via claude haiku) -> gw -> session
+# Usage:
+#   gwai <prompt>          # generate branch name and start `cl` session with the prompt
+#   gwai -c <prompt>       # explicit claude
+#   gwai -x <prompt>       # explicit codex (cdx)
+function gwai() {
+    local launcher="cl"
+    case "${1:-}" in
+        -c) launcher="cl"; shift ;;
+        -x) launcher="cdx"; shift ;;
+        -h|--help|"")
+            cat <<'EOF'
+Usage: gwai [-c|-x] <prompt>
+  -c   start claude session via `cl` (default)
+  -x   start codex session via `cdx`
+
+Generates a Conventional Commits style branch name from <prompt>
+using `claude -p --model haiku`, creates a worktree via `gw`,
+then launches the chosen session with <prompt> as the first message.
+EOF
+            return 1
+            ;;
+    esac
+
+    local prompt="$*"
+    if [ -z "$prompt" ]; then
+        echo "Error: prompt is empty" >&2
+        return 1
+    fi
+
+    if ! command -v claude >/dev/null 2>&1; then
+        echo "Error: claude CLI not found in PATH" >&2
+        return 1
+    fi
+    if ! command -v "$launcher" >/dev/null 2>&1 && ! typeset -f "$launcher" >/dev/null; then
+        echo "Error: launcher '$launcher' not found" >&2
+        return 1
+    fi
+
+    echo "🤖 Generating branch name with claude haiku..."
+    local naming_prompt branch_name
+    naming_prompt="Generate exactly one git branch name for the task below.
+Rules:
+- Prefix with one of: feat/, fix/, refactor/, docs/, test/, chore/, perf/
+- After the prefix, kebab-case, ASCII only, 3-7 words.
+- Output ONLY the branch name. No quotes, no commentary, no trailing punctuation.
+
+Task: ${prompt}"
+
+    branch_name=$(claude -p --model haiku "$naming_prompt" 2>/dev/null \
+        | tr -d '\r`"'\''' \
+        | awk 'NF{print; exit}' \
+        | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+
+    if [[ -z "$branch_name" ]]; then
+        echo "Error: branch name generation returned empty output" >&2
+        return 1
+    fi
+    if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)/[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "Error: generated branch name is invalid: '$branch_name'" >&2
+        return 1
+    fi
+
+    echo "🌿 Branch:   $branch_name"
+    echo "🚀 Launcher: $launcher"
+
+    gw "$branch_name" || return 1
+
+    "$launcher" "$prompt"
+}
+
 # Helper function to remove Claude Code cache for a worktree path
 _gwc_remove_claude_cache() {
     local worktree_path="$1"
