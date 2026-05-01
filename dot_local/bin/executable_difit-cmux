@@ -113,8 +113,13 @@ fi
 # background tab in the same pane).
 "$CMUX" rpc surface.focus "{\"surface_id\":\"${browserSurface}\"}" >/dev/null 2>&1 || true
 
-# Wait until the browser pane is closed, then shut down the server
-while "$CMUX" surface-health 2>&1 | grep -q "$browserSurface"; do
+# Wait until the browser surface is closed, then shut down the server.
+# `surface-health` without --workspace only lists surfaces in the *currently
+# focused* workspace, so the watchdog was killing difit whenever the user
+# switched workspaces. `tree --all` lists surfaces across every workspace,
+# so this only exits when the surface is actually gone. The trailing
+# [^0-9] avoids surface:27 matching surface:271, etc.
+while "$CMUX" tree --all 2>&1 | grep -qE "${browserSurface}([^0-9]|$)"; do
     sleep 1
 done
 
