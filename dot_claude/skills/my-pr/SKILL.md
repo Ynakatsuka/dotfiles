@@ -2,7 +2,8 @@
 name: my-pr
 description: >-
   Unified pull request workflow: parallel review (Claude + Codex), auto-fix, and
-  create/update GitHub PRs. Default runs full flow (review → fix → create).
+  create/update GitHub PRs, then keep fixing CI and automated review findings
+  until the PR is ready to merge. Default runs full flow (review → fix → create → verify).
   Subcommands: `create` (skip review), `review` (review only).
   Use when creating PRs, self-reviewing changes, or requesting "PR作成", "レビュー".
   Do NOT use for responding to others' review comments or reviewing external repositories.
@@ -19,8 +20,8 @@ argument-hint: "[create|review]"
 
 | 引数 | 動作 |
 |---|---|
-| `$ARGUMENTS` が空（デフォルト） | 簡素化 → レビュー → 自動修正 → PR作成 |
-| `$0` = `create` | 簡素化 → PR作成 |
+| `$ARGUMENTS` が空（デフォルト） | 簡素化 → レビュー → 自動修正 → PR作成 → PR後検証 → Ready化 |
+| `$0` = `create` | 簡素化 → PR作成 → PR後検証 → Ready化 |
 | `$0` = `review` | 簡素化 → レビュー → 自動修正（PR作成・push しない） |
 
 ---
@@ -305,15 +306,216 @@ gh pr edit --body "更新内容"
 
 ---
 
+## Phase 7: PR 後検証・自動修正・Ready 化（`review` の場合はスキップ）
+
+PR 作成または更新後、GitHub Actions と自動レビューが走る場合がある。PR は **draft のまま** にして、すべて成功・解消してから `ready to merge` に変更する。
+
+### 7-1: PR 番号とブランチを確定
+
+```bash
+PR_NUMBER=$(gh pr view --json number -q .number)
+HEAD_BRANCH=$(gh pr view --json headRefName -q .headRefName)
+```
+
+### 7-2: 完了条件
+
+以下をすべて満たすまで loop する:
+
+1. GitHub Actions が存在する場合、対象 PR の checks がすべて `pass` / `skipping` である
+2. GitHub Actions の失敗・キャンセル・タイムアウトがない
+3. Claude Code / Codex / Copilot などの自動 review が実行済みの場合、全 review thread を確認済みで対応対象の未解決指摘がない
+4. 対応した修正が commit 済みで、remote branch に push 済みである
+5. `gh pr ready "$PR_NUMBER"` が成功している
+
+### 7-3: 監視 loop
+
+最大 10 回まで実行する。各 iteration の冒頭で 60 秒待ち、GitHub 側の checks / reviews 反映を待つ。失敗や対応対象の review 指摘があれば 7-4 / 7-5 で修正して push し、次の iteration に戻る。all clear なら 7-6 に進む。
+
+`gh pr checks --watch` は長時間 pending で外側の上限が効かなくなるため使わない。`--json` の `bucket` を polling して判定する。
+
+```bash
+CHECKS_CLEAR=0
+CHECKS_NEED_FIX=0
+
+for i in $(seq 1 10); do
+  echo "Waiting for GitHub checks and automated reviews: iteration $i/10"
+  sleep 60
+
+  CHECKS_JSON=$(gh pr checks "$PR_NUMBER" --json name,bucket,state,workflow,link 2>/tmp/pr-checks.err)
+  CHECK_STATUS=$?
+
+  gh pr view "$PR_NUMBER" --json reviews,reviewDecision,comments,latestReviews
+  printf '%s\n' "$CHECKS_JSON"
+
+  if [ -n "$CHECKS_JSON" ] && printf '%s\n' "$CHECKS_JSON" | jq -e 'any(.[]; .bucket == "fail" or .bucket == "cancel")' >/dev/null; then
+    echo "Checks failed or were cancelled. Continue to 7-4, fix root causes, push, then rerun this loop."
+    CHECKS_NEED_FIX=1
+    break
+  elif [ -n "$CHECKS_JSON" ] && printf '%s\n' "$CHECKS_JSON" | jq -e 'any(.[]; .bucket == "pending")' >/dev/null; then
+    echo "Checks are still pending. Continue waiting."
+    continue
+  elif [ -n "$CHECKS_JSON" ]; then
+    echo "Checks are clear. Inspect all automated review threads before continuing to 7-6."
+    CHECKS_CLEAR=1
+    break
+  elif [ "$CHECK_STATUS" -ne 0 ] && rg -qi "no checks|checks have not been created|not found" /tmp/pr-checks.err; then
+    echo "No checks are configured for this PR. Continue to automated review inspection."
+    CHECKS_CLEAR=1
+    break
+  elif [ "$CHECK_STATUS" -ne 0 ]; then
+    cat /tmp/pr-checks.err
+    echo "Could not inspect checks. Surface the error and stop."
+    exit 1
+  fi
+done
+
+if [ "$CHECKS_NEED_FIX" -eq 1 ]; then
+  echo "Do not continue to 7-6. Execute 7-4, commit and push the fix, then rerun 7-3."
+elif [ "$CHECKS_CLEAR" -ne 1 ]; then
+  echo "Checks did not finish within the wait limit. Report pending check names and URLs, then stop."
+  printf '%s\n' "$CHECKS_JSON" | jq -r '.[] | select(.bucket == "pending") | "\(.name) \(.link)"'
+  exit 1
+fi
+```
+
+`gh pr checks` が「checks が存在しない」ことを示す場合は GitHub Actions 未設定として扱い、レビュー確認に進む。存在する checks が `pending` の場合は待つ。`fail` / `cancel` の場合は 7-4 で修正する。10 回待っても `pending` が残る場合は、長時間実行中の check 名と run URL を報告して停止する。
+
+### 7-4: GitHub Actions 失敗の修正
+
+checks が失敗した場合:
+
+1. 失敗した check 名を特定する
+2. 失敗した workflow run の log を取得する
+3. root cause を修正する
+4. 関連テストをローカルで実行する
+5. 修正を commit する（Conventional Commits 形式、英語）
+6. `git push` する
+7. 7-3 に戻る
+
+```bash
+gh pr checks "$PR_NUMBER"
+gh run list --branch "$HEAD_BRANCH" --limit 10
+gh run view <RUN_ID> --log-failed
+```
+
+失敗原因が flake や外部障害に見える場合も、まず log から再現性と影響範囲を確認する。retry は idempotent で、bounded で、最終失敗が表面化する場合だけ実行する。
+
+### 7-5: 自動 review 指摘の修正
+
+Claude Code / Codex / Copilot などの review がある場合、未解決コメントを確認する。
+
+```bash
+REVIEWS_CLEAR=0
+
+gh pr view "$PR_NUMBER" --json reviews,comments,latestReviews,reviewDecision
+REVIEW_COMMENTS_JSON=$(gh api "repos/{owner}/{repo}/pulls/$PR_NUMBER/comments")
+REVIEW_THREADS_JSON=$(gh api graphql -f owner="$(gh repo view --json owner -q .owner.login)" -f repo="$(gh repo view --json name -q .name)" -F number="$PR_NUMBER" -f query='
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviews(first: 100) {
+        nodes {
+          author { login }
+          body
+          state
+          url
+        }
+      }
+      comments(first: 100) {
+        nodes {
+          author { login }
+          body
+          url
+        }
+      }
+      reviewThreads(first: 100) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+        nodes {
+          isResolved
+          comments(first: 20) {
+            nodes {
+              author { login }
+              body
+              path
+              line
+              url
+            }
+          }
+        }
+      }
+    }
+  }
+}')
+
+printf '%s\n' "$REVIEW_COMMENTS_JSON"
+printf '%s\n' "$REVIEW_THREADS_JSON"
+
+# Set this after classifying review threads, review bodies, and top-level comments.
+: "${ACTIONABLE_REVIEW_FINDINGS:?Set actionable automated review finding count before continuing}"
+
+case "$ACTIONABLE_REVIEW_FINDINGS" in
+  ''|*[!0-9]*)
+    echo "ACTIONABLE_REVIEW_FINDINGS must be a non-negative integer."
+    exit 1
+    ;;
+esac
+
+if [ "$ACTIONABLE_REVIEW_FINDINGS" -gt 0 ]; then
+  echo "Actionable automated review findings remain. Fix them, push, then rerun 7-3."
+else
+  REVIEWS_CLEAR=1
+fi
+```
+
+`reviewThreads.pageInfo.hasNextPage` が `true` の場合は `after: <endCursor>` を付けて次ページを取得する。`hasNextPage` が `false` になるまで全ページを確認してから未解決指摘数を判定する。
+PR 全体の review body と top-level comments も同じ基準で分類する。LOW / nit / style / 好みの問題だけが残る場合は、対応しない理由を記録して `REVIEWS_CLEAR=1` とする。
+
+対応基準:
+
+| 指摘 | 対応 |
+|---|---|
+| HIGH / critical / 🔴 / 修正必須 | **必ず修正** |
+| MEDIUM / middle / warning / 🟡 | **正しさ・保守性・運用安定性に効くものは修正** |
+| LOW / nit / style | **原則対応しない** |
+| 好みの問題 | **対応しない** |
+
+修正した場合:
+
+1. 指摘ごとに root cause を修正する
+2. 関連テストを実行する
+3. 修正を commit する（Conventional Commits 形式、英語）
+4. `git push` する
+5. 7-3 に戻る
+
+### 7-6: Ready 化
+
+7-2 の完了条件を満たしたら draft を解除する。
+
+`CHECKS_CLEAR=1` かつ `REVIEWS_CLEAR=1` を確認してから実行する。どちらかが `1` でなければ 7-3 / 7-5 に戻る。
+
+```bash
+gh pr ready "$PR_NUMBER"
+gh pr view "$PR_NUMBER" --json isDraft,reviewDecision,mergeStateStatus,statusCheckRollup
+```
+
+`isDraft` が `false` で、対象 checks と対応対象 review 指摘が clear であることを確認して完了する。
+
+---
+
 ## 注意事項
 
 - PR 内容は日本語で書く
-- デフォルトで `--draft` を付ける
+- デフォルトで `--draft` を付け、Phase 7 が all clear になってから `ready to merge` に変更する
 - `--assignee @me` を常に付ける
 - タイトルは簡潔に（70文字以内）
 - コミットメッセージは Conventional Commits 形式（英語）
 - 2つのレビューは **並列実行** する
 - Codex レビューは必ず実行する（スキップ不可）。`codex` コマンドが見つからない場合は、mise が管理するパス（`~/.local/share/mise/installs/` 以下）を確認し、フルパスで実行を試みる。それでも見つからない場合はユーザーに報告して対処を求める
+- GitHub Actions が存在する場合は、すべて成功するまで自動修正・commit・push を繰り返す
+- Claude Code / Codex などの自動 review が走る場合は、HIGH 以上と対応価値のある MEDIUM / middle を自動修正する
 - 好みの問題（フォーマット、命名の趣味）は指摘しない
 - テストが壊れる修正はしない
 - ワークツリー使用時は、ワークツリー内で作業を続ける。PR 作成後も修正が必要になる場合があるため、ワークツリーは自動削除しない
