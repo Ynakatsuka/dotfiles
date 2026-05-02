@@ -17,6 +17,8 @@
 - Batch parallel file reads together. Never read files sequentially when reads are independent.
 - Use `apply_patch` for single-file edits; use shell commands with an explicit `workdir` parameter.
 - When a dedicated tool exists (search, read, patch), use it instead of a shell command.
+- Use `rtk` for shell commands that can produce token-heavy output, such as `rtk git status`, `rtk git diff`, `rtk rg "pattern" .`, `rtk pytest -q`, and `rtk cargo test`.
+- Use `rtk proxy` only when raw unfiltered command output is required.
 
 ### Git Safety
 
