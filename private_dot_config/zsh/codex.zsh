@@ -4,7 +4,43 @@
 
 # Codex launcher (mirrors `cl` for claude)
 function cdx() {
-    codex --dangerously-bypass-approvals-and-sandbox "$@"
+    local project_dir="$PWD"
+    local i=1
+
+    while ((i <= $#)); do
+        case "${argv[$i]}" in
+            -C | --cd)
+                ((i++))
+                if ((i > $#)); then
+                    echo "Error: ${argv[$((i - 1))]} requires a directory" >&2
+                    return 2
+                fi
+                project_dir="${argv[$i]}"
+                ;;
+            -C=*)
+                project_dir="${argv[$i]#-C=}"
+                ;;
+            --cd=*)
+                project_dir="${argv[$i]#--cd=}"
+                ;;
+        esac
+        ((i++))
+    done
+
+    if [ ! -d "$project_dir" ]; then
+        echo "Error: Codex project directory not found: $project_dir" >&2
+        return 1
+    fi
+
+    local project_path escaped_project_path
+    project_path=$(cd "$project_dir" && pwd -P) || return 1
+    escaped_project_path=${project_path//\\/\\\\}
+    escaped_project_path=${escaped_project_path//\"/\\\"}
+
+    codex \
+        --dangerously-bypass-approvals-and-sandbox \
+        -c "projects.\"$escaped_project_path\".trust_level=\"trusted\"" \
+        "$@"
 }
 
 # Internal helper: portable dev:inode fetch
