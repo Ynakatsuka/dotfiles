@@ -32,14 +32,33 @@ function cdx() {
         return 1
     fi
 
-    local project_path escaped_project_path
-    project_path=$(cd "$project_dir" && pwd -P) || return 1
-    escaped_project_path=${project_path//\\/\\\\}
-    escaped_project_path=${escaped_project_path//\"/\\\"}
+    local logical_project_path physical_project_path git_root physical_git_root
+    local -a trust_paths config_args
+    local -A seen_paths
+
+    logical_project_path=$(cd "$project_dir" && pwd -L) || return 1
+    physical_project_path=$(cd "$project_dir" && pwd -P) || return 1
+    trust_paths=("$logical_project_path" "$physical_project_path")
+
+    if git_root=$(git -C "$project_dir" rev-parse --show-toplevel 2>/dev/null); then
+        physical_git_root=$(cd "$git_root" && pwd -P) || return 1
+        trust_paths+=("$git_root" "$physical_git_root")
+    fi
+
+    local trust_path escaped_project_path
+    for trust_path in "${trust_paths[@]}"; do
+        if [[ -n "${seen_paths[$trust_path]}" ]]; then
+            continue
+        fi
+        seen_paths[$trust_path]=1
+        escaped_project_path=${trust_path//\\/\\\\}
+        escaped_project_path=${escaped_project_path//\"/\\\"}
+        config_args+=(-c "projects.\"$escaped_project_path\".trust_level=\"trusted\"")
+    done
 
     codex \
         --dangerously-bypass-approvals-and-sandbox \
-        -c "projects.\"$escaped_project_path\".trust_level=\"trusted\"" \
+        "${config_args[@]}" \
         "$@"
 }
 
