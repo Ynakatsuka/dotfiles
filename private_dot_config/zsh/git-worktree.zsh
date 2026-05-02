@@ -22,6 +22,17 @@ _gw_copy_env() {
     done
 }
 
+# Helper function to refresh Codex trusted projects after creating a worktree
+_gw_refresh_codex_trust() {
+    if ! command -v chezmoi >/dev/null 2>&1; then
+        echo "Error: chezmoi not found; cannot refresh Codex trusted projects" >&2
+        return 1
+    fi
+
+    echo "Refreshing Codex trusted projects..."
+    chezmoi apply "$HOME/.codex/config.toml"
+}
+
 # Smart git worktree function for InsightX
 function gw() {
     local branch_name=$1
@@ -187,6 +198,7 @@ function gw() {
     if [ "$new_worktree_created" = true ]; then
         _gw_copy_env "$git_root"
         _gw_setup_direnv
+        _gw_refresh_codex_trust || return 1
 
         local colors=(
             "#e74c3c" "#3498db" "#2ecc71" "#f39c12" "#9b59b6"

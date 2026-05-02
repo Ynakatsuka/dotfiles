@@ -21,6 +21,16 @@ if [[ -z "$branch_name" ]]; then
   exit 2
 fi
 
+refresh_codex_trust() {
+  if ! command -v chezmoi >/dev/null 2>&1; then
+    echo "Error: chezmoi not found; cannot refresh Codex trusted projects" >&2
+    return 1
+  fi
+
+  echo "Refreshing Codex trusted projects..."
+  chezmoi apply "$HOME/.codex/config.toml"
+}
+
 git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "Error: not in a git repository" >&2
   exit 1
@@ -136,8 +146,10 @@ for f in .env .envrc; do
 done
 
 if [[ -f "$worktree_dir/.envrc" ]] && command -v direnv >/dev/null 2>&1; then
-  ( cd "$worktree_dir" && direnv allow )
+  (cd "$worktree_dir" && direnv allow)
 fi
+
+refresh_codex_trust
 
 echo ""
 echo "Worktree ready: $worktree_dir"
