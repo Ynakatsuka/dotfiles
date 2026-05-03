@@ -10,6 +10,24 @@ function cl() {
     fi
 }
 
+_format_session_tokens() {
+    local tokens="$1"
+    [[ "$tokens" == <-> ]] || {
+        printf "%s" "-"
+        return 0
+    }
+
+    awk -v tokens="$tokens" 'BEGIN {
+        if (tokens >= 1000000) {
+            printf "%.1fM", tokens / 1000000
+        } else if (tokens >= 1000) {
+            printf "%.0fk", tokens / 1000
+        } else {
+            printf "%d", tokens
+        }
+    }'
+}
+
 # Collect Claude Code sessions for current directory.
 # Uses zsh builtins (zstat, strftime) instead of forking stat(1)/date(1) per file.
 _collect_claude_sessions() {
@@ -25,15 +43,35 @@ _collect_claude_sessions() {
     zmodload -F zsh/stat b:zstat 2>/dev/null
     zmodload -F zsh/datetime b:strftime 2>/dev/null
 
-    local file name summary mtime date_str
+    local file name title turns tokens token_display mtime date_str
     local -A st
     for file in "$project_dir"/*.jsonl(N); do
         name="${${file:t}%.jsonl}"
         [[ "$name" == agent-* ]] && continue
         [[ ${#name} -ne 36 ]] && continue
 
-        summary=$(head -1 "$file" 2>/dev/null | jq -r '.summary // empty' 2>/dev/null)
-        [[ -z "$summary" ]] && summary="(no summary)"
+        title=$(head -1 "$file" 2>/dev/null | jq -r '.summary // empty' 2>/dev/null)
+        [[ -z "$title" ]] && title="(no title)"
+        turns=$(jq -r '
+            select(
+                .type=="user"
+                and (.isMeta != true)
+                and ((.message.content | tostring | startswith("<local-command-caveat>")) | not)
+                and ((.message.content | tostring | startswith("<command-name>")) | not)
+            )
+            | 1
+        ' "$file" 2>/dev/null | wc -l | tr -d ' ')
+        [[ -n "$turns" ]] || turns="-"
+        tokens=$(jq -r '
+            select(.type=="assistant" and .message.usage)
+            | (
+                (.message.usage.input_tokens // 0)
+                + (.message.usage.cache_creation_input_tokens // 0)
+                + (.message.usage.cache_read_input_tokens // 0)
+                + (.message.usage.output_tokens // 0)
+            )
+        ' "$file" 2>/dev/null | awk '{s += $1} END {if (NR > 0) print s}')
+        token_display=$(_format_session_tokens "$tokens")
 
         if (( $+builtins[zstat] )); then
             zstat -H st -- "$file" 2>/dev/null
@@ -47,7 +85,7 @@ _collect_claude_sessions() {
             date_str=$(date -r "$mtime" "+%m/%d %H:%M")
         fi
 
-        printf "%s\tclaude\t%s\t-\t%s\t%s\t%s\n" "$mtime" "$date_str" "$summary" "$name" "$file"
+        printf "%s\tclaude\t%s\t%s\t%s\t%s\t%s\t%s\n" "$mtime" "$date_str" "$turns" "$token_display" "$title" "$name" "$file"
     done
 }
 
@@ -76,7 +114,7 @@ _collect_codex_sessions() {
     zmodload -F zsh/stat b:zstat 2>/dev/null
     zmodload -F zsh/datetime b:strftime 2>/dev/null
 
-    local file meta cwd session_id mtime date_str
+    local file meta cwd session_id title turns tokens token_display mtime date_str
     local -A st
     for file in $candidates; do
         [[ -f "$file" ]] || continue
@@ -99,7 +137,35 @@ _collect_codex_sessions() {
             date_str=$(date -r "$mtime" "+%m/%d %H:%M")
         fi
 
-        printf "%s\tcodex\t%s\t-\t(codex session)\t%s\t%s\n" "$mtime" "$date_str" "$session_id" "$file"
+        title=$(head -200 "$file" 2>/dev/null | jq -r '
+            (
+                select(.type=="event_msg" and .payload.type=="user_message")
+                | .payload.message
+            ),
+            (
+                select(.type=="response_item" and .payload.type=="message" and .payload.role=="user")
+                | .payload.content[]?
+                | select(.type=="input_text")
+                | .text
+                | select(
+                    (startswith("# AGENTS.md instructions") | not)
+                    and (startswith("<environment_context>") | not)
+                    and (contains("<INSTRUCTIONS>") | not)
+                )
+            )
+            | gsub("[[:space:]]+"; " ")
+            | .[0:120]
+        ' 2>/dev/null | head -1)
+        [[ -z "$title" ]] && title="(codex session)"
+        turns=$(jq -r 'select(.type=="event_msg" and .payload.type=="user_message") | 1' "$file" 2>/dev/null | wc -l | tr -d ' ')
+        [[ -n "$turns" ]] || turns="-"
+        tokens=$(jq -r '
+            select(.type=="event_msg" and .payload.type=="token_count" and .payload.info.total_token_usage.total_tokens)
+            | .payload.info.total_token_usage.total_tokens
+        ' "$file" 2>/dev/null | tail -1)
+        token_display=$(_format_session_tokens "$tokens")
+
+        printf "%s\tcodex\t%s\t%s\t%s\t%s\t%s\t%s\n" "$mtime" "$date_str" "$turns" "$token_display" "$title" "$session_id" "$file"
     done
 }
 
@@ -120,21 +186,21 @@ function fzf-session-resume() {
         --reverse \
         --ansi \
         --delimiter=$'\t' \
-        --with-nth=1,2,3,4,5 \
+        --with-nth=1,2,3,4,5,6 \
         --preview='
             tool=$(echo {} | awk -F"\t" "{print \$1}")
-            filepath=$(echo {} | awk -F"\t" "{print \$6}")
+            filepath=$(echo {} | awk -F"\t" "{print \$7}")
             if [ "$tool" = "claude" ]; then
                 head -200 "$filepath" 2>/dev/null | jq -r "select(.type==\"user\") | .message.content" 2>/dev/null | head -30
             else
-                head -200 "$filepath" 2>/dev/null | jq -r "select(.type==\"response_item\" and .payload.role==\"user\") | .payload.content[] | if type == \"object\" then .text // empty else . end" 2>/dev/null | grep -v "^#" | grep -v "^<" | grep -v "^$" | head -30
+                head -200 "$filepath" 2>/dev/null | jq -r "(select(.type==\"event_msg\" and .payload.type==\"user_message\") | .payload.message), (select(.type==\"response_item\" and .payload.type==\"message\" and .payload.role==\"user\") | .payload.content[]? | select(.type==\"input_text\") | .text | select((startswith(\"# AGENTS.md instructions\") | not) and (startswith(\"<environment_context>\") | not) and (contains(\"<INSTRUCTIONS>\") | not)))" 2>/dev/null | grep -v "^$" | awk "!seen[\$0]++" | head -30
             fi
         ' \
         --preview-window=right:40%:wrap)
 
     if [[ -n "$selected" ]]; then
         local tool=$(echo "$selected" | awk -F'\t' '{print $1}')
-        local session_id=$(echo "$selected" | awk -F'\t' '{print $5}')
+        local session_id=$(echo "$selected" | awk -F'\t' '{print $6}')
         if [[ "$tool" == "claude" ]]; then
             BUFFER="cl --resume=$session_id"
         else
