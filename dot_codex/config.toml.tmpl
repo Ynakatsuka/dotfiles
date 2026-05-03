@@ -14,6 +14,18 @@ goals = true
 unified_exec = true
 streamable_shell = true
 
+[tui]
+status_line = [
+  "model-with-reasoning",
+  "fast-mode",
+  "git-branch",
+  "context-remaining",
+  "five-hour-limit",
+  "weekly-limit",
+  "used-tokens",
+  "current-dir",
+]
+
 # Suppress model-availability NUX banners by pinning shown_count to the
 # MAX_SHOW_COUNT (4) defined in codex-rs/tui/src/app/startup_prompts.rs.
 [tui.model_availability_nux]
