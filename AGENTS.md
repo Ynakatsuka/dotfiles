@@ -36,6 +36,17 @@ Write natural, concise Japanese. Cut verbosity, not accuracy.
 - Remove near-duplicate clauses; shorten redundant forms (〜することができる → 〜できる).
 - Prefer bullet lists over markdown tables when both convey the same information.
 
+When the answer contains decisions, recommendations, or classifications, make the action clear first.
+
+- Start with the decision or recommended action, not the background.
+- Separate what to do, why it matters, evidence, and scope.
+- Put each item in exactly one category.
+- Do not repeat the same point across summary and details.
+- Use categories with clear action meaning, such as Required, Recommended, Not needed, or Blocked.
+- Define category boundaries when the labels could be ambiguous.
+- Distinguish direct evidence from inference.
+- Prefer short labels over sentence-like headings.
+
 </output_style>
 
 ## No Implicit Fallbacks
