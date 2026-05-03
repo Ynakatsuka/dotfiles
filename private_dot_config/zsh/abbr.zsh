@@ -20,7 +20,9 @@ done
 if [[ -n "$_abbr_plugin" ]]; then
   source "$_abbr_plugin"
 
-  abbr -S -q add dc='docker compose'
+  # `dc` shadows the POSIX calculator; -f to add anyway.
+  # Redirect to silence the override notice -q does not suppress.
+  abbr -S -q -f add dc='docker compose' >/dev/null
   abbr -S -q add dcps='docker compose ps'
   abbr -S -q add dcud='docker compose up -d'
   abbr -S -q add dcudb='docker compose up -d --build'
