@@ -2,59 +2,33 @@
 
 ## Codex-Specific Addendum
 
-- Codex CLI auto-enumerates `AGENTS.md` files from repo root down to the cwd, but does not load Claude's `rules/*.md` or skill files. Encode anything Codex must follow here.
+Codex auto-enumerates `AGENTS.md` from repo root to cwd, but Claude's `rules/*.md` and `dot_claude/skills/*` are not automatic global instructions for Codex. Encode Codex-only overrides here.
 
-### Autonomy & Persistence
+### Autonomy
 
-- Act as a senior engineer. Once given direction, gather context, implement, and verify within a single turn.
-- Bias toward action: make reasonable assumptions and proceed. Ask for clarification only when truly blocked.
-- If an approach loops or stalls, switch strategy instead of retrying the same steps.
-- Skip filler phrases ("Good catch", "Let me think"). Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
+- Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
 
 ### Tool Usage
 
-- Prefer `rg` over `grep` for text search; use `rg --files` for file listing.
-- Batch parallel file reads together. Never read files sequentially when reads are independent.
-- Use `apply_patch` for single-file edits; use shell commands with an explicit `workdir` parameter.
-- When a dedicated tool exists (search, read, patch), use it instead of a shell command.
-- Use `rtk` for shell commands that can produce token-heavy output, such as `rtk git status`, `rtk git diff`, `rtk rg "pattern" .`, `rtk pytest -q`, and `rtk cargo test`.
-- Use `rtk proxy` only when raw unfiltered command output is required.
+- Pass an explicit `workdir` parameter when running shell commands.
+- Use `rtk` for shell commands with token-heavy output (`rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`). Use `rtk proxy` only when raw output is required.
 
-### Git Safety
+### Git
 
-- Never run `git reset --hard`, `git push --force`, or other destructive commands without explicit user approval.
-- Before committing, inspect changes with `git status` and `git diff`.
-- Use the **Conventional Commits** format for commit messages (e.g., `feat:`, `fix:`, `refactor:`).
-- Never commit secrets, credentials, or `.env` files. Warn the user if asked to do so.
-- Use `gh` for all GitHub operations (PRs, issues, etc.).
+- Use **Conventional Commits** format (`feat:`, `fix:`, `refactor:`).
+- Never commit secrets, credentials, or `.env` files. Warn if asked.
+- Use `gh` for all GitHub operations (PRs, issues).
 
 ### Domain Rules
 
-- If the task touches Python, follow the Python rules: use `uv`, prefer modern typing, use Ruff/Mypy/Pytest, and keep comments/docstrings/logs in English.
-- If the task touches BigQuery or `.sql`, use `bq`, show current project/account before execution, and run `--dry_run` before expensive queries.
-- If the task runs GPU-heavy Python code, check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
+- Python: use `uv`, modern typing, Ruff/Mypy/Pytest. Comments/docstrings/logs in English.
+- BigQuery / `.sql`: use `bq`, show current project/account before execution, run `--dry_run` before expensive queries.
+- GPU Python: check `nvidia-smi` first, set `CUDA_VISIBLE_DEVICES` explicitly.
 
-### Verification & Stopping
+### Verification
 
-- Resolve the user request in the fewest useful tool loops. After each tool result, ask "Can I answer now?" and stop when the answer is yes.
-- Do not declare a task complete until you can demonstrate it works: run tests, check logs, or verify output.
-- If verification is not possible (no test suite, no runnable environment), state explicitly what was not verified.
-
-### Plan Usage
-
-- Plan only when the task is multi-step or the path is non-obvious; skip planning for scoped, single-step changes.
-- Update the plan as subtasks complete. Before finishing, mark every TODO as Done, Blocked, or Cancelled — never leave items in progress.
+- If verification is not possible (no test suite, no runnable env), state explicitly what was not verified.
 
 ## Output Format
 
-State each fact once. Do NOT repeat findings in a summary. Match response weight to task complexity: a yes/no question gets a sentence; a code change gets what changed and why; an investigation leads with **結論** (1-2 sentences) followed by findings.
-
-### Formatting rules
-
-- Write in Japanese (except technical terms, code, and file paths).
-- **One fact per bullet.** Single short sentence (「AはBである」). Never chain clauses with だが/しかし/で/また.
-- **Bullets per list: 4-6**, ordered by importance. Merge related points.
-- **No nested bullets.** Flatten with headings instead.
-- **Headings**: short (1-3 words). Use `##` / `###`.
-- **Code**: fenced blocks with language info string. File references as `` `src/app.ts:42` ``.
-- Bold key terms or numbers for scannability.
+- Lead investigations with **結論** in 1-2 sentences before findings.
