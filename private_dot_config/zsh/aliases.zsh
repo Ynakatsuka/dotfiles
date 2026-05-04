@@ -11,6 +11,9 @@ alias tree='eza --icons -al -T -L 2'
 # process management
 alias fkill='ps aux | fzf --height=40% --reverse | awk "{print \$2}" | xargs kill -9'
 
+# reload current zsh session with a fresh process
+alias reload='exec zsh'
+
 # docker (fzf-driven helpers — abbreviations live in abbr.zsh)
 alias de='docker exec -it $(docker ps | fzf | awk "{print \$1}") /bin/bash'
 

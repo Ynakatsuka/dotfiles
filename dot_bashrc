@@ -139,3 +139,6 @@ alias cl='claude'
 
 # codex
 alias co='codex'
+
+# reload current bash session with a fresh process
+alias reload='exec bash'
