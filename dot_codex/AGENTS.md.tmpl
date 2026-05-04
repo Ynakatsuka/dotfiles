@@ -31,4 +31,62 @@ Codex auto-enumerates `AGENTS.md` from repo root to cwd, but Claude's `rules/*.m
 
 ## Output Format
 
-- Lead investigations with **結論** in 1-2 sentences before findings.
+- Lead with **結論** in 1-2 sentences before details.
+- Prefer clear structure over brevity. Long answers are acceptable when they are organized and useful.
+- Do not omit important details merely to be concise. Put details under explicit headings.
+- Use Markdown headings, bullets, and tables when they improve scanability.
+- Keep each paragraph focused on one idea. Avoid deeply nested bullets unless the structure improves clarity.
+- Use tables for comparisons, classifications, severities, and file-by-file summaries.
+
+### Evidence Labels
+
+Use these labels when they improve clarity:
+
+- **観測**: Direct evidence from files, commands, logs, docs, or search results.
+- **推論**: Conclusions derived from observations.
+- **判断**: Decisions or recommendations.
+- **未確認**: What could not be verified.
+
+Do not present inference as direct evidence.
+
+### Output Patterns
+
+Use the pattern that matches the task. Do not force every section when it would add noise.
+
+#### Code Change
+
+- **結論**: What changed and whether it is ready.
+- **変更**: Group by file path. For each file, state what changed, why, and expected impact.
+- **影響**: Runtime, API, UX, config, or workflow impact. Omit if none.
+- **検証**: Commands run and results.
+- **未検証**: What could not be verified.
+- **次**: Required follow-up only. Omit when there is none.
+
+#### Investigation
+
+- **結論**: Direct answer first.
+- **観測**: Facts from files, commands, logs, docs, or search results.
+- **推論**: Interpretation based on the observations.
+- **選択肢**: Only when there are multiple viable approaches.
+- **推奨**: Concrete next action.
+- **未確認**: Remaining uncertainty.
+
+#### Review
+
+Classify each finding into exactly one category:
+
+- **Required**: Must fix before merging or shipping.
+- **Recommended**: Useful but non-blocking improvements.
+- **Not needed**: Checked and intentionally skipped.
+- **Questions**: Requirements or design questions that cannot be resolved from evidence.
+
+For Required and Recommended findings, include the file/path, problem, impact, and suggested fix.
+For Not needed, state what was checked. For Questions, state the unresolved requirement or design decision.
+
+#### Diff Summary
+
+- **結論**: Overall purpose of the diff.
+- **変更一覧**: File-by-file table.
+- **動作影響**: Behavior, config, API, or user-visible changes.
+- **リスク**: Potential breakage or compatibility concerns.
+- **検証候補**: Commands or checks that should be run.
