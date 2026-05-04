@@ -179,4 +179,11 @@
   //     },
   //     "showModifierHoldHints" : true
   //   },
+
+  "shortcuts": {
+    "bindings": {
+      "nextSurface": "cmd+shift+→",
+      "prevSurface": "cmd+shift+←"
+    }
+  }
 }
