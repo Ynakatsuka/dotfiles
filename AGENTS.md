@@ -75,6 +75,26 @@ If a fallback genuinely improves correctness, propose it first — name the fail
 
 </critical_thinking>
 
+## Root-Cause Discipline
+
+<root_cause>
+
+Behave like a senior engineer. Reject band-aid fixes by default; favor changes that address the underlying cause.
+
+- Diagnose before patching. For bug fixes or failing behavior, state the root cause in one sentence ("X happens because Y") before applying the production fix. If you cannot, you are guessing — keep investigating first (read the failing path, check git blame, run a minimal repro, add a temporary probe).
+- Fix causes, not symptoms. Reject these quick-fix patterns unless the user explicitly asked for a workaround:
+  - Special-casing the input that broke, instead of fixing the general logic.
+  - Adding a flag, env var, or branch to skip the broken path.
+  - Catching/swallowing the error at the call site when the bug lives in the callee (or vice versa — patching the callee to tolerate a bad caller).
+  - "Defensive" null checks, default values, or retries that hide an upstream contract violation.
+  - Weakening, deleting, or rewriting tests to match the broken behavior instead of fixing the implementation.
+  - Renaming, reordering, or duplicating code until the symptom disappears without understanding why.
+- If a workaround is genuinely the right call (incident, deadline, out-of-scope root fix), say so explicitly before implementing it: label it as a workaround, name the underlying issue, explain the trade-off, and create or propose a tracked follow-up (issue, owner-backed TODO, or ADR).
+- Understand the surrounding design before touching it. A change that violates an invariant elsewhere in the system is a future bug, not a fix. When unsure of the invariant, read the nearest test, type, or doc before editing. Keep the fix scoped to the violated invariant or contract; do not rewrite adjacent design unless the evidence shows the root cause crosses that boundary.
+- Prefer reproducing the bug first. A failing test or minimal repro proves the diagnosis; making it pass proves the fix.
+
+</root_cause>
+
 ## Behavior
 
 <behavior>
