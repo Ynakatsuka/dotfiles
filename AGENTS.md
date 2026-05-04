@@ -50,7 +50,13 @@ When the answer contains decisions, recommendations, or classifications, make th
 
 <no_implicit_fallbacks>
 
-Default to letting failures surface as errors. Do not add a fallback unless (a) the user explicitly requested it, (b) it is part of a documented contract (spec, ADR, type signature, schema, public API doc), or (c) you proposed it for this change and got approval.
+Default to letting failures surface as errors. Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, or workaround paths during code changes.
+
+Fallbacks are proposal-only. If a fallback seems necessary, stop before editing and propose it to the user: name the failure mode, the exact fallback behavior, the trade-off, and what erroring out would look like. Implement it only after explicit user approval for that specific fallback in the current task.
+
+Documentation, specs, schemas, type signatures, public API docs, tests, existing nearby patterns, or "better UX" are not permission to add a new fallback. If they appear to require one, report the conflict and ask before implementing.
+
+Do not preserve or broaden an existing fallback when modifying nearby code unless it is already part of the current behavior being intentionally kept. If the task touches existing fallback logic, call it out explicitly and either leave it unchanged or ask before changing it.
 
 Common patterns to avoid:
 
@@ -58,8 +64,8 @@ Common patterns to avoid:
 - `catch { return null }`, `except: pass`, or broad exception handlers that swallow the cause.
 - Continuing with mock / stub / cached data when an external dependency fails.
 - Silent retries without bounded attempts, backoff, logging, and a final error.
-
-If a fallback genuinely improves correctness, propose it first — name the failure mode, the trade-off, and what erroring out would look like — then wait for approval.
+- Guessing an alternate data source, config path, branch, model, endpoint, parser, or command when the intended one is missing or fails.
+- Treating partial results as complete success without surfacing the missing or failed portion.
 
 </no_implicit_fallbacks>
 
