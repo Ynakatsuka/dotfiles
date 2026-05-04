@@ -101,12 +101,7 @@ plugin_autoupdate_last_check_duration = "7 days"
 GITHUB_TOKEN = "{{exec(command='GH=$(find ~/.local/share/mise/installs/gh -name gh -type f 2>/dev/null | head -1) && $GH auth token 2>/dev/null || true')}}"
 AGENT_BROWSER_NATIVE = "1"
 
-[tasks.claude-viewer]
-description = "Claude Code Viewer (port 50100)"
-run = "npx @kimuson/claude-code-viewer@latest"
-env = { PORT = "50100" }
-
-[tasks.update-dotfile]
+[tasks.update-dotfiles]
 description = "Update dotfiles and development environment"
 run = """
 mise up && \
