@@ -4,7 +4,5 @@ window-padding-x = 4
 window-padding-y = 4
 window-save-state = always
 term = xterm-256color
-background = 1a1a1a
-foreground = d4d4d4
 keybind = super+left=previous_tab
 keybind = super+right=next_tab
