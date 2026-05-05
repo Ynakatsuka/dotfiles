@@ -109,7 +109,7 @@ codex exec "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
 
 ### 2. Gemini
 
-`my-gemini` の preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/gemini-credentials.json` の存在）。読み取り専用なので `--approval-mode plan` を使う:
+`my-agent` の Gemini preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/gemini-credentials.json` の存在）。読み取り専用なので `--approval-mode plan` を使う:
 
 ```bash
 gemini --approval-mode plan -p "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
@@ -117,7 +117,7 @@ gemini --approval-mode plan -p "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.tx
 ```
 
 - `timeout: 600000`
-- preflight 失敗時は `my-gemini` のガイダンスに従い、本レビューでは gemini をスキップして残り 2 者で続行
+- preflight 失敗時は `my-agent` の Gemini ガイダンスに従い、本レビューでは gemini をスキップして残り 2 者で続行
 
 ### 3. Claude (subagent)
 
@@ -182,7 +182,7 @@ touch /tmp/sdd-reviews/{feature-name}/done
 | 失敗 | 対応 |
 |---|---|
 | codex 失敗 | エラーをユーザーに通知し、残り 2 者で続行 |
-| gemini 失敗（preflight 含む） | 同上。preflight は `my-gemini` のガイダンスに従う |
+| gemini 失敗（preflight 含む） | 同上。preflight は `my-agent` の Gemini ガイダンスに従う |
 | claude (subagent) 失敗 | 同上 |
 | 3 者すべて失敗 | レビュー結果なしを報告し、Phase 2 へ進めるかユーザーに判断を仰ぐ |
 

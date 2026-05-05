@@ -44,8 +44,7 @@ Always edit in the ghq repo, never in `~/`.
 | `dot_gemini/settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
 
 Do NOT modify model IDs that appear inside skill examples
-(e.g., `dot_claude/skills/my-codex/SKILL.md`,
-`dot_claude/skills/my-gemini/SKILL.md`). Those are illustrative only.
+(e.g., `dot_claude/skills/my-agent/SKILL.md`). Those are illustrative only.
 
 ## Primary Sources
 
