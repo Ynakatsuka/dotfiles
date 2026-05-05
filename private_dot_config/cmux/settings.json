@@ -180,6 +180,10 @@
   //     "showModifierHoldHints" : true
   //   },
 
+  "app": {
+    "appearance": "dark"
+  },
+
   "shortcuts": {
     "bindings": {
       "nextSurface": "cmd+shift+→",
