@@ -57,7 +57,7 @@ Focus on:
 </scope>
 
 <out_of_scope>
-Code quality, duplication, naming style, formatting, and efficiency are handled separately by integrated simplify. Do not report style preferences or pure readability nits.
+Code quality, duplication, naming style, formatting, and efficiency are handled separately by integrated simplify. Do not report style preferences, pure readability nits, generated files, lockfiles, vendored dependencies, snapshots, or issues already enforced by CI unless the diff creates a concrete correctness or security risk.
 </out_of_scope>
 
 <finding_policy>
@@ -83,11 +83,11 @@ Report every plausible issue you find, including low-severity or uncertain findi
 
 ## Reviewer C: Codex correctness review
 
-Create the diff file before invoking Codex:
+Create the diff file in the same shell session that invokes Codex, and clean it up with `trap` so failures do not leave temporary files behind:
 
 ```bash
-DIFF_FILE="/tmp/pr-diff-$(git rev-parse --short HEAD).patch"
-rm -f "$DIFF_FILE"
+DIFF_FILE=$(mktemp -t my-pr-diff.XXXXXX.patch)
+trap 'rm -f "$DIFF_FILE"' EXIT
 git diff "$BASE_BRANCH"..HEAD > "$DIFF_FILE"
 ```
 
@@ -100,6 +100,7 @@ Scope:
 - Review the full branch diff against <BASE_BRANCH>.
 - Focus on correctness bugs, edge cases, data loss, race conditions, security issues, unsafe shell usage, secret leakage, authorization mistakes, and missing tests.
 - Do not report code quality, duplication, naming style, formatting, or efficiency issues; integrated simplify handles those separately.
+- Do not report issues already enforced by CI, generated files, lockfiles, vendored dependencies, snapshots, or preference-only nits unless the diff creates a concrete correctness or security risk.
 
 Finding policy:
 - Report every plausible issue you find, including low-severity or uncertain findings.
@@ -123,11 +124,7 @@ Output exactly this structure:
 - Optional: notable risks inspected but not reported, with reason.
 ```
 
-Remove the diff file after Codex finishes:
-
-```bash
-rm -f "$DIFF_FILE"
-```
+The `trap` removes the diff file after Codex finishes or fails.
 
 ## Integration rules
 

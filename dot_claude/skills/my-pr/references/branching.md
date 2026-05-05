@@ -55,16 +55,22 @@ done
 git diff --stat
 ```
 
-Clean the original protected branch after copying.
+Clean the original protected branch after copying, but preserve unrelated untracked files.
 
 ```bash
 git -C "$ORIG_REPO" reset HEAD -- $STAGED_FILES
 git -C "$ORIG_REPO" checkout -- $CHANGED_FILES $STAGED_FILES
-for f in $UNTRACKED_FILES; do rm -f "$ORIG_REPO/$f"; done
+
+# Delete only untracked files that were created during the current task and copied to the worktree.
+# If ownership is uncertain, leave the file in place and report it instead of deleting it.
+for f in $TASK_CREATED_UNTRACKED_FILES; do
+  rm -f "$ORIG_REPO/$f"
+done
+
 git -C "$ORIG_REPO" status --short
 ```
 
-If the original repository still has changes, stop and investigate before continuing.
+Do not include unrelated untracked files in `TASK_CREATED_UNTRACKED_FILES`. If the original repository still has changes, stop and investigate before continuing.
 
 ## Upstream safety
 

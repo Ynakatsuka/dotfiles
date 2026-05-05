@@ -31,7 +31,7 @@ Use the polling script instead of `gh pr checks --watch`.
 dot_claude/skills/my-pr/scripts/poll-pr-checks.sh "$PR_NUMBER"
 ```
 
-If the script reports failed checks, inspect logs, fix root cause, test, commit, push, then poll again.
+If the script reports failed checks, inspect logs, fix root cause, test, commit, run push destination safety, push, then poll again.
 
 ```bash
 gh pr checks "$PR_NUMBER"
@@ -56,7 +56,25 @@ Classify findings:
 | LOW / nit / style | Do not fix |
 | Preference | Do not fix |
 
-If actionable findings exist, fix them, test, commit, push, and return to checks polling.
+If actionable findings exist, fix them, test, commit, run push destination safety, push, and return to checks polling.
+
+## Push destination safety
+
+Before every push, verify that the push destination is safe and that the current branch matches the PR head branch.
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+test "$CURRENT_BRANCH" = "$HEAD_BRANCH"
+dot_claude/skills/my-pr/scripts/check-push-destination.sh
+```
+
+If no push destination is configured, push only to the matching remote branch after the current branch check succeeds.
+
+```bash
+git push -u origin HEAD:"$CURRENT_BRANCH"
+```
+
+If the push destination is a protected branch mismatch, stop and ask the user before pushing.
 
 ## Ready
 
