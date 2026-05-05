@@ -6,7 +6,7 @@ description: >-
   Use when the user asks to create a release or generate release notes
   (e.g., "リリースノート", "release note", "リリース作成").
   Do NOT use for changelogs, commit summaries, or PR descriptions.
-argument-hint: "[version]"
+argument-hint: "[patch|minor|major|<version>]"
 ---
 
 # Release Note — Release Note Generator
@@ -31,6 +31,28 @@ gh pr list --state merged --limit 50 --json number,title,mergeCommit
 
 ## 手順2: バージョン番号の決定
 
+引数 (`$1`) によって挙動が変わる:
+
+| 引数 | 挙動 |
+|---|---|
+| `patch` / `minor` / `major` | 自動判定をスキップし、`$LAST_TAG` の対応コンポーネントを 1 つ上げる |
+| `vX.Y.Z` 形式の明示バージョン | そのまま採用 |
+| 引数なし | 下記の自動判定ロジックを使用 |
+
+`patch`/`minor`/`major` を計算する例 (`$LAST_TAG=v1.2.3`):
+
+```bash
+# patch → v1.2.4 / minor → v1.3.0 / major → v2.0.0
+IFS='.' read -r MAJ MIN PAT <<< "${LAST_TAG#v}"
+case "$1" in
+  patch) NEW_TAG="v${MAJ}.${MIN}.$((PAT + 1))" ;;
+  minor) NEW_TAG="v${MAJ}.$((MIN + 1)).0" ;;
+  major) NEW_TAG="v$((MAJ + 1)).0.0" ;;
+esac
+```
+
+### 自動判定 (引数なしの場合)
+
 - 前回リリース: `$LAST_TAG`
 - **デフォルトは PATCH**。迷ったら PATCH を選ぶ。
 - セマンティックバージョニングに基づき、以下の基準で判定:
@@ -43,7 +65,6 @@ gh pr list --state merged --limit 50 --json number,title,mergeCommit
 - 判断に迷う場合の指針:
   - 「新機能っぽいが小さい」→ PATCH
   - 「既存機能の挙動が少し変わる（互換性は保たれる）」→ PATCH
-  - ユーザーから明示的に MINOR/MAJOR の指示があればそれに従う
 
 ## 手順3: 変更の分類
 
