@@ -109,10 +109,10 @@ codex exec "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
 
 ### 2. Gemini
 
-`my-agent` の Gemini preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/gemini-credentials.json` の存在）。読み取り専用なので `--approval-mode plan` を使う:
+`my-agent` の Gemini preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/oauth_creds.json` または `~/.gemini/gemini-credentials.json` のいずれかが存在）。読み取り専用なので `--approval-mode plan` を使い、信頼ディレクトリ外でも動かすため `--skip-trust` を必ず付ける（Gemini CLI 0.39+ で必須。詳細は `my-agent/references/gemini.md` Preflight #2）:
 
 ```bash
-gemini --approval-mode plan -p "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
+gemini --skip-trust --approval-mode plan -p "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
   > /tmp/sdd-reviews/{feature-name}/gemini.md 2>&1
 ```
 
