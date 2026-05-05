@@ -17,19 +17,17 @@ _format_session_tokens() {
         return 0
     }
 
-    awk -v tokens="$tokens" 'BEGIN {
-        if (tokens >= 1000000) {
-            printf "%.1fM", tokens / 1000000
-        } else if (tokens >= 1000) {
-            printf "%.0fk", tokens / 1000
-        } else {
-            printf "%d", tokens
-        }
-    }'
+    if (( tokens >= 1000000 )); then
+        printf "%.1fM" "$(( tokens / 1000000.0 ))"
+    elif (( tokens >= 1000 )); then
+        printf "%.0fk" "$(( tokens / 1000.0 ))"
+    else
+        printf "%d" "$tokens"
+    fi
 }
 
 # Collect Claude Code sessions for current directory.
-# Uses zsh builtins (zstat, strftime) instead of forking stat(1)/date(1) per file.
+# Uses one jq pass per file; Ctrl-K latency is dominated by per-session forks.
 _collect_claude_sessions() {
     local claude_projects_dir="$HOME/.claude/projects"
     local current_path="$(pwd)"
@@ -43,34 +41,53 @@ _collect_claude_sessions() {
     zmodload -F zsh/stat b:zstat 2>/dev/null
     zmodload -F zsh/datetime b:strftime 2>/dev/null
 
-    local file name title turns tokens token_display mtime date_str
+    local file name summary title turns tokens token_display mtime date_str
     local -A st
     for file in "$project_dir"/*.jsonl(N); do
         name="${${file:t}%.jsonl}"
         [[ "$name" == agent-* ]] && continue
         [[ ${#name} -ne 36 ]] && continue
 
-        title=$(head -1 "$file" 2>/dev/null | jq -r '.summary // empty' 2>/dev/null)
+        summary=$(jq -r -n '
+            reduce inputs as $item (
+                {title: "", turns: 0, tokens: 0, has_tokens: false};
+                .title = (
+                    if .title == "" and (($item.summary? // "") != "") then
+                        ($item.summary | gsub("[[:space:]]+"; " ") | .[0:120])
+                    else
+                        .title
+                    end
+                )
+                | .turns += (
+                    if (
+                        $item.type == "user"
+                        and ($item.isMeta != true)
+                        and ((($item.message.content // "") | tostring | startswith("<local-command-caveat>")) | not)
+                        and ((($item.message.content // "") | tostring | startswith("<command-name>")) | not)
+                    ) then 1 else 0 end
+                )
+                | if $item.type == "assistant" and ($item.message.usage? != null) then
+                    .tokens += (
+                        ($item.message.usage.input_tokens // 0)
+                        + ($item.message.usage.cache_creation_input_tokens // 0)
+                        + ($item.message.usage.cache_read_input_tokens // 0)
+                        + ($item.message.usage.output_tokens // 0)
+                    )
+                    | .has_tokens = true
+                else
+                    .
+                end
+            )
+            | [
+                (.turns | tostring),
+                (if .has_tokens then (.tokens | tostring) else "" end),
+                .title
+            ]
+            | @tsv
+        ' "$file" 2>/dev/null)
+        IFS=$'\t' read -r turns tokens title <<< "$summary"
         [[ -z "$title" ]] && title="(no title)"
-        turns=$(jq -r '
-            select(
-                .type=="user"
-                and (.isMeta != true)
-                and ((.message.content | tostring | startswith("<local-command-caveat>")) | not)
-                and ((.message.content | tostring | startswith("<command-name>")) | not)
-            )
-            | 1
-        ' "$file" 2>/dev/null | wc -l | tr -d ' ')
         [[ -n "$turns" ]] || turns="-"
-        tokens=$(jq -r '
-            select(.type=="assistant" and .message.usage)
-            | (
-                (.message.usage.input_tokens // 0)
-                + (.message.usage.cache_creation_input_tokens // 0)
-                + (.message.usage.cache_read_input_tokens // 0)
-                + (.message.usage.output_tokens // 0)
-            )
-        ' "$file" 2>/dev/null | awk '{s += $1} END {if (NR > 0) print s}')
         token_display=$(_format_session_tokens "$tokens")
 
         if (( $+builtins[zstat] )); then
@@ -114,17 +131,10 @@ _collect_codex_sessions() {
     zmodload -F zsh/stat b:zstat 2>/dev/null
     zmodload -F zsh/datetime b:strftime 2>/dev/null
 
-    local file meta cwd session_id title turns tokens token_display mtime date_str
+    local file meta session_id title turns tokens token_display mtime date_str
     local -A st
     for file in $candidates; do
         [[ -f "$file" ]] || continue
-        meta=$(head -1 "$file" 2>/dev/null | jq -r 'select(.type=="session_meta") | [.payload.cwd, .payload.id] | @tsv' 2>/dev/null)
-        [[ -z "$meta" ]] && continue
-        cwd="${meta%%	*}"
-        session_id="${meta##*	}"
-        [[ "$cwd" == "$current_path" ]] || continue
-        [[ -n "$session_id" ]] || continue
-
         if (( $+builtins[zstat] )); then
             zstat -H st -- "$file" 2>/dev/null
             mtime=${st[mtime]:-0}
@@ -137,32 +147,55 @@ _collect_codex_sessions() {
             date_str=$(date -r "$mtime" "+%m/%d %H:%M")
         fi
 
-        title=$(head -200 "$file" 2>/dev/null | jq -r '
-            (
-                select(.type=="event_msg" and .payload.type=="user_message")
-                | .payload.message
-            ),
-            (
-                select(.type=="response_item" and .payload.type=="message" and .payload.role=="user")
-                | .payload.content[]?
-                | select(.type=="input_text")
-                | .text
-                | select(
-                    (startswith("# AGENTS.md instructions") | not)
-                    and (startswith("<environment_context>") | not)
-                    and (contains("<INSTRUCTIONS>") | not)
+        meta=$(jq -r -n --arg current_path "$current_path" '
+            def user_title($item):
+                if $item.type == "event_msg" and $item.payload.type == "user_message" then
+                    ($item.payload.message // empty)
+                elif $item.type == "response_item" and $item.payload.type == "message" and $item.payload.role == "user" then
+                    $item.payload.content[]?
+                    | select(.type == "input_text")
+                    | .text
+                    | select(
+                        (startswith("# AGENTS.md instructions") | not)
+                        and (startswith("<environment_context>") | not)
+                        and (contains("<INSTRUCTIONS>") | not)
+                    )
+                else
+                    empty
+                end;
+
+            reduce inputs as $item (
+                {cwd: "", session_id: "", title: "", turns: 0, tokens: ""};
+                if $item.type == "session_meta" then
+                    .cwd = ($item.payload.cwd // "")
+                    | .session_id = ($item.payload.id // "")
+                else
+                    .
+                end
+                | .title = (
+                    if .title == "" then
+                        (([user_title($item)] | .[0] // "") | gsub("[[:space:]]+"; " ") | .[0:120])
+                    else
+                        .title
+                    end
                 )
+                | .turns += (
+                    if $item.type == "event_msg" and $item.payload.type == "user_message" then 1 else 0 end
+                )
+                | if $item.type == "event_msg" and $item.payload.type == "token_count" and ($item.payload.info.total_token_usage.total_tokens? != null) then
+                    .tokens = ($item.payload.info.total_token_usage.total_tokens | tostring)
+                else
+                    .
+                end
             )
-            | gsub("[[:space:]]+"; " ")
-            | .[0:120]
-        ' 2>/dev/null | head -1)
+            | select(.cwd == $current_path and .session_id != "")
+            | [.session_id, (.turns | tostring), .tokens, .title]
+            | @tsv
+        ' "$file" 2>/dev/null)
+        [[ -z "$meta" ]] && continue
+        IFS=$'\t' read -r session_id turns tokens title <<< "$meta"
         [[ -z "$title" ]] && title="(codex session)"
-        turns=$(jq -r 'select(.type=="event_msg" and .payload.type=="user_message") | 1' "$file" 2>/dev/null | wc -l | tr -d ' ')
         [[ -n "$turns" ]] || turns="-"
-        tokens=$(jq -r '
-            select(.type=="event_msg" and .payload.type=="token_count" and .payload.info.total_token_usage.total_tokens)
-            | .payload.info.total_token_usage.total_tokens
-        ' "$file" 2>/dev/null | tail -1)
         token_display=$(_format_session_tokens "$tokens")
 
         printf "%s\tcodex\t%s\t%s\t%s\t%s\t%s\t%s\n" "$mtime" "$date_str" "$turns" "$token_display" "$title" "$session_id" "$file"
