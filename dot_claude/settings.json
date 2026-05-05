@@ -58,7 +58,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "npx -y ccusage statusline"
+    "command": "~/.claude/scripts/ccv-statusline-proxy.sh"
   },
   "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
