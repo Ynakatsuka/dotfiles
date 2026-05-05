@@ -78,6 +78,7 @@ Common patterns to avoid:
 - For changes to shared modules or public interfaces, list what you verified versus could not verify.
 - Distinguish direct observations from inference; label uncertainty explicitly.
 - Before making or reversing a non-obvious decision, read existing ADRs, PRDs, and design docs. Record the *why* in the closest scope: a one-line code comment for local choices, the commit/PR body for change-level motivation, or an updated ADR/PRD for cross-module or product-scope decisions.
+- Before changing any function, type, config key, schema, or other public-facing behavior, grep for callers (upstream) and dependents (downstream). For each, state in one line whether the change preserves the contract they rely on (signature, return shape, side effects, ordering, error semantics, performance assumptions). If any contract would break, stop and report before editing — do not silently update call sites to match.
 
 </critical_thinking>
 
