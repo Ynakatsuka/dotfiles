@@ -184,6 +184,11 @@
     "appearance": "dark"
   },
 
+  "sidebarAppearance": {
+    "darkModeTintColor": "#808080",
+    "tintOpacity": 0.2
+  },
+
   "shortcuts": {
     "bindings": {
       "nextSurface": "cmd+shift+→",
