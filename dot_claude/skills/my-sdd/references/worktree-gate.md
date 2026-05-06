@@ -23,12 +23,16 @@ case "$current_branch" in
   *) protected=false ;;
 esac
 
-# ベースブランチ（staging > main）
-if git show-ref --verify --quiet refs/heads/staging \
-   || git show-ref --verify --quiet refs/remotes/origin/staging; then
-  base_branch=staging
+# ベースブランチ（staging > main）と base ref の解決
+# remote ref があれば origin/<branch>、無ければ local ref。両方無ければ main にフォールバック。
+if git show-ref --verify --quiet refs/remotes/origin/staging; then
+  base_branch=staging; base_ref=origin/staging
+elif git show-ref --verify --quiet refs/heads/staging; then
+  base_branch=staging; base_ref=staging
+elif git show-ref --verify --quiet refs/remotes/origin/main; then
+  base_branch=main; base_ref=origin/main
 else
-  base_branch=main
+  base_branch=main; base_ref=main
 fi
 ```
 
@@ -51,40 +55,51 @@ fi
 
 ## spec ファイルの移送
 
-`docs/specs/{feature-name}/` の状態に応じて 3 通り:
+`docs/specs/{feature-name}/` の状態に応じて 3 通り。
 
 ### 1. 未コミットのみ（保護ブランチに該当 spec の local-only コミットなし）
 
 ```bash
-git fetch origin {base_branch}
+[ "${base_ref}" = "origin/${base_branch}" ] && git fetch origin "${base_branch}"
 git worktree add -b feat-{feature-name} \
-  "{main_root}-worktree/feat-{feature-name}" "origin/{base_branch}"
+  "{main_root}-worktree/feat-{feature-name}" "${base_ref}"
 cp -R "{main_root}/docs/specs/{feature-name}" "{worktree}/docs/specs/"
 ```
 
-元の保護ブランチに残った未コミット変更は `git -C {main_root} checkout -- docs/specs/{feature-name}/` および追跡外があれば `git -C {main_root} clean -fd docs/specs/{feature-name}/` で破棄するか、ユーザーに確認する。
+元の保護ブランチに残った未コミット変更（`docs/specs/{feature-name}/` 配下）は **自動で破棄しない**。`git status -- docs/specs/{feature-name}/` の出力と「失われる変更の有無」を提示し、以下の選択肢で明示承認を待つ:
+
+- (a) `git -C {main_root} checkout -- docs/specs/{feature-name}/` で追跡済み変更を破棄
+- (b) `git -C {main_root} clean -fd docs/specs/{feature-name}/` で追跡外も削除（移送先にコピー済みである旨を明示）
+- (c) 保護ブランチに残したまま続行（次回切替時に再度確認される）
 
 ### 2. 保護ブランチに spec 関連の local-only コミットあり
 
 該当範囲の全コミットが `docs/specs/{feature-name}/` のみに閉じているか判定:
 
 ```bash
-bad=$(git log --format=%H "origin/{base_branch}..HEAD" -- ':!docs/specs/{feature-name}')
+bad=$(git log --format=%H "${base_ref}..HEAD" -- ':!docs/specs/{feature-name}')
 ```
 
-**`bad` が空（spec 専用コミットのみ）**: 自動で移送して保護ブランチを巻き戻す。
+**`bad` が空（spec 専用コミットのみ）**: 移送と保護ブランチ巻き戻しは **2 段階の承認**に分ける。
+
+段階 1（worktree 作成と cherry-pick）:
 
 ```bash
-git fetch origin {base_branch}
+[ "${base_ref}" = "origin/${base_branch}" ] && git fetch origin "${base_branch}"
 git worktree add -b feat-{feature-name} \
-  "{main_root}-worktree/feat-{feature-name}" "origin/{base_branch}"
-git -C "{worktree}" cherry-pick "origin/{base_branch}..{current_branch}"
-git -C "{main_root}" reset --keep "origin/{base_branch}"
+  "{main_root}-worktree/feat-{feature-name}" "${base_ref}"
+git -C "{worktree}" cherry-pick "${base_ref}..{current_branch}"
 ```
 
-`--keep` を使うことで未コミットの作業ツリー変更は保持される。未コミットの spec 変更が残っていれば 1 と同様に `cp -R` で追加移送。
+段階 2（保護ブランチの巻き戻し）は破壊的操作のため、実行前に必ず以下を表示してユーザー承認を得る:
 
-**`bad` が非空（spec 以外のコミットも混在）**: 自動巻き戻しは行わない。`git log --oneline origin/{base_branch}..HEAD` を提示し、以下の選択肢を提示してユーザー指示を待つ:
+1. `git -C {main_root} log --oneline ${base_ref}..HEAD` の出力
+2. 実行コマンド（`git -C "{main_root}" reset --keep "${base_ref}"`）
+3. 巻き戻しによって失われる commit 一覧と未コミット差分の有無
+
+承認が得られない場合は段階 2 をスキップし、保護ブランチをそのままにする（cherry-pick 済みの worktree 側で実装は継続可）。`--keep` で未コミットの作業ツリー変更は保持される。未コミットの spec 変更が残っていれば 1 と同様に `cp -R` で追加移送。
+
+**`bad` が非空（spec 以外のコミットも混在）**: 自動巻き戻しは行わない。`git log --oneline ${base_ref}..HEAD` を提示し、以下から指示を待つ:
 
 - (a) 手動で別ブランチに切り出してから再実行
 - (b) `--no-worktree` で保護ブランチのまま続行

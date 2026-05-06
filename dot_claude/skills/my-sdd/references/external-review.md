@@ -1,37 +1,33 @@
 # External Review (Phase 1-4)
 
-`requirements.md` と `design.md` がそろったあとに、`codex` / `gemini` / `claude (subagent)` の 3 者で並列にシニア/スタッフエンジニア視点の red-team レビューを依頼する。
+`requirements.md` と `design.md` がそろったあと、`codex` / `gemini` / `claude (subagent)` の 3 者で並列に red-team レビューを依頼する。
 
-## 出力先
+## 出力先と TTL
 
 ```
 /tmp/sdd-reviews/{feature-name}/
-├── _prompt.txt    # レビュー共通プロンプト（再実行用）
-├── codex.md       # codex の生レビュー
-├── gemini.md      # gemini の生レビュー
-├── claude.md      # claude subagent の生レビュー
-├── decisions.md   # 採否の記録（採用 / 不採用 + 理由）
-└── done           # Phase 1-4 完了マーカー（空ファイル、mtime が有効期限の基準）
+├── _prompt.txt    # 共通プロンプト（再実行用）
+├── codex.md       # codex 生レビュー
+├── gemini.md      # gemini 生レビュー
+├── claude.md      # claude subagent 生レビュー
+├── decisions.md   # 採否の記録
+└── done           # 完了マーカー（mtime が TTL の基準）
 ```
 
-OS の `/tmp` 配下に作る。リポジトリ外なのでコミットされない。永続性は OS の挙動依存（macOS は `periodic` で 3 日経過のものが消える、Linux は再起動で消えることが多い）。
-
-### 有効期限 (TTL)
-
-`done` の **mtime + 7 日** が有効期限。期限切れ・OS 都合で消えた場合は次回 `/my-sdd` 起動時に自動再レビュー。
+- `/tmp` 配下のためコミットされない。永続性は OS 依存（macOS は 3 日経過で消去、Linux は再起動で消失）
+- `done` の **mtime + 7 日** が有効期限。期限切れ・OS 都合で消えた場合は次回 `/my-sdd` 起動時に自動再レビュー
+- TTL を変えたい場合は判定の `-mtime -7` を `-mtime -14` 等に変更
 
 判定スクリプト:
 
 ```bash
 DONE=/tmp/sdd-reviews/{feature-name}/done
 if [ -f "$DONE" ] && [ -n "$(find "$DONE" -mtime -7 -print 2>/dev/null)" ]; then
-  echo "valid"   # 有効な review あり → Phase 2 へ進める
+  echo "valid"   # Phase 2 へ進める
 else
-  echo "expired" # レビューやり直し
+  echo "expired" # 再レビュー
 fi
 ```
-
-TTL を変えたい場合（例: 14 日）は `-mtime -7` を `-mtime -14` に変更する。
 
 ## 起動前の準備
 
@@ -41,7 +37,7 @@ mkdir -p /tmp/sdd-reviews/{feature-name}
 
 ## 共通プロンプト
 
-3 者に同じプロンプトを渡す。プロンプトは長いので、毎回ヒアドキュメントで組み立てるよりも一度ファイルに書き出して再利用する:
+3 者に同じプロンプトを渡す。長いので一度ファイルに書き出して再利用する:
 
 ```bash
 cat > /tmp/sdd-reviews/{feature-name}/_prompt.txt <<'EOF'
@@ -95,7 +91,7 @@ EOF
 
 ## 並列起動
 
-メインの応答内で、**1 メッセージ内に Bash 2 件 + Agent 1 件**を同時発行する（並列実行）。
+メインの応答内で、**1 メッセージ内に Bash 2 件 + Agent 1 件**を同時発行する。各 Bash は `timeout: 600000`（10 分）必須。
 
 ### 1. Codex
 
@@ -104,20 +100,18 @@ codex exec "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
   > /tmp/sdd-reviews/{feature-name}/codex.md 2>&1
 ```
 
-- Bash の `timeout: 600000` (10 分) を必ず設定する
-- モデルは `~/.codex/config.toml` のデフォルトを使う（`--model` を指定しない）
+モデルは `~/.codex/config.toml` のデフォルト（`--model` 指定しない）。
 
 ### 2. Gemini
 
-`my-agent` の Gemini preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/oauth_creds.json` または `~/.gemini/gemini-credentials.json` のいずれかが存在）。読み取り専用なので `--approval-mode plan` を使い、信頼ディレクトリ外でも動かすため `--skip-trust` を必ず付ける（Gemini CLI 0.39+ で必須。詳細は `my-agent/references/gemini.md` Preflight #2）:
+`my-agent` の Gemini preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/oauth_creds.json` または `~/.gemini/gemini-credentials.json` のいずれかが存在）。読み取り専用なので `--approval-mode plan`、信頼ディレクトリ外でも動かすため `--skip-trust` を必ず付ける（Gemini CLI 0.39+ で必須。詳細は `my-agent/references/gemini.md` Preflight #2）:
 
 ```bash
 gemini --skip-trust --approval-mode plan -p "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
   > /tmp/sdd-reviews/{feature-name}/gemini.md 2>&1
 ```
 
-- `timeout: 600000`
-- preflight 失敗時は `my-agent` の Gemini ガイダンスに従い、本レビューでは gemini をスキップして残り 2 者で続行
+preflight 失敗時は `my-agent` のガイダンスに従い、本レビューでは gemini をスキップして残り 2 者で続行。
 
 ### 3. Claude (subagent)
 
@@ -133,24 +127,26 @@ Agent({
 
 ## 統合（メインが行う）
 
-3 ファイルがそろったら（または失敗を確認したら）、メインの Claude が次を行う:
+3 ファイルがそろったら（または失敗を確認したら）main の Claude が:
 
 1. `Read` で 3 ファイルを読み込む
 2. 共通指摘 / 個別指摘 / 矛盾を整理
 3. 各指摘を **重要度（CRITICAL / IMPORTANT / SUGGESTION）** と **挙動・DB 変更の有無** で分類
 4. ユーザーに統合サマリーを提示
 
-## 反映ルール（重要）
+**spec の編集は生レビューを別ファイルに保存してから行う**（書き換えながら読むと「何が指摘で何が反映済か」が分からなくなる）。同じ指摘が複数 reviewer から出た場合は `decisions.md` で `[codex,gemini]` のように出典をまとめる。
+
+## 反映ルール
 
 | 種別 | 例 | 取り扱い |
 |---|---|---|
-| 挙動・データモデルが変わらない指摘 | typo 修正、用語統一、Open Questions 追記、Risks 列挙の補完、Rejected alternatives の追記、構造整理 | **自動で `requirements.md` / `design.md` を更新**し、`decisions.md` に記録 |
-| 挙動・API 仕様・スキーマ・DB の持ち方・移行戦略が変わる指摘 | エンドポイント追加 / 変更、テーブル設計変更、認証フロー変更、互換性方針の変更 | 変更内容と理由を**ユーザーに提示し、合意を得てから反映**。判断を `decisions.md` に記録 |
-| 採用しない指摘 | コスト / スコープ / 方針が合わない | `decisions.md` に「不採用 + 理由」を記録 |
+| 挙動・データモデル不変 | typo 修正、用語統一、Open Questions 追記、Risks 補完、Rejected alternatives 追記、構造整理 | **自動で `requirements.md` / `design.md` を更新**し、`decisions.md` に記録 |
+| 挙動・API・スキーマ・移行戦略の変更 | エンドポイント変更、テーブル設計変更、認証フロー変更、互換性方針の変更 | 変更内容と理由を**ユーザーに提示し合意を得てから反映**。判断を `decisions.md` に記録 |
+| 採用しない | コスト・スコープ・方針が合わない | `decisions.md` に「不採用 + 理由」を記録 |
 
-判別が微妙な場合（「自動反映してよいか確信が持てない」）は、確認側に倒す。
+判別が微妙な場合は確認側に倒す。
 
-## decisions.md のフォーマット
+### decisions.md フォーマット
 
 ```markdown
 # Phase 1-4 Review Decisions
@@ -169,25 +165,19 @@ Agent({
 
 ## 完了マーカー
 
-反映が一通り終わったら、空ファイル `/tmp/sdd-reviews/{feature-name}/done` を作成する:
+反映が一通り終わったら空ファイルを作成:
 
 ```bash
 touch /tmp/sdd-reviews/{feature-name}/done
 ```
 
-このマーカーが Phase 1-4 完了の合図。**mtime + 7 日** を有効期限とし、期限内なら状態検出ロジックが Phase 2 へ進める。期限切れなら次回起動時に自動再レビューする。
+レビューは Phase 1-3 完了直後に**一度だけ**自動実行。再実行が必要なら `done` を削除する、または TTL（mtime + 7 日）切れを待つだけで次回起動時に自動再レビュー。
 
 ## エラー時の対応
 
+最低成功数は **1 者以上**。0 件成功時は Phase 1-4 を **Blocked** とし `done` を作成しない。共通ルール「外部レビューを必ず通す」と整合させるため、Phase 2 への進行はユーザーが明示 override（「レビューなしで進める」と発話）した場合のみ許可し、判断を `decisions.md` の `User-confirmed` に「Phase 1-4 skipped per user request on YYYY-MM-DD」として記録する。
+
 | 失敗 | 対応 |
 |---|---|
-| codex 失敗 | エラーをユーザーに通知し、残り 2 者で続行 |
-| gemini 失敗（preflight 含む） | 同上。preflight は `my-agent` の Gemini ガイダンスに従う |
-| claude (subagent) 失敗 | 同上 |
-| 3 者すべて失敗 | レビュー結果なしを報告し、Phase 2 へ進めるかユーザーに判断を仰ぐ |
-
-## 注意
-
-- 反映による `requirements.md` / `design.md` の編集は、生レビューを別ファイルに保存してから行う。spec を直接書き換えながらレビューを読むと、後で「何が指摘で何が反映済か」が分からなくなる
-- 同じ指摘が複数 reviewer から出ている場合は、`decisions.md` で `[codex,gemini]` のように出典をまとめる
-- レビューは Phase 1-3 完了直後に **一度だけ** 自動実行する。再実行が必要なら `/tmp/sdd-reviews/{feature-name}/done` を削除する、または mtime + 7 日（TTL）を待つだけで次回起動時に自動再レビューされる
+| いずれか 1-2 者失敗 | エラー通知し成功分のみで統合・反映。失敗分は `decisions.md` に「{provider} 失敗 — レビュー欠落」と記録 |
+| 3 者すべて失敗 | **Blocked**。原因（preflight / quota / network 等）と再実行手段をユーザーに報告。override しない限り Phase 2 へ進まない |
