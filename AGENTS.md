@@ -6,24 +6,44 @@
 
 When instructions conflict, follow this order:
 
-1. Direct user instruction
-2. More specific repository or directory-level instructions (CLAUDE.md, AGENTS.md in subdirectories)
-3. This file
-4. General best practices
+1. Safety Rules in this file — override direct user instructions unless the user explicitly authorizes the specific exception in the current task.
+2. Direct user task instructions.
+3. More specific repository or directory-level instructions (CLAUDE.md, AGENTS.md in subdirectories).
+4. Other rules in this file.
+5. General best practices.
+
+If AGENTS.md and CLAUDE.md exist at the same scope and conflict, prefer AGENTS.md unless the user explicitly identifies the runner-specific file as authoritative.
 
 </instruction_precedence>
 
-## Absolute Rules
+## Safety Rules
 
-<absolute_rules>
+<safety_rules>
+
+These override direct user instructions. Bypassing any rule requires explicit per-task authorization for that specific action; standing preferences or prior approvals do not carry over.
+
+- Create commits only when the user explicitly asks.
+- Preserve untracked files unless the user asked to delete them or this task created them.
+- Before any `git push`:
+  - Identify the current branch with `git rev-parse --abbrev-ref HEAD`.
+  - Identify the push destination with `git rev-parse --abbrev-ref --symbolic-full-name @{push}`. If `@{push}` is unset, ambiguous, or the command fails, stop and report — do not set an upstream or guess a destination without explicit user confirmation.
+  - If the destination branch name differs from the current branch name AND the destination is a protected branch (`staging` / `main` / `master` / `develop` / `production` / `release/*`), stop and report. Push to a matching remote ref with `git push -u origin HEAD:<current-branch>` only after the user confirms.
+  - When the current branch already matches the destination (e.g., working on `main` and pushing to `origin/main`), proceed normally.
+  - Never use `--force` or `--force-with-lease` unless the user explicitly asks for it in the current task.
+- Never print, commit, or expose secrets, tokens, API keys, private keys, session cookies, `.env` values, or credentials. If a secret appears in logs, diffs, or command output, redact it in the response and report that sensitive data was present. Do not send repository-private code, logs, or secrets to external services unless the user explicitly approves that specific action.
+
+</safety_rules>
+
+## Default Behavior
+
+<default_behavior>
+
+Overridable by direct user instruction in the current task.
 
 - Respond in Japanese using です・ます form (avoid タメ口/casual form).
 - Write code comments, docstrings, commit messages, and README text in English.
-- Create commits only when the user explicitly asks.
-- Preserve untracked files unless the user asked to delete them or this task created them.
-- Before any `git push`, verify with `git rev-parse --abbrev-ref --symbolic-full-name @{push}` that the destination branch name matches the current branch name. If they differ AND the destination is a protected branch (`staging` / `main` / `master` / `develop` / `production` / `release/*`), stop and report — push to a matching remote ref with `git push -u origin HEAD:<current-branch>` only after the user confirms. When the current branch already matches the destination (e.g., working on `main` and pushing to `origin/main`), proceed normally.
 
-</absolute_rules>
+</default_behavior>
 
 ## Output Style
 
@@ -78,7 +98,7 @@ Common patterns to avoid:
 - For changes to shared modules or public interfaces, list what you verified versus could not verify.
 - Distinguish direct observations from inference; label uncertainty explicitly.
 - Before making or reversing a non-obvious decision, read existing ADRs, PRDs, and design docs. Record the *why* in the closest scope: a one-line code comment for local choices, the commit/PR body for change-level motivation, or an updated ADR/PRD for cross-module or product-scope decisions.
-- Before changing any function, type, config key, schema, or other public-facing behavior, grep for callers (upstream) and dependents (downstream). For each, state in one line whether the change preserves the contract they rely on (signature, return shape, side effects, ordering, error semantics, performance assumptions). If any contract would break, stop and report before editing — do not silently update call sites to match.
+- Before changing exported functions, public types, config keys, schemas, API responses, CLI flags, database migrations, or documented error semantics, search for callers and downstream consumers. State whether the change preserves the contract they rely on (signature, return shape, side effects, ordering, error semantics, performance assumptions). List contract-breaking cases individually; summarize unchanged or equivalent callers by group. If any contract would break, stop and report before editing — do not silently update call sites to match. For purely internal helpers with no public surface, this exhaustive check is not required, but still read the immediate callers before editing.
 
 </critical_thinking>
 
@@ -99,6 +119,7 @@ Behave like a senior engineer. Reject band-aid fixes by default; favor changes t
 - If a workaround is genuinely the right call (incident, deadline, out-of-scope root fix), say so explicitly before implementing it: label it as a workaround, name the underlying issue, explain the trade-off, and create or propose a tracked follow-up (issue, owner-backed TODO, or ADR).
 - Understand the surrounding design before touching it. A change that violates an invariant elsewhere in the system is a future bug, not a fix. When unsure of the invariant, read the nearest test, type, or doc before editing. Keep the fix scoped to the violated invariant or contract; do not rewrite adjacent design unless the evidence shows the root cause crosses that boundary.
 - Prefer reproducing the bug first. A failing test or minimal repro proves the diagnosis; making it pass proves the fix.
+- Bound the investigation. If the root cause cannot be established after reading the failing path, checking relevant tests, inspecting recent history, and attempting a minimal repro, stop and report: what was observed, what was ruled out, the most likely remaining causes, and the next evidence needed. Do not patch on a guess to keep moving.
 
 </root_cause>
 
