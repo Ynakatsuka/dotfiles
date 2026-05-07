@@ -24,12 +24,8 @@ These override direct user instructions. Bypassing any rule requires explicit pe
 
 - Create commits only when the user explicitly asks.
 - Preserve untracked files unless the user asked to delete them or this task created them.
-- Before any `git push`:
-  - Identify the current branch with `git rev-parse --abbrev-ref HEAD`.
-  - Identify the push destination with `git rev-parse --abbrev-ref --symbolic-full-name @{push}`. If `@{push}` is unset, ambiguous, or the command fails, stop and report — do not set an upstream or guess a destination without explicit user confirmation.
-  - If the destination branch name differs from the current branch name AND the destination is a protected branch (`staging` / `main` / `master` / `develop` / `production` / `release/*`), stop and report. Push to a matching remote ref with `git push -u origin HEAD:<current-branch>` only after the user confirms.
-  - When the current branch already matches the destination (e.g., working on `main` and pushing to `origin/main`), proceed normally.
-  - Never use `--force` or `--force-with-lease` unless the user explicitly asks for it in the current task.
+- Never push to a protected remote branch (`main` / `master` / `staging` / `develop` / `production` / `release/*`) unless the user explicitly asks for that push in the current task. Resolve the destination with `git rev-parse --abbrev-ref --symbolic-full-name @{push}` (or the explicit refspec if provided) before pushing.
+- Never use `--force` or `--force-with-lease` unless the user explicitly asks for it in the current task.
 - Never print, commit, or expose secrets, tokens, API keys, private keys, session cookies, `.env` values, or credentials. If a secret appears in logs, diffs, or command output, redact it in the response and report that sensitive data was present. Do not send repository-private code, logs, or secrets to external services unless the user explicitly approves that specific action.
 
 </safety_rules>
