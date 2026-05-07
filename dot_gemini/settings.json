@@ -1,10 +1,67 @@
 {
-  "security": {
-    "auth": {
-      "selectedType": "oauth-personal"
-    }
+  "hooks" : {
+    "AfterAgent" : [
+      {
+        "hooks" : [
+          {
+            "command" : "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_GEMINI_HOOKS_DISABLED\" != \"1\" ] && command -v cmux >\/dev\/null 2>&1 && cmux hooks gemini stop || echo '{}'",
+            "timeout" : 10000,
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "BeforeAgent" : [
+      {
+        "hooks" : [
+          {
+            "command" : "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_GEMINI_HOOKS_DISABLED\" != \"1\" ] && command -v cmux >\/dev\/null 2>&1 && cmux hooks gemini prompt-submit || echo '{}'",
+            "timeout" : 10000,
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "PreToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_GEMINI_HOOKS_DISABLED\" != \"1\" ] && command -v cmux >\/dev\/null 2>&1 && cmux hooks feed --source gemini --event PreToolUse || echo '{}'",
+            "timeout" : 120000,
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "SessionEnd" : [
+      {
+        "hooks" : [
+          {
+            "command" : "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_GEMINI_HOOKS_DISABLED\" != \"1\" ] && command -v cmux >\/dev\/null 2>&1 && cmux hooks gemini session-end || echo '{}'",
+            "timeout" : 10000,
+            "type" : "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart" : [
+      {
+        "hooks" : [
+          {
+            "command" : "[ -n \"$CMUX_SURFACE_ID\" ] && [ \"$CMUX_GEMINI_HOOKS_DISABLED\" != \"1\" ] && command -v cmux >\/dev\/null 2>&1 && cmux hooks gemini session-start || echo '{}'",
+            "timeout" : 10000,
+            "type" : "command"
+          }
+        ]
+      }
+    ]
   },
-  "model": {
-    "name": "pro"
+  "model" : {
+    "name" : "pro"
+  },
+  "security" : {
+    "auth" : {
+      "selectedType" : "oauth-personal"
+    }
   }
 }
