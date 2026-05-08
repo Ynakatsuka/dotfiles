@@ -22,6 +22,13 @@ _gw_copy_env() {
     done
 }
 
+# Helper function to trust mise config files in the current worktree
+_gw_trust_mise() {
+    if command -v mise >/dev/null 2>&1; then
+        mise trust --all >/dev/null 2>&1 || true
+    fi
+}
+
 # Helper function to refresh Codex trusted projects after creating a worktree
 _gw_refresh_codex_trust() {
     if ! command -v chezmoi >/dev/null 2>&1; then
@@ -87,7 +94,6 @@ function gw() {
 
         _gw_copy_env "$git_root"
         _gw_setup_direnv
-        _gw_open_cursor
         return 0
     fi
 
@@ -198,6 +204,7 @@ function gw() {
     if [ "$new_worktree_created" = true ]; then
         _gw_copy_env "$git_root"
         _gw_setup_direnv
+        _gw_trust_mise
         _gw_refresh_codex_trust || return 1
 
         local colors=(
