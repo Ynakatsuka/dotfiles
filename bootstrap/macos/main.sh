@@ -122,7 +122,6 @@ case "$PLAN" in
 
     run_dotfiles
     run_mise_install
-    run bash "${SCRIPT_DIR}/50_code_server.sh"
 
     run "$BREW" cleanup
     ;;
@@ -140,7 +139,6 @@ case "$PLAN" in
 
     run_dotfiles
     run_mise_install
-    run bash "${SCRIPT_DIR}/50_code_server.sh"
 
     run "$BREW" cleanup
     ;;
