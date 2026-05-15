@@ -97,7 +97,7 @@ chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 | `cm` | `git commit` |
 | `br` | `git branch` |
 | `lb` | Select a branch with FZF |
-| `gw` | Create or switch a worktree with FZF |
+| `gw` | Create or switch a worktree with FZF, newest first |
 | `gw <branch>` | Open or create a worktree for a branch |
 | `gwc` | Remove worktrees with multi-select confirmation |
 | `gwt` | `git worktree` |

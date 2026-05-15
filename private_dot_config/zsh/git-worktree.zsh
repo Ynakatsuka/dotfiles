@@ -40,6 +40,54 @@ _gw_refresh_codex_trust() {
     chezmoi apply "$HOME/.codex/config.toml"
 }
 
+_gw_worktree_created_at() {
+    local worktree_path="$1"
+    local created_at
+
+    if created_at=$(stat -f "%B" "$worktree_path" 2>/dev/null); then
+        if [[ "$created_at" =~ '^[0-9]+$' ]] && [ "$created_at" -gt 0 ]; then
+            echo "$created_at"
+            return 0
+        fi
+
+        echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
+        return 1
+    fi
+
+    if created_at=$(stat -c "%W" "$worktree_path" 2>/dev/null); then
+        if [[ "$created_at" =~ '^[0-9]+$' ]] && [ "$created_at" -gt 0 ]; then
+            echo "$created_at"
+            return 0
+        fi
+
+        echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
+        return 1
+    fi
+
+    echo "Error: failed to read creation time for worktree: $worktree_path" >&2
+    return 1
+}
+
+_gw_worktree_list_newest_first() {
+    local line
+    local worktree_path
+    local created_at
+    local -a entries
+
+    while IFS= read -r line; do
+        worktree_path="${line%%[[:space:]]*}"
+        if ! created_at=$(_gw_worktree_created_at "$worktree_path"); then
+            return 1
+        fi
+
+        entries+=("${created_at}"$'\t'"${line}")
+    done < <(git worktree list)
+
+    if [ ${#entries[@]} -gt 0 ]; then
+        printf '%s\n' "${entries[@]}" | sort -rn -k1,1 | cut -f2-
+    fi
+}
+
 # Smart git worktree function for InsightX
 function gw() {
     local branch_name=$1
@@ -70,7 +118,12 @@ function gw() {
     fi
 
     if [ -z "$branch_name" ]; then
-        local selected_worktree=$(git worktree list | fzf --height=40% --reverse --preview='echo "Branch: $(basename $(echo {} | awk "{print \$1}"))"' | awk '{print $1}')
+        local worktree_list
+        if ! worktree_list=$(_gw_worktree_list_newest_first); then
+            return 1
+        fi
+
+        local selected_worktree=$(printf '%s\n' "$worktree_list" | fzf --height=40% --reverse --preview='echo "Branch: $(basename $(echo {} | awk "{print \$1}"))"' | awk '{print $1}')
         if [ -n "$selected_worktree" ]; then
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
