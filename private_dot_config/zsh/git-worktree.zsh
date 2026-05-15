@@ -88,6 +88,83 @@ _gw_worktree_list_newest_first() {
     fi
 }
 
+_gw_worktree_fzf_preview_command() {
+    cat <<'EOF'
+worktree_path={1}
+
+if [ -z "$worktree_path" ]; then
+    exit 0
+fi
+
+if [ ! -d "$worktree_path" ]; then
+    echo "Error: worktree path does not exist: $worktree_path" >&2
+    exit 1
+fi
+
+if created_epoch=$(stat -f "%B" "$worktree_path" 2>/dev/null); then
+    :
+elif created_epoch=$(stat -c "%W" "$worktree_path" 2>/dev/null); then
+    :
+else
+    echo "Error: failed to read creation time for worktree: $worktree_path" >&2
+    exit 1
+fi
+
+if ! printf '%s\n' "$created_epoch" | grep -Eq '^[0-9]+$' || [ "$created_epoch" -le 0 ]; then
+    echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
+    exit 1
+fi
+
+if created_at=$(date -r "$created_epoch" "+%Y-%m-%d %H:%M:%S" 2>/dev/null); then
+    :
+elif created_at=$(date -d "@$created_epoch" "+%Y-%m-%d %H:%M:%S" 2>/dev/null); then
+    :
+else
+    echo "Error: failed to format creation time for worktree: $worktree_path" >&2
+    exit 1
+fi
+
+commit=$(git -C "$worktree_path" rev-parse --short HEAD) || exit 1
+subject=$(git -C "$worktree_path" log -1 --format=%s) || exit 1
+branch=$(git -C "$worktree_path" symbolic-ref --short HEAD 2>/dev/null)
+if [ -z "$branch" ]; then
+    branch="(detached HEAD)"
+fi
+
+status_lines=$(git -C "$worktree_path" status --short) || exit 1
+if [ -n "$status_lines" ]; then
+    state="dirty"
+else
+    state="clean"
+fi
+
+printf '%s\n' "Worktree details"
+printf '%s\n' "----------------"
+printf 'Path:     %s\n' "$worktree_path"
+printf 'Branch:   %s\n' "$branch"
+printf 'Commit:   %s %s\n' "$commit" "$subject"
+printf 'Created:  %s\n' "$created_at"
+printf 'State:    %s\n' "$state"
+
+if upstream=$(git -C "$worktree_path" rev-parse --abbrev-ref --symbolic-full-name "@{upstream}" 2>/dev/null); then
+    ahead_behind=$(git -C "$worktree_path" rev-list --left-right --count "$upstream...HEAD") || exit 1
+    behind=$(printf '%s\n' "$ahead_behind" | awk '{print $1}')
+    ahead=$(printf '%s\n' "$ahead_behind" | awk '{print $2}')
+    printf 'Upstream: %s (ahead %s, behind %s)\n' "$upstream" "$ahead" "$behind"
+else
+    printf '%s\n' "Upstream: not configured"
+fi
+
+printf '\n%s\n' "Status"
+printf '%s\n' "------"
+git -C "$worktree_path" status --short --branch
+
+printf '\n%s\n' "Recent commits"
+printf '%s\n' "--------------"
+git -C "$worktree_path" log --oneline --decorate -5
+EOF
+}
+
 # Smart git worktree function for InsightX
 function gw() {
     local branch_name=$1
@@ -123,7 +200,7 @@ function gw() {
             return 1
         fi
 
-        local selected_worktree=$(printf '%s\n' "$worktree_list" | fzf --height=40% --reverse --preview='echo "Branch: $(basename $(echo {} | awk "{print \$1}"))"' | awk '{print $1}')
+        local selected_worktree=$(printf '%s\n' "$worktree_list" | fzf --height=60% --reverse --preview="$(_gw_worktree_fzf_preview_command)" --preview-window='right:55%:wrap' | awk '{print $1}')
         if [ -n "$selected_worktree" ]; then
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
@@ -396,8 +473,13 @@ function gwc() {
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     local repo_name=$(basename "$git_root")
     local worktree_base="${git_root}-worktree"
+    local worktree_list
 
-    local worktrees=$(git worktree list | grep -v "$(git rev-parse --show-toplevel)$")
+    if ! worktree_list=$(_gw_worktree_list_newest_first); then
+        return 1
+    fi
+
+    local worktrees=$(printf '%s\n' "$worktree_list" | awk -v current_root="$(git rev-parse --show-toplevel)" '$1 != current_root')
 
     if [ -z "$worktrees" ]; then
         echo "削除可能なworktreeが見つかりません"
@@ -409,7 +491,9 @@ function gwc() {
         --height=60% \
         --reverse \
         --prompt="削除するworktreeを選択 (Tab: 複数選択): " \
-        --header="Tab: 選択/解除, Enter: 確定")
+        --header="新しい作成日順 | Tab: 選択/解除, Enter: 確定" \
+        --preview="$(_gw_worktree_fzf_preview_command)" \
+        --preview-window='right:55%:wrap')
 
     if [ -z "$selected_lines" ]; then
         echo "worktreeが選択されませんでした"
@@ -419,8 +503,20 @@ function gwc() {
     local -a worktree_paths
     local -a branch_names
     while IFS= read -r line; do
-        worktree_paths+=("$(echo "$line" | awk '{print $1}')")
-        branch_names+=("$(echo "$line" | awk '{print $2}')")
+        local selected_path=$(echo "$line" | awk '{print $1}')
+        local selected_branch
+
+        if selected_branch=$(git -C "$selected_path" symbolic-ref --short HEAD 2>/dev/null); then
+            :
+        elif git -C "$selected_path" rev-parse --verify HEAD >/dev/null 2>&1; then
+            selected_branch="(detached HEAD)"
+        else
+            echo "Error: failed to read branch for worktree: $selected_path" >&2
+            return 1
+        fi
+
+        worktree_paths+=("$selected_path")
+        branch_names+=("$selected_branch")
     done <<< "$selected_lines"
 
     echo "削除予定のworktree (${#worktree_paths[@]}件):"
