@@ -44,6 +44,12 @@ _gw_worktree_created_at() {
     local worktree_path="$1"
     local created_at
 
+    if [ ! -d "$worktree_path" ]; then
+        echo "Error: worktree path does not exist: $worktree_path" >&2
+        echo "Run 'git worktree prune' to remove stale worktree metadata." >&2
+        return 1
+    fi
+
     if created_at=$(stat -f "%B" "$worktree_path" 2>/dev/null); then
         if [[ "$created_at" =~ '^[0-9]+$' ]] && [ "$created_at" -gt 0 ]; then
             echo "$created_at"
@@ -69,6 +75,13 @@ _gw_worktree_created_at() {
 }
 
 _gw_worktree_list_newest_first() {
+    if [ "${1:-}" = "--prune-stale" ]; then
+        if ! git worktree prune; then
+            echo "Error: failed to prune stale worktree metadata" >&2
+            return 1
+        fi
+    fi
+
     local line
     local worktree_path
     local created_at
@@ -475,7 +488,7 @@ function gwc() {
     local worktree_base="${git_root}-worktree"
     local worktree_list
 
-    if ! worktree_list=$(_gw_worktree_list_newest_first); then
+    if ! worktree_list=$(_gw_worktree_list_newest_first --prune-stale); then
         return 1
     fi
 
