@@ -82,7 +82,9 @@ chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 | `Ctrl+G` | GCloud configuration selector with login |
 | `Ctrl+R` | FZF `ghq` repository search |
 | `Ctrl+O` | Copy the last command output to the clipboard |
-| `Ctrl+K` | Resume a Claude Code or Codex session for the current directory |
+| `Ctrl+K` | Resume a recent Claude Code or Codex session for the current directory |
+
+`Ctrl+K` lists up to 50 recent sessions by default. Set `FZF_SESSION_RESUME_LIMIT` to adjust the limit.
 
 ### Git
 
@@ -99,7 +101,7 @@ chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 | `lb` | Select a branch with FZF |
 | `gw` | Create or switch a worktree with FZF, newest first |
 | `gw <branch>` | Open or create a worktree for a branch |
-| `gwc` | Remove worktrees with multi-select confirmation |
+| `gwc [-j jobs]` | Remove worktrees in parallel with multi-select confirmation |
 | `gwt` | `git worktree` |
 | `gwta` | `git worktree add` |
 | `gwtl` | `git worktree list` |

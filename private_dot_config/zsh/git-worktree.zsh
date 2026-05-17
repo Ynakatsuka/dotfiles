@@ -481,8 +481,62 @@ _gwc_remove_claude_cache() {
     fi
 }
 
+_gwc_remove_worktree() {
+    local index="$1"
+    local total="$2"
+    local worktree_path="$3"
+
+    echo ""
+    echo "[$index/$total] worktreeを削除中: $worktree_path"
+    if git worktree remove "$worktree_path" --force; then
+        echo "✅ worktreeが削除されました: $worktree_path"
+
+        if [ -d "$worktree_path" ]; then
+            echo "📂 残りのディレクトリを削除中..."
+            rm -rf "$worktree_path"
+        fi
+
+        _gwc_remove_claude_cache "$worktree_path" || true
+        return 0
+    fi
+
+    echo "❌ worktreeの削除に失敗しました: $worktree_path"
+    return 1
+}
+
 # Git worktree cleanup function
 function gwc() {
+    local max_jobs=4
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -j|--jobs)
+                shift
+                if [[ -z "${1:-}" || ! "$1" =~ '^[1-9][0-9]*$' ]]; then
+                    echo "Error: -j/--jobs requires a positive integer" >&2
+                    return 1
+                fi
+                max_jobs="$1"
+                ;;
+            -h|--help)
+                cat <<'EOF'
+Usage: gwc [-j jobs]
+
+Remove selected git worktrees in parallel.
+
+Options:
+  -j, --jobs <n>  Maximum parallel deletions (default: 4)
+  -h, --help      Show this help
+EOF
+                return 0
+                ;;
+            *)
+                echo "Error: unknown option: $1" >&2
+                return 1
+                ;;
+        esac
+        shift
+    done
+
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     local repo_name=$(basename "$git_root")
     local worktree_base="${git_root}-worktree"
@@ -516,8 +570,9 @@ function gwc() {
     local -a worktree_paths
     local -a branch_names
     while IFS= read -r line; do
-        local selected_path=$(echo "$line" | awk '{print $1}')
-        local selected_branch
+        local selected_path=""
+        local selected_branch=""
+        selected_path=$(echo "$line" | awk '{print $1}')
 
         if selected_branch=$(git -C "$selected_path" symbolic-ref --short HEAD 2>/dev/null); then
             :
@@ -543,28 +598,59 @@ function gwc() {
     if [[ "$confirmation" =~ ^[yY]$ ]]; then
         local success_count=0
         local fail_count=0
+        local total=${#worktree_paths[@]}
+        local tmp_dir
+        local -a pids
+        local -a log_files
 
-        for i in {1..${#worktree_paths[@]}}; do
+        if ! tmp_dir=$(mktemp -d); then
+            echo "Error: failed to create temporary directory for gwc logs" >&2
+            return 1
+        fi
+
+        echo ""
+        echo "並列削除を開始します: 最大 $max_jobs 件"
+
+        local i=1
+        local active_count=0
+        local next_wait_index=1
+        while [ "$i" -le "$total" ]; do
             local worktree_path="${worktree_paths[$i]}"
-            local branch_name="${branch_names[$i]}"
+            local log_file="$tmp_dir/$i.log"
 
-            echo ""
-            echo "[$i/${#worktree_paths[@]}] worktreeを削除中: $worktree_path"
-            if git worktree remove "$worktree_path" --force; then
-                echo "✅ worktreeが削除されました: $worktree_path"
-                ((success_count++))
+            log_files[$i]="$log_file"
+            _gwc_remove_worktree "$i" "$total" "$worktree_path" > "$log_file" 2>&1 &
+            pids[$i]="$!"
+            ((active_count++))
 
-                if [ -d "$worktree_path" ]; then
-                    echo "📂 残りのディレクトリを削除中..."
-                    rm -rf "$worktree_path"
+            if [ "$active_count" -ge "$max_jobs" ]; then
+                if wait "${pids[$next_wait_index]}"; then
+                    ((success_count++))
+                else
+                    ((fail_count++))
                 fi
+                ((active_count--))
+                ((next_wait_index++))
+            fi
 
-                _gwc_remove_claude_cache "$worktree_path"
+            ((i++))
+        done
+
+        while [ "$next_wait_index" -le "$total" ]; do
+            if wait "${pids[$next_wait_index]}"; then
+                ((success_count++))
             else
-                echo "❌ worktreeの削除に失敗しました: $worktree_path"
                 ((fail_count++))
             fi
+            ((next_wait_index++))
         done
+
+        i=1
+        while [ "$i" -le "$total" ]; do
+            cat "${log_files[$i]}"
+            ((i++))
+        done
+        rm -rf "$tmp_dir"
 
         echo ""
         echo "=========================================="

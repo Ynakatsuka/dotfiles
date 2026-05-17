@@ -26,9 +26,20 @@ _format_session_tokens() {
     fi
 }
 
+_session_resume_limit() {
+    local limit="${FZF_SESSION_RESUME_LIMIT:-50}"
+    if [[ ! "$limit" =~ '^[1-9][0-9]*$' ]]; then
+        echo "Error: FZF_SESSION_RESUME_LIMIT must be a positive integer" >&2
+        return 1
+    fi
+
+    printf "%s" "$limit"
+}
+
 # Collect Claude Code sessions for current directory.
-# Uses one jq pass per file; Ctrl-K latency is dominated by per-session forks.
+# Reads only recent files and only enough leading lines to build the fzf list.
 _collect_claude_sessions() {
+    local limit="$1"
     local claude_projects_dir="$HOME/.claude/projects"
     local current_path="$(pwd)"
     local current_dir="${current_path//\//-}"
@@ -41,54 +52,26 @@ _collect_claude_sessions() {
     zmodload -F zsh/stat b:zstat 2>/dev/null
     zmodload -F zsh/datetime b:strftime 2>/dev/null
 
-    local file name summary title turns tokens token_display mtime date_str
+    local file="" name="" title="" turns="" token_display="" mtime="" date_str="" count=0
+    local -a files
     local -A st
-    for file in "$project_dir"/*.jsonl(N); do
+    files=("$project_dir"/*.jsonl(Nom))
+    for file in "${files[@]}"; do
         name="${${file:t}%.jsonl}"
         [[ "$name" == agent-* ]] && continue
         [[ ${#name} -ne 36 ]] && continue
+        ((count++))
+        ((count > limit)) && break
 
-        summary=$(jq -r -n '
-            reduce inputs as $item (
-                {title: "", turns: 0, tokens: 0, has_tokens: false};
-                .title = (
-                    if .title == "" and (($item.summary? // "") != "") then
-                        ($item.summary | gsub("[[:space:]]+"; " ") | .[0:120])
-                    else
-                        .title
-                    end
-                )
-                | .turns += (
-                    if (
-                        $item.type == "user"
-                        and ($item.isMeta != true)
-                        and ((($item.message.content // "") | tostring | startswith("<local-command-caveat>")) | not)
-                        and ((($item.message.content // "") | tostring | startswith("<command-name>")) | not)
-                    ) then 1 else 0 end
-                )
-                | if $item.type == "assistant" and ($item.message.usage? != null) then
-                    .tokens += (
-                        ($item.message.usage.input_tokens // 0)
-                        + ($item.message.usage.cache_creation_input_tokens // 0)
-                        + ($item.message.usage.cache_read_input_tokens // 0)
-                        + ($item.message.usage.output_tokens // 0)
-                    )
-                    | .has_tokens = true
-                else
-                    .
-                end
-            )
-            | [
-                (.turns | tostring),
-                (if .has_tokens then (.tokens | tostring) else "" end),
-                .title
-            ]
-            | @tsv
-        ' "$file" 2>/dev/null)
-        IFS=$'\t' read -r turns tokens title <<< "$summary"
+        title=$(head -200 "$file" 2>/dev/null | jq -r '
+            select((.summary? // "") != "")
+            | .summary
+            | gsub("[[:space:]]+"; " ")
+            | .[0:120]
+        ' 2>/dev/null | head -1)
         [[ -z "$title" ]] && title="(no title)"
-        [[ -n "$turns" ]] || turns="-"
-        token_display=$(_format_session_tokens "$tokens")
+        turns="-"
+        token_display="-"
 
         if (( $+builtins[zstat] )); then
             zstat -H st -- "$file" 2>/dev/null
@@ -107,10 +90,10 @@ _collect_claude_sessions() {
 }
 
 # Collect Codex sessions for current directory.
-# Pre-filters candidates with ripgrep (or head+grep fallback) so we only run jq
-# on files whose first line already contains the current cwd. Avoids scanning
-# all ~/.codex/sessions/**/*.jsonl with jq, which is the dominant cost.
+# Pre-filters candidates with ripgrep, ranks them by mtime, then reads only
+# enough leading lines from recent files to build the fzf list.
 _collect_codex_sessions() {
+    local limit="$1"
     local codex_sessions_dir="$HOME/.codex/sessions"
     [[ -d "$codex_sessions_dir" ]] || return 0
 
@@ -131,23 +114,31 @@ _collect_codex_sessions() {
     zmodload -F zsh/stat b:zstat 2>/dev/null
     zmodload -F zsh/datetime b:strftime 2>/dev/null
 
-    local file meta session_id title turns tokens token_display mtime date_str
+    local file="" meta="" session_id="" title="" turns="" token_display="" mtime="" date_str="" ranked=""
     local -A st
-    for file in $candidates; do
+    ranked=$(
+        for file in "${candidates[@]}"; do
+            [[ -f "$file" ]] || continue
+            if (( $+builtins[zstat] )); then
+                zstat -H st -- "$file" 2>/dev/null
+                mtime=${st[mtime]:-0}
+            else
+                mtime=$(stat -f "%m" "$file" 2>/dev/null)
+            fi
+            printf "%s\t%s\n" "$mtime" "$file"
+        done | sort -t$'\t' -k1,1nr | head -n "$limit"
+    )
+
+    while IFS=$'\t' read -r mtime file; do
+        [[ -n "$file" ]] || continue
         [[ -f "$file" ]] || continue
-        if (( $+builtins[zstat] )); then
-            zstat -H st -- "$file" 2>/dev/null
-            mtime=${st[mtime]:-0}
-        else
-            mtime=$(stat -f "%m" "$file" 2>/dev/null)
-        fi
         if (( $+builtins[strftime] )); then
             strftime -s date_str "%m/%d %H:%M" "$mtime"
         else
             date_str=$(date -r "$mtime" "+%m/%d %H:%M")
         fi
 
-        meta=$(jq -r -n --arg current_path "$current_path" '
+        meta=$(head -200 "$file" 2>/dev/null | jq -r -n --arg current_path "$current_path" '
             def user_title($item):
                 if $item.type == "event_msg" and $item.payload.type == "user_message" then
                     ($item.payload.message // empty)
@@ -165,7 +156,7 @@ _collect_codex_sessions() {
                 end;
 
             reduce inputs as $item (
-                {cwd: "", session_id: "", title: "", turns: 0, tokens: ""};
+                {cwd: "", session_id: "", title: ""};
                 if $item.type == "session_meta" then
                     .cwd = ($item.payload.cwd // "")
                     | .session_id = ($item.payload.id // "")
@@ -179,33 +170,31 @@ _collect_codex_sessions() {
                         .title
                     end
                 )
-                | .turns += (
-                    if $item.type == "event_msg" and $item.payload.type == "user_message" then 1 else 0 end
-                )
-                | if $item.type == "event_msg" and $item.payload.type == "token_count" and ($item.payload.info.total_token_usage.total_tokens? != null) then
-                    .tokens = ($item.payload.info.total_token_usage.total_tokens | tostring)
-                else
-                    .
-                end
             )
             | select(.cwd == $current_path and .session_id != "")
-            | [.session_id, (.turns | tostring), .tokens, .title]
+            | [.session_id, .title]
             | @tsv
-        ' "$file" 2>/dev/null)
+        ' 2>/dev/null)
         [[ -z "$meta" ]] && continue
-        IFS=$'\t' read -r session_id turns tokens title <<< "$meta"
+        IFS=$'\t' read -r session_id title <<< "$meta"
         [[ -z "$title" ]] && title="(codex session)"
-        [[ -n "$turns" ]] || turns="-"
-        token_display=$(_format_session_tokens "$tokens")
+        turns="-"
+        token_display="-"
 
         printf "%s\tcodex\t%s\t%s\t%s\t%s\t%s\t%s\n" "$mtime" "$date_str" "$turns" "$token_display" "$title" "$session_id" "$file"
-    done
+    done <<< "$ranked"
 }
 
 # fzf session resume: Claude Code + Codex (current directory only)
 function fzf-session-resume() {
+    local session_limit
+    if ! session_limit=$(_session_resume_limit); then
+        zle -M "Invalid FZF_SESSION_RESUME_LIMIT"
+        return 1
+    fi
+
     local sessions=$(
-        { _collect_claude_sessions; _collect_codex_sessions } | sort -t$'\t' -k1 -nr | cut -f2-
+        { _collect_claude_sessions "$session_limit"; _collect_codex_sessions "$session_limit" } | sort -t$'\t' -k1 -nr | cut -f2-
     )
 
     if [[ -z "$sessions" ]]; then
@@ -219,7 +208,7 @@ function fzf-session-resume() {
         --reverse \
         --ansi \
         --delimiter=$'\t' \
-        --with-nth=1,2,3,4,5,6 \
+        --with-nth=1,2,5,6 \
         --preview='
             tool=$(echo {} | awk -F"\t" "{print \$1}")
             filepath=$(echo {} | awk -F"\t" "{print \$7}")
