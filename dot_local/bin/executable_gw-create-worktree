@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Shared git worktree creation helper for interactive shell helpers and skills.
+
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: gw-create-worktree <branch_name>
+
+Creates or reuses a git worktree using the repository convention:
+  ${repo_root}-worktree/${branch_name//\//-}
+
+Outputs machine-readable lines:
+  WORKTREE_PATH=<path>
+  WORKTREE_CREATED=<0|1>
+USAGE
+}
+
+branch_name="${1:-}"
+if [[ -z "$branch_name" || "${branch_name}" == "-h" || "${branch_name}" == "--help" ]]; then
+  usage >&2
+  if [[ -z "$branch_name" ]]; then
+    exit 2
+  fi
+  exit 0
+fi
+
+if [[ $# -ne 1 ]]; then
+  usage >&2
+  exit 2
+fi
+
+refresh_codex_trust() {
+  if ! command -v chezmoi >/dev/null 2>&1; then
+    echo "Error: chezmoi not found; cannot refresh Codex trusted projects" >&2
+    return 1
+  fi
+
+  echo "Refreshing Codex trusted projects..."
+  chezmoi apply "$HOME/.codex/config.toml"
+}
+
+git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "Error: not in a git repository" >&2
+  exit 1
+}
+
+original_root="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+if [[ "$git_root" != "$original_root" ]]; then
+  echo "Currently in a worktree. Switching to main repository: $original_root"
+  cd "$original_root"
+  git_root="$original_root"
+fi
+
+worktree_base="${git_root}-worktree"
+sanitized="${branch_name//\//-}"
+worktree_dir="${worktree_base}/${sanitized}"
+
+existing_wt="$(
+  git worktree list --porcelain |
+    awk -v b="$branch_name" '
+      /^worktree/ { wt = $2 }
+      $1 == "branch" && $2 == "refs/heads/" b { print wt; exit }
+    '
+)"
+if [[ -n "$existing_wt" ]]; then
+  echo "Worktree for '$branch_name' already exists at: $existing_wt"
+  echo "WORKTREE_PATH=$existing_wt"
+  echo "WORKTREE_CREATED=0"
+  exit 0
+fi
+
+if [[ -e "$worktree_dir" ]]; then
+  echo "Error: '$worktree_dir' already exists but is not a registered worktree." >&2
+  echo "Inspect and remove manually before retrying." >&2
+  exit 1
+fi
+
+echo "Fetching from origin..."
+git fetch origin --prune
+
+base_candidates=(staging main master)
+chosen_base=""
+
+for base in "${base_candidates[@]}"; do
+  if ! git show-ref --verify --quiet "refs/remotes/origin/$base"; then
+    continue
+  fi
+
+  checked_out_at="$(
+    git worktree list --porcelain |
+      awk -v b="$base" '
+        /^worktree/ { wt = $2 }
+        $1 == "branch" && $2 == "refs/heads/" b { print wt; exit }
+      '
+  )"
+
+  if [[ -n "$checked_out_at" ]]; then
+    echo "Pulling '$base' (checked out at $checked_out_at)..."
+    if ! git -C "$checked_out_at" pull --ff-only origin "$base"; then
+      echo "Error: failed to fast-forward '$base' in $checked_out_at." >&2
+      echo "Resolve uncommitted changes or divergence there, then retry." >&2
+      exit 1
+    fi
+  elif git show-ref --verify --quiet "refs/heads/$base"; then
+    echo "Fast-forwarding local '$base' to origin/$base..."
+    if ! git fetch origin "$base:$base"; then
+      echo "Error: local '$base' has diverged from origin/$base." >&2
+      echo "Reconcile manually (rebase / reset), then retry." >&2
+      exit 1
+    fi
+  else
+    echo "Creating local '$base' from origin/$base..."
+    git branch "$base" "origin/$base"
+  fi
+
+  if [[ -z "$chosen_base" ]]; then
+    chosen_base="$base"
+  fi
+done
+
+if [[ -z "$chosen_base" ]]; then
+  echo "Error: none of staging/main/master exist on origin. Cannot pick base branch." >&2
+  exit 1
+fi
+
+echo "Base branch resolved: $chosen_base"
+
+if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
+  if git show-ref --verify --quiet "refs/heads/$branch_name"; then
+    echo "Reusing local branch '$branch_name' for the worktree."
+    git worktree add "$worktree_dir" "$branch_name"
+  else
+    echo "Checking out remote branch '$branch_name' into worktree..."
+    git worktree add "$worktree_dir" "$branch_name"
+  fi
+elif git show-ref --verify --quiet "refs/heads/$branch_name"; then
+  echo "Reusing local-only branch '$branch_name' for the worktree."
+  git worktree add "$worktree_dir" "$branch_name"
+else
+  echo "Creating new branch '$branch_name' from '$chosen_base'..."
+  git worktree add -b "$branch_name" "$worktree_dir" "$chosen_base"
+fi
+
+for file in .env .envrc; do
+  if [[ -f "$git_root/$file" && ! -f "$worktree_dir/$file" ]]; then
+    echo "Copying $file to worktree..."
+    cp "$git_root/$file" "$worktree_dir/$file"
+  fi
+done
+
+if [[ -f "$worktree_dir/.envrc" ]] && command -v direnv >/dev/null 2>&1; then
+  (cd "$worktree_dir" && direnv allow)
+fi
+
+if command -v mise >/dev/null 2>&1; then
+  echo "Trusting mise config files..."
+  (cd "$worktree_dir" && mise trust --all)
+fi
+
+refresh_codex_trust
+
+echo ""
+echo "Worktree ready: $worktree_dir"
+echo "WORKTREE_PATH=$worktree_dir"
+echo "WORKTREE_CREATED=1"

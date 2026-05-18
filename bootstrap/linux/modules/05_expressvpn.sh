@@ -6,14 +6,13 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 # shellcheck source=../../lib/common.sh
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
-DRY_RUN=0
 VERSION="3.69.0.0-1"
 PKG="expressvpn_${VERSION}_amd64.deb"
 URL="https://www.expressvpn.works/clients/linux/${PKG}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     *)
       warn "Unknown option: $1"
       exit 1
@@ -24,14 +23,6 @@ done
 
 require_ubuntu
 require_cmd wget
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 if confirm "Download and install ExpressVPN ${VERSION}?"; then
   run wget -O "$PKG" "$URL"

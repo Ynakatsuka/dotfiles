@@ -6,11 +6,9 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 # shellcheck source=../../lib/common.sh
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
-DRY_RUN=0
-
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     *)
       warn "Unknown option: $1"
       exit 1
@@ -18,14 +16,6 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 if [ -d "${ZDOTDIR:-$HOME}/.zprezto" ]; then
   log "prezto already installed, skipping"

@@ -6,12 +6,11 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 # shellcheck source=../../lib/common.sh
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
-DRY_RUN=0
 SKIP_AGE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     --skip-age) SKIP_AGE=1 ;;
     *)
       warn "Unknown option: $1"
@@ -22,14 +21,6 @@ while [ $# -gt 0 ]; do
 done
 
 require_ubuntu
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 has_apt() { command -v apt-get >/dev/null 2>&1; }
 

@@ -4,8 +4,20 @@
 [[ -n "${_COMMON_SH_LOADED:-}" ]] && return 0
 _COMMON_SH_LOADED=1
 
+DRY_RUN=0
+
 log() { printf '[INFO] %s\n' "$*"; }
 warn() { printf '[WARN] %s\n' "$*" >&2; }
+
+enable_dry_run() { DRY_RUN=1; }
+
+run() {
+  if [ "${DRY_RUN:-0}" -eq 1 ]; then
+    echo "[DRY-RUN] $*"
+  else
+    "$@"
+  fi
+}
 
 confirm() {
   local answer

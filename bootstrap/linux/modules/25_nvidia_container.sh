@@ -6,11 +6,9 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 # shellcheck source=../../lib/common.sh
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
-DRY_RUN=0
-
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     *)
       warn "Unknown option: $1"
       exit 1
@@ -22,14 +20,6 @@ done
 require_ubuntu
 require_cmd curl
 require_cmd apt-get
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 log "Installing NVIDIA Container Toolkit"
 run bash -c 'curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg'

@@ -6,12 +6,11 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 # shellcheck source=../../lib/common.sh
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
-DRY_RUN=0
 XDG_ENGLISH_DIRS=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     --xdg-english-dirs) XDG_ENGLISH_DIRS=1 ;;
     *)
       warn "Unknown option: $1"
@@ -23,14 +22,6 @@ done
 
 require_ubuntu
 require_cmd apt-get
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 log "Updating apt and installing base packages"
 run sudo apt-get update -y

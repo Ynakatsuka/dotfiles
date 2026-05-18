@@ -22,24 +22,6 @@ _gw_copy_env() {
     done
 }
 
-# Helper function to trust mise config files in the current worktree
-_gw_trust_mise() {
-    if command -v mise >/dev/null 2>&1; then
-        mise trust --all >/dev/null 2>&1 || true
-    fi
-}
-
-# Helper function to refresh Codex trusted projects after creating a worktree
-_gw_refresh_codex_trust() {
-    if ! command -v chezmoi >/dev/null 2>&1; then
-        echo "Error: chezmoi not found; cannot refresh Codex trusted projects" >&2
-        return 1
-    fi
-
-    echo "Refreshing Codex trusted projects..."
-    chezmoi apply "$HOME/.codex/config.toml"
-}
-
 _gw_worktree_created_at() {
     local worktree_path="$1"
     local created_at
@@ -178,6 +160,74 @@ git -C "$worktree_path" log --oneline --decorate -5
 EOF
 }
 
+_gw_write_vscode_workspace() {
+    local worktree_dir="$1"
+    local repo_name="$2"
+    local branch_name="$3"
+
+    local colors=(
+        "#e74c3c" "#3498db" "#2ecc71" "#f39c12" "#9b59b6"
+        "#1abc9c" "#e91e63" "#ff5722" "#607d8b" "#795548"
+        "#ff9800" "#4caf50" "#00bcd4" "#673ab7" "#009688"
+        "#8bc34a" "#ffc107" "#03a9f4" "#ff6f00" "#7b1fa2"
+        "#00695c" "#c2185b" "#1976d2" "#388e3c"
+    )
+    local color_index=$(( $(echo "$branch_name" | cksum | cut -d' ' -f1) % ${#colors[@]} ))
+    local color="${colors[$color_index]}"
+
+    local workspace_file="${worktree_dir}/worktree.code-workspace"
+    cat > "$workspace_file" << EOF
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "window.title": "${repo_name}:${branch_name}",
+    "workbench.colorCustomizations": {
+      "titleBar.activeBackground": "$color",
+      "titleBar.activeForeground": "#fff"
+    }
+  }
+}
+EOF
+
+    local exclude_file=".git/info/exclude"
+    if [ -f "$exclude_file" ]; then
+        if ! grep -q "^worktree\.code-workspace$" "$exclude_file"; then
+            echo "worktree.code-workspace" >> "$exclude_file"
+        fi
+    fi
+
+    echo "🎨 Branch: $branch_name | Color: $color"
+}
+
+_gw_create_worktree() {
+    local branch_name="$1"
+    local creation_output
+
+    if ! command -v gw-create-worktree >/dev/null 2>&1; then
+        echo "Error: gw-create-worktree not found in PATH" >&2
+        return 1
+    fi
+
+    if ! creation_output=$(gw-create-worktree "$branch_name"); then
+        printf '%s\n' "$creation_output"
+        return 1
+    fi
+
+    printf '%s\n' "$creation_output"
+
+    _GW_CREATED_PATH=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_PATH" {print substr($0, index($0, "=") + 1)}' | tail -1)
+    _GW_CREATED_FLAG=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_CREATED" {print $2}' | tail -1)
+
+    if [ -z "$_GW_CREATED_PATH" ]; then
+        echo "Error: gw-create-worktree did not output WORKTREE_PATH" >&2
+        return 1
+    fi
+}
+
 # Smart git worktree function for InsightX
 function gw() {
     local branch_name=$1
@@ -198,14 +248,6 @@ function gw() {
     fi
 
     local repo_name=$(basename "$git_root")
-    local worktree_base="${git_root}-worktree"
-
-    # Determine base branch (prefer staging, fallback to main)
-    local base_branch="staging"
-    if ! git show-ref --verify --quiet "refs/heads/$base_branch" && \
-       ! git show-ref --verify --quiet "refs/remotes/origin/$base_branch"; then
-        base_branch="main"
-    fi
 
     if [ -z "$branch_name" ]; then
         local worktree_list
@@ -228,164 +270,17 @@ function gw() {
         fi
     fi
 
-    local worktree_dir="${worktree_base}/${branch_name//\//-}"
-
-    if git worktree list | grep -qF "$worktree_dir"; then
-        echo "Worktree already exists at: $worktree_dir"
-        echo "Changing directory to existing worktree..."
-        cd "$worktree_dir"
-
-        _gw_copy_env "$git_root"
-        _gw_setup_direnv
-        return 0
-    fi
-
-    # Fetch all latest remote refs
-    echo "Fetching latest from origin..."
-    if ! git fetch origin; then
-        echo "Error: Failed to fetch from remote"
+    if ! _gw_create_worktree "$branch_name"; then
         return 1
     fi
 
-    # Update base branch to latest remote
-    echo "Updating $base_branch branch to latest remote..."
+    echo "Changing directory to worktree: $_GW_CREATED_PATH"
+    cd "$_GW_CREATED_PATH" || return 1
+    _gw_copy_env "$git_root"
+    _gw_setup_direnv
 
-    if ! git show-ref --verify --quiet "refs/heads/$base_branch"; then
-        if ! git branch "$base_branch" "origin/$base_branch"; then
-            echo "Error: Failed to create local $base_branch branch"
-            return 1
-        fi
-    else
-        local staging_worktree=$(git worktree list --porcelain | awk '/^worktree/ {wt=$2} /^branch refs\/heads\/'"$base_branch"'$/ {print wt; exit}')
-        if [ -n "$staging_worktree" ]; then
-            echo "Updating $base_branch in worktree: $staging_worktree"
-            if ! (cd "$staging_worktree" && git pull origin "$base_branch"); then
-                echo "Error: Failed to update $base_branch in worktree"
-                echo "Local changes detected in $staging_worktree"
-                echo -n "Stash changes and retry? [Y/n]: "
-                read -r stash_answer
-                stash_answer=${stash_answer:-Y}
-                if [[ "$stash_answer" =~ ^[Yy]$ ]]; then
-                    if (cd "$staging_worktree" && git stash push -m "gw: auto-stash before updating $base_branch"); then
-                        echo "Changes stashed. Retrying pull..."
-                        if ! (cd "$staging_worktree" && git pull origin "$base_branch"); then
-                            echo "Error: Still failed to update $base_branch"
-                            echo "Restoring stashed changes..."
-                            (cd "$staging_worktree" && git stash pop)
-                            return 1
-                        fi
-                        echo "Successfully updated. Your changes are stashed (use 'git stash pop' to restore)"
-                    else
-                        echo "Error: Failed to stash changes"
-                        return 1
-                    fi
-                else
-                    echo "Aborted. Please commit or stash your changes manually in $staging_worktree"
-                    return 1
-                fi
-            fi
-        else
-            if ! git branch -f "$base_branch" "origin/$base_branch"; then
-                echo "Error: Failed to update local $base_branch branch"
-                return 1
-            fi
-        fi
-    fi
-
-    local new_worktree_created=false
-
-    local branch_worktree=$(git worktree list --porcelain | awk '/^worktree/ {wt=$2} /^branch refs\/heads\/'"$branch_name"'$/ {print wt; exit}')
-    if [ -n "$branch_worktree" ]; then
-        if [ "$branch_worktree" = "$git_root" ]; then
-            echo "Branch '$branch_name' is checked out in main repository. Switching to $base_branch..."
-            if ! git checkout "$base_branch"; then
-                echo "Error: Failed to switch to $base_branch"
-                return 1
-            fi
-        else
-            echo "Branch '$branch_name' is already checked out in worktree: $branch_worktree"
-            echo "Changing directory to existing worktree..."
-            cd "$branch_worktree"
-
-            _gw_copy_env "$git_root"
-            _gw_setup_direnv
-
-            return 0
-        fi
-    fi
-
-    if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
-        if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-            echo "Deleting local branch to sync with remote: $branch_name"
-            git branch -D "$branch_name"
-        fi
-        echo "Creating worktree for remote branch: $branch_name"
-        if ! git worktree add "$worktree_dir" "$branch_name"; then
-            echo "Error: Failed to create worktree for branch $branch_name"
-            return 1
-        fi
-        cd "$worktree_dir"
-        new_worktree_created=true
-    elif git show-ref --verify --quiet "refs/heads/$branch_name"; then
-        echo "Creating worktree for local-only branch: $branch_name"
-        if ! git worktree add "$worktree_dir" "$branch_name"; then
-            echo "Error: Failed to create worktree for branch $branch_name"
-            return 1
-        fi
-        cd "$worktree_dir"
-        new_worktree_created=true
-    else
-        echo "Creating new branch '$branch_name' from $base_branch and worktree"
-        if ! git worktree add -b "$branch_name" "$worktree_dir" "$base_branch"; then
-            echo "Error: Failed to create new branch and worktree"
-            return 1
-        fi
-        cd "$worktree_dir"
-        new_worktree_created=true
-    fi
-
-    if [ "$new_worktree_created" = true ]; then
-        _gw_copy_env "$git_root"
-        _gw_setup_direnv
-        _gw_trust_mise
-        _gw_refresh_codex_trust || return 1
-
-        local colors=(
-            "#e74c3c" "#3498db" "#2ecc71" "#f39c12" "#9b59b6"
-            "#1abc9c" "#e91e63" "#ff5722" "#607d8b" "#795548"
-            "#ff9800" "#4caf50" "#00bcd4" "#673ab7" "#009688"
-            "#8bc34a" "#ffc107" "#03a9f4" "#ff6f00" "#7b1fa2"
-            "#00695c" "#c2185b" "#1976d2" "#388e3c"
-        )
-        local color_index=$(( $(echo "$branch_name" | cksum | cut -d' ' -f1) % ${#colors[@]} ))
-        local color="${colors[$color_index]}"
-
-        local workspace_file="${worktree_dir}/worktree.code-workspace"
-        cat > "$workspace_file" << EOF
-{
-  "folders": [
-    {
-      "path": "."
-    }
-  ],
-  "settings": {
-    "window.title": "${repo_name}:${branch_name}",
-    "workbench.colorCustomizations": {
-      "titleBar.activeBackground": "$color",
-      "titleBar.activeForeground": "#fff"
-    }
-  }
-}
-EOF
-
-        local exclude_file=".git/info/exclude"
-        if [ -f "$exclude_file" ]; then
-            if ! grep -q "^worktree\.code-workspace$" "$exclude_file"; then
-                echo "worktree.code-workspace" >> "$exclude_file"
-            fi
-        fi
-
-        echo "🎨 Branch: $branch_name | Color: $color"
+    if [ "$_GW_CREATED_FLAG" = "1" ]; then
+        _gw_write_vscode_workspace "$_GW_CREATED_PATH" "$repo_name" "$branch_name"
     fi
 }
 
@@ -504,6 +399,128 @@ _gwc_remove_worktree() {
     return 1
 }
 
+_gwc_select_worktrees() {
+    local worktrees="$1"
+
+    echo "$worktrees" | sed 's/\[//g; s/\]//g' | fzf \
+        -m \
+        --height=60% \
+        --reverse \
+        --prompt="削除するworktreeを選択 (Tab: 複数選択): " \
+        --header="新しい作成日順 | Tab: 選択/解除, Enter: 確定" \
+        --preview="$(_gw_worktree_fzf_preview_command)" \
+        --preview-window='right:55%:wrap'
+}
+
+_gwc_collect_selected_worktrees() {
+    local selected_lines="$1"
+    local line
+    local selected_path
+    local selected_branch
+
+    _GWC_WORKTREE_PATHS=()
+    _GWC_BRANCH_NAMES=()
+
+    while IFS= read -r line; do
+        selected_path=$(echo "$line" | awk '{print $1}')
+
+        if selected_branch=$(git -C "$selected_path" symbolic-ref --short HEAD 2>/dev/null); then
+            :
+        elif git -C "$selected_path" rev-parse --verify HEAD >/dev/null 2>&1; then
+            selected_branch="(detached HEAD)"
+        else
+            echo "Error: failed to read branch for worktree: $selected_path" >&2
+            return 1
+        fi
+
+        _GWC_WORKTREE_PATHS+=("$selected_path")
+        _GWC_BRANCH_NAMES+=("$selected_branch")
+    done <<< "$selected_lines"
+}
+
+_gwc_confirm_removal() {
+    echo "削除予定のworktree (${#_GWC_WORKTREE_PATHS[@]}件):"
+    local i=1
+    while [ "$i" -le "${#_GWC_WORKTREE_PATHS[@]}" ]; do
+        echo "  [$i] パス: ${_GWC_WORKTREE_PATHS[$i]}"
+        echo "      ブランチ: ${_GWC_BRANCH_NAMES[$i]}"
+        ((i++))
+    done
+    echo -n "本当に削除しますか？ (y/N): "
+
+    local confirmation
+    read confirmation
+    [[ "$confirmation" =~ ^[yY]$ ]]
+}
+
+_gwc_remove_selected_worktrees() {
+    local max_jobs="$1"
+    local success_count=0
+    local fail_count=0
+    local total=${#_GWC_WORKTREE_PATHS[@]}
+    local tmp_dir
+    local -a pids
+    local -a log_files
+
+    if ! tmp_dir=$(mktemp -d); then
+        echo "Error: failed to create temporary directory for gwc logs" >&2
+        return 1
+    fi
+
+    echo ""
+    echo "並列削除を開始します: 最大 $max_jobs 件"
+
+    local i=1
+    local active_count=0
+    local next_wait_index=1
+    while [ "$i" -le "$total" ]; do
+        local worktree_path="${_GWC_WORKTREE_PATHS[$i]}"
+        local log_file="$tmp_dir/$i.log"
+
+        log_files[$i]="$log_file"
+        _gwc_remove_worktree "$i" "$total" "$worktree_path" > "$log_file" 2>&1 &
+        pids[$i]="$!"
+        ((active_count++))
+
+        if [ "$active_count" -ge "$max_jobs" ]; then
+            if wait "${pids[$next_wait_index]}"; then
+                ((success_count++))
+            else
+                ((fail_count++))
+            fi
+            ((active_count--))
+            ((next_wait_index++))
+        fi
+
+        ((i++))
+    done
+
+    while [ "$next_wait_index" -le "$total" ]; do
+        if wait "${pids[$next_wait_index]}"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+        ((next_wait_index++))
+    done
+
+    i=1
+    while [ "$i" -le "$total" ]; do
+        cat "${log_files[$i]}"
+        ((i++))
+    done
+    rm -rf "$tmp_dir"
+
+    echo ""
+    echo "=========================================="
+    echo "削除完了: 成功 $success_count 件, 失敗 $fail_count 件"
+    echo "=========================================="
+
+    if [ $fail_count -gt 0 ]; then
+        return 1
+    fi
+}
+
 # Git worktree cleanup function
 function gwc() {
     local max_jobs=4
@@ -553,117 +570,24 @@ EOF
         return 1
     fi
 
-    local selected_lines=$(echo "$worktrees" | sed 's/\[//g; s/\]//g' | fzf \
-        -m \
-        --height=60% \
-        --reverse \
-        --prompt="削除するworktreeを選択 (Tab: 複数選択): " \
-        --header="新しい作成日順 | Tab: 選択/解除, Enter: 確定" \
-        --preview="$(_gw_worktree_fzf_preview_command)" \
-        --preview-window='right:55%:wrap')
+    local selected_lines
+    selected_lines=$(_gwc_select_worktrees "$worktrees")
 
     if [ -z "$selected_lines" ]; then
         echo "worktreeが選択されませんでした"
         return 1
     fi
 
-    local -a worktree_paths
-    local -a branch_names
-    while IFS= read -r line; do
-        local selected_path=""
-        local selected_branch=""
-        selected_path=$(echo "$line" | awk '{print $1}')
+    if ! _gwc_collect_selected_worktrees "$selected_lines"; then
+        return 1
+    fi
 
-        if selected_branch=$(git -C "$selected_path" symbolic-ref --short HEAD 2>/dev/null); then
-            :
-        elif git -C "$selected_path" rev-parse --verify HEAD >/dev/null 2>&1; then
-            selected_branch="(detached HEAD)"
-        else
-            echo "Error: failed to read branch for worktree: $selected_path" >&2
-            return 1
-        fi
-
-        worktree_paths+=("$selected_path")
-        branch_names+=("$selected_branch")
-    done <<< "$selected_lines"
-
-    echo "削除予定のworktree (${#worktree_paths[@]}件):"
-    for i in {1..${#worktree_paths[@]}}; do
-        echo "  [$i] パス: ${worktree_paths[$i]}"
-        echo "      ブランチ: ${branch_names[$i]}"
-    done
-    echo -n "本当に削除しますか？ (y/N): "
-    read confirmation
-
-    if [[ "$confirmation" =~ ^[yY]$ ]]; then
-        local success_count=0
-        local fail_count=0
-        local total=${#worktree_paths[@]}
-        local tmp_dir
-        local -a pids
-        local -a log_files
-
-        if ! tmp_dir=$(mktemp -d); then
-            echo "Error: failed to create temporary directory for gwc logs" >&2
-            return 1
-        fi
-
-        echo ""
-        echo "並列削除を開始します: 最大 $max_jobs 件"
-
-        local i=1
-        local active_count=0
-        local next_wait_index=1
-        while [ "$i" -le "$total" ]; do
-            local worktree_path="${worktree_paths[$i]}"
-            local log_file="$tmp_dir/$i.log"
-
-            log_files[$i]="$log_file"
-            _gwc_remove_worktree "$i" "$total" "$worktree_path" > "$log_file" 2>&1 &
-            pids[$i]="$!"
-            ((active_count++))
-
-            if [ "$active_count" -ge "$max_jobs" ]; then
-                if wait "${pids[$next_wait_index]}"; then
-                    ((success_count++))
-                else
-                    ((fail_count++))
-                fi
-                ((active_count--))
-                ((next_wait_index++))
-            fi
-
-            ((i++))
-        done
-
-        while [ "$next_wait_index" -le "$total" ]; do
-            if wait "${pids[$next_wait_index]}"; then
-                ((success_count++))
-            else
-                ((fail_count++))
-            fi
-            ((next_wait_index++))
-        done
-
-        i=1
-        while [ "$i" -le "$total" ]; do
-            cat "${log_files[$i]}"
-            ((i++))
-        done
-        rm -rf "$tmp_dir"
-
-        echo ""
-        echo "=========================================="
-        echo "削除完了: 成功 $success_count 件, 失敗 $fail_count 件"
-        echo "=========================================="
-
-        if [ $fail_count -gt 0 ]; then
-            return 1
-        fi
-    else
+    if ! _gwc_confirm_removal; then
         echo "削除をキャンセルしました"
         return 0
     fi
+
+    _gwc_remove_selected_worktrees "$max_jobs"
 }
 
 # Git local branch cleanup function

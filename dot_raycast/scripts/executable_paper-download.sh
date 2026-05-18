@@ -175,27 +175,13 @@ download_paper() {
   fi
 }
 
-# Process with Claude Code
-process_with_claude() {
-  local paper_file=$1
-  local url=$2
+# Write Claude prompt for paper summarization.
+write_claude_prompt() {
+  local prompt_file=$1
+  local paper_file=$2
+  local url=$3
+  local paper_file_display=$4
 
-  log INFO "Processing with Claude Code..."
-
-  local file_size
-  file_size=$(wc -c <"$paper_file")
-  [ "$file_size" -gt 10485760 ] && log WARN "Large file (>10MB), may take several minutes"
-
-  mkdir -p "$PAPERS_DIR"
-
-  local output_file="$TEMP_DIR/claude_output.txt"
-  local timeout_seconds=600 # 10 minutes timeout
-
-  # Convert file path to use tilde notation
-  local paper_file_display="${paper_file/#$HOME/~}"
-
-  # Prepare the prompt with file reference and metadata
-  local prompt_file="$TEMP_DIR/prompt.txt"
   cat >"$prompt_file" <<EOF
 Analyze the paper at this file path: $paper_file
 
@@ -266,9 +252,13 @@ Output ONLY the markdown content, starting with the paper title heading.
 - Ensure comprehensive analysis of the paper
 - Extract all important information from the paper including figures and tables
 EOF
+}
 
-  # Run Claude with the paper file directly
-  # Add papers directory to allowed directories for file access
+run_claude_with_timeout() {
+  local prompt_file=$1
+  local output_file=$2
+  local timeout_seconds=$3
+
   {
     cat "$prompt_file" | claude -p --add-dir "$PAPERS_DIR" --add-dir "$PAPERS_RAW_DIR" >"$output_file" 2>&1
   } &
@@ -280,7 +270,9 @@ EOF
   while kill -0 "$claude_pid" 2>/dev/null; do
     [ "$elapsed" -ge "$timeout_seconds" ] && {
       kill "$claude_pid" 2>/dev/null
-      wait "$claude_pid" 2>/dev/null
+      if ! wait "$claude_pid" 2>/dev/null; then
+        :
+      fi
       log ERROR "Processing timed out after ${timeout_seconds}s"
       return 1
     }
@@ -288,41 +280,77 @@ EOF
     ((elapsed++))
   done
 
-  wait "$claude_pid"
-  local exit_status=$?
-
-  if [ $exit_status -eq 0 ]; then
-    log INFO "Processing completed (${elapsed}s)"
-
-    # Extract title and create filename
-    local paper_title
-    paper_title=$(head -1 "$output_file" | sed 's/^# //')
-
-    if [ -z "$paper_title" ]; then
-      log ERROR "Failed to extract paper title"
-      return 1
-    fi
-
-    # Create URL-friendly filename
-    local filename
-    filename=$(echo "$paper_title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g' | cut -c1-60)
-    filename="${filename}.md"
-
-    # Save to papers directory
-    cp "$output_file" "$PAPERS_DIR/$filename"
-    log INFO "Summary saved to: $PAPERS_DIR/$filename"
-
-    # Open in Cursor if available
-    if command -v cursor &>/dev/null; then
-      cursor "$PAPERS_DIR/$filename"
-    elif [ -d "/Applications/Cursor.app" ]; then
-      open -a "Cursor" "$PAPERS_DIR/$filename"
-    fi
-
+  local exit_status
+  if wait "$claude_pid"; then
+    exit_status=0
   else
+    exit_status=$?
+  fi
+
+  if [ $exit_status -ne 0 ]; then
     log ERROR "Claude processing failed (exit code: $exit_status)"
     return 1
   fi
+
+  CLAUDE_ELAPSED_SECONDS=$elapsed
+}
+
+summary_filename_from_output() {
+  local output_file=$1
+  local paper_title
+  paper_title=$(head -1 "$output_file" | sed 's/^# //')
+
+  if [ -z "$paper_title" ]; then
+    log ERROR "Failed to extract paper title"
+    return 1
+  fi
+
+  local filename
+  filename=$(echo "$paper_title" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g' | cut -c1-60)
+  echo "${filename}.md"
+}
+
+save_and_open_summary() {
+  local output_file=$1
+  local filename=$2
+  local summary_path="$PAPERS_DIR/$filename"
+
+  cp "$output_file" "$summary_path"
+  log INFO "Summary saved to: $summary_path"
+
+  if command -v cursor &>/dev/null; then
+    cursor "$summary_path"
+  elif [ -d "/Applications/Cursor.app" ]; then
+    open -a "Cursor" "$summary_path"
+  fi
+}
+
+# Process with Claude Code
+process_with_claude() {
+  local paper_file=$1
+  local url=$2
+
+  log INFO "Processing with Claude Code..."
+
+  local file_size
+  file_size=$(wc -c <"$paper_file")
+  [ "$file_size" -gt 10485760 ] && log WARN "Large file (>10MB), may take several minutes"
+
+  mkdir -p "$PAPERS_DIR"
+
+  local output_file="$TEMP_DIR/claude_output.txt"
+  local prompt_file="$TEMP_DIR/prompt.txt"
+  local timeout_seconds=600 # 10 minutes timeout
+  local paper_file_display="${paper_file/#$HOME/~}"
+
+  write_claude_prompt "$prompt_file" "$paper_file" "$url" "$paper_file_display"
+  run_claude_with_timeout "$prompt_file" "$output_file" "$timeout_seconds" || return 1
+
+  log INFO "Processing completed (${CLAUDE_ELAPSED_SECONDS}s)"
+
+  local filename
+  filename=$(summary_filename_from_output "$output_file") || return 1
+  save_and_open_summary "$output_file" "$filename"
 }
 
 # Background job wrapper
