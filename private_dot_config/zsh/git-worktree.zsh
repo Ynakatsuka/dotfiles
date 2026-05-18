@@ -324,24 +324,42 @@ EOF
     fi
 
     echo "🤖 Generating branch name with claude haiku..."
-    local naming_prompt branch_name
-    naming_prompt="Generate exactly one git branch name for the task below.
+    local naming_prompt naming_output branch_type branch_slug branch_name
+    naming_prompt="Generate exactly one git branch type and slug for the task below.
 Rules:
-- Prefix with one of: feat/, fix/, refactor/, docs/, test/, chore/, perf/
-- After the prefix, kebab-case, ASCII only, 3-7 words.
-- Output ONLY the branch name. No quotes, no commentary, no trailing punctuation.
+- Output exactly two tokens separated by one space: <type> <slug>
+- <type> must be one of: feat, fix, refactor, docs, test, chore, perf
+- <slug> must be kebab-case, ASCII only, 3-7 words.
+- Do not include a slash in the output. The shell function adds it.
+- Output ONLY the two tokens. No quotes, no commentary, no trailing punctuation.
 
 Task: ${prompt}"
 
-    branch_name=$(claude -p --model haiku "$naming_prompt" 2>/dev/null \
+    naming_output=$(claude -p --model haiku "$naming_prompt" 2>/dev/null \
         | tr -d '\r`"'\''' \
         | awk 'NF{print; exit}' \
         | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
+    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
+    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
 
-    if [[ -z "$branch_name" ]]; then
+    if [[ -z "$naming_output" ]]; then
         echo "Error: branch name generation returned empty output" >&2
         return 1
     fi
+    if [[ "$naming_output" != "$branch_type $branch_slug" ]]; then
+        echo "Error: generated branch components are invalid: '$naming_output'" >&2
+        return 1
+    fi
+    if [[ ! "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]]; then
+        echo "Error: generated branch type is invalid: '$branch_type'" >&2
+        return 1
+    fi
+    if [[ ! "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "Error: generated branch slug is invalid: '$branch_slug'" >&2
+        return 1
+    fi
+
+    branch_name="${branch_type}/${branch_slug}"
     if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)/[a-z0-9][a-z0-9-]*$ ]]; then
         echo "Error: generated branch name is invalid: '$branch_name'" >&2
         return 1
