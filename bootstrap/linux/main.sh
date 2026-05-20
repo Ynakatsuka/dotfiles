@@ -33,7 +33,7 @@ Options:
   --with-expressvpn          Install ExpressVPN (guarded).
   --with-docker              Install Docker CE + plugins.
   --with-nvidia-container    Install NVIDIA Container Toolkit.
-  --with-clis                Install age/uv/mise/tailscale/claude (non mise-managed CLIs).
+  --with-clis                Install age/uv/mise/tailscale/claude/antigravity (non mise-managed CLIs).
   --with-dotfiles            Setup prezto/tpm/chezmoi (guarded).
   --with-cleanup             Run apt autoremove at the end.
   --xdg-english-dirs         Convert XDG user dirs to English (guarded).

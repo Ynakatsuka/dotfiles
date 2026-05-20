@@ -65,4 +65,10 @@ elif confirm "Install Claude Code (native installer)?"; then
   run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://claude.ai/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
 fi
 
+if command -v antigravity >/dev/null 2>&1; then
+  log "antigravity already installed, skipping"
+elif confirm "Install Antigravity CLI (native installer)?"; then
+  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://antigravity.google/cli/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
+fi
+
 log "CLIs module completed"
