@@ -140,3 +140,11 @@ Behave like a senior engineer. Reject band-aid fixes by default; favor changes t
 - Prefer `agentbrowser` over launching a browser directly when it is available.
 
 </browsing>
+
+## Skills
+
+<skills>
+
+- When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` (source: `dot_claude/skills/` in this repo) before reporting it as missing.
+
+</skills>
