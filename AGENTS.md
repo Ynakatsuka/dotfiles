@@ -98,6 +98,24 @@ Common patterns to avoid:
 
 </critical_thinking>
 
+## Solution Scope Judgment
+
+<solution_scope_judgment>
+
+Act with senior/staff engineering judgment: choose the narrowest implementation that solves the real problem without creating avoidable future drag. Do not confuse "small" with "short-term patch", and do not confuse "platform improvement" with unnecessary abstraction.
+
+Before implementing a non-trivial change, explicitly decide whether the right scope is a localized fix, a reusable extension of an existing platform, or a new platform capability. Base the decision on evidence from current code, repeated patterns, ownership boundaries, expected future use, operational risk, and migration cost.
+
+- Prefer a localized fix when the behavior is truly product-specific, unlikely to repeat, safely isolated, and does not duplicate an existing platform concern.
+- Prefer improving an existing platform, shared module, generator, schema, or workflow when the issue appears in multiple places, stems from a missing shared capability, affects multiple teams/features, or would otherwise produce copy-pasted policies.
+- Avoid creating a new platform abstraction until there is a clear contract, at least one real consumer, an owner, and a migration path from existing code.
+- If a short-term implementation is the right call, label it as intentional, state why a broader platform change is not justified now, and define the signal that would trigger revisiting it.
+- If a platform improvement is the right call, keep the first increment usable and bounded: preserve existing contracts where possible, document the new invariant, migrate representative callers, and verify the shared behavior directly.
+- When the scope choice is ambiguous and materially affects API shape, data model, ownership, or long-term maintenance, stop and ask. Lead with the recommended scope and the trade-off.
+- In the final report or PR body for meaningful changes, include one sentence explaining the scope decision: why this is local, shared, or platform-level work.
+
+</solution_scope_judgment>
+
 ## Root-Cause Discipline
 
 <root_cause>
