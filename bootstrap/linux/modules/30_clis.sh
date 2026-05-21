@@ -71,4 +71,10 @@ elif confirm "Install Antigravity CLI (native installer)?"; then
   run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://antigravity.google/cli/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
 fi
 
+if command -v cursor-agent >/dev/null 2>&1; then
+  log "cursor-agent already installed, skipping"
+elif confirm "Install Cursor Agent CLI (native installer)?"; then
+  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://cursor.com/install -o "$_s" && bash "$_s" && rm -f "$_s"'
+fi
+
 log "CLIs module completed"

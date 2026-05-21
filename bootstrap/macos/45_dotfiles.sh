@@ -122,4 +122,19 @@ else
   echo "[INFO] Antigravity CLI already installed"
 fi
 
+# Install Cursor Agent CLI (native installer)
+if ! command -v cursor-agent >/dev/null 2>&1; then
+  read -r -p "Install Cursor Agent CLI (native installer)? [y/N]: " install_cursor_agent
+  if [[ "$install_cursor_agent" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    _install_script=$(mktemp)
+    curl --fail -fsSL https://cursor.com/install -o "$_install_script"
+    bash "$_install_script"
+    rm -f "$_install_script"
+  else
+    echo "[WARN] Skipped Cursor Agent CLI installation"
+  fi
+else
+  echo "[INFO] Cursor Agent CLI already installed"
+fi
+
 echo "[INFO] Dotfiles setup completed"
