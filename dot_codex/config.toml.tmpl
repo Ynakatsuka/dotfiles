@@ -3,7 +3,8 @@ network_access = true
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 model = "gpt-5.5"
-model_reasoning_effort = "high"
+model_reasoning_effort = "medium"
+service_tier = "fast"
 
 [features]
 hooks = true
@@ -40,5 +41,14 @@ status_line = [
 trust_level = "trusted"
 
 {{- end }}
+{{- end }}
+{{- end }}
+{{/* Preserve Codex's runtime hook trust state across chezmoi applies. */}}
+{{- $codexConfig := joinPath .chezmoi.homeDir ".codex/config.toml" }}
+{{- if stat $codexConfig }}
+{{- $hookState := output "awk" "BEGIN { in_hooks = 0 } /^\\[hooks\\.state\\]$/ { in_hooks = 1; print; next } in_hooks && /^\\[/ && $0 !~ /^\\[hooks\\.state(\\]|\\.)/ { in_hooks = 0 } in_hooks { print }" $codexConfig }}
+{{- if $hookState }}
+
+{{ $hookState -}}
 {{- end }}
 {{- end }}
