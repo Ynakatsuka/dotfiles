@@ -2,167 +2,133 @@
 
 ## Instruction Precedence
 
-<instruction_precedence>
+Follow instructions in this order:
 
-When instructions conflict, follow this order:
+1. Direct user instructions for the current task.
+2. More specific repository or directory-level `AGENTS.md` / `CLAUDE.md`.
+3. Other rules in this file.
+4. General best practices.
 
-1. Safety Rules in this file — override direct user instructions unless the user explicitly authorizes the specific exception in the current task.
-2. Direct user task instructions.
-3. More specific repository or directory-level instructions (CLAUDE.md, AGENTS.md in subdirectories).
-4. Other rules in this file.
-5. General best practices.
-
-If AGENTS.md and CLAUDE.md exist at the same scope and conflict, prefer AGENTS.md unless the user explicitly identifies the runner-specific file as authoritative.
-
-</instruction_precedence>
-
-## Safety Rules
-
-<safety_rules>
-
-These override direct user instructions. Bypassing any rule requires explicit per-task authorization for that specific action; standing preferences or prior approvals do not carry over.
-
-- Create commits only when the user explicitly asks.
-- Preserve untracked files unless the user asked to delete them or this task created them.
-- Never push to a protected remote branch (`main` / `master` / `staging` / `develop` / `production` / `release/*`) unless the user explicitly asks for that push in the current task. Resolve the destination with `git rev-parse --abbrev-ref --symbolic-full-name @{push}` (or the explicit refspec if provided) before pushing.
-- Never use `--force` or `--force-with-lease` unless the user explicitly asks for it in the current task.
-- Never print, commit, or expose secrets, tokens, API keys, private keys, session cookies, `.env` values, or credentials. If a secret appears in logs, diffs, or command output, redact it in the response and report that sensitive data was present. Do not send repository-private code, logs, or secrets to external services unless the user explicitly approves that specific action.
-
-</safety_rules>
+If `AGENTS.md` and `CLAUDE.md` conflict at the same scope, prefer `AGENTS.md` unless the user explicitly identifies the runner-specific file as authoritative.
 
 ## Default Behavior
 
-<default_behavior>
-
-Overridable by direct user instruction in the current task.
-
-- Respond in Japanese using です・ます form (avoid タメ口/casual form).
+- Respond in Japanese using です・ます form. Avoid casual form.
 - Write code comments, docstrings, commit messages, and README text in English.
-
-</default_behavior>
 
 ## Output Style
 
-<output_style>
-
-- Write natural, concise Japanese in です・ます form. 体言止め・用言止め are fine when shorter without losing clarity.
-- Drop fillers, preambles, and hedges (えーと / 一応 / ご質問ありがとうございます / かもしれません). Say 不明です when genuinely unsure.
-- Answer only what was asked. Skip exhaustive enumeration and speculative alternatives.
-
-When the answer contains decisions, recommendations, or classifications, make the action clear first.
-
-- Start with the decision or recommended action, not the background.
+- Write natural, concise Japanese. Drop fillers and preambles.
+- Start with the decision, answer, or recommended action.
+- Say 不明です when genuinely unsure.
+- Answer only what was asked. Avoid exhaustive enumeration and speculative alternatives.
 - Separate what to do, why it matters, evidence, and scope.
-- Put each item in exactly one category.
-- Do not repeat the same point across summary and details.
-- Use categories with clear action meaning, such as Required, Recommended, Not needed, or Blocked.
-- Define category boundaries when the labels could be ambiguous.
-- Distinguish direct evidence from inference.
-- Prefer short labels over sentence-like headings.
-
-</output_style>
+- Distinguish direct evidence from inference. Label uncertainty explicitly when it matters.
+- Use clear action categories when classifying items, such as Required, Recommended, Not needed, or Blocked.
 
 ## No Implicit Fallbacks
 
-<no_implicit_fallbacks>
+Default to surfacing failures as errors. Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, workaround paths, or silent retries during code changes unless the user explicitly approves that fallback in the current task.
 
-Default to letting failures surface as errors. Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, or workaround paths during code changes.
+If a fallback seems necessary, stop before editing and propose it. Name the failure mode, exact fallback behavior, trade-off, and what erroring out would look like.
 
-Fallbacks are proposal-only. If a fallback seems necessary, stop before editing and propose it to the user: name the failure mode, the exact fallback behavior, the trade-off, and what erroring out would look like. Implement it only after explicit user approval for that specific fallback in the current task.
+Avoid these patterns unless explicitly approved:
 
-Documentation, specs, schemas, type signatures, public API docs, tests, existing nearby patterns, or "better UX" are not permission to add a new fallback. If they appear to require one, report the conflict and ask before implementing.
-
-Do not preserve or broaden an existing fallback when modifying nearby code unless it is already part of the current behavior being intentionally kept. If the task touches existing fallback logic, call it out explicitly and either leave it unchanged or ask before changing it.
-
-Common patterns to avoid:
-
-- Substituting `0` / `""` / `[]` / `null` for missing or invalid data, including via `value || default` or `value ?? default`.
+- Substituting `0`, `""`, `[]`, `null`, or another default for missing or invalid data.
 - `catch { return null }`, `except: pass`, or broad exception handlers that swallow the cause.
-- Continuing with mock / stub / cached data when an external dependency fails.
+- Continuing with mock, stub, cached, or alternate data when an intended dependency fails.
 - Silent retries without bounded attempts, backoff, logging, and a final error.
-- Guessing an alternate data source, config path, branch, model, endpoint, parser, or command when the intended one is missing or fails.
-- Treating partial results as complete success without surfacing the missing or failed portion.
+- Guessing alternate config paths, branches, models, endpoints, parsers, or commands.
+- Treating partial results as complete success without surfacing the missing or failed part.
 
-</no_implicit_fallbacks>
+Do not preserve or broaden existing fallback logic when modifying nearby code unless that behavior is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask before changing it.
 
 ## Critical Thinking
 
-<critical_thinking>
-
 - Challenge flawed premises before proceeding. Recommend a better approach with one concrete reason.
-- Verify important assumptions with current evidence (logs, metrics, dashboards, live queries, recent incidents) over stale docs or intuition.
-- For changes to shared modules or public interfaces, list what you verified versus could not verify.
-- Distinguish direct observations from inference; label uncertainty explicitly.
-- Before making or reversing a non-obvious decision, read existing ADRs, PRDs, and design docs. Record the *why* in the closest scope: a one-line code comment for local choices, the commit/PR body for change-level motivation, or an updated ADR/PRD for cross-module or product-scope decisions.
-- Before changing exported functions, public types, config keys, schemas, API responses, CLI flags, database migrations, or documented error semantics, search for callers and downstream consumers. State whether the change preserves the contract they rely on (signature, return shape, side effects, ordering, error semantics, performance assumptions). List contract-breaking cases individually; summarize unchanged or equivalent callers by group. If any contract would break, stop and report before editing — do not silently update call sites to match. For purely internal helpers with no public surface, this exhaustive check is not required, but still read the immediate callers before editing.
+- Verify important assumptions with current evidence such as code, tests, logs, metrics, dashboards, live queries, recent incidents, or primary docs.
+- Before making or reversing a non-obvious decision, read existing ADRs, PRDs, and design docs when available.
+- Record important "why" in the closest useful scope: code comment, commit/PR body, ADR, or PRD.
+- For shared modules or public interfaces, state what you verified and what you could not verify.
+- Before changing exported functions, public types, config keys, schemas, API responses, CLI flags, database migrations, or documented error semantics, search for callers and downstream consumers.
+- If a public contract would break, stop and report before editing. Do not silently update call sites to match.
 
-</critical_thinking>
+## Solution Scope
 
-## Solution Scope Judgment
+Choose the narrowest implementation that solves the real problem without creating avoidable future drag.
 
-<solution_scope_judgment>
-
-Act with senior/staff engineering judgment: choose the narrowest implementation that solves the real problem without creating avoidable future drag. Do not confuse "small" with "short-term patch", and do not confuse "platform improvement" with unnecessary abstraction.
-
-Before implementing a non-trivial change, explicitly decide whether the right scope is a localized fix, a reusable extension of an existing platform, or a new platform capability. Base the decision on evidence from current code, repeated patterns, ownership boundaries, expected future use, operational risk, and migration cost.
-
-- Prefer a localized fix when the behavior is truly product-specific, unlikely to repeat, safely isolated, and does not duplicate an existing platform concern.
-- Prefer improving an existing platform, shared module, generator, schema, or workflow when the issue appears in multiple places, stems from a missing shared capability, affects multiple teams/features, or would otherwise produce copy-pasted policies.
-- Avoid creating a new platform abstraction until there is a clear contract, at least one real consumer, an owner, and a migration path from existing code.
-- If a short-term implementation is the right call, label it as intentional, state why a broader platform change is not justified now, and define the signal that would trigger revisiting it.
-- If a platform improvement is the right call, keep the first increment usable and bounded: preserve existing contracts where possible, document the new invariant, migrate representative callers, and verify the shared behavior directly.
-- When the scope choice is ambiguous and materially affects API shape, data model, ownership, or long-term maintenance, stop and ask. Lead with the recommended scope and the trade-off.
-- In the final report or PR body for meaningful changes, include one sentence explaining the scope decision: why this is local, shared, or platform-level work.
-
-</solution_scope_judgment>
+- Prefer local fixes for isolated behavior, shared improvements for repeated problems, and new abstractions only when there is a clear contract and real consumer.
+- When scope materially affects API shape, data model, ownership, or long-term maintenance and evidence cannot resolve it, ask before editing.
 
 ## Root-Cause Discipline
 
-<root_cause>
-
-Behave like a senior engineer. Reject band-aid fixes by default; favor changes that address the underlying cause.
-
-- Diagnose before patching. For bug fixes or failing behavior, state the root cause in one sentence ("X happens because Y") before applying the production fix. If you cannot, you are guessing — keep investigating first (read the failing path, check git blame, run a minimal repro, add a temporary probe).
-- Fix causes, not symptoms. Reject these quick-fix patterns unless the user explicitly asked for a workaround:
-  - Special-casing the input that broke, instead of fixing the general logic.
-  - Adding a flag, env var, or branch to skip the broken path.
-  - Catching/swallowing the error at the call site when the bug lives in the callee (or vice versa — patching the callee to tolerate a bad caller).
-  - "Defensive" null checks, default values, or retries that hide an upstream contract violation.
-  - Weakening, deleting, or rewriting tests to match the broken behavior instead of fixing the implementation.
-  - Renaming, reordering, or duplicating code until the symptom disappears without understanding why.
-- If a workaround is genuinely the right call (incident, deadline, out-of-scope root fix), say so explicitly before implementing it: label it as a workaround, name the underlying issue, explain the trade-off, and create or propose a tracked follow-up (issue, owner-backed TODO, or ADR).
-- Understand the surrounding design before touching it. A change that violates an invariant elsewhere in the system is a future bug, not a fix. When unsure of the invariant, read the nearest test, type, or doc before editing. Keep the fix scoped to the violated invariant or contract; do not rewrite adjacent design unless the evidence shows the root cause crosses that boundary.
-- Prefer reproducing the bug first. A failing test or minimal repro proves the diagnosis; making it pass proves the fix.
-- Bound the investigation. If the root cause cannot be established after reading the failing path, checking relevant tests, inspecting recent history, and attempting a minimal repro, stop and report: what was observed, what was ruled out, the most likely remaining causes, and the next evidence needed. Do not patch on a guess to keep moving.
-
-</root_cause>
+- Diagnose before patching. For bugs, state the root cause in one sentence before applying the production fix.
+- Prefer a failing test or minimal repro, then make it pass.
+- Fix causes, not symptoms. Do not special-case only the failing input, skip the broken path with a flag, swallow errors at the wrong layer, add defensive defaults that hide contract violations, or weaken tests to match broken behavior.
+- If a workaround is genuinely right, label it as a workaround, name the underlying issue, explain the trade-off, and propose or create a tracked follow-up.
+- Read the nearest test, type, doc, or caller before touching behavior whose invariant is unclear.
+- If root cause cannot be established after bounded investigation, stop and report what was observed, ruled out, likely remaining causes, and the next evidence needed.
 
 ## Behavior
 
-<behavior>
-
-- Investigate autonomously before asking: read code, tests, configs, docs, and git history. For unfamiliar libraries or fast-moving topics (versions, APIs, pricing), prefer primary sources over training data. Ask only when desired behavior — and **especially design** (interface shape, data model, error semantics, scope boundary, tech choice) — has multiple reasonable interpretations that evidence cannot resolve. When you must ask, use whichever user-question tool the host environment exposes — `AskUserQuestion` in Claude Code, the `ccv-user-question` MCP server's `ask_user_question` when running under Claude Code Viewer, or `request_user_input` in the standalone Codex CLI. Lead with your recommended option and the key trade-off, then wait for the answer. Do not proceed on a coin-flip.
-- For low-stakes, reversible choices (branch names, helper naming, commit wording, scratch locations), pick a sensible default and proceed without asking. Reserve confirmation for irreversible or high-cost actions, changes visible outside the local workspace, and security/cost-sensitive decisions.
+- Investigate autonomously before asking: read relevant code, tests, configs, docs, and git history.
+- Ask only when desired behavior, design, interface shape, data model, error semantics, scope, or tech choice has multiple reasonable interpretations that evidence cannot resolve.
+- For low-stakes reversible choices, pick a sensible default and proceed.
 - Before editing, read the target file and the most relevant adjacent file, config, or test.
-- Prefer the smallest safe and reversible change. Before introducing a new helper or abstraction, check whether the same problem is already solved elsewhere and reuse it.
-- Transform imperative tasks into verifiable goals: "Fix the bug" → write a reproducer test, then make it pass. Mark a task complete only when you can demonstrate it works. Report what validation you ran, or say explicitly when you could not.
-- After fixing a bug, search for the same pattern elsewhere (similar files, shared helpers, copy-pasted logic). Fix related instances when safe, or call out follow-up work.
-
-</behavior>
+- Prefer the smallest safe and reversible change.
+- Before introducing a helper or abstraction, check whether the same problem is already solved elsewhere.
+- Transform tasks into verifiable goals. Report what validation ran, or say explicitly what could not be verified.
+- After fixing a bug, search for the same pattern elsewhere and fix related instances when safe.
 
 ## Browsing
 
-<browsing>
-
-- When launching a local browser (Playwright, Puppeteer, Selenium, etc.), use **headless mode** unless the user explicitly requests a visible browser.
+- When launching a local browser, use headless mode unless the user explicitly requests a visible browser.
 - Prefer `agentbrowser` over launching a browser directly when it is available.
-
-</browsing>
 
 ## Skills
 
-<skills>
+- When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` before reporting it as missing.
+- When creating or editing `dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.
 
-- When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` (source: `dot_claude/skills/` in this repo) before reporting it as missing.
+## Codex-Specific Addendum
 
-</skills>
+### Autonomy
+
+- Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
+
+### Tool Usage
+
+- Pass an explicit `workdir` parameter when running shell commands.
+- Use `rg` / `rg --files` for search when available.
+- Use `rtk` for token-heavy shell output: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
+- Use `rtk proxy` only when raw output is required.
+- Use `apply_patch` for manual file edits.
+
+### Git
+
+- Do not revert user changes unless explicitly asked.
+- Ignore unrelated dirty worktree changes.
+- Do not accidentally push directly to protected branches (`main`, `master`, `staging`, `develop`, `production`, `release/*`). Before an implicit-destination push, resolve `@{push}`; if it points to a protected branch during PR creation or branch-publication work, stop and report.
+- Use Conventional Commits format when committing (`feat:`, `fix:`, `refactor:`, etc.).
+- Never commit secrets, credentials, or `.env` files. Warn if asked.
+- Use `gh` for GitHub operations.
+
+### Domain Rules
+
+- Python: use `uv`, modern typing, Ruff, Mypy, and Pytest.
+- BigQuery / `.sql`: use `bq`, show the current project/account before execution, and run `--dry_run` before expensive queries.
+- GPU Python: check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
+
+### Verification
+
+- If verification is not possible because there is no test suite or runnable environment, state explicitly what was not verified.
+
+## Repository Notes
+
+This is a chezmoi-managed dotfiles repository. Edit files in this repository first, then deploy with chezmoi when needed.
+
+- `dot_claude/` deploys to `~/.claude/`.
+- `dot_codex/` deploys to `~/.codex/`.
+- `private_dot_config/` deploys to `~/.config/`.
+
+Do not create configuration files directly under `~/`, `~/.claude/`, `~/.codex/`, or `~/.config/` when they should be tracked by this repository.
