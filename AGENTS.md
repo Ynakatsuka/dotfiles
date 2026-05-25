@@ -100,8 +100,6 @@ Choose the narrowest implementation that solves the real problem without creatin
 
 - Pass an explicit `workdir` parameter when running shell commands.
 - Use `rg` / `rg --files` for search when available.
-- Use `rtk` for token-heavy shell output: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
-- Use `rtk proxy` only when raw output is required.
 - Use `apply_patch` for manual file edits.
 
 ### Git
@@ -111,7 +109,7 @@ Choose the narrowest implementation that solves the real problem without creatin
 - Do not accidentally push directly to protected branches (`main`, `master`, `staging`, `develop`, `production`, `release/*`). Before an implicit-destination push, resolve `@{push}`; if it points to a protected branch during PR creation or branch-publication work, stop and report.
 - Use Conventional Commits format when committing (`feat:`, `fix:`, `refactor:`, etc.).
 - Never commit secrets, credentials, or `.env` files. Warn if asked.
-- Use `gh` for GitHub operations.
+- Use `gh` for all GitHub operations (PRs, issues, releases, checks).
 
 ### Domain Rules
 
