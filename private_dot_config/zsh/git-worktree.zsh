@@ -205,19 +205,35 @@ EOF
 
 _gw_create_worktree() {
     local branch_name="$1"
-    local creation_output
+    local creation_output output_file helper_status tee_status
+    local -a pipeline_status
 
     if ! command -v gw-create-worktree >/dev/null 2>&1; then
         echo "Error: gw-create-worktree not found in PATH" >&2
         return 1
     fi
 
-    if ! creation_output=$(gw-create-worktree "$branch_name"); then
-        printf '%s\n' "$creation_output"
+    output_file=$(mktemp) || return 1
+
+    gw-create-worktree "$branch_name" | tee "$output_file"
+    pipeline_status=("${pipestatus[@]}")
+    helper_status="${pipeline_status[1]}"
+    tee_status="${pipeline_status[2]}"
+
+    if ! creation_output=$(cat "$output_file"); then
+        rm -f "$output_file"
         return 1
     fi
+    rm -f "$output_file"
 
-    printf '%s\n' "$creation_output"
+    if [ "$tee_status" -ne 0 ]; then
+        echo "Error: failed to capture gw-create-worktree output" >&2
+        return "$tee_status"
+    fi
+
+    if [ "$helper_status" -ne 0 ]; then
+        return "$helper_status"
+    fi
 
     _GW_CREATED_PATH=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_PATH" {print substr($0, index($0, "=") + 1)}' | tail -1)
     _GW_CREATED_FLAG=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_CREATED" {print $2}' | tail -1)
