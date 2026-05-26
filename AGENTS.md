@@ -19,12 +19,6 @@ If `AGENTS.md` and `CLAUDE.md` conflict at the same scope, prefer `AGENTS.md` un
 ## Output Style
 
 - Write natural, concise Japanese. Drop fillers and preambles.
-- Start with the decision, answer, or recommended action.
-- Say 不明です when genuinely unsure.
-- Answer only what was asked. Avoid exhaustive enumeration and speculative alternatives.
-- Separate what to do, why it matters, evidence, and scope.
-- Distinguish direct evidence from inference. Label uncertainty explicitly when it matters.
-- Use clear action categories when classifying items, such as Required, Recommended, Not needed, or Blocked.
 
 ## No Implicit Fallbacks
 
