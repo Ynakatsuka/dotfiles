@@ -1,16 +1,5 @@
 # Global Rules
 
-## Instruction Precedence
-
-Follow instructions in this order:
-
-1. Direct user instructions for the current task.
-2. More specific repository or directory-level `AGENTS.md` / `CLAUDE.md`.
-3. Other rules in this file.
-4. General best practices.
-
-If `AGENTS.md` and `CLAUDE.md` conflict at the same scope, prefer `AGENTS.md` unless the user explicitly identifies the runner-specific file as authoritative.
-
 ## Default Behavior
 
 - Respond in Japanese using です・ます form. Avoid casual form.
