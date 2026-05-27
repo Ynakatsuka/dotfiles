@@ -87,7 +87,7 @@ Choose the narrowest implementation that solves the real problem without creatin
 
 - Do not revert user changes unless explicitly asked.
 - Ignore unrelated dirty worktree changes.
-- Do not accidentally push directly to protected branches (`main`, `master`, `staging`, `develop`, `production`, `release/*`). Before an implicit-destination push, resolve `@{push}`; if it points to a protected branch during PR creation or branch-publication work, stop and report.
+- Do not let an implicit push destination send branch-specific work to protected branches (`main`, `master`, `staging`, `develop`, `production`, `release/*`). Before any implicit-destination push such as `git push` or `git push @{push}`, resolve `@{push}`; if the current branch is not that protected branch and `@{push}` points to one, stop and report. If the user explicitly asks to push from a protected branch to the same protected branch, that is allowed.
 - Use Conventional Commits format when committing (`feat:`, `fix:`, `refactor:`, etc.).
 - Never commit secrets, credentials, or `.env` files. Warn if asked.
 - Use `gh` for all GitHub operations (PRs, issues, releases, checks).
