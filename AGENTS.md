@@ -73,19 +73,17 @@ Choose the narrowest implementation that solves the real problem without creatin
 - When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` before reporting it as missing.
 - When creating or editing `dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.
 
-## Codex-Specific Addendum
-
-### Autonomy
+## Autonomy
 
 - Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
 
-### Tool Usage
+## Tool Usage
 
 - Pass an explicit `workdir` parameter when running shell commands.
 - Use `rg` / `rg --files` for search when available.
 - Use `apply_patch` for manual file edits.
 
-### Git
+## Git
 
 - Do not revert user changes unless explicitly asked.
 - Ignore unrelated dirty worktree changes.
@@ -94,7 +92,7 @@ Choose the narrowest implementation that solves the real problem without creatin
 - Never commit secrets, credentials, or `.env` files. Warn if asked.
 - Use `gh` for all GitHub operations (PRs, issues, releases, checks).
 
-### Domain Rules
+## Domain Rules
 
 - Python: use `uv`, modern typing, Ruff, Mypy, and Pytest.
 - BigQuery / `.sql`: use `bq`, show the current project/account before execution, and run `--dry_run` before expensive queries.
