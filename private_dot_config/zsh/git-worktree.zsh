@@ -362,7 +362,7 @@ Rules:
 - Output exactly two tokens separated by one space: <type> <slug>
 - <type> must be one of: feat, fix, refactor, docs, test, chore, perf
 - <slug> must be kebab-case, ASCII only, 3-7 words.
-- Do not include a slash in the output. The shell function adds it.
+- Do not include the type in <slug>. The shell function prefixes it.
 - Output ONLY the two tokens. No quotes, no commentary, no trailing punctuation.
 
 Task: ${prompt}"
@@ -391,8 +391,8 @@ Task: ${prompt}"
         return 1
     fi
 
-    branch_name="${branch_type}/${branch_slug}"
-    if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)/[a-z0-9][a-z0-9-]*$ ]]; then
+    branch_name="${branch_type}-${branch_slug}"
+    if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]]; then
         echo "Error: generated branch name is invalid: '$branch_name'" >&2
         return 1
     fi
