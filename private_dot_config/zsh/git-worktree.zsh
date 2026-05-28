@@ -305,6 +305,7 @@ function gw() {
 #   gwai <prompt>          # generate branch name and start `cl` session with the prompt
 #   gwai -c <prompt>       # explicit claude
 #   gwai -x <prompt>       # explicit codex (cdx)
+#   pbpaste | gwai -x <prompt>
 function gwai() {
     local launcher="cl"
     case "${1:-}" in
@@ -319,12 +320,27 @@ Usage: gwai [-c|-x] <prompt>
 Generates a Conventional Commits style branch name from <prompt>
 using `claude -p --model haiku`, creates a worktree via `gw`,
 then launches the chosen session with <prompt> as the first message.
+
+If stdin is piped, stdin is appended to <prompt>.
 EOF
             return 1
             ;;
     esac
 
     local prompt="$*"
+    if [[ ! -t 0 ]]; then
+        local stdin_prompt
+        stdin_prompt=$(cat)
+        if [[ -n "$stdin_prompt" ]]; then
+            if [[ -n "$prompt" ]]; then
+                prompt="${prompt}
+${stdin_prompt}"
+            else
+                prompt="$stdin_prompt"
+            fi
+        fi
+    fi
+
     if [ -z "$prompt" ]; then
         echo "Error: prompt is empty" >&2
         return 1
