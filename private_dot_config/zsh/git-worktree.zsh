@@ -388,6 +388,7 @@ Task: ${prompt}"
 
     "$launcher" "$prompt"
 }
+alias gwai='noglob gwai'
 
 # Helper function to remove Claude Code cache for a worktree path
 _gwc_remove_claude_cache() {
