@@ -371,27 +371,29 @@ Task: ${prompt}"
         | tr -d '\r`"'\''' \
         | awk 'NF{print; exit}' \
         | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
-    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
-    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
-
     if [[ -z "$naming_output" ]]; then
         echo "Error: branch name generation returned empty output" >&2
         return 1
     fi
-    if [[ "$naming_output" != "$branch_type $branch_slug" ]]; then
-        echo "Error: generated branch components are invalid: '$naming_output'" >&2
-        return 1
-    fi
-    if [[ ! "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]]; then
-        echo "Error: generated branch type is invalid: '$branch_type'" >&2
-        return 1
-    fi
-    if [[ ! "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-        echo "Error: generated branch slug is invalid: '$branch_slug'" >&2
-        return 1
+
+    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
+    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
+
+    if [[ "$naming_output" = "$branch_type $branch_slug" ]] \
+        && [[ "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]] \
+        && [[ "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        branch_name="${branch_type}-${branch_slug}"
+    else
+        local fallback_stamp
+        if ! fallback_stamp=$(date "+%Y%m%d%H%M%S"); then
+            echo "Error: failed to generate fallback branch timestamp" >&2
+            return 1
+        fi
+        branch_name="chore-ai-task-${fallback_stamp}"
+        echo "Warning: generated branch components are invalid, using rough branch name: '$branch_name'" >&2
+        echo "Invalid generation output: '$naming_output'" >&2
     fi
 
-    branch_name="${branch_type}-${branch_slug}"
     if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]]; then
         echo "Error: generated branch name is invalid: '$branch_name'" >&2
         return 1
@@ -399,6 +401,16 @@ Task: ${prompt}"
 
     echo "🌿 Branch:   $branch_name"
     echo "🚀 Launcher: $launcher"
+
+    local current_git_root current_dir_name
+    if current_git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+        current_dir_name=$(basename "$current_git_root")
+        if [[ "$current_dir_name" = "$branch_name" ]]; then
+            echo "Using current directory: $current_git_root"
+            "$launcher" "$prompt"
+            return
+        fi
+    fi
 
     gw "$branch_name" || return 1
 
