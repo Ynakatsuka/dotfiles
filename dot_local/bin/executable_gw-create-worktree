@@ -30,14 +30,26 @@ if [[ $# -ne 1 ]]; then
   exit 2
 fi
 
-refresh_codex_trust() {
-  if ! command -v chezmoi >/dev/null 2>&1; then
-    echo "Error: chezmoi not found; cannot refresh Codex trusted projects" >&2
-    return 1
+trust_codex_project() {
+  local project_path="$1"
+  local codex_home="${CODEX_HOME:-$HOME/.codex}"
+  local config_file="$codex_home/config.toml"
+  local escaped_project_path
+
+  mkdir -p "$codex_home"
+  touch "$config_file"
+
+  escaped_project_path="${project_path//\\/\\\\}"
+  escaped_project_path="${escaped_project_path//\"/\\\"}"
+
+  if grep -F -x -q -- "[projects.\"$escaped_project_path\"]" "$config_file"; then
+    return 0
   fi
 
-  echo "Refreshing Codex trusted projects..."
-  chezmoi apply "$HOME/.codex/config.toml"
+  {
+    printf '\n[projects."%s"]\n' "$escaped_project_path"
+    printf 'trust_level = "trusted"\n'
+  } >>"$config_file"
 }
 
 git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
@@ -155,10 +167,11 @@ fi
 
 if command -v mise >/dev/null 2>&1; then
   echo "Trusting mise config files..."
-  (cd "$worktree_dir" && mise trust --all)
+  (cd "$worktree_dir" && mise trust --all --yes)
 fi
 
-refresh_codex_trust
+echo "Trusting Codex project..."
+trust_codex_project "$worktree_dir"
 
 echo ""
 echo "Worktree ready: $worktree_dir"

@@ -58,9 +58,12 @@ repos:
       - id: check-json
         # cmux/settings.json is JSONC (JSON with comments) per its own header,
         # so strict JSON parsing must skip it.
+        # modify_*.json files are chezmoi `modify_` scripts (shell, not JSON)
+        # whose source names keep the target's .json suffix.
         exclude: |
           (?x)^(
               .*\.tmpl|
+              .*/modify_[^/]+\.json|
               private_dot_config/cmux/settings\.json
           )$
 

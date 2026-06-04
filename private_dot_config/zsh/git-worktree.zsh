@@ -205,19 +205,35 @@ EOF
 
 _gw_create_worktree() {
     local branch_name="$1"
-    local creation_output
+    local creation_output output_file helper_status tee_status
+    local -a pipeline_status
 
     if ! command -v gw-create-worktree >/dev/null 2>&1; then
         echo "Error: gw-create-worktree not found in PATH" >&2
         return 1
     fi
 
-    if ! creation_output=$(gw-create-worktree "$branch_name"); then
-        printf '%s\n' "$creation_output"
+    output_file=$(mktemp) || return 1
+
+    gw-create-worktree "$branch_name" | tee "$output_file"
+    pipeline_status=("${pipestatus[@]}")
+    helper_status="${pipeline_status[1]}"
+    tee_status="${pipeline_status[2]}"
+
+    if ! creation_output=$(cat "$output_file"); then
+        rm -f "$output_file"
         return 1
     fi
+    rm -f "$output_file"
 
-    printf '%s\n' "$creation_output"
+    if [ "$tee_status" -ne 0 ]; then
+        echo "Error: failed to capture gw-create-worktree output" >&2
+        return "$tee_status"
+    fi
+
+    if [ "$helper_status" -ne 0 ]; then
+        return "$helper_status"
+    fi
 
     _GW_CREATED_PATH=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_PATH" {print substr($0, index($0, "=") + 1)}' | tail -1)
     _GW_CREATED_FLAG=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_CREATED" {print $2}' | tail -1)
@@ -289,6 +305,7 @@ function gw() {
 #   gwai <prompt>          # generate branch name and start `cl` session with the prompt
 #   gwai -c <prompt>       # explicit claude
 #   gwai -x <prompt>       # explicit codex (cdx)
+#   pbpaste | gwai -x <prompt>
 function gwai() {
     local launcher="cl"
     case "${1:-}" in
@@ -303,12 +320,27 @@ Usage: gwai [-c|-x] <prompt>
 Generates a Conventional Commits style branch name from <prompt>
 using `claude -p --model haiku`, creates a worktree via `gw`,
 then launches the chosen session with <prompt> as the first message.
+
+If stdin is piped, stdin is appended to <prompt>.
 EOF
             return 1
             ;;
     esac
 
     local prompt="$*"
+    if [[ ! -t 0 ]]; then
+        local stdin_prompt
+        stdin_prompt=$(cat)
+        if [[ -n "$stdin_prompt" ]]; then
+            if [[ -n "$prompt" ]]; then
+                prompt="${prompt}
+${stdin_prompt}"
+            else
+                prompt="$stdin_prompt"
+            fi
+        fi
+    fi
+
     if [ -z "$prompt" ]; then
         echo "Error: prompt is empty" >&2
         return 1
@@ -330,7 +362,7 @@ Rules:
 - Output exactly two tokens separated by one space: <type> <slug>
 - <type> must be one of: feat, fix, refactor, docs, test, chore, perf
 - <slug> must be kebab-case, ASCII only, 3-7 words.
-- Do not include a slash in the output. The shell function adds it.
+- Do not include the type in <slug>. The shell function prefixes it.
 - Output ONLY the two tokens. No quotes, no commentary, no trailing punctuation.
 
 Task: ${prompt}"
@@ -339,28 +371,30 @@ Task: ${prompt}"
         | tr -d '\r`"'\''' \
         | awk 'NF{print; exit}' \
         | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
-    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
-    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
-
     if [[ -z "$naming_output" ]]; then
         echo "Error: branch name generation returned empty output" >&2
         return 1
     fi
-    if [[ "$naming_output" != "$branch_type $branch_slug" ]]; then
-        echo "Error: generated branch components are invalid: '$naming_output'" >&2
-        return 1
-    fi
-    if [[ ! "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]]; then
-        echo "Error: generated branch type is invalid: '$branch_type'" >&2
-        return 1
-    fi
-    if [[ ! "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-        echo "Error: generated branch slug is invalid: '$branch_slug'" >&2
-        return 1
+
+    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
+    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
+
+    if [[ "$naming_output" = "$branch_type $branch_slug" ]] \
+        && [[ "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]] \
+        && [[ "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        branch_name="${branch_type}-${branch_slug}"
+    else
+        local fallback_stamp
+        if ! fallback_stamp=$(date "+%Y%m%d%H%M%S"); then
+            echo "Error: failed to generate fallback branch timestamp" >&2
+            return 1
+        fi
+        branch_name="chore-ai-task-${fallback_stamp}"
+        echo "Warning: generated branch components are invalid, using rough branch name: '$branch_name'" >&2
+        echo "Invalid generation output: '$naming_output'" >&2
     fi
 
-    branch_name="${branch_type}/${branch_slug}"
-    if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)/[a-z0-9][a-z0-9-]*$ ]]; then
+    if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]]; then
         echo "Error: generated branch name is invalid: '$branch_name'" >&2
         return 1
     fi
@@ -368,10 +402,21 @@ Task: ${prompt}"
     echo "🌿 Branch:   $branch_name"
     echo "🚀 Launcher: $launcher"
 
+    local current_git_root current_dir_name
+    if current_git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+        current_dir_name=$(basename "$current_git_root")
+        if [[ "$current_dir_name" = "$branch_name" ]]; then
+            echo "Using current directory: $current_git_root"
+            "$launcher" "$prompt"
+            return
+        fi
+    fi
+
     gw "$branch_name" || return 1
 
     "$launcher" "$prompt"
 }
+alias gwai='noglob gwai'
 
 # Helper function to remove Claude Code cache for a worktree path
 _gwc_remove_claude_cache() {
