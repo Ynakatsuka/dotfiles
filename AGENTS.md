@@ -8,6 +8,13 @@
 ## Output Style
 
 - Write natural, concise Japanese. Drop fillers and preambles.
+- Avoid translation-like Japanese. Prefer natural headings such as `確認結果`, `対応方針`, `管理範囲`, and `補足` over stiff phrases such as `確認した事実` or `今回の整理`.
+- Put the conclusion first, but avoid chatty or directive wording. Prefer `結論は以下の通りです。` over `結論はこうです。`
+- Use short sentences. Keep one idea per sentence.
+- Use bullet lists for conditions, steps, comparisons, and ownership boundaries.
+- Do not turn bullet lists into long sentences. Prefer sentence fragments, nominal endings, or `項目: 内容` form when it improves readability.
+- Keep bullets in the same section at the same level of detail and grammatical shape.
+- Reduce vague filler such as `適切に`, `さまざまな`, `十分に`, and repeated connectors such as `つまり` or `そのため`.
 
 ## No Implicit Fallbacks
 
