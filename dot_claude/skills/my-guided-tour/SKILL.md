@@ -32,8 +32,17 @@ Ask the user concise questions before explaining when their goal, audience, or e
    - HTML visual explanation
    - Text-first explanation plus HTML
    - Quiz included or skipped
+4. **Focus area for broad topics**
+   - Architecture and module relationships
+   - User or product behavior
+   - Data flow and state changes
+   - API or interface contracts
+   - Failure modes and edge cases
+   - Implementation roadmap or extension points
 
 If the user already supplied these answers, do not ask again.
+
+For broad topics, ask which area to emphasize before producing the explanation. If the user does not choose, lead with the highest-level map first, then identify 2-3 likely focus areas and ask before going deeper.
 
 ## Investigation
 
