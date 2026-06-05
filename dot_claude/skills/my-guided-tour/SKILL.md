@@ -5,8 +5,10 @@ description: >-
   higher-level perspective, then create an HTML visual explanation and optional
   quiz matched to the user's understanding goal and role. Use when the user asks
   to zoom out, wants broader context, is unfamiliar with an area, wants a diagram,
-  or asks how something fits into the bigger picture. Do NOT use for direct
-  implementation, refactoring, bug fixing, or scaffolding exercises.
+  asks how something fits into the bigger picture, or wants enough context to
+  implement safely. Include implementation locations and code/entity anchors when
+  depth requires it. Do NOT use for direct implementation, refactoring, bug fixing,
+  or scaffolding exercises.
 license: MIT
 ---
 
@@ -15,6 +17,15 @@ license: MIT
 # Guided Tour Explanation
 
 Guide the user through the target at the right altitude before any implementation work.
+
+## Core rules
+
+- Keep user-facing prose in the user's language. Preserve code identifiers, paths, type names, API fields, and domain terms that are written in the code.
+- Ground the tour in current repository evidence: read the target module plus adjacent callers, types, tests, configs, or docs before explaining behavior.
+- Do not invent missing behavior. If code diverges from design docs, say which part is code-backed and which part is design context.
+- For implementation-level or complete-understanding goals, include concise real code snippets for important DTOs, public types, entity definitions, schemas, config objects, or interfaces.
+- In the overall explanation, explicitly map each conceptual part to where it is implemented, what kind of part it is, its main inputs/outputs, and key types/entities.
+- Include concrete examples from the investigated repository. Prefer examples that name a real file, symbol, endpoint, config key, entity field, test case, or observed value; avoid abstract examples such as "module A calls module B".
 
 ## Start by asking
 
@@ -51,17 +62,34 @@ Before explaining code or architecture:
 1. Read the target file/module and the most relevant adjacent files, callers, tests, configs, or docs.
 2. Identify the domain vocabulary used by the project.
 3. Map how the target fits into the surrounding system: inputs, outputs, dependencies, callers, side effects, and invariants.
-4. State what was verified and what could not be verified.
+4. Search for callers and downstream consumers before explaining public contracts such as exported functions, public types, config keys, schemas, API responses, or CLI flags.
+5. State what was verified and what could not be verified.
 
 Do not invent missing behavior. If evidence is insufficient, say what evidence is missing.
+
+## Concrete examples
+
+Use examples to make the explanation actionable. Concrete examples should be code-backed and specific enough for the user to jump into the repository.
+
+Good examples:
+
+- "`handler/recommender/v2/validator/parser.go` sets `req.ClientID = c.Param(\"clientId\")`, so the path parameter is the source of truth."
+- "`entity.Shelf` in `go/pkg/entity/shelf.go` is the final response shape; `Items []Item` is populated after Bigtable metadata hydration."
+- "`shelforder/defaults.go` is where a new default `ShelfExecutionPlan` starts; `shelforder/map.go` then applies client/order/shelf overrides."
+
+Avoid examples:
+
+- "The parser normalizes input."
+- "A service calls another service."
+- "The data model has an entity."
 
 ## Explanation levels
 
 Adjust depth to the user's goal:
 
 - **Conceptual understanding**: focus on purpose, mental model, domain terms, and why the structure exists. Avoid implementation detail unless needed for orientation.
-- **Use while implementing**: include boundaries, extension points, common pitfalls, relevant files, and examples of safe changes.
-- **Recreate/reimplement**: include data flow, control flow, invariants, edge cases, minimal algorithm, and test strategy.
+- **Use while implementing**: include boundaries, extension points, common pitfalls, relevant files, examples of safe changes, and real types/entities that define the contract.
+- **Recreate/reimplement**: include data flow, control flow, invariants, edge cases, minimal algorithm, test strategy, and concise code/entity excerpts.
 
 Adjust language to the user's role:
 
@@ -78,10 +106,14 @@ The HTML should include:
 1. Title and short summary
 2. Scope and assumptions
 3. High-level map or flow diagram
-4. Key concepts and glossary
-5. How the pieces interact
-6. Role- and goal-appropriate detail
-7. Verified sources within the repository, such as files, tests, or docs read
+4. A concrete examples section or inline examples that show actual files, symbols, values, and behavior from the repository
+5. Key concepts and glossary
+6. How the pieces interact, preferably with implementation file references for each step
+7. Implementation anchors with concise real code snippets when the user's goal is implementation-level or complete understanding
+8. Where-to-change guidance for likely implementation tasks
+9. Failure modes and edge cases when relevant
+10. A parts-and-implementation section mapping diagram boxes to files/modules, responsibilities, inputs/outputs, and key types/entities; this can be near the end as an implementation appendix if placing it earlier would interrupt the explanation flow
+11. Verified sources within the repository, such as files, tests, or docs read
 
 If creating the HTML in a project, choose a clear local artifact path and show it to the user with the available preview mechanism when possible.
 
@@ -92,15 +124,25 @@ After the explanation, create a short quiz when possible unless the user asked t
 Match the quiz to the user's understanding goal:
 
 - **Conceptual understanding**: vocabulary, purpose, and diagram-reading questions.
-- **Use while implementing**: scenario questions about where to make a change, which dependency matters, or what invariant must be preserved.
-- **Recreate/reimplement**: step-by-step reconstruction, edge cases, and test-design questions.
+- **Use while implementing**: concrete scenario questions about where to make a change, which dependency matters, or what invariant must be preserved.
+- **Recreate/reimplement**: step-by-step reconstruction, edge cases, and test-design questions grounded in actual code paths, types, or entity fields.
 
 Match the quiz to the user's role:
 
 - **Engineer**: include code-path, API, invariant, and test questions.
 - **Product/business**: include behavior, trade-off, workflow, and impact questions.
 
-Use 3-7 questions. Prefer a mix of multiple-choice and short-answer questions. Include an answer key after the user has had a chance to answer, or include it immediately if the user asks for self-study material.
+For HTML output:
+
+- Use multiple-choice questions only.
+- Use at most 10 questions.
+- Use 2-5 options per question; do not force exactly 3 options.
+- Add a difficulty label to every question as `Level 1` through `Level 5`.
+- Show correctness and explanation immediately when the user selects an option; do not require a submit button.
+- Include explanations for both correct and incorrect selections.
+- A reset button and score summary are useful, but secondary to immediate feedback.
+
+For text-only output, multiple-choice is still preferred. Short-answer questions are acceptable only when there is no interactive HTML quiz.
 
 ## Boundaries
 
