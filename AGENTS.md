@@ -81,6 +81,9 @@ Choose the narrowest implementation that solves the real problem without creatin
 
 - Pass an explicit `workdir` parameter when running shell commands.
 - Use `rg` / `rg --files` for search when available.
+- Use `fd` for fast file discovery before reading files, especially when narrowing by extension or path pattern.
+- Use `ast-grep` for syntax-aware code search or rewrites when matching language constructs; do not approximate those changes with plain regex when AST matching is safer.
+- Use `jq` for JSON and `yq` for YAML/TOML/XML/CSV/properties filtering to keep command output small and structured.
 - Use `apply_patch` for manual file edits.
 
 ## Git

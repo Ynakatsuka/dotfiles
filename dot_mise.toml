@@ -53,6 +53,18 @@ terraform = "latest"
 # gh - GitHub CLI
 gh = "latest"
 
+# fd - Fast file finder that respects ignore files
+fd = "latest"
+
+# ast-grep - Syntax-aware code search and rewrite
+ast-grep = "latest"
+
+# jq - Command-line JSON processor
+jq = "latest"
+
+# yq - Command-line YAML, JSON, XML, CSV, TOML and properties processor
+yq = "latest"
+
 # aws - AWS CLI
 aws = "latest"
 
