@@ -97,6 +97,7 @@ Phase 6 Program Closure
 - Public contracts that may change
 - Data / migration / operational concerns
 - Rollout and rollback expectations
+- Decision brief before user questions
 - Confirmation plan / decision tree
 - Open decisions
 
@@ -110,6 +111,17 @@ Phase 6 Program Closure
 4. ユーザー確認が不要な不明点は `Open decisions` に残すか、後続 Phase の調査タスクへ送る
 5. 確認が必要な不明点だけを 1〜3 問に圧縮する
 
+ユーザーに質問する前に、必ず判断材料を提示する。質問だけを先に出さない。
+
+提示順:
+
+1. 現状の理解: 要求、対象範囲、既存実装、制約
+2. 調査で確定したこと: docs、コード、テスト、issue / PR から確認できた事実
+3. 判断が必要な理由: 何が未確定で、どの Phase や PR tree に影響するか
+4. 選択肢ごとの影響: scope、PR 分割、検証、rollout / rollback、破壊的変更リスク
+5. 推奨案: 推奨する選択肢と理由
+6. 質問: ユーザーに決めてほしいこと
+
 分岐計画の書き方:
 
 ```text
@@ -120,6 +132,8 @@ If the user chooses C, stop Phase 3 until decision D-00N is resolved.
 
 ユーザー確認では、各質問に以下を含める。
 
+- 質問前の現状説明
+- 判断に必要な事実と制約
 - 何が不明か
 - なぜ今確認が必要か
 - 推奨選択肢

@@ -32,6 +32,14 @@ Use these templates for files under `docs/epics/{epic}/`.
 - **Related tests**:
 - **Related issues / PRs**:
 
+## Decision brief
+- **Current understanding**:
+- **Confirmed facts**:
+- **Why a decision is needed now**:
+- **Impact of each option**:
+- **Recommendation**:
+- **Question to ask**:
+
 ## Confirmation plan
 | ID | Unknown | Why ask now | Options | Branch plan | Recommendation | Status |
 |---|---|---|---|---|---|---|
