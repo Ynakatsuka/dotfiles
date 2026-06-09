@@ -15,10 +15,10 @@ Use these templates for files under `docs/epics/{epic}/`.
 
 ## Scope
 ### In scope
-- 
+-
 
 ### Non-goals
-- 
+-
 
 ## Constraints
 - **Technical**:
@@ -31,6 +31,11 @@ Use these templates for files under `docs/epics/{epic}/`.
 - **Related code**:
 - **Related tests**:
 - **Related issues / PRs**:
+
+## Confirmation plan
+| ID | Unknown | Why ask now | Options | Branch plan | Recommendation | Status |
+|---|---|---|---|---|---|---|
+| Q-001 |  |  | A: / B: / C: | If A: / If B: / If C: |  | open |
 
 ## Public contracts at risk
 - **API**:
@@ -63,8 +68,8 @@ Use these templates for files under `docs/epics/{epic}/`.
 - **Status**: proposed | accepted | rejected | superseded
 - **Context**:
 - **Options considered**:
-  1. 
-  2. 
+  1.
+  2.
 - **Decision**:
 - **Why**:
 - **Trade-offs**:

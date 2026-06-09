@@ -79,6 +79,8 @@ Phase 6 Program Closure
 3. 関連コード、テスト、既存の同種実装、公開 contract、schema、CLI/API を調べる
 4. `gh issue` / `gh pr` が使える場合は関連 issue / PR / default branch を確認する
 5. 調査から分かる制約、既存技術、危険な変更点を短くまとめる
+6. 調査で確定できない仕様、優先順位、破壊的変更、検証方法を確認候補として列挙する
+7. 各確認候補について「この回答ならこう進める」という分岐計画を作る
 
 ユーザーに聞くのは、調査で確定できない product decision、優先順位、破壊的変更の許容だけにする。
 
@@ -95,15 +97,43 @@ Phase 6 Program Closure
 - Public contracts that may change
 - Data / migration / operational concerns
 - Rollout and rollback expectations
+- Confirmation plan / decision tree
 - Open decisions
 
-作成後、root goal をユーザーに確認する。確認は 1〜3 問に絞り、各選択肢に推奨理由を付ける。
+### 確認計画
+
+`program.md` 作成時は、Phase 0 の調査結果を先に埋めてから確認計画を作る。
+
+1. 証拠で確定した内容と、証拠では確定できない内容を分ける
+2. 不明点を `goal / scope / success metric / contract / data / rollout / priority` に分類する
+3. 各不明点に、確認が必要な理由、選択肢、推奨案、分岐後の処理を記録する
+4. ユーザー確認が不要な不明点は `Open decisions` に残すか、後続 Phase の調査タスクへ送る
+5. 確認が必要な不明点だけを 1〜3 問に圧縮する
+
+分岐計画の書き方:
+
+```text
+If the user chooses A, set X as in-scope and plan leaf Y.
+If the user chooses B, mark X as non-goal and skip leaf Y.
+If the user chooses C, stop Phase 3 until decision D-00N is resolved.
+```
+
+ユーザー確認では、各質問に以下を含める。
+
+- 何が不明か
+- なぜ今確認が必要か
+- 推奨選択肢
+- 各選択肢を選んだ場合に次に何をするか
+
+作成後、root goal と確認計画をユーザーに確認する。確認は 1〜3 問に絞り、各選択肢に推奨理由と分岐後の動きを付ける。
 
 進めてよい条件:
 
 - root goal が一文で説明できる
 - non-goals が明記されている
 - 成功判定がコード、テスト、データ、運用のいずれかで検証できる
+- 確認計画が `program.md` に記録されている
+- ユーザー回答ごとの分岐後の処理が明記されている
 - 未決事項が `Open decisions` に分離されている
 
 ## Phase 2: Architecture / Tech Choice
