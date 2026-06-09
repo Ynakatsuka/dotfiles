@@ -1,6 +1,6 @@
 # Verification Harness Design
 
-A PR leaf is not ready for implementation until its harness explains how success will be measured.
+A PR leaf is not ready for implementation until its harness explains how success will be measured. An operation node is not ready for execution until its runbook explains what will be run, where it will run, what evidence proves success, and how to abort or roll back.
 
 ## Gate categories
 
@@ -71,6 +71,25 @@ Specify:
 - Rollback command or revert plan
 - Cleanup PR trigger
 
+### Operational execution gate
+
+Required for migration, backfill, initial script execution, feature flag changes, external console work, cleanup, and other operation nodes.
+
+Specify:
+
+- Exact command or manual action
+- Target environment, account, project, region, tenant, or service
+- Executor / owner
+- Required credentials or permissions
+- Preconditions and dependency nodes
+- Dry-run, preview, backup, or snapshot step when relevant
+- Expected evidence: output, log line, row count, dashboard, metric, trace, or audit record
+- Abort condition
+- Rollback command or manual recovery action
+- Irreversible effects
+
+Do not replace an operation gate with "run manually". If manual execution is necessary, define the exact screen, field, value, action, and expected evidence.
+
 ## Harness-first rule
 
 Create a separate Harness PR before implementation when:
@@ -82,7 +101,7 @@ Create a separate Harness PR before implementation when:
 
 Do not hide an absent harness by weakening the acceptance criteria.
 
-## Ready checklist
+## PR leaf ready checklist
 
 Before implementation, each leaf must answer:
 
@@ -93,3 +112,17 @@ Before implementation, each leaf must answer:
 - What review checks prove spec compliance before code quality cleanup?
 - What failure would block PR creation?
 - What evidence will be pasted into the PR body?
+
+## Operation node ready checklist
+
+Before execution, each operation node must answer:
+
+- What exact command or manual action will run?
+- Which environment, account, project, region, tenant, or service will it touch?
+- Who owns execution and approval?
+- Which dependency PR leaves or operation nodes must be complete?
+- What dry-run, preview, backup, or snapshot proves readiness?
+- What output, data invariant, log, metric, trace, dashboard, or audit record proves success?
+- What condition triggers abort or rollback?
+- What rollback or recovery action is available?
+- What evidence will be recorded in the operation file?

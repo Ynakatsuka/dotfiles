@@ -88,12 +88,14 @@ Use these templates for files under `docs/epics/{epic}/`.
 ## tree.md
 
 ````markdown
-# PR Decomposition Tree
+# Delivery Tree
 
 ## Overview
 - **Root goal**:
 - **Milestones**:
-- **Total PR leaves**:
+- **Total nodes**:
+- **PR leaves**:
+- **Operation nodes**:
 - **Critical path**:
 
 ## Tree
@@ -102,33 +104,43 @@ Use these templates for files under `docs/epics/{epic}/`.
 Root Initiative
 └── M1: {milestone}
     ├── PR-001: {leaf title}
-    └── PR-002: {leaf title}
+    ├── OP-001: {operation title}
+    └── VERIFY-001: {verification title}
 ```
 
 ## Dependency DAG
 
-| Leaf | Depends on | Unlocks | Parallel group | Status |
-|---|---|---|---|---|
-| PR-001 | none | PR-002 | P1 | planned |
+| Node | Type | Depends on | Unlocks | Parallel group | Status |
+|---|---|---|---|---|---|
+| PR-001 | PR leaf | none | OP-001 | P1 | planned |
+| OP-001 | Operation | PR-001 | VERIFY-001 | serial | planned |
 
 ## Progress matrix
 
-| Leaf | Approval | Implementation | Test gate | Data gate | Smoke gate | Review gates | PR |
-|---|---|---|---|---|---|---|---|
-| PR-001 | pending | not-started | pending | n/a | pending | pending | not-created |
+| Node | Type | Approval | Execution | Test gate | Data gate | Smoke / evidence gate | Review gates | PR |
+|---|---|---|---|---|---|---|---|---|
+| PR-001 | PR leaf | pending | not-started | pending | n/a | pending | pending | not-created |
+| OP-001 | Operation | pending | not-started | n/a | pending | pending | n/a | n/a |
 
 ## File touch matrix
 
-| Leaf | CREATE | MODIFY | TEST | DO NOT TOUCH | Parallel-safe with |
+| Node | CREATE | MODIFY | TEST | DO NOT TOUCH | Parallel-safe with |
 |---|---|---|---|---|---|
 | PR-001 | `src/new.ts` | `src/index.ts` | `tests/new.test.ts` | `src/legacy.ts` | PR-003 |
+| OP-001 | n/a | n/a | n/a | application code | none |
+
+## Operation matrix
+
+| Node | Environment | Owner | Action | Preconditions | Evidence | Rollback / abort |
+|---|---|---|---|---|---|---|
+| OP-001 | staging |  | Run script | PR-001 merged | log line / data check | abort command |
 
 ## Milestones
 
 ### M1: {milestone}
 - **Goal**:
 - **Exit criteria**:
-- **Leaves**: PR-001, PR-002
+- **Nodes**: PR-001, OP-001, VERIFY-001
 - **User approval**: pending | approved
 ````
 
@@ -252,6 +264,81 @@ Return:
 - **Spec compliance review**:
 - **Code quality review**:
 - **PR URL**:
+- **Remaining risks / follow-ups**:
+
+## Execution log
+| Time | Actor | Action | Result |
+|---|---|---|---|
+````
+
+## operations/{id}-{slug}.md
+
+````markdown
+# {ID}: {Operation title}
+
+## Status
+- **State**: planned | approved | in-progress | blocked | complete | skipped
+- **Owner / executor**:
+- **Environment**:
+- **Scheduled time / window**:
+
+## Operation goal
+- **Outcome**:
+- **Why this operation exists**:
+- **Out of scope**:
+
+## Dependencies
+- **Depends on**:
+- **Unlocks**:
+- **Parallel safety**:
+
+## Execution scope
+- **Operation type**: migration | backfill | initial script | feature flag | external console | verification | cleanup
+- **Target account / project / region / tenant**:
+- **Systems touched**:
+- **Data / operational impact**:
+
+## Preconditions
+- [ ] Required PRs merged:
+- [ ] Required credentials / permissions confirmed:
+- [ ] Current account / project shown:
+- [ ] Dry-run / preview / backup / snapshot completed:
+- [ ] User approval recorded:
+
+## Execution steps
+### Dry-run / preview
+- [ ] Command / action:
+- [ ] Expected result:
+
+### Execute
+- [ ] Command / action:
+- [ ] Expected result:
+
+### Evidence
+- [ ] Logs / output:
+- [ ] Data checks:
+- [ ] Metrics / dashboard / traces:
+
+## Rollback / abort
+- **Abort condition**:
+- **Rollback command / action**:
+- **Irreversible effects**:
+- **Escalation owner**:
+
+## Approval gate
+- [ ] Current situation explained before asking
+- [ ] Facts and constraints shown
+- [ ] Impact of running / not running explained
+- [ ] Recommendation shown
+- [ ] User approved exact command / action
+
+## Execution record
+- **Executed by**:
+- **Executed at**:
+- **Command / action run**:
+- **Result**:
+- **Evidence links / output**:
+- **Rollback used**: yes | no
 - **Remaining risks / follow-ups**:
 
 ## Execution log

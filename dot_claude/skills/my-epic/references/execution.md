@@ -1,10 +1,21 @@
-# Leaf Execution
+# Node Execution
 
-Use this workflow for each approved PR leaf. The default is direct implementation by the current agent. Use an external implementation agent such as Codex CLI only when it materially helps with parallelism, isolated exploration, or implementation speed.
+Use this workflow for each approved delivery node. PR leaves produce code changes and draft PRs. Operation nodes execute migration, backfill, initial script, rollout, external console, cleanup, or verification work that is not itself a PR.
+
+## Node type decision
+
+Choose the node type before execution.
+
+| Type | Use when | Output |
+|---|---|---|
+| PR leaf | Code, tests, docs, config, schema files, or scripts must change and be reviewed | Draft PR |
+| Operation | Existing command/script/manual action must be run against an environment | Execution record |
+| Verification | Existing state, data, logs, metrics, or dashboards must be checked | Evidence record |
+| Decision | Execution depends on a product, rollout, owner, or risk decision | Recorded decision |
 
 ## Implementation mode decision
 
-Choose one mode and record it in the leaf execution log.
+Choose one mode for PR leaves and record it in the leaf execution log.
 
 | Mode | Use when | Notes |
 |---|---|---|
@@ -24,6 +35,22 @@ Do not call another local skill as the default path. Keep the workflow self-cont
 6. Run Test / Data / Smoke gates
 7. Run Spec compliance review, then Code quality review
 8. Update the implementation record and execution log
+
+## Operation execution
+
+Use this for approved `operations/{id}-{slug}.md` nodes. Do not treat an operation as a PR unless files must change.
+
+1. Read the operation file, `program.md`, and `tree.md`
+2. Confirm all dependency PR leaves and prior operation nodes are complete
+3. Show the current account, project, region, tenant, environment, and executor identity when relevant
+4. Run dry-run, preview, backup, snapshot, or precondition checks exactly as written
+5. Before asking for approval, explain the current situation, confirmed facts, constraints, impact of each option, recommendation, and exact command/action
+6. Run only the approved command/action. Do not invent alternate commands, config paths, branches, credentials, endpoints, or manual console steps
+7. Capture output, logs, data checks, metrics, dashboards, traces, and other expected evidence
+8. If execution fails, stop and report root cause evidence, impact, rollback/abort status, and options
+9. Update the execution record and `tree.md` only after required evidence gates pass
+
+Never silently continue after a partial operation. Partial execution must be recorded as blocked or failed with the missing evidence.
 
 ## Codex-assisted implementation
 
@@ -96,7 +123,7 @@ Return:
 
 ## Integration
 
-After implementation:
+After PR leaf implementation:
 
 1. Inspect `git diff --stat` and `git diff`
 2. Confirm all edits are inside the approved file touch map
@@ -105,6 +132,14 @@ After implementation:
 5. Run Spec compliance review before Code quality review
 6. Update the implementation record and leaf execution log
 7. Update `tree.md` only after all required gates pass
+
+After operation execution:
+
+1. Inspect the operation record and evidence
+2. Confirm the executed command/action matches the approved operation node
+3. Confirm data / smoke / observability evidence matches expected results
+4. Record rollback use or the fact that rollback was not needed
+5. Update `tree.md` only after all required evidence gates pass
 
 ## Review gates
 
@@ -188,7 +223,9 @@ Stop and ask the user when:
 
 - Implementation changes files outside the approved file touch map
 - A gate is missing, impossible to run, or depends on unavailable credentials
+- Operation execution requires a command/action, environment, account, project, region, tenant, credential, or console step that is not written in the operation node
+- Operation execution has partial success, ambiguous output, missing evidence, or unclear rollback status
 - A test failure remains after one targeted fix
 - The implementation requires fallback behavior
 - Implementation requires a new technical decision
-- Implementation requires splitting or merging leaves
+- Implementation requires splitting or merging nodes
