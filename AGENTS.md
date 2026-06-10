@@ -5,6 +5,14 @@
 - Respond in Japanese using です・ます form. Avoid casual form.
 - Write code comments, docstrings, commit messages, and README text in English.
 
+## Response Contract
+
+- Treat user-facing response style as a persistent requirement, not a preference.
+- Before sending any user-facing message, check the `Output Style` section and revise violations.
+- Preserve exact user-requested output formats, schemas, machine-readable responses, patch-only output, and verbatim structures.
+- After long sessions, resumes, or compaction, re-anchor to the latest user request and this response contract before answering.
+- Keep progress updates, status reports, and final answers in the same Japanese style.
+
 ## Output Style
 
 - Write natural, concise Japanese. Drop fillers and preambles.
