@@ -10,6 +10,8 @@
 #
 # Scope:
 #   - Links every directory under dot_claude/skills/ that ships a SKILL.md.
+#   - Prunes stale user skill directories under ~/.claude/skills/ that are no
+#     longer present in dot_claude/skills/.
 #   - Never touches ~/.codex/skills/.system/ (Codex-managed system skills).
 #   - Prunes stale symlinks that previously pointed into ~/.claude/skills/ but
 #     whose source skill no longer exists.
@@ -33,6 +35,31 @@ skills=(
 {{- end }}
 )
 
+is_managed_skill() {
+  local candidate="$1"
+  local keep
+  for keep in "${skills[@]}"; do
+    if [[ "${candidate}" == "${keep}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Prune stale Claude Code user skill directories. Keep this before linking
+# Codex skills so stale Codex symlinks can be pruned in the next block.
+shopt -s nullglob
+for entry in "${CLAUDE_SKILLS}"/*; do
+  [[ -d "${entry}" ]] || continue
+  [[ -e "${entry}/SKILL.md" ]] || continue
+  name="$(basename "${entry}")"
+  if ! is_managed_skill "${name}"; then
+    echo "Pruning stale Claude skill: ${entry}"
+    rm -rf -- "${entry}"
+  fi
+done
+shopt -u nullglob
+
 for skill in "${skills[@]}"; do
   src="${CLAUDE_SKILLS}/${skill}"
   dst="${CODEX_SKILLS}/${skill}"
@@ -55,14 +82,7 @@ for entry in "${CODEX_SKILLS}"/*; do
     *) continue ;;
   esac
   name="$(basename "${entry}")"
-  found=0
-  for keep in "${skills[@]}"; do
-    if [[ "${name}" == "${keep}" ]]; then
-      found=1
-      break
-    fi
-  done
-  if [[ "${found}" -eq 0 ]]; then
+  if ! is_managed_skill "${name}"; then
     echo "Pruning stale symlink: ${entry}"
     rm -f "${entry}"
   fi
