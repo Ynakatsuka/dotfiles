@@ -32,6 +32,7 @@ Phase 6 Program Closure
 ## 共通原則
 
 - **このスキルの責務**: 分解、合意、依存管理、PR leaf 実装、operation 実行、検証ゲート、統合、PR 作成判断
+- **記述言語**: `program.md` / `tree.md` / leaf / operation / decision / 実行記録は日本語で書く。コードコメント、docstring、commit message、README、コマンド、識別子は英語を維持する
 - **実装方針**: まず自分で実装できる範囲を進める。必要なら Codex CLI などの外部実装エージェントを補助的に使う
 - **PR leaf の定義**: 単独でレビュー・マージ可能で、受入基準と検証ゲートが明確な最小成果物
 - **確認単位**: root goal、主要分岐、PR leaf goal、operation 実行内容、技術選定、破壊的変更、PR 作成前
@@ -91,16 +92,18 @@ Phase 6 Program Closure
 
 必須項目:
 
-- Problem / outcome
-- Scope / non-goals
-- Success metrics
-- Constraints
-- Public contracts that may change
+- 実行計画（タイトル直下に置き、各 Phase で何を確認するかを先に示す）
+- 問題 / 期待する成果
+- スコープ / 対象外
+- 成功指標
+- 制約
+- 変更され得る公開 contract
 - Data / migration / operational concerns
-- Rollout and rollback expectations
-- Decision brief before user questions
-- Confirmation plan / decision tree
-- Open decisions
+- Rollout / rollback expectations
+- PR 外作業の想定（初回実行、script 実行、migration、backfill、feature flag、外部設定、手動確認）
+- ユーザー質問前の判断材料
+- 確認計画 / decision tree
+- 未決事項
 
 ### 確認計画
 
@@ -175,6 +178,8 @@ If the user chooses C, stop Phase 3 until decision D-00N is resolved.
 ## Phase 3: Delivery Tree Decomposition
 
 `tree.md` を作成し、root goal を PR leaf と operation node を含む delivery tree へ分解する。
+
+Delivery tree は、調査で「PR 以外の作業が不要」と確認できた場合を除き、PR leaf だけで完結させない。初回実行、one-off script、migration、backfill、feature flag 切替、外部サービス設定、手動確認、検証だけの作業を必ず operation / verification / decision node として検討し、不要なら理由を `tree.md` に記録する。
 
 node 種別:
 

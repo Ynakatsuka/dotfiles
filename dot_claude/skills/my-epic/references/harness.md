@@ -1,30 +1,31 @@
 # Verification Harness Design
 
-A PR leaf is not ready for implementation until its harness explains how success will be measured. An operation node is not ready for execution until its runbook explains what will be run, where it will run, what evidence proves success, and how to abort or roll back.
+PR leaf は、成功をどう測るかを harness で説明するまで実装準備完了にしない。
+Operation node は、何を、どこで実行し、何を証跡に成功と判断し、どう中止または rollback するかを runbook で説明するまで実行準備完了にしない。
 
-## Gate categories
+## Gate categories（gate 種別）
 
-### Test gate
+### Test gate（テスト）
 
-Use the narrowest automated tests that prove the leaf goal.
+leaf goal を証明する最小の自動テストを使う。
 
-- Unit tests for pure logic
-- Integration tests for boundary behavior
-- Contract tests for public API / event / schema compatibility
-- E2E tests only when cross-component behavior is the leaf goal
+- Pure logic: unit test
+- Boundary behavior: integration test
+- Public API / event / schema compatibility: contract test
+- Cross-component behavior が leaf goal の場合だけ E2E test
 
-Every test gate needs:
+すべての Test gate に以下を含める。
 
 - Exact command
 - Expected pass condition
 - Existing test files or new test file path
 - Known flakes or environment requirements
 
-### Data gate
+### Data gate（データ）
 
-Required when the leaf touches persistence, migrations, backfills, analytics, permissions, or generated data.
+永続化、migration、backfill、analytics、permission、generated data に触れる場合は必須。
 
-Specify one or more:
+以下のいずれかを指定する。
 
 - Migration dry-run command
 - Row-count or invariant query
@@ -33,37 +34,37 @@ Specify one or more:
 - Backfill checkpoint / resume check
 - Data deletion or retention check
 
-For BigQuery or expensive queries, show current project/account and run dry-run first.
+BigQuery や高コスト query では、current project / account を表示し、先に dry-run を実行する。
 
-### Smoke gate
+### Smoke gate（スモーク）
 
-Use the smallest realistic scenario that exercises the new path after local or staging startup.
+local または staging 起動後に新しい経路を通す最小の現実的 scenario を使う。
 
-Good smoke gates:
+良い Smoke gate:
 
-- One CLI command with expected stdout
-- One HTTP request with expected status and response shape
-- One UI route with exact interaction and expected visible result
-- One worker/job invocation with expected log line and side effect
+- Expected stdout を持つ CLI command
+- Expected status / response shape を持つ HTTP request
+- Exact interaction と expected visible result を持つ UI route
+- Expected log line と side effect を持つ worker / job invocation
 
-Avoid smoke gates that say only "check manually". If manual observation is unavoidable, define the exact screen, input, and expected result.
+「手で確認する」だけにしない。手動観察が避けられない場合も、exact screen、input、expected result を定義する。
 
-### Observability gate
+### Observability gate（観測）
 
-Required when the change introduces production risk.
+production risk がある変更では必須。
 
-Specify:
+以下を指定する。
 
 - New or existing metric name
 - Log event and fields
 - Trace span or audit record
 - Alert or dashboard to inspect
 
-### Rollout / rollback gate
+### Rollout / rollback gate（展開 / 戻し）
 
-Required when rollout is not all-at-once.
+all-at-once ではない rollout の場合は必須。
 
-Specify:
+以下を指定する。
 
 - Feature flag or config name
 - Default value
@@ -71,11 +72,11 @@ Specify:
 - Rollback command or revert plan
 - Cleanup PR trigger
 
-### Operational execution gate
+### Operational execution gate（運用実行）
 
-Required for migration, backfill, initial script execution, feature flag changes, external console work, cleanup, and other operation nodes.
+migration、backfill、initial script execution、feature flag change、external console work、cleanup、その他 operation node では必須。
 
-Specify:
+以下を指定する。
 
 - Exact command or manual action
 - Target environment, account, project, region, tenant, or service
@@ -88,41 +89,41 @@ Specify:
 - Rollback command or manual recovery action
 - Irreversible effects
 
-Do not replace an operation gate with "run manually". If manual execution is necessary, define the exact screen, field, value, action, and expected evidence.
+operation gate を「手で実行する」で置き換えない。手動実行が必要な場合も、exact screen、field、value、action、expected evidence を定義する。
 
-## Harness-first rule
+## Harness-first rule（harness 優先）
 
-Create a separate Harness PR before implementation when:
+以下の場合は、実装 PR より前に separate Harness PR を作る。
 
-- The required tests do not exist and will be reused by multiple leaves
-- Contract behavior is unclear
-- Data validation requires reusable scripts or fixtures
-- Smoke testing needs new local/staging tooling
+- 必要な test が存在せず、複数 leaf で再利用される
+- Contract behavior が不明
+- Data validation に reusable script や fixture が必要
+- Smoke testing に新しい local / staging tooling が必要
 
-Do not hide an absent harness by weakening the acceptance criteria.
+Acceptance criteria を弱めて、harness 不足を隠さない。
 
-## PR leaf ready checklist
+## PR leaf ready checklist（PR leaf 準備完了 checklist）
 
-Before implementation, each leaf must answer:
+実装前に各 leaf が答えること。
 
-- What exact command proves the code path?
-- What exact data invariant must hold?
-- What exact smoke scenario proves the feature path?
-- What exact files may be created, modified, tested, or must not be touched?
-- What review checks prove spec compliance before code quality cleanup?
-- What failure would block PR creation?
-- What evidence will be pasted into the PR body?
+- どの exact command が code path を証明するか
+- どの exact data invariant が成立すべきか
+- どの exact smoke scenario が feature path を証明するか
+- どの file を create / modify / test してよく、どの file に触れてはいけないか
+- Code quality cleanup 前に、どの review check で spec compliance を証明するか
+- 何が起きたら PR creation を block するか
+- PR body に貼る evidence は何か
 
-## Operation node ready checklist
+## Operation node ready checklist（operation node 準備完了 checklist）
 
-Before execution, each operation node must answer:
+実行前に各 operation node が答えること。
 
-- What exact command or manual action will run?
-- Which environment, account, project, region, tenant, or service will it touch?
-- Who owns execution and approval?
-- Which dependency PR leaves or operation nodes must be complete?
-- What dry-run, preview, backup, or snapshot proves readiness?
-- What output, data invariant, log, metric, trace, dashboard, or audit record proves success?
-- What condition triggers abort or rollback?
-- What rollback or recovery action is available?
-- What evidence will be recorded in the operation file?
+- どの exact command or manual action を実行するか
+- どの environment、account、project、region、tenant、service に触るか
+- 誰が execution と approval を持つか
+- どの dependency PR leaf or operation node が完了している必要があるか
+- どの dry-run、preview、backup、snapshot が readiness を証明するか
+- どの output、data invariant、log、metric、trace、dashboard、audit record が成功を証明するか
+- どの condition で abort or rollback するか
+- どの rollback or recovery action が使えるか
+- どの evidence を operation file に記録するか

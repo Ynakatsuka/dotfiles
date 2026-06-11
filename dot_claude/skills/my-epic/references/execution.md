@@ -1,62 +1,65 @@
 # Node Execution
 
-Use this workflow for each approved delivery node. PR leaves produce code changes and draft PRs. Operation nodes execute migration, backfill, initial script, rollout, external console, cleanup, or verification work that is not itself a PR.
+承認済み delivery node ごとにこの workflow を使う。
+PR leaf は code change と draft PR を生む。
+Operation node は migration、backfill、initial script、rollout、external console、cleanup、verification など、PR 自体ではない作業を実行する。
 
-## Node type decision
+## Node type decision（node 種別判断）
 
-Choose the node type before execution.
+実行前に node type を選ぶ。
 
-| Type | Use when | Output |
+| Type | 使う場面 | Output |
 |---|---|---|
-| PR leaf | Code, tests, docs, config, schema files, or scripts must change and be reviewed | Draft PR |
-| Operation | Existing command/script/manual action must be run against an environment | Execution record |
-| Verification | Existing state, data, logs, metrics, or dashboards must be checked | Evidence record |
-| Decision | Execution depends on a product, rollout, owner, or risk decision | Recorded decision |
+| PR leaf | Code、test、docs、config、schema file、script を変更して review する必要がある | Draft PR |
+| Operation | 既存 command / script / manual action を環境に対して実行する必要がある | Execution record |
+| Verification | 既存状態、data、log、metric、dashboard を確認するだけ | Evidence record |
+| Decision | Product、rollout、owner、risk の判断がないと実行できない | Recorded decision |
 
-## Implementation mode decision
+## Implementation mode decision（実装方式判断）
 
-Choose one mode for PR leaves and record it in the leaf execution log.
+PR leaf ごとに 1 つの mode を選び、leaf execution log に記録する。
 
-| Mode | Use when | Notes |
+| Mode | 使う場面 | Notes |
 |---|---|---|
-| Direct | The leaf is small, file touch map is clear, and the current agent can implement safely | Default |
-| Codex-assisted | The leaf is large but bounded, or parallel implementation is useful | Main agent still owns review and gates |
-| Explore-only | The implementation path is unclear and codebase research is needed | No edits unless explicitly scoped |
+| Direct | leaf が小さく、file touch map が明確で、現在の agent が安全に実装できる | Default |
+| Codex-assisted | leaf が大きいが境界が明確、または並列実装が有効 | Main agent が review と gate の責任を持つ |
+| Explore-only | 実装経路が不明で codebase research が必要 | 明示 scope がない限り編集しない |
 
-Do not call another local skill as the default path. Keep the workflow self-contained.
+別の local skill 呼び出しを default path にしない。workflow は自己完結させる。
 
-## Direct implementation
+## Direct implementation（直接実装）
 
-1. Read the leaf file, `program.md`, and `tree.md`
-2. Read target files and nearest relevant tests before editing
-3. Search for shared contracts and callers before changing exported behavior
-4. Implement only inside the approved file touch map
-5. Add or update tests before marking the leaf complete
-6. Run Test / Data / Smoke gates
-7. Run Spec compliance review, then Code quality review
-8. Update the implementation record and execution log
+1. leaf file、`program.md`、`tree.md` を読む
+2. 編集前に target files と最寄りの relevant tests を読む
+3. Exported behavior を変える前に shared contracts と callers を探す
+4. 承認済み file touch map の範囲だけ実装する
+5. leaf 完了前に test を追加または更新する
+6. Test / Data / Smoke gates を実行する
+7. Spec compliance review、Code quality review の順で確認する
+8. Implementation record と execution log を更新する
 
-## Operation execution
+## Operation execution（operation 実行）
 
-Use this for approved `operations/{id}-{slug}.md` nodes. Do not treat an operation as a PR unless files must change.
+承認済み `operations/{id}-{slug}.md` node に使う。
+Files を変更する必要がない限り、operation を PR として扱わない。
 
-1. Read the operation file, `program.md`, and `tree.md`
-2. Confirm all dependency PR leaves and prior operation nodes are complete
-3. Show the current account, project, region, tenant, environment, and executor identity when relevant
-4. Run dry-run, preview, backup, snapshot, or precondition checks exactly as written
-5. Before asking for approval, explain the current situation, confirmed facts, constraints, impact of each option, recommendation, and exact command/action
-6. Run only the approved command/action. Do not invent alternate commands, config paths, branches, credentials, endpoints, or manual console steps
-7. Capture output, logs, data checks, metrics, dashboards, traces, and other expected evidence
-8. If execution fails, stop and report root cause evidence, impact, rollback/abort status, and options
-9. Update the execution record and `tree.md` only after required evidence gates pass
+1. operation file、`program.md`、`tree.md` を読む
+2. 依存 PR leaves と prior operation nodes が完了していることを確認する
+3. 関連する current account、project、region、tenant、environment、executor identity を表示する
+4. 書かれている通りに dry-run、preview、backup、snapshot、precondition checks を実行する
+5. 承認前に、現状、確認済み事実、制約、選択肢ごとの影響、推奨案、exact command / action を説明する
+6. 承認済み command / action だけを実行する。代替 command、config path、branch、credential、endpoint、manual console step を推測しない
+7. Output、log、data check、metric、dashboard、trace、その他 expected evidence を記録する
+8. 失敗した場合は停止し、root cause evidence、影響範囲、rollback / abort status、選択肢を報告する
+9. Required evidence gates が通った後だけ execution record と `tree.md` を更新する
 
-Never silently continue after a partial operation. Partial execution must be recorded as blocked or failed with the missing evidence.
+Partial operation 後に黙って継続しない。Partial execution は missing evidence とともに blocked or failed として記録する。
 
-## Codex-assisted implementation
+## Codex-assisted implementation（Codex 補助実装）
 
-If using Codex CLI, pass a self-contained prompt from `leaves/{id}-{slug}.md`.
+Codex CLI を使う場合は、`leaves/{id}-{slug}.md` から self-contained prompt を渡す。
 
-The prompt must include:
+Prompt には以下を含める。
 
 - Repo path and current branch/worktree
 - Leaf file path
@@ -74,9 +77,9 @@ Example command:
 codex exec "<SELF_CONTAINED_PROMPT>"
 ```
 
-Do not hardcode model names. Let the CLI default decide.
+Model name を hardcode しない。CLI default に任せる。
 
-## Prompt skeleton
+## Prompt skeleton（prompt 雛形）
 
 ```text
 Implement PR leaf {ID}: {title} in {repo_path}.
@@ -121,51 +124,52 @@ Return:
 6. Blockers or follow-up
 ```
 
-## Integration
+## Integration（統合確認）
 
-After PR leaf implementation:
+PR leaf 実装後:
 
-1. Inspect `git diff --stat` and `git diff`
-2. Confirm all edits are inside the approved file touch map
-3. Run the leaf gates directly
-4. Search for related call sites if any public or shared contract was touched
-5. Run Spec compliance review before Code quality review
-6. Update the implementation record and leaf execution log
-7. Update `tree.md` only after all required gates pass
+1. `git diff --stat` と `git diff` を確認する
+2. すべての編集が承認済み file touch map 内であることを確認する
+3. leaf gates を直接実行する
+4. Public or shared contract に触れた場合は related call sites を探す
+5. Code quality review の前に Spec compliance review を実行する
+6. Implementation record と leaf execution log を更新する
+7. Required gates がすべて通った後だけ `tree.md` を更新する
 
-After operation execution:
+Operation 実行後:
 
-1. Inspect the operation record and evidence
-2. Confirm the executed command/action matches the approved operation node
-3. Confirm data / smoke / observability evidence matches expected results
-4. Record rollback use or the fact that rollback was not needed
-5. Update `tree.md` only after all required evidence gates pass
+1. Operation record と evidence を確認する
+2. 実行した command / action が承認済み operation node と一致することを確認する
+3. Data / smoke / observability evidence が expected results と一致することを確認する
+4. Rollback を使ったか、不要だったことを記録する
+5. Required evidence gates がすべて通った後だけ `tree.md` を更新する
 
-## Review gates
+## Review gates（レビュー gate）
 
-Run these after implementation and before PR creation. Do not start code quality cleanup until spec compliance passes.
+実装後、PR creation 前に実行する。
+Spec compliance が通るまで code quality cleanup を始めない。
 
-### Spec compliance review
+### Spec compliance review（仕様適合）
 
-- Built exactly the approved PR goal
-- All acceptance criteria are satisfied
-- No extra feature or scope creep
-- No out-of-scope file changes
-- Contract impact matches the approved leaf
-- Test / Data / Smoke gates ran or have an explicit blocking reason
+- 承認済み PR goal だけを実装している
+- すべての acceptance criteria を満たしている
+- 余分な feature や scope creep がない
+- Out-of-scope file changes がない
+- Contract impact が承認済み leaf と一致している
+- Test / Data / Smoke gates が実行済み、または明示的な blocking reason がある
 
-### Code quality review
+### Code quality review（品質）
 
-- Existing patterns followed
-- Shared contracts and callers checked when touched
-- Error semantics preserved
-- Tests verify real behavior
-- No fallback behavior, silent retry, broad catch, mock continuation, or default substitution added
-- Implementation remains reviewable as one PR
+- Existing patterns に従っている
+- Shared contracts and callers を確認している
+- Error semantics を維持している
+- Tests が実挙動を検証している
+- Fallback behavior、silent retry、broad catch、mock continuation、default substitution を追加していない
+- 実装が 1 PR として review 可能な大きさに収まっている
 
-## Implementation record
+## Implementation record（実装記録）
 
-Update the leaf file with:
+Leaf file に以下を更新する。
 
 - Mode: Direct | Codex-assisted | Explore-only
 - Summary
@@ -179,9 +183,9 @@ Update the leaf file with:
 - PR URL
 - Remaining risks / follow-ups
 
-## PR creation
+## PR creation（PR 作成）
 
-Create or update a draft PR directly with `gh`.
+`gh` で draft PR を作成または更新する。
 
 Preflight:
 
@@ -205,7 +209,7 @@ else
 fi
 ```
 
-PR body should include:
+PR body には以下を含める。
 
 - Leaf ID and goal
 - Tree dependency context
@@ -213,19 +217,19 @@ PR body should include:
 - Rollout and rollback notes
 - Remaining risks or follow-ups
 
-Use draft PRs until CI, automated reviews, and required gates are green.
+CI、自動 review、required gates が green になるまで draft PR のままにする。
 
-## Failure handling
+## Failure handling（失敗時対応）
 
-Do not silently retry. One bounded repair loop is allowed only when the cause is clear.
+黙って retry しない。原因が明確な場合だけ、1 回の bounded repair loop を許可する。
 
-Stop and ask the user when:
+以下では停止してユーザーに確認する。
 
-- Implementation changes files outside the approved file touch map
-- A gate is missing, impossible to run, or depends on unavailable credentials
-- Operation execution requires a command/action, environment, account, project, region, tenant, credential, or console step that is not written in the operation node
-- Operation execution has partial success, ambiguous output, missing evidence, or unclear rollback status
-- A test failure remains after one targeted fix
-- The implementation requires fallback behavior
-- Implementation requires a new technical decision
-- Implementation requires splitting or merging nodes
+- 実装が承認済み file touch map 外を変更する必要がある
+- Gate が未定義、実行不能、または unavailable credentials に依存する
+- Operation execution が operation node に書かれていない command/action、environment、account、project、region、tenant、credential、console step を必要とする
+- Operation execution が partial success、ambiguous output、missing evidence、unclear rollback status になった
+- Test failure が 1 回の targeted fix 後も残る
+- 実装に fallback behavior が必要になる
+- 新しい technical decision が必要になる
+- Node の split or merge が必要になる
