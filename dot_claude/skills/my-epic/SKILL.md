@@ -35,7 +35,7 @@ epic root は `docs/epics/{name}/`。人間向けと AI 用をディレクトリ
 
 ```text
 docs/epics/{name}/
-├── README.md            # 人間向け: 承認に必要な情報だけの 1 画面ダイジェスト
+├── README.md            # 人間向け: 目的、Phase 計画、成功基準、承認事項の判断ダイジェスト
 └── ai/                  # AI 用: 作業詳細と実行記録
     ├── program.md       # ゴール契約と判断表
     ├── tree.md          # delivery tree と node 状態の single source of truth
@@ -44,7 +44,7 @@ docs/epics/{name}/
     └── operations/      # operation node の承認部と実行部
 ```
 
-- 同じ情報は 1 ファイルにだけ書く。node 状態は `ai/tree.md` の node 表、file touch map と gate 詳細は leaf / operation ファイルが正。`README.md` はその要約
+- 同じ情報は 1 ファイルにだけ書く。node 状態は `ai/tree.md` の node 表、file touch map と gate 詳細は leaf / operation ファイルが正。`README.md` は判断に必要な要約
 - 承認を求めるときは `README.md` を更新してから、該当部分だけをチャットに提示する。`ai/` 配下の全文を人間に読ませない
 
 ## 承認ビュー
@@ -119,7 +119,7 @@ docs/epics/{name}/
 
 `README.md`（人間向け）と `ai/program.md` を作成する。テンプレートは `references/templates.md`。
 
-- `README.md`: 現在地、ゴール、主要リスク、node 一覧、承認待ち事項、承認履歴
+- `README.md`: 現在地、目的、root goal、Phase 計画、成功基準、主要リスク、node 一覧、承認待ち事項、承認履歴
 - `ai/program.md`: 状態、ゴール契約、スコープ、制約、既存情報、判断表、公開 contract、rollout / rollback 方針
 
 ### 判断表の作り方
@@ -142,8 +142,10 @@ If the user chooses B, mark X as non-goal and skip node Y.
 進めてよい条件:
 
 - root goal が一文で説明できる
+- 目的と「なぜ今やるか」が README.md に書かれている
 - non-goals が明記されている
 - 成功判定がコード、テスト、データ、運用のいずれかで検証できる
+- Phase ごとの目的、主な作業、成功基準が README.md から分かる
 - 判断表に選択肢と分岐後の処理が記録されている
 - ユーザー確認の結果が承認履歴と判断表に反映されている
 
@@ -211,7 +213,7 @@ Root Initiative
 
 ユーザー確認:
 
-- `README.md` の node 一覧（1 node 1 行）と主要リスクを更新してから、承認ビュー形式で確認する
+- `README.md` の Phase 計画、node 一覧（1 node 1 行）、主要リスク、成功基準を更新してから、承認ビュー形式で確認する
 - milestone 単位でまとめて確認してよい。operation node と破壊的変更を含む node は個別に明示する
 - ユーザー承認前に Phase 5 の実装・実行へ進まない
 
