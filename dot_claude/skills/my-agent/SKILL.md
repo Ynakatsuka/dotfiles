@@ -1,41 +1,44 @@
 ---
 name: my-agent
 description: >-
-  Delegate tasks to an external CLI agent (OpenAI Codex or Google Gemini) for
-  second opinions or parallel execution. Use when the user explicitly mentions
-  "codex" or "gemini" or asks to delegate work to one of them
+  Delegate tasks to an external CLI agent (OpenAI Codex, Google Gemini, or
+  Claude Code) for second opinions or parallel execution. Use when the user
+  explicitly mentions "codex", "gemini", or "claude" or asks to delegate work to one of them
   (e.g., "codexで実行", "codexに聞いて", "geminiで実行", "Geminiに聞いて",
-  "run with codex", "ask gemini").
-  Do NOT use for general coding tasks that don't mention codex or gemini.
-argument-hint: "[codex|gemini] <task-description>"
+  "claudeで実行", "Claudeに聞いて", "run with codex", "ask gemini",
+  "ask claude").
+  Do NOT use for general coding tasks that don't mention codex, gemini, or claude.
+argument-hint: "[codex|gemini|claude] <task-description>"
 ---
 
 # CLI Agent Runner
 
-Delegate tasks to an external CLI agent from within Claude Code. Supports two providers:
+Delegate tasks to an external CLI agent from within Claude Code. Supports three providers:
 
 - **codex** — OpenAI Codex CLI (`codex exec ...`)
 - **gemini** — Google Gemini CLI (`gemini -p ...`)
+- **claude** — Claude Code CLI (`claude -p ...`)
 
 ## Provider Selection
 
 Pick the provider in this order:
 
 1. User says "gemini" / "ジェミニ" / asks to delegate to Gemini → `gemini`
-2. User says "codex" / "コーデックス" → `codex`
-3. **No explicit provider mentioned (default) → `codex`**
+2. User says "claude" / "クロード" / asks to delegate to Claude → `claude`
+3. User says "codex" / "コーデックス" → `codex`
+4. **No explicit provider mentioned (default) → `codex`**
 
-The first argument is treated as a provider only if it is exactly `codex` or `gemini`; otherwise the entire argument string is the task prompt and `codex` is used. Do NOT ask the user which provider to use — pick `codex` and proceed.
+The first argument is treated as a provider only if it is exactly `codex`, `gemini`, or `claude`; otherwise the entire argument string is the task prompt and `codex` is used. Do NOT ask the user which provider to use — pick `codex` and proceed.
 
 The remaining arguments form the task prompt. Convert the user's request into a clear, self-contained prompt and include relevant file paths/context. If the user provides a literal prompt, pass it through directly.
 
-## Common Notes (both providers)
+## Common Notes (all providers)
 
 - Always use the Bash tool with `timeout: 600000` (10 minutes); delegated tasks can take time.
 - Do NOT hardcode model names — let each CLI's own default handle it so it stays current.
 - Output streams to stdout; capture or display results directly.
 - For long-running tasks, warn the user that the delegate may take time.
-- If the delegate fails, report the error and suggest the user run it interactively (`codex` / `gemini`).
+- If the delegate fails, report the error and suggest the user run it interactively (`codex` / `gemini` / `claude`).
 
 ## Quick Reference
 
@@ -56,3 +59,13 @@ gemini --skip-trust -y -p "<PROMPT>"
 ```
 
 For approval modes, structured output, model override, troubleshooting, and more examples, read `references/gemini.md`.
+
+### Claude
+
+**Before the first `claude -p` of the session, read `references/claude.md`.** It contains the non-interactive invocation rules and permission-mode guidance.
+
+```bash
+claude -p "<PROMPT>"
+```
+
+For permission modes, model override, structured output, troubleshooting, and more examples, read `references/claude.md`.
