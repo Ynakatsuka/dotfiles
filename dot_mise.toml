@@ -117,7 +117,9 @@ AGENT_BROWSER_NATIVE = "1"
 [tasks.update-dotfiles]
 description = "Update dotfiles and development environment"
 run = """
-mise up && \
+if ! mise up; then
+  echo "[WARN] mise up failed, continuing with dotfiles update" >&2
+fi
 chezmoi update -v
 """
 
@@ -134,7 +136,9 @@ brew autoremove
 [tasks.maintenance]
 description = "Update dotfiles, mise tools, and Homebrew packages"
 run = """
-mise up && \
+if ! mise up; then
+  echo "[WARN] mise up failed, continuing with remaining maintenance tasks" >&2
+fi
 chezmoi update -v && \
 if command -v brew >/dev/null 2>&1; then
   brew update && \
