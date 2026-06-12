@@ -25,14 +25,42 @@ Phase 6 Program Closure
 
 ## 参照ファイル
 
-- `references/templates.md` — `program.md` / `tree.md` / `leaves/*.md` / `operations/*.md` / `decisions.md` のテンプレート
-- `references/harness.md` — PR leaf ごとの verification harness / gates 設計
+- `references/templates.md` — ドキュメント区分と `README.md` / `ai/` 配下各ファイルのテンプレート
+- `references/harness.md` — PR leaf / operation node の verification harness / gates 設計
 - `references/execution.md` — PR leaf 実装、operation 実行、統合、PR 作成、失敗時停止条件
+
+## ドキュメント区分
+
+epic root は `docs/epics/{name}/`。人間向けと AI 用をディレクトリで分ける。
+
+```text
+docs/epics/{name}/
+├── README.md            # 人間向け: 承認に必要な情報だけの 1 画面ダイジェスト
+└── ai/                  # AI 用: 作業詳細と実行記録
+    ├── program.md       # ゴール契約と判断表
+    ├── tree.md          # delivery tree と node 状態の single source of truth
+    ├── decisions.md     # 技術選定の判断記録
+    ├── leaves/          # PR leaf の承認部と実行部
+    └── operations/      # operation node の承認部と実行部
+```
+
+- 同じ情報は 1 ファイルにだけ書く。node 状態は `ai/tree.md` の node 表、file touch map と gate 詳細は leaf / operation ファイルが正。`README.md` はその要約
+- 承認を求めるときは `README.md` を更新してから、該当部分だけをチャットに提示する。`ai/` 配下の全文を人間に読ませない
+
+## 承認ビュー
+
+すべてのユーザー確認をこの形式で行う。
+
+- チャット提示は 1 画面以内。冒頭に現状理解と確定事実を 3 行以内で示す
+- 質問は最大 3 問。各質問は 5 行以内で、推奨案を先頭に置き、選択肢ごとの分岐後の処理を付ける
+- 返答選択肢は `承認 / 分割 / 統合 / 順序変更 / スコープ変更` を基本にする
+- 再承認では前回承認版との差分だけを示す
+- 結果は `README.md` の承認履歴と、`ai/program.md` の判断表または `ai/decisions.md` に記録する
 
 ## 共通原則
 
 - **このスキルの責務**: 分解、合意、依存管理、PR leaf 実装、operation 実行、検証ゲート、統合、PR 作成判断
-- **記述言語**: `program.md` / `tree.md` / leaf / operation / decision / 実行記録は日本語で書く。コードコメント、docstring、commit message、README、コマンド、識別子は英語を維持する
+- **記述言語**: epic ドキュメントは日本語で書く。コードコメント、docstring、commit message、コマンド、識別子は英語を維持する
 - **実装方針**: まず自分で実装できる範囲を進める。必要なら Codex CLI などの外部実装エージェントを補助的に使う
 - **PR leaf の定義**: 単独でレビュー・マージ可能で、受入基準と検証ゲートが明確な最小成果物
 - **確認単位**: root goal、主要分岐、PR leaf goal、operation 実行内容、技術選定、破壊的変更、PR 作成前
@@ -52,11 +80,11 @@ Phase 6 Program Closure
 | 自然言語要求 | Phase 0 の入力として epic 名を提案 |
 | 空 | `docs/epics/` を走査し、進行中があれば提示。なければ要求を尋ねる |
 
-`docs/epics/{name}/` を epic root とし、以下の有無で再開位置を決める。
+`docs/epics/{name}/` の以下の有無で再開位置を決める。
 
-1. `program.md` なし → Phase 0 / 1
-2. `tree.md` なし → Phase 2 / 3
-3. `leaves/*.md` なし → Phase 4
+1. `ai/program.md` なし → Phase 0 / 1
+2. `ai/tree.md` なし → Phase 2 / 3
+3. `ai/leaves/*.md` なし → Phase 4
 4. 未完 node あり → Phase 5
 5. 全 node 完了 → Phase 6
 
@@ -65,8 +93,9 @@ Phase 6 Program Closure
 ```markdown
 🔍 Epic 状態:
   📁 epic: docs/epics/{name}
-  📄 program.md: ✅ / ❌
-  🌳 tree.md: ✅ / ❌
+  📖 README.md（人間向け）: ✅ / ❌
+  📄 ai/program.md: ✅ / ❌
+  🌳 ai/tree.md: ✅ / ❌
   🍃 nodes: X/Y 完了
 
 ▶️ Phase {N} ({phase-name}) を開始します。
@@ -88,71 +117,35 @@ Phase 6 Program Closure
 
 ## Phase 1: Goal Contract
 
-`program.md` を作成する。テンプレートは `references/templates.md`。
+`README.md`（人間向け）と `ai/program.md` を作成する。テンプレートは `references/templates.md`。
 
-必須項目:
+- `README.md`: 現在地、ゴール、主要リスク、node 一覧、承認待ち事項、承認履歴
+- `ai/program.md`: 状態、ゴール契約、スコープ、制約、既存情報、判断表、公開 contract、rollout / rollback 方針
 
-- 実行計画（タイトル直下に置き、各 Phase で何を確認するかを先に示す）
-- 問題 / 期待する成果
-- スコープ / 対象外
-- 成功指標
-- 制約
-- 変更され得る公開 contract
-- Data / migration / operational concerns
-- Rollout / rollback expectations
-- PR 外作業の想定（初回実行、script 実行、migration、backfill、feature flag、外部設定、手動確認）
-- ユーザー質問前の判断材料
-- 確認計画 / decision tree
-- 未決事項
+### 判断表の作り方
 
-### 確認計画
+Phase 0 の調査結果を `ai/program.md` に埋めてから判断表を作る。
 
-`program.md` 作成時は、Phase 0 の調査結果を先に埋めてから確認計画を作る。
+1. 証拠で確定した内容と確定できない内容を分ける
+2. 不明点ごとに、今決める理由、選択肢、推奨案、分岐後の処理を判断表に記録する
+3. ユーザーに聞くのは product decision、優先順位、破壊的変更の許容だけ。それ以外は `open` のまま後続 Phase の調査タスクへ送る
+4. ユーザー確認が必要な不明点を最大 3 問に圧縮し、`README.md` の承認待ち事項へ転記する
+5. 承認ビュー形式で root goal と質問を確認する
 
-1. 証拠で確定した内容と、証拠では確定できない内容を分ける
-2. 不明点を `goal / scope / success metric / contract / data / rollout / priority` に分類する
-3. 各不明点に、確認が必要な理由、選択肢、推奨案、分岐後の処理を記録する
-4. ユーザー確認が不要な不明点は `Open decisions` に残すか、後続 Phase の調査タスクへ送る
-5. 確認が必要な不明点だけを 1〜3 問に圧縮する
-
-ユーザーに質問する前に、必ず判断材料を提示する。質問だけを先に出さない。
-
-提示順:
-
-1. 現状の理解: 要求、対象範囲、既存実装、制約
-2. 調査で確定したこと: docs、コード、テスト、issue / PR から確認できた事実
-3. 判断が必要な理由: 何が未確定で、どの Phase や delivery tree に影響するか
-4. 選択肢ごとの影響: scope、PR 分割、検証、rollout / rollback、破壊的変更リスク
-5. 推奨案: 推奨する選択肢と理由
-6. 質問: ユーザーに決めてほしいこと
-
-分岐計画の書き方:
+分岐後の処理の書き方:
 
 ```text
 If the user chooses A, set X as in-scope and plan node Y.
 If the user chooses B, mark X as non-goal and skip node Y.
-If the user chooses C, stop Phase 3 until decision D-00N is resolved.
 ```
-
-ユーザー確認では、各質問に以下を含める。
-
-- 質問前の現状説明
-- 判断に必要な事実と制約
-- 何が不明か
-- なぜ今確認が必要か
-- 推奨選択肢
-- 各選択肢を選んだ場合に次に何をするか
-
-作成後、root goal と確認計画をユーザーに確認する。確認は 1〜3 問に絞り、各選択肢に推奨理由と分岐後の動きを付ける。
 
 進めてよい条件:
 
 - root goal が一文で説明できる
 - non-goals が明記されている
 - 成功判定がコード、テスト、データ、運用のいずれかで検証できる
-- 確認計画が `program.md` に記録されている
-- ユーザー回答ごとの分岐後の処理が明記されている
-- 未決事項が `Open decisions` に分離されている
+- 判断表に選択肢と分岐後の処理が記録されている
+- ユーザー確認の結果が承認履歴と判断表に反映されている
 
 ## Phase 2: Architecture / Tech Choice
 
@@ -170,16 +163,16 @@ If the user chooses C, stop Phase 3 until decision D-00N is resolved.
 1. 既存 ADR / design docs / dependency policy を読む
 2. 候補を 2〜4 個に絞る
 3. `Cost / risk / migration / rollback / testability / owner familiarity` で比較する
-4. 推奨案と却下案を `decisions.md` に記録する
-5. 非自明な採用判断はユーザー確認を取る
+4. 推奨案と却下案を `ai/decisions.md` に記録する
+5. 非自明な採用判断は承認ビュー形式でユーザー確認を取る
 
 破壊的 contract 変更が必要なら、編集前に停止して報告する。
 
 ## Phase 3: Delivery Tree Decomposition
 
-`tree.md` を作成し、root goal を PR leaf と operation node を含む delivery tree へ分解する。
+`ai/tree.md` を作成し、root goal を PR leaf と operation node を含む delivery tree へ分解する。node 状態は `ai/tree.md` の node 表を single source of truth にする。
 
-Delivery tree は、調査で「PR 以外の作業が不要」と確認できた場合を除き、PR leaf だけで完結させない。初回実行、one-off script、migration、backfill、feature flag 切替、外部サービス設定、手動確認、検証だけの作業を必ず operation / verification / decision node として検討し、不要なら理由を `tree.md` に記録する。
+Delivery tree は、調査で「PR 以外の作業が不要」と確認できた場合を除き、PR leaf だけで完結させない。初回実行、one-off script、migration、backfill、feature flag 切替、外部サービス設定、手動確認、検証だけの作業を必ず operation / verification / decision node として検討し、不要なら理由を `ai/tree.md` に記録する。
 
 node 種別:
 
@@ -218,48 +211,18 @@ Root Initiative
 
 ユーザー確認:
 
-- milestone 分解ごとに確認する
-- PR leaf の goal と検証ゲートを確認する
-- operation node の実行内容、owner、timing、rollback、証跡を確認する
-- 返答選択肢は `承認 / 分割 / 統合 / 順序変更 / スコープ変更` を基本にする
+- `README.md` の node 一覧（1 node 1 行）と主要リスクを更新してから、承認ビュー形式で確認する
+- milestone 単位でまとめて確認してよい。operation node と破壊的変更を含む node は個別に明示する
 - ユーザー承認前に Phase 5 の実装・実行へ進まない
 
 ## Phase 4: Harness Plan
 
-各 PR leaf について `leaves/{id}-{slug}.md` を作成する。各 operation node について `operations/{id}-{slug}.md` を作成する。テンプレートは `references/templates.md`、詳細基準は `references/harness.md`。
+各 PR leaf に `ai/leaves/{id}-{slug}.md`、各 operation node に `ai/operations/{id}-{slug}.md` を作成する。テンプレートは `references/templates.md`、詳細基準は `references/harness.md`。
 
-各 PR leaf に必ず含める:
+各ファイルは「承認部」と「実行部」に分ける。承認判断に使うのは承認部だけ。該当しない gate は `n/a — 理由` と一行で書き、空欄のまま残さない。
 
-- PR goal
-- Out of scope
-- Dependency and unlocks
-- File touch map
-- Contract impact
-- Test gate
-- Data gate
-- Smoke gate
-- Observability / rollout / rollback gate
-- Spec compliance review gate
-- Code quality review gate
-- PR creation gate
-- Implementation prompt
-- Implementation record
-
-各 operation node に必ず含める:
-
-- Operation goal
-- Out of scope
-- Dependency and unlocks
-- Owner / executor
-- Execution environment
-- Preconditions
-- Exact command / manual action
-- Expected evidence
-- Data / operational impact
-- Observability checks
-- Rollback / abort procedure
-- Approval gate
-- Execution record
+- PR leaf 承認部: PR goal、依存関係、file touch map、contract impact、受入基準、検証 gate、review gate 観点
+- operation 承認部: operation goal、依存関係、実行 scope、前提条件、実行手順、rollback / abort、承認 gate
 
 ハーネスが未整備なら、実装 PR leaf より前に `Harness PR` を作る。
 
@@ -287,28 +250,28 @@ operation node 実行に進んでよい条件:
 
 PR leaf の実行手順:
 
-1. `leaf.md` を読み、依存 leaf が完了していることを確認する
+1. leaf ファイルを読み、依存 leaf が完了していることを確認する
 2. 作業ブランチまたは worktree の安全性を確認する
 3. `references/execution.md` を読み、実装方法を決める
 4. 補助エージェントを使った場合は、その結果を差分レビューする
 5. leaf の Test / Data / Smoke gate を main 側で実行する
 6. Spec compliance review → Code quality review の順で確認する
-7. Implementation record を記録する
+7. 実行部の実装記録を記録する
 8. 失敗した場合は root cause を特定し、1 回だけ修正サイクルを回す
 9. まだ失敗する、または設計矛盾がある場合は停止する
-10. gate が全て通ったら `leaf.md` と `tree.md` を完了に更新する
+10. gate が全て通ったら `ai/tree.md` の node 表と `README.md` の進捗を更新する
 11. `gh` で draft PR を作成・更新し、CI と自動レビューを確認する
 
 operation node の実行手順:
 
-1. `operation.md` を読み、依存 PR leaf / operation node が完了していることを確認する
+1. operation ファイルを読み、依存 PR leaf / operation node が完了していることを確認する
 2. 実行環境、account、project、region、tenant、権限を表示して確認する
 3. precondition と dry-run / preview / backup / snapshot を実行する
-4. ユーザー承認が必要な operation は、現状、判断材料、実行内容、rollback を提示してから確認する
+4. ユーザー承認が必要な operation は、承認ビュー形式で現状、実行内容、rollback を提示してから確認する
 5. exact command / manual action だけを実行する。未記載の補完や代替手順は使わない
-6. expected evidence、data check、observability check を記録する
+6. expected evidence、data check、observability check を実行部に記録する
 7. 失敗した場合は原因、影響範囲、rollback / abort 可否を確認し、推測で継続しない
-8. gate が全て通ったら `operation.md` と `tree.md` を完了に更新する
+8. gate が全て通ったら `ai/tree.md` の node 表と `README.md` の進捗を更新する
 
 停止条件:
 
@@ -326,7 +289,7 @@ operation node の実行手順:
 
 ## Phase 6: Program Closure
 
-全 PR leaf の PR が作成済みまたは merged になり、全 operation / verification node が完了したら、`program.md` に closure summary を追記する。
+全 PR leaf の PR が作成済みまたは merged になり、全 operation / verification node が完了したら、`README.md` の完了サマリーに記入する。
 
 報告項目:
 
