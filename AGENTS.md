@@ -78,6 +78,15 @@ Choose the narrowest implementation that solves the real problem without creatin
 - Transform tasks into verifiable goals. Report what validation ran, or say explicitly what could not be verified.
 - After fixing a bug, search for the same pattern elsewhere and fix related instances when safe.
 
+## Subagent Delegation
+
+- Before starting non-trivial work, decide whether any part should be delegated to a subagent.
+- When subagents are available, automatically delegate isolated research, implementation, testing, and review tasks that have clear inputs and outputs.
+- Keep orchestration, user approval, public-contract decisions, integration, and final verification in the main agent.
+- Prefer the lightest model that can reliably handle each delegated task when the subagent tool supports model selection.
+- Do not delegate tiny one-step edits, irreversible actions, ambiguous product decisions, or changes to public APIs, schemas, config keys, CLI flags, or documented error semantics without first resolving the decision in the main agent.
+- When local skills are available, use `my-subagent` for delegation planning and execution.
+
 ## Browsing
 
 - When launching a local browser, use headless mode unless the user explicitly requests a visible browser.

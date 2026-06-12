@@ -65,6 +65,9 @@ Report every plausible issue you find, including low-severity or uncertain findi
 </finding_policy>
 
 <output_format>
+## Strengths
+- Specific strengths in the diff, if any. Keep this short.
+
 ## Findings
 
 1. **file:line** — short title
@@ -78,6 +81,12 @@ Report every plausible issue you find, including low-severity or uncertain findi
 
 ## Non-findings
 - Optional: notable risks inspected but not reported, with reason.
+
+## Assessment
+
+**Ready to merge?** Yes | No | With fixes
+
+**Reasoning:** One or two technical sentences.
 </output_format>
 ```
 
@@ -109,6 +118,9 @@ Finding policy:
 
 Output exactly this structure:
 
+## Strengths
+- Specific strengths in the diff, if any. Keep this short.
+
 ## Findings
 
 1. **file:line** — short title
@@ -122,6 +134,12 @@ Output exactly this structure:
 
 ## Non-findings
 - Optional: notable risks inspected but not reported, with reason.
+
+## Assessment
+
+**Ready to merge?** Yes | No | With fixes
+
+**Reasoning:** One or two technical sentences.
 ```
 
 The `trap` removes the diff file after Codex finishes or fails.

@@ -30,7 +30,9 @@ Phase 3 (Impl):  3-0 Worktree gate → 3-1 読込 → ┌─→ 3-2 実行 → 3
 - `references/templates.md` — requirements.md / design.md / tasks.md のテンプレート
 - `references/senior-review-checklist.md` — Phase 1-0 調査範囲・1-3 設計観点・1-4 レビュー基準
 - `references/external-review.md` — Phase 1-4 起動・反映ルール
+- `references/document-review.md` — requirements/design/tasks の内部レビューゲート
 - `references/worktree-gate.md` — Phase 3-0 判定・spec 移送
+- `../my-subagent/SKILL.md` — Phase 3 の subagent 委譲・レビューゲート
 
 ## 共通原則
 
@@ -105,6 +107,12 @@ Phase 3 (Impl):  3-0 Worktree gate → 3-1 読込 → ┌─→ 3-2 実行 → 3
 
 ### 1-4 External Review
 
+まず `document-review.md` の **Spec review** を実行し、実装計画に進める粒度か確認する。
+
+- `Status: Approved` → 外部レビューへ進む
+- `Issues Found` かつ挙動・契約変更なし → `requirements.md` / `design.md` に自動反映し、再レビュー
+- `Issues Found` かつ挙動・API・schema・config・CLI・error semantics 変更あり → ユーザー承認を得てから反映
+
 `codex` / `gemini` / `claude (subagent)` の **3 並列で自動起動**。詳細手順・プロンプト・反映ルールは `external-review.md`。
 
 **反映ルール（要旨）:**
@@ -134,11 +142,19 @@ Phase 3 (Impl):  3-0 Worktree gate → 3-1 読込 → ┌─→ 3-2 実行 → 3
 
 **出力**: `tasks.md`（templates.md 参照）。
 
+作成後、`document-review.md` の **Plan review** を実行する。
+
+- `Status: Approved` → Phase 2 完了としてユーザーに Phase 3 進行確認を出す
+- `Issues Found` → `tasks.md` を修正して再レビュー
+- `[P]` 指定は write set と依存関係が説明できる場合だけ残す
+
 ---
 
 ## Phase 3: Impl
 
 **前提**: `requirements.md` / `design.md` / `tasks.md` 揃い。
+
+Phase 3 開始時に `my-subagent` を使う。Skill tool が使える環境では明示的に invoke する。使えない環境では `../my-subagent/SKILL.md` の手順に従う。
 
 **Phase 3 全体は 1 ループ**: 3-1 で全未完タスクを読み込んだら、3-2 → 3-3 → 3-4 を**未完タスクが 0 になるまで自動で繰り返す**。1 タスク完了で skill から抜けない。`tasks.md` に `[ ]` が残っている限り、main は次のタスク（または並列バッチ）の Task tool 起動を**同じターン内**で続ける。
 
@@ -172,6 +188,8 @@ Phase 3 (Impl):  3-0 Worktree gate → 3-1 読込 → ┌─→ 3-2 実行 → 3
 
 サブエージェントには **対象ファイル / 受入基準 / 詳細 / 参考既存実装 / 既存規約遵守** を必ず渡す。
 
+各タスクは `my-subagent` のゲートに従い、**implementer → spec compliance reviewer → code quality reviewer → main 検証** の順で進める。spec compliance が通るまで code quality reviewer に進まない。
+
 **停止条件（これ以外では止まらない・進捗確認・承認待ちでの停止は禁止）:**
 
 1. テスト失敗が 1 度の修正で解消せず原因が即特定できない
@@ -181,9 +199,9 @@ Phase 3 (Impl):  3-0 Worktree gate → 3-1 読込 → ┌─→ 3-2 実行 → 3
 
 停止条件に該当した場合のみ、何のタスクで何が起きたか・必要な判断を 1 メッセージで提示して停止する。それ以外（テストが通った／タスク N が完了した／次が `[P]` バッチ etc.）では**停止せず即次の Task tool を起動**する。
 
-### 3-3 テスト実行
+### 3-3 レビューとテスト実行
 
-main が関連テストを実行（例: `pytest tests/test_{module}.py -v`）。失敗時は修正 → 再実行。**テスト成功までは tasks.md を `[x]` にしない**。テスト成功後は 3-4 → 次タスク起動まで同ターンで継続する。
+main が subagent レビュー結果を読み、Required 指摘が残っていないことを確認する。その後、main が関連テストを実行（例: `pytest tests/test_{module}.py -v`）。失敗時は修正 → 再実行。**レビュー通過とテスト成功までは tasks.md を `[x]` にしない**。テスト成功後は 3-4 → 次タスク起動まで同ターンで継続する。
 
 ### 3-4 tasks.md 更新
 

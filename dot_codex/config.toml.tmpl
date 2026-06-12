@@ -8,6 +8,7 @@ service_tier = "default"
 
 [features]
 hooks = true
+multi_agent = true
 external_migration = false
 suppress_unstable_features_warning = true
 goals = true
@@ -16,6 +17,10 @@ default_mode_request_user_input = true
 [tools]
 unified_exec = true
 streamable_shell = true
+
+[agents]
+max_threads = 6
+max_depth = 1
 
 [tui]
 status_line = [
