@@ -108,16 +108,17 @@ plugin_autoupdate_last_check_duration = "7 days"
 # Trust user-owned workspaces to avoid blocking non-interactive agents.
 trusted_config_paths = ["~"]
 
+[settings.github]
+credential_command = "gh auth token"
+
 [env]
-GITHUB_TOKEN = "{{exec(command='GH=$(find ~/.local/share/mise/installs/gh -name gh -type f 2>/dev/null | head -1) && $GH auth token 2>/dev/null || true')}}"
 AGENT_BROWSER_NATIVE = "1"
 
 [tasks.update-dotfiles]
 description = "Update dotfiles and development environment"
 run = """
 mise up && \
-chezmoi update -v && \
-mise cache clean
+chezmoi update -v
 """
 
 [tasks.update-brew]
@@ -135,7 +136,6 @@ description = "Update dotfiles, mise tools, and Homebrew packages"
 run = """
 mise up && \
 chezmoi update -v && \
-mise cache clean && \
 if command -v brew >/dev/null 2>&1; then
   brew update && \
   brew upgrade && \
@@ -146,3 +146,7 @@ else
   echo "[INFO] brew not found, skipping Homebrew updates"
 fi
 """
+
+[tasks.clean-mise-cache]
+description = "Clean mise cache files manually"
+run = "mise cache clean"
