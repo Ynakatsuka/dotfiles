@@ -2,8 +2,9 @@
 name: my-epic
 description: >-
   Orchestrate medium-to-large software development by turning a broad goal into
-  an approved delivery tree of PR-sized subtasks and operational nodes,
-  defining verification harnesses and gates for each node, then driving
+  an implementation and verification plan made of PR-sized subtasks and
+  operational nodes, defining verification harnesses and gates for each node,
+  then driving
   implementation, operation execution, and PR creation.
   Use when the user asks for large-scale development planning, PR decomposition,
   multi-PR execution, technical selection, or autonomous delivery of a broad
@@ -35,7 +36,7 @@ epic root は `docs/epics/{name}/`。人間向けと AI 用をディレクトリ
 
 ```text
 docs/epics/{name}/
-├── README.md            # 人間向け: 目的、Phase 計画、成功基準、承認事項の判断ダイジェスト
+├── README.md            # 人間向け: 目的、実装・実行・確認の Phase 計画、成功基準、判断ダイジェスト
 └── ai/                  # AI 用: 作業詳細と実行記録
     ├── program.md       # ゴール契約と判断表
     ├── tree.md          # delivery tree と node 状態の single source of truth
@@ -88,7 +89,7 @@ docs/epics/{name}/
 4. 未完 node あり → Phase 5
 5. 全 node 完了 → Phase 6
 
-開始時に必ず表示する。
+開始時に必ず表示する。ユーザー向け表示では、内部フェーズ名ではなく実装・実行・確認上の次作業を示す。
 
 ```markdown
 🔍 Epic 状態:
@@ -98,7 +99,7 @@ docs/epics/{name}/
   🌳 ai/tree.md: ✅ / ❌
   🍃 nodes: X/Y 完了
 
-▶️ Phase {N} ({phase-name}) を開始します。
+▶️ 次の作業: {実装・実行・確認上の次作業}
 ```
 
 ## Phase 0: Discover
@@ -119,8 +120,28 @@ docs/epics/{name}/
 
 `README.md`（人間向け）と `ai/program.md` を作成する。テンプレートは `references/templates.md`。
 
-- `README.md`: 現在地、目的、root goal、Phase 計画、成功基準、主要リスク、node 一覧、承認待ち事項、承認履歴
+- `README.md`: 現在地、目的、root goal、実装・実行・確認の Phase 計画、成功基準、主要リスク、node 一覧、承認待ち事項、承認履歴
 - `ai/program.md`: 状態、ゴール契約、スコープ、制約、既存情報、判断表、公開 contract、rollout / rollback 方針
+
+README.md の Phase 計画は、ユーザーが今回の目的を達成する作業順を理解するためのものにする。スキル内部の orchestration phase（Goal Contract、Architecture / Tech Choice、Delivery Tree、Harness Plan、Program Closure）をそのまま載せない。
+README.md の現在地も、この実装・実行・確認の Phase 計画上の現在行で表す。`Phase 1 Goal Contract` のような内部フェーズ名を現在地として載せない。
+
+Phase 計画に含める内容:
+
+- 現状確認、失敗再現、既存挙動調査
+- テスト、fixture、verification harness の準備
+- コード、設定、docs、script の実装
+- migration、backfill、初期 script、feature flag、manual operation の実行
+- unit / integration / contract / data / smoke / observability の確認
+- cleanup、rollback 確認、PR / CI 確認
+
+Phase 計画に含めない内容:
+
+- ユーザー承認そのもの
+- delivery tree 分解そのもの
+- leaf / operation ファイル作成そのもの
+- README.md や ai/program.md を承認可能にすること
+- このスキルの内部フェーズ名
 
 ### 判断表の作り方
 
@@ -145,7 +166,7 @@ If the user chooses B, mark X as non-goal and skip node Y.
 - 目的と「なぜ今やるか」が README.md に書かれている
 - non-goals が明記されている
 - 成功判定がコード、テスト、データ、運用のいずれかで検証できる
-- Phase ごとの目的、主な作業、成功基準が README.md から分かる
+- Phase ごとの実装・実行・確認内容と成功基準が README.md から分かる
 - 判断表に選択肢と分岐後の処理が記録されている
 - ユーザー確認の結果が承認履歴と判断表に反映されている
 
@@ -214,6 +235,7 @@ Root Initiative
 ユーザー確認:
 
 - `README.md` の Phase 計画、node 一覧（1 node 1 行）、主要リスク、成功基準を更新してから、承認ビュー形式で確認する
+- `README.md` の Phase 計画は、delivery tree を作った後に「今回の目的を達成する実装・実行・テストの順序」へ言い換える。承認、tree 分解、harness plan などの内部作業を phase として載せない
 - milestone 単位でまとめて確認してよい。operation node と破壊的変更を含む node は個別に明示する
 - ユーザー承認前に Phase 5 の実装・実行へ進まない
 

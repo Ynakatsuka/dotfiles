@@ -9,7 +9,7 @@ epic ドキュメントは日本語で書きます。コマンド、コード識
 
 ```text
 docs/epics/{epic}/
-├── README.md            # 人間向け: 目的、Phase 計画、成功基準、承認事項の判断ダイジェスト
+├── README.md            # 人間向け: 目的、実装・実行・確認の Phase 計画、成功基準、判断ダイジェスト
 └── ai/                  # AI 用: 作業詳細と実行記録
     ├── program.md       # ゴール契約と判断表
     ├── tree.md          # delivery tree と node 状態の single source of truth
@@ -26,10 +26,10 @@ docs/epics/{epic}/
 ```markdown
 # {Initiative title}
 
-<!-- 人間向け承認ドキュメント。判断に必要な情報を優先し、詳細な調査ログと実行記録は ai/ 配下へ置く。 -->
+<!-- 人間向け概要ドキュメント。実装・実行・確認の現在地を優先し、詳細な調査ログと実行記録は ai/ 配下へ置く。 -->
 
 ## 現在地
-- **Phase**: {N} {phase-name}
+- **実装フェーズ**: {Phase 計画の現在行}
 - **進捗**: {A}/{Y} nodes 完了
 - **承認待ち**: なし / {対象}
 - **次の判断**: なし / {判断内容}
@@ -47,16 +47,15 @@ docs/epics/{epic}/
 | {期待成果} | {command / query / PR / dashboard / manual evidence} | {PR-001 / OP-001 / VERIFY-001} |
 
 ## Phase 計画
-<!-- 大まかな流れを示す。承認判断に不要な実装詳細は ai/tree.md と leaf / operation ファイルへ置く。 -->
-| Phase | やること | 成功基準 | 状態 |
-|---|---|---|---|
-| 0 Discover | 既存 docs、code、tests、contract、運用制約を調べる | 不明点と制約が判断表に整理済み | planned |
-| 1 Goal Contract | 目的、root goal、scope、non-goals、成功基準を確定する | README.md と ai/program.md が承認可能 | planned |
-| 2 Architecture / Tech Choice | 必要な技術選定と破壊的変更の有無を判断する | 採用案、却下案、rollback 方針が記録済み | planned |
-| 3 Delivery Tree | PR leaf、operation、verification、decision node に分解する | 依存関係と PR 外作業が ai/tree.md に明記済み | planned |
-| 4 Harness Plan | 各 node の受入基準、gate、rollback、証跡を定義する | 実装または実行に進める gate が明記済み | planned |
-| 5 Execute Nodes | 承認済み node を依存順に実装、実行、検証する | gate が通り、PR または operation 証跡が残る | planned |
-| 6 Program Closure | 完了状況、PR、operation、残リスクをまとめる | 完了サマリーと follow-up が記録済み | planned |
+<!-- 今回の目的を達成するための実装・実行・テストの順序を書く。スキル内部の承認、tree 分解、harness plan、closure を phase として載せない。 -->
+| Phase | 目的 | 実装・実行内容 | 確認方法 | 状態 |
+|---|---|---|---|---|
+| 1 現状確認 | 変更対象と既存挙動を特定する | docs、code、tests、contract、運用制約を確認する | 変更対象、影響範囲、未確定事項が記録済み | planned |
+| 2 テスト準備 | 期待挙動を先に固定する | unit / integration / contract / data / smoke の必要な gate を追加または選定する | 失敗再現または回帰検知できる command が明記済み | planned |
+| 3 実装 | 目的達成に必要な code / config / docs / script を変更する | 依存順に PR leaf を実装し、必要な operation 手順を整える | 各 leaf の受入基準と test gate が通る | planned |
+| 4 実行 | PR だけでは完了しない作業を行う | migration、backfill、初期 script、feature flag、manual operation を実行する | dry-run、実行ログ、data check、rollback 証跡が記録済み | planned |
+| 5 総合確認 | 完了条件を横断確認する | CI、smoke、observability、data invariant、PR 状態を確認する | 成功基準がすべて証跡に接続済み | planned |
+| 6 仕上げ | 残リスクと後続作業を閉じる | cleanup、follow-up、未マージ PR、rollback 条件を整理する | 完了サマリーと残タスクが記録済み | planned |
 
 ## 主要リスク
 <!-- 3 件以内。承認判断に影響するものだけ。 -->
