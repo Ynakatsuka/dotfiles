@@ -105,11 +105,6 @@ always_keep_download = false
 always_keep_install = false
 legacy_version_file = true
 plugin_autoupdate_last_check_duration = "7 days"
-# Trust user-owned workspaces to avoid blocking non-interactive agents.
-trusted_config_paths = ["~"]
-
-[settings.github]
-credential_command = "gh auth token"
 
 [env]
 AGENT_BROWSER_NATIVE = "1"

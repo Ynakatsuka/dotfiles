@@ -1,0 +1,6 @@
+[settings]
+# Trust user-owned workspaces to avoid blocking non-interactive agents.
+trusted_config_paths = ["~"]
+
+[settings.github]
+credential_command = "gh auth token"
