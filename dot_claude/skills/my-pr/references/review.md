@@ -10,6 +10,21 @@ Use this reference for the default and `review` command quality review stage.
 - Keep reviewer responsibilities separate. Simplify handles quality, duplication, and efficiency. Claude/Codex review correctness, security, and test risks.
 - Require line references, concrete impact, evidence, and a fix suggestion for every finding.
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
+- Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
+
+## Review focus checklist
+
+Use this checklist for Claude/Codex correctness review. Exclude style or preference-only findings, but keep plausible low-severity or uncertain risks for integration. Put inspected-but-safe areas in Non-findings when useful.
+
+- Fallbacks: unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
+- Downstream impact: changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files consumed by later processing.
+- Cross-client reference parity: existing implementations, helpers, schemas, flows, fixtures, or tests in other clients/SDKs that should have been reused or matched.
+- Cross-client compatibility: behavior changes that can break other clients, shared libraries, generated code, API callers, CLI users, configuration consumers, or migration paths.
+- Security: authentication, authorization, secret handling, injection, unsafe shell/file/path handling, SSRF, XSS, CSRF, deserialization, dependency trust, permissions, and data exposure.
+- Public contracts: exported functions, types, schemas, API responses, CLI flags, config keys, database migrations, documented error semantics, and backward compatibility.
+- Data integrity: data loss, partial writes, duplicate writes, transaction boundaries, rollback behavior, concurrency, race conditions, and timezone/locale/encoding issues.
+- Operations: deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and failure modes that operators must see.
+- Tests: changed behavior without focused unit, integration, regression, security, or cross-client compatibility coverage.
 
 ## Inputs
 
@@ -52,8 +67,13 @@ Changed files:
 Review the full branch diff against the base branch. Do not review only the latest simplify changes.
 Focus on:
 1. Correctness bugs, edge cases, data loss, race conditions, and error semantics
-2. Security issues, secret leakage, injection, unsafe shell usage, and authorization mistakes
-3. Missing or weak tests for changed behavior
+2. Unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures
+3. Downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files
+4. Cross-client impact: ignored reusable/reference implementations in other clients/SDKs, or changes that can break other clients, shared libraries, generated code, API callers, CLI users, configuration consumers, or migration paths
+5. Security issues, secret leakage, injection, unsafe shell/file/path handling, authorization mistakes, dependency trust, permissions, and data exposure
+6. Public contract and backward compatibility risks in exported functions, types, schemas, API responses, CLI flags, config keys, migrations, or documented error semantics
+7. Operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes
+8. Missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage
 </scope>
 
 <out_of_scope>
@@ -71,7 +91,7 @@ Report every plausible issue you find, including low-severity or uncertain findi
 ## Findings
 
 1. **file:line** — short title
-   - Category: correctness | security | tests
+   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | tests
    - Severity: critical | high | medium | low
    - Confidence: high | medium | low
    - Impact: what can break or become unsafe
@@ -107,7 +127,14 @@ Review the diff in <DIFF_FILE> as a senior software engineer.
 
 Scope:
 - Review the full branch diff against <BASE_BRANCH>.
-- Focus on correctness bugs, edge cases, data loss, race conditions, security issues, unsafe shell usage, secret leakage, authorization mistakes, and missing tests.
+- Focus on correctness bugs, edge cases, data loss, race conditions, and error semantics.
+- Check for unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
+- Check downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files.
+- Check cross-client impact: ignored reusable/reference implementations in other clients/SDKs, or changes that can break other clients, shared libraries, generated code, API callers, CLI users, configuration consumers, or migration paths.
+- Check security issues, unsafe shell/file/path handling, secret leakage, injection, authorization mistakes, dependency trust, permissions, and data exposure.
+- Check public contract and backward compatibility risks in exported functions, types, schemas, API responses, CLI flags, config keys, migrations, or documented error semantics.
+- Check operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes.
+- Check missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage.
 - Do not report code quality, duplication, naming style, formatting, or efficiency issues; integrated simplify handles those separately.
 - Do not report issues already enforced by CI, generated files, lockfiles, vendored dependencies, snapshots, or preference-only nits unless the diff creates a concrete correctness or security risk.
 
@@ -124,7 +151,7 @@ Output exactly this structure:
 ## Findings
 
 1. **file:line** — short title
-   - Category: correctness | security | tests
+   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | tests
    - Severity: critical | high | medium | low
    - Confidence: high | medium | low
    - Impact: what can break or become unsafe
@@ -150,8 +177,8 @@ Deduplicate findings from simplify, Claude, and Codex. Put each finding in exact
 
 | Final category | Criteria |
 |---|---|
-| Required | Confirmed correctness/security/data-loss issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
-| Recommended | Plausible but uncertain issue; design/API/schema/config change; simplify Recommended; useful but approval-worthy test expansion |
+| Required | Confirmed correctness/security/data-loss/fallback/downstream/cross-client/contract/operations issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
+| Recommended | Plausible but uncertain issue; design/API/schema/config change; approval-worthy operational design/config change; simplify Recommended; useful but approval-worthy test expansion |
 | Not needed | Style preference; readability-only nit covered by no clear risk; false positive; issue outside this PR's scope |
 
 Required fixes can be applied automatically when they do not change public contracts or intended behavior. Recommended fixes require user approval. Not needed findings are not applied.
