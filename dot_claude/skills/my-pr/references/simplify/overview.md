@@ -1,6 +1,6 @@
 # Integrated Simplify Workflow
 
-Use this reference from `my-pr` when running the `simplify` subcommand, `create`, or the default/review quality workflow.
+Use this reference from `my-pr` when running the `simplify` subcommand, `create`, or the default/review/fix quality workflow.
 
 ## Executor
 

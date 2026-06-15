@@ -1,10 +1,10 @@
-# PR Verify and Ready
+# PR Verify
 
 Use this reference for the default, `create`, and `verify` command verification phase.
 
 ## Scope
 
-`verify` operates on an existing PR. It may edit, commit, and push fixes for that PR branch. It must not create a new PR.
+`verify` operates on an existing PR. It may edit, commit, and push fixes for that PR branch. It must not create/update a PR or mark a PR ready.
 
 ## PR identity
 
@@ -15,13 +15,12 @@ HEAD_BRANCH=$(gh pr view --json headRefName -q .headRefName)
 
 ## Completion conditions
 
-All conditions must be true before marking ready:
+All conditions must be true before reporting verification complete:
 
 1. If GitHub checks exist, all target PR checks are `pass` or `skipping`.
 2. No check is `fail`, `cancel`, or timed out.
 3. Automated review comments have no actionable findings left.
 4. Fixes are committed and pushed to the remote PR branch.
-5. `gh pr ready "$PR_NUMBER"` succeeds.
 
 ## Checks polling
 
@@ -75,14 +74,3 @@ git push -u origin HEAD:"$CURRENT_BRANCH"
 ```
 
 If the push destination is a protected branch mismatch, stop and ask the user before pushing.
-
-## Ready
-
-Only after checks and actionable review findings are clear:
-
-```bash
-gh pr ready "$PR_NUMBER"
-gh pr view "$PR_NUMBER" --json isDraft,reviewDecision,mergeStateStatus,statusCheckRollup
-```
-
-Confirm `isDraft=false` before reporting completion.

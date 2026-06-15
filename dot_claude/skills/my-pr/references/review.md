@@ -1,6 +1,8 @@
 # my-pr Review Prompts
 
-Use this reference for the default and `review` command quality review stage.
+Use this reference for the default, `review`, and `fix` command quality review stage.
+
+This reference is read-only. It collects and integrates findings only. Do not edit files, run fix verification, commit, push, create/update a PR, or mark a PR ready while using this reference.
 
 ## Design principles
 
@@ -8,7 +10,7 @@ Use this reference for the default and `review` command quality review stage.
 - Ask for coverage, not only high-severity findings. Do not let reviewers silently drop plausible bugs because they think they are not important enough.
 - Keep scope explicit: review the full PR diff against the base branch, not only the latest simplify changes.
 - Keep reviewer responsibilities separate. Simplify handles quality, duplication, and efficiency. Claude/Codex review correctness, security, and test risks.
-- Require line references, concrete impact, evidence, and a fix suggestion for every finding.
+- Require line references, problem detail, why it matters, evidence, and a concrete fix strategy for every finding.
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
 
@@ -181,7 +183,7 @@ Deduplicate findings from simplify, Claude, and Codex. Put each finding in exact
 | Recommended | Plausible but uncertain issue; design/API/schema/config change; approval-worthy operational design/config change; simplify Recommended; useful but approval-worthy test expansion |
 | Not needed | Style preference; readability-only nit covered by no clear risk; false positive; issue outside this PR's scope |
 
-Required fixes can be applied automatically when they do not change public contracts or intended behavior. Recommended fixes require user approval. Not needed findings are not applied.
+This phase only classifies findings. Required fixes are applied later by the default or `fix` workflow. Recommended and Not needed findings are not applied by this skill.
 
 ## Integration output
 
