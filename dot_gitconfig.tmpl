@@ -24,4 +24,7 @@
   helper = osxkeychain
 {{- end }}
 [push]
-  default = upstream
+  # `simple` (git >= 2.0 default) refuses to push when the upstream branch
+  # name differs from the current branch, preventing accidental pushes to
+  # main/staging from worktree branches that track a base branch.
+  default = simple
