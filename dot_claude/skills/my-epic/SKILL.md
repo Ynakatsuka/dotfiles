@@ -4,17 +4,29 @@ description: >-
   Orchestrate medium-to-large software development by turning a broad goal into
   an implementation and verification plan made of PR-sized subtasks and
   operational nodes, defining verification harnesses and gates for each node,
-  then driving
-  implementation, operation execution, and PR creation.
+  and stopping after epic creation on the first invocation until the user
+  explicitly asks to implement or execute approved nodes.
   Use when the user asks for large-scale development planning, PR decomposition,
   multi-PR execution, technical selection, or autonomous delivery of a broad
   epic. Do NOT use for a single small bug fix, one obvious PR, pure code
-  review, or ordinary SDD work that already fits in one spec/PR.
+  review, ordinary SDD work that already fits in one spec/PR, or implementing
+  an epic during the same first call that created it.
 ---
 
 # Epic Delivery Orchestrator
 
 中〜大規模の開発ゴールを、検証可能な PR 単位のツリーへ分解し、ユーザー確認を挟みながら実装と PR 作成まで進める。
+
+## 初回呼び出しの境界
+
+新規 epic を作成する最初の呼び出しでは、scope を epic 作成と承認待ちの提示だけに限定する。
+
+- 実行してよいこと: Phase 0〜4 の調査、goal contract、delivery tree、harness plan、`docs/epics/{name}/` 配下の計画ドキュメント作成
+- 実行してはいけないこと: Phase 5 の leaf 実装、operation 実行、draft PR 作成、実装エージェント起動、`references/execution.md` の読み込み
+- 停止位置: `README.md` を更新し、承認ビューで次に実装または実行する node の候補を提示して終了する
+- 再開条件: ユーザーが「実装して」「実行して」「node を進めて」「Phase 5 へ進んで」など、実装または operation 実行を明示した場合だけ Phase 5 に入る
+
+既存 epic の再開でも、ユーザーの依頼が状態確認、計画更新、分解、承認ビュー作成だけなら Phase 5 に入らない。
 
 ```text
 Phase 0 Discover  →  Phase 1 Goal Contract  →  Phase 2 Architecture / Tech Choice
@@ -62,7 +74,7 @@ docs/epics/{name}/
 
 - **このスキルの責務**: 分解、合意、依存管理、PR leaf 実装、operation 実行、検証ゲート、統合、PR 作成判断
 - **記述言語**: epic ドキュメントは日本語で書く。コードコメント、docstring、commit message、コマンド、識別子は英語を維持する
-- **実装方針**: まず自分で実装できる範囲を進める。必要なら Codex CLI などの外部実装エージェントを補助的に使う
+- **実装方針**: 実装または operation 実行は、ユーザーが Phase 5 の開始または特定 node の実行を明示した後にだけ進める。必要なら Codex CLI などの外部実装エージェントを補助的に使う
 - **PR leaf の定義**: 単独でレビュー・マージ可能で、受入基準と検証ゲートが明確な最小成果物
 - **確認単位**: root goal、主要分岐、PR leaf goal、operation 実行内容、技術選定、破壊的変更、PR 作成前
 - **自律性**: コード・テスト・docs・履歴から判断できることはユーザーに聞かない
