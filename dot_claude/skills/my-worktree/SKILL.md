@@ -2,9 +2,9 @@
 name: my-worktree
 description: >-
   Create a git worktree using the project's `{repo}-worktree/{branch}` convention,
-  always pulling origin/staging, origin/main, and origin/master first so the new
-  branch is based on up-to-date refs. Use when the user asks to create a new
-  worktree or start work on a new branch in a worktree (e.g. "ワークツリー作って",
+  fetching origin first and basing new branches on the highest-priority remote
+  ref (`origin/staging`, then `origin/main`, then `origin/master`). Use when the
+  user asks to create a new worktree or start work on a new branch in a worktree (e.g. "ワークツリー作って",
   "worktree 作成", "新しい作業ブランチ", "新規ブランチで作業").
   Do NOT use for removing/listing worktrees (use `gwc` / `git worktree list`),
   for the PR flow (use my-pr — it creates its own worktree on protected branches),
@@ -21,10 +21,12 @@ Runs `~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch>`. The scr
 
 1. Resolves to the main (non-worktree) repo root.
 2. `git fetch origin --prune`.
-3. For each of `staging`, `main`, `master` that exists on origin, fast-forwards the local copy — pulls inside whichever worktree has it checked out, otherwise `git fetch origin <b>:<b>`. Fails loudly on divergence.
-4. Picks the highest-priority existing base branch (staging > main > master) for new branches.
-5. Creates the worktree at `${repo_root}-worktree/${branch//\//-}`.
-6. Copies `.env` / `.envrc` from the main repo and runs `direnv allow` when present.
+3. Fast-forwards local `staging`, `main`, and `master` from origin when their worktrees are clean.
+4. Leaves dirty base-branch worktrees unchanged with an explicit warning, while still using fetched `origin/<base>` for the new worktree.
+5. Picks the highest-priority remote base ref (`origin/staging` > `origin/main` > `origin/master`) for new branches.
+6. Creates new branches directly from that remote ref without an upstream.
+7. Creates the worktree at `${repo_root}-worktree/${branch//\//-}`.
+8. Copies `.env` / `.envrc` from the main repo and runs `direnv allow` when present.
 
 If a worktree for that branch already exists, prints the existing path and exits 0.
 
@@ -41,14 +43,14 @@ If a worktree for that branch already exists, prints the existing path and exits
 
 Surface failures, do not paper over them (per `no_implicit_fallbacks`):
 
-- Local `staging` / `main` / `master` has diverged from origin → script exits 1. Relay the message; ask the user how to reconcile (rebase / reset / etc).
-- Uncommitted changes in a worktree that holds a base branch → `pull --ff-only` fails. Relay the path; do not auto-stash.
+- Uncommitted changes in a worktree that holds a base branch are not modified. New branches are based on `origin/<base>` after fetch.
+- Local `staging` / `main` / `master` divergence from origin → script exits 1. Relay the message; ask the user how to reconcile (rebase / reset / etc).
 - None of staging/main/master exist on origin → exit 1. Ask the user which base branch to use; this skill does not handle that case.
 - Branch directory already exists but is unregistered → exit 1. Inspect manually; do not delete.
 
 ## Boundary with related tools
 
-- `gw` (zsh function in `private_dot_config/zsh/git-worktree.zsh`) — interactive sibling; only fast-forwards staging *or* main, not all three. Prefer this skill when the user explicitly wants the "always pull all base branches" guarantee.
+- `gw` (zsh function in `private_dot_config/zsh/git-worktree.zsh`) — interactive sibling that delegates creation to the same helper.
 - **my-pr** — creates its own worktree before committing on a protected branch.
 - **my-sdd** — Phase 3-0 creates a worktree as part of the spec-driven gate.
 - For removing worktrees, use `gwc`; for listing, `git worktree list`.

@@ -93,10 +93,16 @@ git fetch origin --prune
 
 base_candidates=(staging main master)
 chosen_base=""
+chosen_base_ref=""
 
 for base in "${base_candidates[@]}"; do
   if ! git show-ref --verify --quiet "refs/remotes/origin/$base"; then
     continue
+  fi
+
+  if [[ -z "$chosen_base" ]]; then
+    chosen_base="$base"
+    chosen_base_ref="origin/$base"
   fi
 
   checked_out_at="$(
@@ -108,10 +114,21 @@ for base in "${base_candidates[@]}"; do
   )"
 
   if [[ -n "$checked_out_at" ]]; then
-    echo "Pulling '$base' (checked out at $checked_out_at)..."
-    if ! git -C "$checked_out_at" pull --ff-only origin "$base"; then
+    status_output="$(git -C "$checked_out_at" status --porcelain)" || {
+      echo "Error: failed to inspect '$base' worktree at $checked_out_at." >&2
+      exit 1
+    }
+
+    if [[ -n "$status_output" ]]; then
+      echo "Warning: '$base' has uncommitted changes in $checked_out_at; leaving it unchanged." >&2
+      echo "Warning: new worktrees will still be based on fetched origin/$base." >&2
+      continue
+    fi
+
+    echo "Fast-forwarding '$base' (checked out at $checked_out_at)..."
+    if ! git -C "$checked_out_at" merge --ff-only "origin/$base"; then
       echo "Error: failed to fast-forward '$base' in $checked_out_at." >&2
-      echo "Resolve uncommitted changes or divergence there, then retry." >&2
+      echo "Resolve branch divergence there, then retry." >&2
       exit 1
     fi
   elif git show-ref --verify --quiet "refs/heads/$base"; then
@@ -125,10 +142,6 @@ for base in "${base_candidates[@]}"; do
     echo "Creating local '$base' from origin/$base..."
     git branch "$base" "origin/$base"
   fi
-
-  if [[ -z "$chosen_base" ]]; then
-    chosen_base="$base"
-  fi
 done
 
 if [[ -z "$chosen_base" ]]; then
@@ -136,7 +149,7 @@ if [[ -z "$chosen_base" ]]; then
   exit 1
 fi
 
-echo "Base branch resolved: $chosen_base"
+echo "Base branch resolved: $chosen_base_ref"
 
 if git show-ref --verify --quiet "refs/remotes/origin/$branch_name"; then
   if git show-ref --verify --quiet "refs/heads/$branch_name"; then
@@ -150,8 +163,8 @@ elif git show-ref --verify --quiet "refs/heads/$branch_name"; then
   echo "Reusing local-only branch '$branch_name' for the worktree."
   git worktree add "$worktree_dir" "$branch_name"
 else
-  echo "Creating new branch '$branch_name' from '$chosen_base'..."
-  git worktree add -b "$branch_name" "$worktree_dir" "$chosen_base"
+  echo "Creating new branch '$branch_name' from '$chosen_base_ref'..."
+  git worktree add -b "$branch_name" --no-track "$worktree_dir" "$chosen_base_ref"
 fi
 
 for file in .env .envrc; do
