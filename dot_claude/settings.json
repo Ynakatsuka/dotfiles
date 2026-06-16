@@ -63,6 +63,6 @@
   "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
-  "model": "fable",
+  "model": "opus",
   "cleanupPeriodDays": 180
 }
