@@ -9,7 +9,7 @@ This reference is read-only. It collects and integrates findings only. Do not ed
 - Separate finding from filtering. Reviewers should surface potential issues with severity and confidence; integration decides what is Required, Recommended, or Not needed.
 - Ask for coverage, not only high-severity findings. Do not let reviewers silently drop plausible bugs because they think they are not important enough.
 - Keep scope explicit: review the full PR diff against the base branch, not only the latest simplify changes.
-- Keep reviewer responsibilities separate. Simplify handles quality, duplication, and efficiency. Claude/Codex review correctness, security, and test risks.
+- Keep reviewer responsibilities separate. Simplify handles quality, duplication, and behavior-preserving micro-efficiency. Claude/Codex review correctness, security, performance regressions, and test risks.
 - Require line references, problem detail, why it matters, evidence, and a concrete fix strategy for every finding.
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
@@ -26,7 +26,8 @@ Use this checklist for Claude/Codex correctness review. Exclude style or prefere
 - Public contracts: exported functions, types, schemas, API responses, CLI flags, config keys, database migrations, documented error semantics, and backward compatibility.
 - Data integrity: data loss, partial writes, duplicate writes, transaction boundaries, rollback behavior, concurrency, race conditions, and timezone/locale/encoding issues.
 - Operations: deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and failure modes that operators must see.
-- Tests: changed behavior without focused unit, integration, regression, security, or cross-client compatibility coverage.
+- Performance: algorithmic complexity regressions, N+1 queries, redundant I/O or network calls, blocking work on hot paths, missing pagination/streaming, unbounded memory growth, large allocations or copies inside loops, and lost caching or batching.
+- Tests: changed behavior without focused unit, integration, regression, security, performance, or cross-client compatibility coverage.
 
 ## Inputs
 
@@ -75,7 +76,8 @@ Focus on:
 5. Security issues, secret leakage, injection, unsafe shell/file/path handling, authorization mistakes, dependency trust, permissions, and data exposure
 6. Public contract and backward compatibility risks in exported functions, types, schemas, API responses, CLI flags, config keys, migrations, or documented error semantics
 7. Operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes
-8. Missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage
+8. Performance regressions: algorithmic complexity, N+1 queries, redundant I/O or network calls, blocking work on hot paths, missing pagination/streaming, unbounded memory growth, large allocations or copies inside loops, or lost caching/batching
+9. Missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage
 </scope>
 
 <out_of_scope>
@@ -93,7 +95,7 @@ Report every plausible issue you find, including low-severity or uncertain findi
 ## Findings
 
 1. **file:line** — short title
-   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | tests
+   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | performance | tests
    - Severity: critical | high | medium | low
    - Confidence: high | medium | low
    - Impact: what can break or become unsafe
@@ -136,6 +138,7 @@ Scope:
 - Check security issues, unsafe shell/file/path handling, secret leakage, injection, authorization mistakes, dependency trust, permissions, and data exposure.
 - Check public contract and backward compatibility risks in exported functions, types, schemas, API responses, CLI flags, config keys, migrations, or documented error semantics.
 - Check operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes.
+- Check performance regressions: algorithmic complexity, N+1 queries, redundant I/O or network calls, blocking work on hot paths, missing pagination/streaming, unbounded memory growth, large allocations or copies inside loops, or lost caching/batching.
 - Check missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage.
 - Do not report code quality, duplication, naming style, formatting, or efficiency issues; integrated simplify handles those separately.
 - Do not report issues already enforced by CI, generated files, lockfiles, vendored dependencies, snapshots, or preference-only nits unless the diff creates a concrete correctness or security risk.
@@ -153,7 +156,7 @@ Output exactly this structure:
 ## Findings
 
 1. **file:line** — short title
-   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | tests
+   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | performance | tests
    - Severity: critical | high | medium | low
    - Confidence: high | medium | low
    - Impact: what can break or become unsafe
@@ -179,7 +182,7 @@ Deduplicate findings from simplify, Claude, and Codex. Put each finding in exact
 
 | Final category | Criteria |
 |---|---|
-| Required | Confirmed correctness/security/data-loss/fallback/downstream/cross-client/contract/operations issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
+| Required | Confirmed correctness/security/data-loss/fallback/downstream/cross-client/contract/operations/performance issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
 | Recommended | Plausible but uncertain issue; design/API/schema/config change; approval-worthy operational design/config change; simplify Recommended; useful but approval-worthy test expansion |
 | Not needed | Style preference; readability-only nit covered by no clear risk; false positive; issue outside this PR's scope |
 
