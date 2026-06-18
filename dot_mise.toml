@@ -129,12 +129,13 @@ brew autoremove
 """
 
 [tasks.maintenance]
-description = "Update dotfiles, mise tools, and Homebrew packages"
+description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packages"
 run = """
 if ! mise up; then
   echo "[WARN] mise up failed, continuing with remaining maintenance tasks" >&2
 fi
 chezmoi update -v && \
+cursor-agent update && \
 if command -v brew >/dev/null 2>&1; then
   brew update && \
   brew upgrade && \
