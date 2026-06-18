@@ -56,6 +56,9 @@ terraform = "latest"
 # gh - GitHub CLI
 gh = "latest"
 
+# age - File encryption tool used by chezmoi secrets
+age = "1.3.1"
+
 # fd - Fast file finder that respects ignore files
 fd = "latest"
 
@@ -118,9 +121,44 @@ AGENT_BROWSER_NATIVE = "1"
 [tasks.update-dotfiles]
 description = "Update dotfiles and development environment"
 run = """
-if ! mise up; then
-  echo "[WARN] mise up failed, continuing with dotfiles update" >&2
-fi
+resolve_gh_cmd() {
+  for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  candidate="$(command -v gh 2>/dev/null || true)"
+  case "$candidate" in
+    "" | *"/mise/shims/gh") return 1 ;;
+    *)
+      printf '%s\\n' "$candidate"
+      return 0
+      ;;
+  esac
+}
+
+run_mise_up() {
+  token="${GITHUB_TOKEN:-}"
+  if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
+    token="$("$gh_cmd" auth token 2>/dev/null || true)"
+  fi
+  if [ -z "$token" ]; then
+    echo "[WARN] gh auth token unavailable; skipping mise up to avoid GitHub API rate limits" >&2
+    return 0
+  fi
+  log_file="$(mktemp)"
+  if GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1; then
+    if [ -s "$log_file" ]; then
+      cat "$log_file"
+    fi
+    rm -f "$log_file"
+    return 0
+  fi
+  sed 's/^/[WARN] mise up: /' "$log_file" >&2
+  rm -f "$log_file"
+}
+run_mise_up
 chezmoi update -v
 """
 
@@ -137,9 +175,44 @@ brew autoremove
 [tasks.maintenance]
 description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packages"
 run = """
-if ! mise up; then
-  echo "[WARN] mise up failed, continuing with remaining maintenance tasks" >&2
-fi
+resolve_gh_cmd() {
+  for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\\n' "$candidate"
+      return 0
+    fi
+  done
+  candidate="$(command -v gh 2>/dev/null || true)"
+  case "$candidate" in
+    "" | *"/mise/shims/gh") return 1 ;;
+    *)
+      printf '%s\\n' "$candidate"
+      return 0
+      ;;
+  esac
+}
+
+run_mise_up() {
+  token="${GITHUB_TOKEN:-}"
+  if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
+    token="$("$gh_cmd" auth token 2>/dev/null || true)"
+  fi
+  if [ -z "$token" ]; then
+    echo "[WARN] gh auth token unavailable; skipping mise up to avoid GitHub API rate limits" >&2
+    return 0
+  fi
+  log_file="$(mktemp)"
+  if GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1; then
+    if [ -s "$log_file" ]; then
+      cat "$log_file"
+    fi
+    rm -f "$log_file"
+    return 0
+  fi
+  sed 's/^/[WARN] mise up: /' "$log_file" >&2
+  rm -f "$log_file"
+}
+run_mise_up
 chezmoi update -v && \
 cursor-agent update && \
 if command -v brew >/dev/null 2>&1; then

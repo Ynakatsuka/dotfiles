@@ -1,9 +1,17 @@
-{{- $ageCmd := lookPath "age" -}}
-{{- if not $ageCmd -}}
-{{-   $misePath := joinPath .chezmoi.homeDir ".local/share/mise/shims/age" -}}
-{{-   if stat $misePath -}}
-{{-     $ageCmd = $misePath -}}
+{{- $ageCmd := "" -}}
+{{- range $candidate := list "/usr/bin/age" "/usr/local/bin/age" "/opt/homebrew/bin/age" (joinPath .chezmoi.homeDir ".local/bin/age") -}}
+{{-   if and (not $ageCmd) (stat $candidate) -}}
+{{-     $ageCmd = $candidate -}}
 {{-   end -}}
+{{- end -}}
+{{- range $candidate := glob (joinPath .chezmoi.homeDir ".local/share/mise/installs/age/*/bin/age") -}}
+{{-   if and (not $ageCmd) (stat $candidate) -}}
+{{-     $ageCmd = $candidate -}}
+{{-   end -}}
+{{- end -}}
+{{- $pathAge := lookPath "age" -}}
+{{- if and (not $ageCmd) $pathAge (not (contains "mise/shims/age" $pathAge)) -}}
+{{-   $ageCmd = $pathAge -}}
 {{- end -}}
 {{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
 encryption = "age"

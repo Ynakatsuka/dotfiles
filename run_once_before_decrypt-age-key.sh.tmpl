@@ -5,6 +5,30 @@
 KEY_PATH="${HOME}/.config/chezmoi/key.txt"
 ENCRYPTED_KEY="{{ joinPath .chezmoi.sourceDir ".age-key.age" }}"
 
+resolve_age_cmd() {
+    for candidate in /usr/bin/age /usr/local/bin/age /opt/homebrew/bin/age "$HOME/.local/bin/age"; do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+    for candidate in "$HOME"/.local/share/mise/installs/age/*/bin/age; do
+        if [ -x "$candidate" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    candidate="$(command -v age 2>/dev/null || true)"
+    case "$candidate" in
+        "" | *"/mise/shims/age") return 1 ;;
+        *)
+            printf '%s\n' "$candidate"
+            return 0
+            ;;
+    esac
+}
+
 if [ -f "$KEY_PATH" ]; then
     exit 0
 fi
@@ -15,13 +39,13 @@ if [ ! -f "$ENCRYPTED_KEY" ]; then
     exit 0
 fi
 
-if ! command -v age >/dev/null 2>&1; then
+if ! AGE_CMD="$(resolve_age_cmd)"; then
     echo "[WARN] age not found. Install age first, then run 'chezmoi apply'."
     exit 0
 fi
 
 echo "[INFO] Decrypting age key (passphrase required once)..."
 mkdir -p "$(dirname "$KEY_PATH")"
-age -d -o "$KEY_PATH" "$ENCRYPTED_KEY"
+"$AGE_CMD" -d -o "$KEY_PATH" "$ENCRYPTED_KEY"
 chmod 600 "$KEY_PATH"
 echo "[INFO] Age key cached at $KEY_PATH"
