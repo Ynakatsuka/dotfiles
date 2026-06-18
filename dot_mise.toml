@@ -109,6 +109,9 @@ always_keep_install = false
 legacy_version_file = true
 plugin_autoupdate_last_check_duration = "7 days"
 
+[settings.task]
+run_auto_install = false
+
 [env]
 AGENT_BROWSER_NATIVE = "1"
 
