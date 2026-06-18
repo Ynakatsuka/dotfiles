@@ -156,7 +156,9 @@ run_mise_up() {
   rm -f "$log_file"
 }
 run_mise_up
-chezmoi update -v
+chezmoi git pull -- --ff-only
+chezmoi init
+chezmoi apply -v
 """
 
 [tasks.update-brew]
@@ -210,7 +212,9 @@ run_mise_up() {
   rm -f "$log_file"
 }
 run_mise_up
-chezmoi update -v && \
+chezmoi git pull -- --ff-only && \
+chezmoi init && \
+chezmoi apply -v && \
 cursor-agent update && \
 if command -v brew >/dev/null 2>&1; then
   brew update && \
