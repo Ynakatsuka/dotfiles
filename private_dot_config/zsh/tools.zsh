@@ -20,8 +20,19 @@ export PATH="$HOME/.local/bin:$PATH"
 # Older mise versions do not support settings.task.run_auto_install.
 if command -v mise > /dev/null 2>&1; then
   mise() {
-    if [[ "$1" == "maintenance" || "$1" == "update-dotfiles" ]] ||
-      { [[ "$1" == "run" || "$1" == "r" ]] && [[ "$2" == "maintenance" || "$2" == "update-dotfiles" ]]; }; then
+    local arg skip_auto_install=0
+    if [[ "$1" == "maintenance" || "$1" == "update-dotfiles" ]]; then
+      skip_auto_install=1
+    elif [[ "$1" == "run" || "$1" == "r" ]]; then
+      for arg in "$@"; do
+        if [[ "$arg" == "maintenance" || "$arg" == "update-dotfiles" ]]; then
+          skip_auto_install=1
+          break
+        fi
+      done
+    fi
+
+    if (( skip_auto_install )); then
       MISE_TASK_RUN_AUTO_INSTALL=false command mise "$@"
     else
       command mise "$@"
