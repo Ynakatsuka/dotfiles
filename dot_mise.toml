@@ -5,6 +5,9 @@
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
+# OpenCode CLI
+"github:anomalyco/opencode" = "latest"
+
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 

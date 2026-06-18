@@ -87,6 +87,16 @@ backend = "aqua:x-motemen/ghq"
 checksum = "sha256:5e3100de0c5a248eebe6ab176ad94d6e12386af70a58c535368a4301861b1398"
 url = "https://github.com/x-motemen/ghq/releases/download/v1.10.1/ghq_darwin_arm64.zip"
 
+[[tools."github:anomalyco/opencode"]]
+version = "1.17.7"
+backend = "github:anomalyco/opencode"
+
+[tools."github:anomalyco/opencode"."platforms.macos-arm64"]
+checksum = "sha256:7a63aeb5a15b29da2681ac2b8c74d4cb3a64fa13b61198a3c7dc771243c23972"
+url = "https://github.com/anomalyco/opencode/releases/download/v1.17.7/opencode-darwin-arm64.zip"
+url_api = "https://api.github.com/repos/anomalyco/opencode/releases/assets/447476261"
+provenance = "github-attestations"
+
 [[tools."github:rtk-ai/rtk"]]
 version = "0.42.3"
 backend = "github:rtk-ai/rtk"
