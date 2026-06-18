@@ -17,6 +17,18 @@ fi
 # .local
 export PATH="$HOME/.local/bin:$PATH"
 
+# Older mise versions do not support settings.task.run_auto_install.
+if command -v mise > /dev/null 2>&1; then
+  mise() {
+    if [[ "$1" == "maintenance" || "$1" == "update-dotfiles" ]] ||
+      { [[ "$1" == "run" || "$1" == "r" ]] && [[ "$2" == "maintenance" || "$2" == "update-dotfiles" ]]; }; then
+      MISE_TASK_RUN_AUTO_INSTALL=false command mise "$@"
+    else
+      command mise "$@"
+    fi
+  }
+fi
+
 # docker build
 if [[ $(uname -m) == "arm64" ]]; then
   export DOCKER_DEFAULT_PLATFORM=linux/amd64
@@ -34,7 +46,7 @@ _initialize_runtime_tools() {
 
   # mise (--shims avoids precmd hook overhead on every Enter)
   if command -v mise > /dev/null 2>&1; then
-    eval "$(mise activate zsh --shims)"
+    eval "$(command mise activate zsh --shims)"
   fi
 
   # direnv
