@@ -13,7 +13,7 @@
 {{- if and (not $ageCmd) $pathAge (not (contains "mise/shims/age" $pathAge)) -}}
 {{-   $ageCmd = $pathAge -}}
 {{- end -}}
-{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
+{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) -}}
 encryption = "age"
 
 [age]
