@@ -30,11 +30,14 @@ checksum = "sha256:8c847d0a29aa4b3101b3361e0b3ee7fb53c7e497adc9ed1afc9615538cd40
 url = "https://github.com/ast-grep/ast-grep/releases/download/0.43.0/app-aarch64-apple-darwin.zip"
 
 [[tools.aws]]
-version = "2.35.2"
+version = "2.35.9"
 backend = "aqua:aws/aws-cli"
 
+[tools.aws."platforms.linux-x64"]
+url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.35.9.zip"
+
 [tools.aws."platforms.macos-arm64"]
-url = "https://awscli.amazonaws.com/AWSCLIV2-2.35.2.pkg"
+url = "https://awscli.amazonaws.com/AWSCLIV2-2.35.9.pkg"
 
 [[tools.bun]]
 version = "1.3.14"
@@ -53,12 +56,16 @@ checksum = "sha256:4f569f3a36732bfd8b8fea7bfcc6ad87a59745c109022164d0ca4832451d5
 url = "https://github.com/direnv/direnv/releases/download/v2.37.1/direnv.darwin-arm64"
 
 [[tools.dotenvx]]
-version = "1.71.2"
+version = "1.73.1"
 backend = "aqua:dotenvx/dotenvx"
 
+[tools.dotenvx."platforms.linux-x64"]
+checksum = "sha256:4d29c34a4aaed8cec28954df91c3f8ab11c5bd0a3018a33b0683bbee6c0f8410"
+url = "https://github.com/dotenvx/dotenvx/releases/download/v1.73.1/dotenvx-1.73.1-linux-amd64.tar.gz"
+
 [tools.dotenvx."platforms.macos-arm64"]
-checksum = "sha256:e7678cadd15d9fc9dfdf9578b5399c92de10e6760dc5d0f706d113b8197eb5ac"
-url = "https://github.com/dotenvx/dotenvx/releases/download/v1.71.2/dotenvx-1.71.2-darwin-arm64.tar.gz"
+checksum = "sha256:ac95697c82b6a9e919f9790b49318036c3e3b9cd1cf062ffed42c0a779585252"
+url = "https://github.com/dotenvx/dotenvx/releases/download/v1.73.1/dotenvx-1.73.1-darwin-arm64.tar.gz"
 
 [[tools.eza]]
 version = "0.23.4"
@@ -81,16 +88,21 @@ checksum = "sha256:d27fd68c04fb9b42f7c73a3f7d38069a74d308e40174f64a072c747213e97
 url = "https://github.com/junegunn/fzf/releases/download/v0.73.1/fzf-0.73.1-darwin_arm64.tar.gz"
 
 [[tools.gcloud]]
-version = "572.0.0"
+version = "573.0.0"
 backend = "asdf:gcloud"
 
 [[tools.gh]]
-version = "2.93.0"
+version = "2.95.0"
 backend = "aqua:cli/cli"
 
+[tools.gh."platforms.linux-x64"]
+checksum = "sha256:25d1e4729e8808c9ed3d613e96ebd3f3e44446f2d368c89d878a71a36ddb3d8c"
+url = "https://github.com/cli/cli/releases/download/v2.95.0/gh_2.95.0_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
 [tools.gh."platforms.macos-arm64"]
-checksum = "sha256:a86be4e0a86c26456cf71177d6572d6f1165cf1679e532b72f7f15918ee51fd2"
-url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_macOS_arm64.zip"
+checksum = "sha256:3677f9c27965825f9c7d50395473c134edaea4b484373ef6b25de653570a0489"
+url = "https://github.com/cli/cli/releases/download/v2.95.0/gh_2.95.0_macOS_arm64.zip"
 provenance = "github-attestations"
 
 [[tools.ghq]]
@@ -112,13 +124,18 @@ url_api = "https://api.github.com/repos/anomalyco/opencode/releases/assets/44747
 provenance = "github-attestations"
 
 [[tools."github:rtk-ai/rtk"]]
-version = "0.42.3"
+version = "0.42.4"
 backend = "github:rtk-ai/rtk"
 
+[tools."github:rtk-ai/rtk"."platforms.linux-x64"]
+checksum = "sha256:34975116da11e09e502501daf758143e0b22ed3a42a10eb67fb693a6270d9e36"
+url = "https://github.com/rtk-ai/rtk/releases/download/v0.42.4/rtk-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/rtk-ai/rtk/releases/assets/445871732"
+
 [tools."github:rtk-ai/rtk"."platforms.macos-arm64"]
-checksum = "sha256:d47823afb25919e4e60838c5622e88ffa6536bc0b36a34a3f928bdccac40f614"
-url = "https://github.com/rtk-ai/rtk/releases/download/v0.42.3/rtk-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/rtk-ai/rtk/releases/assets/439464983"
+checksum = "sha256:f223ca074a0215af002679bc1d34ca92b93e25b3e8ae16aace6e84c06e586802"
+url = "https://github.com/rtk-ai/rtk/releases/download/v0.42.4/rtk-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/rtk-ai/rtk/releases/assets/445871734"
 
 [[tools."github:sdf-labs/sdf-cli"]]
 version = "0.10.8-p"
@@ -128,13 +145,18 @@ backend = "github:sdf-labs/sdf-cli"
 matching = "sdf-*.tar.gz"
 
 [[tools."github:vercel-labs/agent-browser"]]
-version = "0.27.1"
+version = "0.28.0"
 backend = "github:vercel-labs/agent-browser"
 
+[tools."github:vercel-labs/agent-browser"."platforms.linux-x64"]
+checksum = "sha256:c0bef69599d6ed123bf147bd6747755978330948d2ef5eaae492ef171b659556"
+url = "https://github.com/vercel-labs/agent-browser/releases/download/v0.28.0/agent-browser-linux-x64"
+url_api = "https://api.github.com/repos/vercel-labs/agent-browser/releases/assets/449468719"
+
 [tools."github:vercel-labs/agent-browser"."platforms.macos-arm64"]
-checksum = "sha256:5ff18a2f0c7d4c662d638b8ac5ce434b589be5f6bde8b8fe7e25c3658e2bcbf9"
-url = "https://github.com/vercel-labs/agent-browser/releases/download/v0.27.1/agent-browser-darwin-arm64"
-url_api = "https://api.github.com/repos/vercel-labs/agent-browser/releases/assets/435568390"
+checksum = "sha256:bc2b3faec46e7ec33c02009d322f58036eaa09aba392e143139d3d16aae02492"
+url = "https://github.com/vercel-labs/agent-browser/releases/download/v0.28.0/agent-browser-darwin-arm64"
+url_api = "https://api.github.com/repos/vercel-labs/agent-browser/releases/assets/449468695"
 
 [[tools.go]]
 version = "1.26.4"
@@ -178,7 +200,7 @@ version = "30.1.0"
 backend = "npm:@antfu/ni"
 
 [[tools."npm:@openai/codex"]]
-version = "0.139.0"
+version = "0.141.0"
 backend = "npm:@openai/codex"
 
 [[tools."npm:@vscode/vsce"]]
@@ -190,12 +212,17 @@ version = "5.0.2"
 backend = "npm:difit"
 
 [[tools.prek]]
-version = "0.4.4"
+version = "0.4.5"
 backend = "aqua:j178/prek"
 
+[tools.prek."platforms.linux-x64"]
+checksum = "sha256:94698d1cd74e7b462a017257efeab6f46142f4fb3da9a1314f06c1d55c26d614"
+url = "https://github.com/j178/prek/releases/download/v0.4.5/prek-x86_64-unknown-linux-musl.tar.gz"
+provenance = "github-attestations"
+
 [tools.prek."platforms.macos-arm64"]
-checksum = "sha256:d3d74f96bbb9fe88d14bdb3119501f8f39602b885e19f57c6567791599afd231"
-url = "https://github.com/j178/prek/releases/download/v0.4.4/prek-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:ed4920762f0e3db07163c437af622a1d4905e1ad7053692a495551b9ce92549f"
+url = "https://github.com/j178/prek/releases/download/v0.4.5/prek-aarch64-apple-darwin.tar.gz"
 provenance = "github-attestations"
 
 [[tools.python]]
@@ -208,12 +235,17 @@ url = "https://github.com/astral-sh/python-build-standalone/releases/download/20
 provenance = "github-attestations"
 
 [[tools.ruff]]
-version = "0.15.16"
+version = "0.15.18"
 backend = "aqua:astral-sh/ruff"
 
+[tools.ruff."platforms.linux-x64"]
+checksum = "sha256:9ca54aec52cfdbe1e708cc975e41e3e736a2c1ebe76668575efe09e0701465c8"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.18/ruff-x86_64-unknown-linux-musl.tar.gz"
+provenance = "github-attestations"
+
 [tools.ruff."platforms.macos-arm64"]
-checksum = "sha256:9deb6c4c38c9324bfd98ea4efb40946aae99a987e7f9d1308a1291f14f6b46e2"
-url = "https://github.com/astral-sh/ruff/releases/download/0.15.16/ruff-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:f0cc66c2df37f2a11c99a85b59b8fde21b37f61df062404a0afaed387b56dad0"
+url = "https://github.com/astral-sh/ruff/releases/download/0.15.18/ruff-aarch64-apple-darwin.tar.gz"
 provenance = "github-attestations"
 
 [[tools.rye]]
@@ -249,12 +281,17 @@ checksum = "sha256:23ca24a9186b5cb395b5f6c8eea8cdb02911c8980833e016454b56e90c3bd
 url = "https://github.com/crate-ci/typos/releases/download/v1.47.2/typos-v1.47.2-aarch64-apple-darwin.tar.gz"
 
 [[tools.uv]]
-version = "0.11.20"
+version = "0.11.22"
 backend = "aqua:astral-sh/uv"
 
+[tools.uv."platforms.linux-x64"]
+checksum = "sha256:b80bd6952ee11b920b5ab2a35dbccddc364f579e5f2e028d115848cdaa72963e"
+url = "https://github.com/astral-sh/uv/releases/download/0.11.22/uv-x86_64-unknown-linux-musl.tar.gz"
+provenance = "github-attestations"
+
 [tools.uv."platforms.macos-arm64"]
-checksum = "sha256:0a2b6a757d5693671a7ce0002554ae869604e1e69acb10313ac14d08374be01a"
-url = "https://github.com/astral-sh/uv/releases/download/0.11.20/uv-aarch64-apple-darwin.tar.gz"
+checksum = "sha256:97a45e2ff8d5ea262623eed57ec2d9c468a42d74496d5c3c3eef11340235bd7f"
+url = "https://github.com/astral-sh/uv/releases/download/0.11.22/uv-aarch64-apple-darwin.tar.gz"
 provenance = "github-attestations"
 
 [[tools.yq]]
