@@ -57,7 +57,11 @@ git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   exit 1
 }
 
-original_root="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+original_root="$(git worktree list --porcelain | awk 'NR == 1 { sub(/^worktree /, ""); print }')"
+if [[ -z "$original_root" ]]; then
+  echo "Error: failed to resolve main worktree root." >&2
+  exit 1
+fi
 if [[ "$git_root" != "$original_root" ]]; then
   echo "Currently in a worktree. Switching to main repository: $original_root"
   cd "$original_root"
@@ -72,7 +76,8 @@ existing_wt="$(
   git worktree list --porcelain |
     awk -v b="$branch_name" '
       /^worktree/ { wt = $2 }
-      $1 == "branch" && $2 == "refs/heads/" b { print wt; exit }
+      $1 == "branch" && $2 == "refs/heads/" b && found == "" { found = wt }
+      END { if (found != "") print found }
     '
 )"
 if [[ -n "$existing_wt" ]]; then
@@ -109,7 +114,8 @@ for base in "${base_candidates[@]}"; do
     git worktree list --porcelain |
       awk -v b="$base" '
         /^worktree/ { wt = $2 }
-        $1 == "branch" && $2 == "refs/heads/" b { print wt; exit }
+        $1 == "branch" && $2 == "refs/heads/" b && found == "" { found = wt }
+        END { if (found != "") print found }
       '
   )"
 

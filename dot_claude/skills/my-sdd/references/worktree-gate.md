@@ -14,7 +14,7 @@ Phase 3 開始時、保護ブランチ（`main` / `master` / `staging` / `develo
 ## 判定
 
 ```bash
-main_root=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+main_root=$(git worktree list --porcelain | awk 'NR == 1 { sub(/^worktree /, ""); print }')
 current_root=$(git rev-parse --show-toplevel)
 current_branch=$(git branch --show-current)
 

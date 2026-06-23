@@ -256,7 +256,11 @@ function gw() {
     fi
 
     # Resolve to the main (non-worktree) repository root
-    local original_root=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+    local original_root=$(git worktree list --porcelain | awk 'NR == 1 { sub(/^worktree /, ""); print }')
+    if [ -z "$original_root" ]; then
+        echo "Error: failed to resolve main worktree root." >&2
+        return 1
+    fi
     if [ "$git_root" != "$original_root" ]; then
         echo "Currently in worktree. Switching to main repository: $original_root"
         cd "$original_root"
