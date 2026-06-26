@@ -165,16 +165,48 @@ chezmoi apply -v
 [tasks.update-brew]
 description = "Update Homebrew and all installed packages"
 run = """
-brew update && \
-brew upgrade && \
-brew upgrade --cask && \
-brew cleanup -s && \
-brew autoremove
+set -e
+
+upgrade_homebrew_packages() {
+  cask_list="$(mktemp)"
+  filtered_cask_list="$(mktemp)"
+  trap 'rm -f "$cask_list" "$filtered_cask_list"' EXIT
+
+  brew update
+  brew upgrade --formula
+
+  brew outdated --cask --quiet > "$cask_list"
+  awk '
+    $0 == "google-chrome" {
+      skipped = 1
+      next
+    }
+    { print }
+    END {
+      if (skipped) {
+        print "[INFO] Skipping google-chrome cask upgrade; Chrome self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
+      }
+    }
+  ' "$cask_list" > "$filtered_cask_list"
+
+  if [ -s "$filtered_cask_list" ]; then
+    xargs brew upgrade --cask < "$filtered_cask_list"
+  else
+    echo "[INFO] No outdated Homebrew casks to upgrade"
+  fi
+
+  brew cleanup -s
+  brew autoremove
+}
+
+upgrade_homebrew_packages
 """
 
 [tasks.maintenance]
 description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packages"
 run = """
+set -e
+
 resolve_gh_cmd() {
   for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
     if [ -x "$candidate" ]; then
@@ -212,17 +244,46 @@ run_mise_up() {
   sed 's/^/[WARN] mise up: /' "$log_file" >&2
   rm -f "$log_file"
 }
+
+upgrade_homebrew_packages() {
+  cask_list="$(mktemp)"
+  filtered_cask_list="$(mktemp)"
+  trap 'rm -f "$cask_list" "$filtered_cask_list"' EXIT
+
+  brew update
+  brew upgrade --formula
+
+  brew outdated --cask --quiet > "$cask_list"
+  awk '
+    $0 == "google-chrome" {
+      skipped = 1
+      next
+    }
+    { print }
+    END {
+      if (skipped) {
+        print "[INFO] Skipping google-chrome cask upgrade; Chrome self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
+      }
+    }
+  ' "$cask_list" > "$filtered_cask_list"
+
+  if [ -s "$filtered_cask_list" ]; then
+    xargs brew upgrade --cask < "$filtered_cask_list"
+  else
+    echo "[INFO] No outdated Homebrew casks to upgrade"
+  fi
+
+  brew cleanup -s
+  brew autoremove
+}
+
 run_mise_up
 chezmoi git pull -- --ff-only && \
 chezmoi init && \
 chezmoi apply -v && \
 cursor-agent update && \
 if command -v brew >/dev/null 2>&1; then
-  brew update && \
-  brew upgrade && \
-  brew upgrade --cask && \
-  brew cleanup -s && \
-  brew autoremove
+  upgrade_homebrew_packages
 else
   echo "[INFO] brew not found, skipping Homebrew updates"
 fi
