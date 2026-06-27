@@ -12,12 +12,14 @@ Do not silently switch from Codex to Claude if Codex fails. Report the failure a
 
 | Mode | Behavior |
 |---|---|
-| `review` | Analyze current PR changes and report findings only. Do not edit files. |
+| `review` | Analyze current PR changes and report findings only. Do not edit or write files. |
 | `apply` | Apply only Required behavior-preserving simplifications, then verify. |
 
 ## Scope
 
 Target only files changed in the current conversation or current PR diff. Do not touch unrelated staged, unstaged, or untracked files.
+
+When invoked from `my-pr`, use the repo-local `MY_PR_REVIEW_DIFF` artifact from `prepare-review-artifacts.sh`. Do not use `/tmp` diff files. If the artifact cannot be read, stop and report the failure instead of reviewing current file state as a substitute.
 
 Before analysis, inspect:
 
@@ -102,12 +104,13 @@ Follow these constraints:
 - Preserve behavior. Do not change public APIs, schemas, CLI/config contracts, persistence formats, or error semantics without approval.
 - Target only the current conversation changes or current PR diff. Do not touch unrelated files.
 - Classify every finding as Required, Recommended, or Not needed. Put each finding in exactly one category.
-- In review mode, do not edit files.
+- In review mode, do not edit or write files anywhere, including .plans, .tmp, or /tmp.
 - In apply mode, apply only Required behavior-preserving simplifications. Do not apply Recommended changes.
 - Do not add fallbacks, default substitutions, broad catches, silent retries, mocks, or stub continuations.
 - Respect AGENTS.md, CLAUDE.md, ADRs, specs, nearby tests, and project conventions.
 - Run targeted verification from documented project commands. If no documented command exists, report it as unverified instead of inventing one.
 - Report changed files, skipped recommendations, and verification results.
+- If MY_PR_REVIEW_DIFF is provided and unreadable, return REVIEW_INCOMPLETE and stop.
 ```
 
 ## Verification
