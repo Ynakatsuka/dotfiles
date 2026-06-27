@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Upgrade mise-managed tools while still allowing non-GitHub backends without a token.
+
+set -euo pipefail
+
+LOG_FILE=""
+
+cleanup() {
+  if [ -n "$LOG_FILE" ]; then
+    rm -f "$LOG_FILE"
+  fi
+}
+
+resolve_gh_cmd() {
+  local candidate
+
+  for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  candidate="$(command -v gh 2>/dev/null || true)"
+  case "$candidate" in
+    "" | *"/mise/shims/gh") return 1 ;;
+    *)
+      printf '%s\n' "$candidate"
+      return 0
+      ;;
+  esac
+}
+
+main() {
+  local gh_cmd status token
+
+  token="${GITHUB_TOKEN:-}"
+  if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
+    token="$("$gh_cmd" auth token 2>/dev/null || true)"
+  fi
+
+  LOG_FILE="$(mktemp)"
+  trap cleanup EXIT
+
+  if [ -n "$token" ]; then
+    if GITHUB_TOKEN="$token" mise up "$@" >"$LOG_FILE" 2>&1; then
+      status=0
+    else
+      status="$?"
+    fi
+  elif mise up "$@" >"$LOG_FILE" 2>&1; then
+    status=0
+  else
+    status="$?"
+  fi
+
+  if [ "$status" -eq 0 ]; then
+    if [ -s "$LOG_FILE" ]; then
+      cat "$LOG_FILE"
+    fi
+    return 0
+  fi
+
+  sed 's/^/[WARN] mise up: /' "$LOG_FILE" >&2
+  return "$status"
+}
+
+main "$@"

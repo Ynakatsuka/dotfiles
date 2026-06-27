@@ -119,49 +119,9 @@ AGENT_BROWSER_NATIVE = "1"
 [tasks.update-dotfiles]
 description = "Update dotfiles and development environment"
 run = """
-resolve_gh_cmd() {
-  for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
-    if [ -x "$candidate" ]; then
-      printf '%s\\n' "$candidate"
-      return 0
-    fi
-  done
-  candidate="$(command -v gh 2>/dev/null || true)"
-  case "$candidate" in
-    "" | *"/mise/shims/gh") return 1 ;;
-    *)
-      printf '%s\\n' "$candidate"
-      return 0
-      ;;
-  esac
-}
-
-run_mise_up() {
-  token="${GITHUB_TOKEN:-}"
-  if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
-    token="$("$gh_cmd" auth token 2>/dev/null || true)"
-  fi
-  log_file="$(mktemp)"
-  # Run even without a GitHub token so non-GitHub backends can refresh mise.lock.
-  if [ -n "$token" ]; then
-    GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1
-  else
-    mise up >"$log_file" 2>&1
-  fi
-  status="$?"
-  if [ "$status" -eq 0 ]; then
-    if [ -s "$log_file" ]; then
-      cat "$log_file"
-    fi
-    rm -f "$log_file"
-    return 0
-  fi
-  sed 's/^/[WARN] mise up: /' "$log_file" >&2
-  rm -f "$log_file"
-}
-run_mise_up
+set -e
+"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
 chezmoi git pull -- --ff-only
-chezmoi init
 chezmoi apply -v
 """
 
@@ -170,39 +130,7 @@ description = "Update Homebrew and all installed packages"
 run = """
 set -e
 
-upgrade_homebrew_packages() {
-  cask_list="$(mktemp)"
-  filtered_cask_list="$(mktemp)"
-  trap 'rm -f "$cask_list" "$filtered_cask_list"' EXIT
-
-  brew update
-  brew upgrade --formula
-
-  brew outdated --cask --quiet > "$cask_list"
-  awk '
-    $0 == "google-chrome" {
-      skipped = 1
-      next
-    }
-    { print }
-    END {
-      if (skipped) {
-        print "[INFO] Skipping google-chrome cask upgrade; Chrome self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
-      }
-    }
-  ' "$cask_list" > "$filtered_cask_list"
-
-  if [ -s "$filtered_cask_list" ]; then
-    xargs brew upgrade --cask < "$filtered_cask_list"
-  else
-    echo "[INFO] No outdated Homebrew casks to upgrade"
-  fi
-
-  brew cleanup -s
-  brew autoremove
-}
-
-upgrade_homebrew_packages
+"$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
 """
 
 [tasks.maintenance]
@@ -210,86 +138,12 @@ description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packa
 run = """
 set -e
 
-resolve_gh_cmd() {
-  for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
-    if [ -x "$candidate" ]; then
-      printf '%s\\n' "$candidate"
-      return 0
-    fi
-  done
-  candidate="$(command -v gh 2>/dev/null || true)"
-  case "$candidate" in
-    "" | *"/mise/shims/gh") return 1 ;;
-    *)
-      printf '%s\\n' "$candidate"
-      return 0
-      ;;
-  esac
-}
-
-run_mise_up() {
-  token="${GITHUB_TOKEN:-}"
-  if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
-    token="$("$gh_cmd" auth token 2>/dev/null || true)"
-  fi
-  log_file="$(mktemp)"
-  # Run even without a GitHub token so non-GitHub backends can refresh mise.lock.
-  if [ -n "$token" ]; then
-    GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1
-  else
-    mise up >"$log_file" 2>&1
-  fi
-  status="$?"
-  if [ "$status" -eq 0 ]; then
-    if [ -s "$log_file" ]; then
-      cat "$log_file"
-    fi
-    rm -f "$log_file"
-    return 0
-  fi
-  sed 's/^/[WARN] mise up: /' "$log_file" >&2
-  rm -f "$log_file"
-}
-
-upgrade_homebrew_packages() {
-  cask_list="$(mktemp)"
-  filtered_cask_list="$(mktemp)"
-  trap 'rm -f "$cask_list" "$filtered_cask_list"' EXIT
-
-  brew update
-  brew upgrade --formula
-
-  brew outdated --cask --quiet > "$cask_list"
-  awk '
-    $0 == "google-chrome" {
-      skipped = 1
-      next
-    }
-    { print }
-    END {
-      if (skipped) {
-        print "[INFO] Skipping google-chrome cask upgrade; Chrome self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
-      }
-    }
-  ' "$cask_list" > "$filtered_cask_list"
-
-  if [ -s "$filtered_cask_list" ]; then
-    xargs brew upgrade --cask < "$filtered_cask_list"
-  else
-    echo "[INFO] No outdated Homebrew casks to upgrade"
-  fi
-
-  brew cleanup -s
-  brew autoremove
-}
-
-run_mise_up
-chezmoi git pull -- --ff-only && \
-chezmoi init && \
-chezmoi apply -v && \
-cursor-agent update && \
+"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+chezmoi git pull -- --ff-only
+chezmoi apply -v
+cursor-agent update
 if command -v brew >/dev/null 2>&1; then
-  upgrade_homebrew_packages
+  "$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
 else
   echo "[INFO] brew not found, skipping Homebrew updates"
 fi

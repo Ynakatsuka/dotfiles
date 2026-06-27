@@ -56,6 +56,7 @@ echo "[INFO] 1) SSH (git@github.com:...) requires working SSH auth"
 echo "[INFO] 2) HTTPS (https://github.com/...) works without SSH"
 read -r -p "Use SSH for chezmoi init? [y/N]: " use_ssh
 
+source_dir="$HOME/ghq/github.com/Ynakatsuka/dotfiles"
 remote_https="https://github.com/Ynakatsuka/dotfiles.git"
 remote_ssh="git@github.com:Ynakatsuka/dotfiles.git"
 
@@ -65,9 +66,10 @@ else
   remote="$remote_https"
 fi
 
-read -r -p "Run 'chezmoi init --apply' from $remote ? [y/N]: " run_apply
+read -r -p "Run 'chezmoi -S $source_dir init --apply' from $remote ? [y/N]: " run_apply
 if [[ "$run_apply" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-  chezmoi init --apply "$remote"
+  mkdir -p "$(dirname "$source_dir")"
+  chezmoi -S "$source_dir" init --apply "$remote"
 else
   echo "[WARN] Skipped chezmoi init/apply"
 fi

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Upgrade Homebrew packages while leaving Chrome cask updates to Chrome itself.
+
+set -euo pipefail
+
+CASK_LIST=""
+FILTERED_CASK_LIST=""
+
+cleanup() {
+  if [ -n "$CASK_LIST" ]; then
+    rm -f "$CASK_LIST"
+  fi
+  if [ -n "$FILTERED_CASK_LIST" ]; then
+    rm -f "$FILTERED_CASK_LIST"
+  fi
+}
+
+main() {
+  CASK_LIST="$(mktemp)"
+  FILTERED_CASK_LIST="$(mktemp)"
+  trap cleanup EXIT
+
+  brew update
+  brew upgrade --formula
+
+  brew outdated --cask --quiet >"$CASK_LIST"
+  awk '
+    $0 == "google-chrome" {
+      skipped = 1
+      next
+    }
+    { print }
+    END {
+      if (skipped) {
+        print "[INFO] Skipping google-chrome cask upgrade; Chrome self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
+      }
+    }
+  ' "$CASK_LIST" >"$FILTERED_CASK_LIST"
+
+  if [ -s "$FILTERED_CASK_LIST" ]; then
+    xargs brew upgrade --cask <"$FILTERED_CASK_LIST"
+  else
+    echo "[INFO] No outdated Homebrew casks to upgrade"
+  fi
+
+  brew cleanup -s
+  brew autoremove
+}
+
+main "$@"

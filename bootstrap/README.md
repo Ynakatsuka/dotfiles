@@ -34,9 +34,10 @@ make -C bootstrap linux-dotfiles
 Set up user-local environment with a single command. Requires `curl`, `git`, and `make`.
 
 ```bash
+DOTFILES_SOURCE="$HOME/ghq/github.com/Ynakatsuka/dotfiles" && \
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
-  "$HOME/.local/bin/chezmoi" init --apply Ynakatsuka/dotfiles && \
-  make -C ~/.local/share/chezmoi/bootstrap linux-user
+  "$HOME/.local/bin/chezmoi" -S "$DOTFILES_SOURCE" init --apply Ynakatsuka/dotfiles && \
+  make -C "$DOTFILES_SOURCE/bootstrap" linux-user
 ```
 
 ### Pre‑clone Setup (Fresh Machines)
@@ -46,16 +47,16 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 - macOS
   ```bash
   xcode-select --install
-  git clone https://github.com/Ynakatsuka/dotfiles.git
-  cd dotfiles
+  git clone https://github.com/Ynakatsuka/dotfiles.git "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
+  cd "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
   make -C bootstrap macos
   ```
 
 - Ubuntu 22.04
   ```bash
   sudo apt-get update && sudo apt-get install -y git curl
-  git clone https://github.com/Ynakatsuka/dotfiles.git
-  cd dotfiles
+  git clone https://github.com/Ynakatsuka/dotfiles.git "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
+  cd "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
   make -C bootstrap linux
   ```
 

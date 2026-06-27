@@ -61,11 +61,8 @@ tmux source ~/.tmux.conf   # Reload tmux config
 
 ### Repository Location
 
-This repository may have multiple clones on the system:
-- **Primary (authoritative)**: `~/ghq/github.com/Ynakatsuka/dotfiles/`
-- **Chezmoi source**: `~/.local/share/chezmoi/` (used by chezmoi for deployment)
-
-Always edit files in the `ghq` directory. Changes need to be committed/pushed from there and pulled into the chezmoi source directory, or applied directly to both locations.
+The authoritative repository and chezmoi source are both `~/ghq/github.com/Ynakatsuka/dotfiles/`.
+`~/.config/chezmoi/chezmoi.toml` sets `sourceDir` to that path, so `chezmoi apply` reads from the ghq clone.
 
 ### Template Processing
 
@@ -126,12 +123,10 @@ osascript -e 'tell application "Hammerspoon" to execute lua code "hs.reload()"'
 
 Note: after a fresh install you must Reload Config **once manually** from the Hammerspoon menu bar before the CLI/AppleScript paths work.
 
-### Chezmoi Source vs ghq Clone
-
-The chezmoi source dir (`~/.local/share/chezmoi/`) is a separate git clone from the authoritative ghq dir. `chezmoi apply` reads from the chezmoi source, NOT the ghq dir. After committing in ghq, sync the chezmoi source before applying:
+### Chezmoi Source
 
 ```bash
-git -C ~/.local/share/chezmoi pull
+chezmoi git pull -- --ff-only
 chezmoi apply -v
 ```
 

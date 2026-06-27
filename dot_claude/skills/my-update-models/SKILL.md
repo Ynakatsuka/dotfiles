@@ -85,9 +85,9 @@ another primary source before acting.
 5. **Apply edits in the ghq repo** with the Edit tool. One field per edit.
 6. **Scan the invoking repository** for hardcoded model IDs (see next section).
 7. **Deploy.** Tell the user the deploy steps; only run them if asked.
-   The chezmoi source dir is a separate clone, so the canonical sequence is:
+   The chezmoi source dir is the ghq clone, so the canonical sequence is:
    ```bash
-   git -C ~/.local/share/chezmoi pull   # after the user commits + pushes in ghq
+   chezmoi git pull -- --ff-only
    chezmoi diff
    chezmoi apply -v
    ```

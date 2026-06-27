@@ -33,7 +33,8 @@ if command -v chezmoi >/dev/null 2>&1 || [ -x "$HOME/.local/bin/chezmoi" ]; then
   log "chezmoi already installed, skipping"
 elif confirm "Install chezmoi and apply this dotfiles repo?"; then
   run bash -lc 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
-  run bash -lc '"$HOME/.local/bin/chezmoi" init --apply git@github.com:Ynakatsuka/dotfiles.git'
+  run bash -lc 'mkdir -p "$HOME/ghq/github.com/Ynakatsuka"'
+  run bash -lc '"$HOME/.local/bin/chezmoi" -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init --apply git@github.com:Ynakatsuka/dotfiles.git'
   run bash -lc 'source "$HOME/.zshrc" || true'
 fi
 

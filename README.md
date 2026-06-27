@@ -28,9 +28,10 @@ make -C bootstrap minimal   # Dotfiles only (chezmoi apply)
 No Git clone required. Fastest path for a user-local Linux setup:
 
 ```bash
+DOTFILES_SOURCE="$HOME/ghq/github.com/Ynakatsuka/dotfiles" && \
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
-  "$HOME/.local/bin/chezmoi" init --apply Ynakatsuka/dotfiles && \
-  make -C ~/.local/share/chezmoi/bootstrap standard
+  "$HOME/.local/bin/chezmoi" -S "$DOTFILES_SOURCE" init --apply Ynakatsuka/dotfiles && \
+  make -C "$DOTFILES_SOURCE/bootstrap" standard
 ```
 
 Detailed bootstrap behavior lives in [bootstrap/README.md](bootstrap/README.md).
@@ -67,7 +68,7 @@ tmux source ~/.tmux.conf
 For a forced re-init:
 
 ```bash
-chezmoi init --apply https://github.com/Ynakatsuka/dotfiles.git --force
+chezmoi -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 ```
 
 ## Shortcuts
@@ -203,7 +204,7 @@ Bootstrap on Linux also installs `age`.
 ### First-Time Setup on a New Machine
 
 ```bash
-chezmoi init https://github.com/Ynakatsuka/dotfiles.git
+chezmoi -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init https://github.com/Ynakatsuka/dotfiles.git
 chezmoi apply -v
 ```
 
