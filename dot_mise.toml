@@ -141,12 +141,15 @@ run_mise_up() {
   if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
     token="$("$gh_cmd" auth token 2>/dev/null || true)"
   fi
-  if [ -z "$token" ]; then
-    echo "[WARN] gh auth token unavailable; skipping mise up to avoid GitHub API rate limits" >&2
-    return 0
-  fi
   log_file="$(mktemp)"
-  if GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1; then
+  # Run even without a GitHub token so non-GitHub backends can refresh mise.lock.
+  if [ -n "$token" ]; then
+    GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1
+  else
+    mise up >"$log_file" 2>&1
+  fi
+  status="$?"
+  if [ "$status" -eq 0 ]; then
     if [ -s "$log_file" ]; then
       cat "$log_file"
     fi
@@ -229,12 +232,15 @@ run_mise_up() {
   if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
     token="$("$gh_cmd" auth token 2>/dev/null || true)"
   fi
-  if [ -z "$token" ]; then
-    echo "[WARN] gh auth token unavailable; skipping mise up to avoid GitHub API rate limits" >&2
-    return 0
-  fi
   log_file="$(mktemp)"
-  if GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1; then
+  # Run even without a GitHub token so non-GitHub backends can refresh mise.lock.
+  if [ -n "$token" ]; then
+    GITHUB_TOKEN="$token" mise up >"$log_file" 2>&1
+  else
+    mise up >"$log_file" 2>&1
+  fi
+  status="$?"
+  if [ "$status" -eq 0 ]; then
     if [ -s "$log_file" ]; then
       cat "$log_file"
     fi
