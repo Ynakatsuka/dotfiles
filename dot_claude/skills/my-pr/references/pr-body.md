@@ -61,14 +61,32 @@ Mention risks that reviewers should prioritize:
 
 ## Create/update commands
 
+Use a repo-local body file under the my-pr artifact directory. Do not use `/tmp/pr-body.md`.
+
+```bash
+: "${MY_PR_ARTIFACT_DIR:?Run prepare-review-artifacts.sh first and source MY_PR_ARTIFACT_ENV when resuming}"
+PR_BODY_FILE="$MY_PR_ARTIFACT_DIR/pr-body.md"
+cat >| "$PR_BODY_FILE" <<'EOF'
+## 概要
+
+## 変更内容
+-
+
+## テスト内容
+- [ ]
+EOF
+```
+
 Create a draft PR when none exists.
 
 ```bash
-gh pr create --draft --title "TITLE" --body-file /tmp/pr-body.md --assignee @me
+gh pr create --draft --title "TITLE" --body-file "$PR_BODY_FILE" --assignee @me
 ```
 
 Update an existing PR body.
 
 ```bash
-gh pr edit --body-file /tmp/pr-body.md
+gh pr edit --body-file "$PR_BODY_FILE"
 ```
+
+Never stage or commit `.tmp/my-pr/`.

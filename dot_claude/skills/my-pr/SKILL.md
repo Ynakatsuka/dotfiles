@@ -53,15 +53,25 @@ git diff "$BASE_BRANCH"..HEAD --stat
 git log "$BASE_BRANCH"..HEAD --oneline
 ```
 
+PR scope を確認する。未コミット差分だけでなく、base branch との差分量を必ず報告する。
+
+```bash
+eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_BRANCH")"
+```
+
+出力された `MY_PR_ARTIFACT_ENV` は再開用に source できる。`MY_PR_SCOPE_SUMMARY` を読む。`MY_PR_SCOPE_GATE` が `ok` 以外の場合は停止する。`large` はユーザーがそのブランチ全体を PR 対象として明示済みの場合だけ続行できる。`untracked` は対象ファイルを明示して stage / `git add -N` するか、対象外と確認してから artifact を作り直す。
+
 既存 PR の有無を確認する。
 
 ```bash
-if gh pr view --json number,title,state 2>/tmp/my-pr-view.err; then
+ERR_FILE=$(mktemp -t my-pr-view.XXXXXX.err)
+trap 'rm -f "$ERR_FILE"' EXIT
+if gh pr view --json number,title,state 2>"$ERR_FILE"; then
   echo "Existing PR found."
-elif rg -qi "no pull requests|not found" /tmp/my-pr-view.err; then
+elif rg -qi "no pull requests|not found" "$ERR_FILE"; then
   echo "No existing PR for this branch."
 else
-  cat /tmp/my-pr-view.err
+  cat "$ERR_FILE"
   exit 1
 fi
 ```
@@ -83,15 +93,21 @@ fi
 
 最初に simplify apply を実行しない。先に apply すると、Claude/Codex が古い diff をレビューするため。
 
+`prepare-review-artifacts.sh` が作成した repo-local artifact を使う。`/tmp` の diff や「現在のファイル状態」レビューへ暗黙に切り替えない。
+
 以下 3 つを同時に起動する。
 
 - Reviewer A: integrated simplify review
 - Reviewer B: Claude Code correctness review
 - Reviewer C: Codex correctness review via `/my-agent codex`
 
+いずれかの reviewer が失敗、quota、permission、diff access 不可、timeout になった場合は review incomplete として停止する。Claude/local review への代替や、部分レビューでの PR 作成は、ユーザーが明示承認した場合だけ行う。
+
 ### 3-3. 統合
 
 `references/review.md` の Integration rules と Integration output に従う。3つの結果を重複排除し、各指摘を Required / Recommended / Not needed のどれか1つに分類する。
+
+background 実行した reviewer が残っている間は最終回答しない。やむを得ず待機に入る場合は、再開に必要な artifact path、reviewer output path、次の手順を保存し、CCV の background monitor が利用可能なら監視登録する。
 
 `review` は read-only なのでここで終了する。ファイル編集、検証、commit、push、PR作成をしない。
 
@@ -137,10 +153,13 @@ fi
 - commit message は Conventional Commits 形式の英語。
 - `create` でも integrated simplify apply は必ず実行する。
 - `review` は read-only。指摘の収集と統合だけを行う。
+- read-only reviewer は repo 内外を問わずファイルを書かない。`.plans`、`/tmp`、`.tmp/my-pr` への追加メモも禁止する。main orchestrator が作る `.tmp/my-pr/` artifact だけは例外。
 - `fix` は Required だけ修正・検証・commit し、push しない。
 - デフォルトでは read-only review → Required fix → PR作成/更新 → verify の順に実行する。
 - Codex レビューは `/my-agent codex` を使う。
+- Codex や diff artifact 取得に失敗したら停止する。暗黙に Claude/local review へ切り替えない。
 - fallback、default substitution、broad catch を追加しない。
 - 好みの問題や style 指摘は修正対象にしない。
 - テストが壊れる修正はしない。
 - worktree 使用時は、PR 作成後も自動削除しない。
+- `.tmp/my-pr/` は local artifact 置き場。stage / commit しない。

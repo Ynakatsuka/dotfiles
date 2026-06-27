@@ -2,7 +2,7 @@
 
 Use this reference for the default, `review`, and `fix` command quality review stage.
 
-This reference is read-only. It collects and integrates findings only. Do not edit files, run fix verification, commit, push, create/update a PR, or mark a PR ready while using this reference.
+This reference is read-only for repository behavior. It collects and integrates findings only. Do not edit product files, write reviewer notes, run fix verification, commit, push, create/update a PR, or mark a PR ready while using this reference. The main orchestrator may write `.tmp/my-pr/` artifacts and state files only; reviewers must not write files.
 
 ## Design principles
 
@@ -13,6 +13,53 @@ This reference is read-only. It collects and integrates findings only. Do not ed
 - Require line references, problem detail, why it matters, evidence, and a concrete fix strategy for every finding.
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
+- Do not continue with degraded evidence. If a diff artifact, reviewer, Codex run, or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path.
+
+## Artifact and scope gate
+
+Use repo-local artifacts. Do not pass `/tmp` diff files to reviewers.
+
+```bash
+eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_BRANCH")"
+```
+
+Read `MY_PR_SCOPE_SUMMARY` before launching reviewers. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
+
+- `large`: continue only when the user already clearly confirmed that the whole current branch/diff is the target PR scope.
+- `untracked`: classify the untracked files. Stage or `git add -N` task-created files that belong in the PR, or confirm they are out of scope, then regenerate artifacts.
+- `large+untracked`: resolve both conditions before continuing.
+
+Use these generated paths:
+
+```text
+MY_PR_ARTIFACT_DIR=<repo-local artifact dir>
+MY_PR_ARTIFACT_ENV=<artifact dir>/artifact.env
+MY_PR_REVIEW_DIFF=<artifact dir>/review.diff
+MY_PR_CHANGED_FILES=<artifact dir>/changed-files.txt
+MY_PR_SCOPE_SUMMARY=<artifact dir>/scope-summary.txt
+```
+
+Never stage or commit `.tmp/my-pr/`.
+
+## Large diff chunking
+
+If any condition is true, split Reviewer B and Reviewer C by file groups or top-level domains:
+
+- changed files > 40
+- review diff lines > 5,000
+- a single reviewer cannot read the full artifact within tool limits
+
+Chunk rules:
+
+1. Group files by subsystem or top-level directory.
+2. Keep each chunk near 2,000-3,000 diff lines when possible.
+3. Generate initial chunk artifacts with `${CLAUDE_SKILL_DIR}/scripts/split-review-chunks.sh "$BASE_BRANCH"`.
+4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
+5. Integration must list all chunks and stop if any chunk is missing, failed, or inaccessible.
+
+If a generated chunk is still too large, split its `files.txt` into smaller subsystem-specific file lists and create additional chunk artifacts under `MY_PR_ARTIFACT_DIR/chunks/`.
+
+For small diffs, use the single `MY_PR_REVIEW_DIFF`.
 
 ## Review focus checklist
 
@@ -36,13 +83,17 @@ Prepare these values before launching reviewers:
 ```text
 BRANCH=<current branch>
 BASE_BRANCH=<default branch>
-CHANGED_FILES=<git diff --name-only $BASE_BRANCH..HEAD>
-DIFF_FILE=<path to full git diff patch when needed>
+MY_PR_REVIEW_DIFF=<repo-local full review diff from prepare-review-artifacts.sh>
+MY_PR_CHANGED_FILES=<repo-local changed files list from prepare-review-artifacts.sh>
+MY_PR_SCOPE_SUMMARY=<repo-local scope summary from prepare-review-artifacts.sh>
+MY_PR_ARTIFACT_ENV=<sourceable env file for resuming the same artifact paths>
 ```
 
 ## Reviewer A: integrated simplify review
 
-Read `references/simplify/overview.md`. Run integrated simplify in `review` mode. Default executor is `/my-agent codex` unless the user explicitly requested Claude/local execution.
+Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF`. Default executor is `/my-agent codex` unless the user explicitly requested Claude/local execution.
+
+If Codex fails, times out, lacks quota, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
 
 Keep its output categories as-is:
 
@@ -63,11 +114,14 @@ You are a senior software engineer reviewing a pull request for correctness, sec
 Branch: <BRANCH>
 Base branch: <BASE_BRANCH>
 Changed files:
-<CHANGED_FILES>
+<MY_PR_CHANGED_FILES contents>
+Review diff artifact:
+<MY_PR_REVIEW_DIFF>
 </context>
 
 <scope>
 Review the full branch diff against the base branch. Do not review only the latest simplify changes.
+Use the review diff artifact as the source of truth. If you cannot read it, return BLOCKED and do not review current file state as a substitute.
 Focus on:
 1. Correctness bugs, edge cases, data loss, race conditions, and error semantics
 2. Unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures
@@ -83,6 +137,13 @@ Focus on:
 <out_of_scope>
 Code quality, duplication, naming style, formatting, and efficiency are handled separately by integrated simplify. Do not report style preferences, pure readability nits, generated files, lockfiles, vendored dependencies, snapshots, or issues already enforced by CI unless the diff creates a concrete correctness or security risk.
 </out_of_scope>
+
+<read_only_rules>
+Do not edit files.
+Do not write files anywhere, including the repository, .plans, .tmp, or /tmp.
+Do not run formatters, tests that update snapshots, generators, migrations, or commands with side effects.
+If you need a small reproduction, run it inline without writing a file.
+</read_only_rules>
 
 <finding_policy>
 Report every plausible issue you find, including low-severity or uncertain findings. Do not filter for importance at this stage; integration will rank and filter. For each finding include severity and confidence.
@@ -116,21 +177,16 @@ Report every plausible issue you find, including low-severity or uncertain findi
 
 ## Reviewer C: Codex correctness review
 
-Create the diff file in the same shell session that invokes Codex, and clean it up with `trap` so failures do not leave temporary files behind:
-
-```bash
-DIFF_FILE=$(mktemp -t my-pr-diff.XXXXXX.patch)
-trap 'rm -f "$DIFF_FILE"' EXIT
-git diff "$BASE_BRANCH"..HEAD > "$DIFF_FILE"
-```
+Use the repo-local `MY_PR_REVIEW_DIFF`. Do not create `/tmp` diff files.
 
 Run `/my-agent codex` with this prompt:
 
 ```text
-Review the diff in <DIFF_FILE> as a senior software engineer.
+Review the diff in <MY_PR_REVIEW_DIFF> as a senior software engineer.
 
 Scope:
 - Review the full branch diff against <BASE_BRANCH>.
+- Use the diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
 - Focus on correctness bugs, edge cases, data loss, race conditions, and error semantics.
 - Check for unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
 - Check downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files.
@@ -142,6 +198,7 @@ Scope:
 - Check missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage.
 - Do not report code quality, duplication, naming style, formatting, or efficiency issues; integrated simplify handles those separately.
 - Do not report issues already enforced by CI, generated files, lockfiles, vendored dependencies, snapshots, or preference-only nits unless the diff creates a concrete correctness or security risk.
+- Do not edit or write files anywhere. Do not create notes under .plans, .tmp, or /tmp.
 
 Finding policy:
 - Report every plausible issue you find, including low-severity or uncertain findings.
@@ -174,11 +231,26 @@ Output exactly this structure:
 **Reasoning:** One or two technical sentences.
 ```
 
-The `trap` removes the diff file after Codex finishes or fails.
+If Codex exits non-zero, lacks quota, cannot read the diff, or returns incomplete output, stop before integration. Do not replace Codex with Claude/local review without explicit user approval.
+
+## Background execution rule
+
+If reviewers run in the background, do not send a final answer while any reviewer is still running.
+
+When a long-running review must continue after the current response, persist a state note under `MY_PR_ARTIFACT_DIR/state.md` with:
+
+- reviewer names and output paths
+- current status
+- next command or next manual step
+- whether any degraded path was approved
+
+If the environment provides a background monitor, register the task before the final response. Otherwise wait in the foreground or stop with `REVIEW_INCOMPLETE`.
 
 ## Integration rules
 
 Deduplicate findings from simplify, Claude, and Codex. Put each finding in exactly one category.
+
+Before classifying, confirm all required reviewers and chunks completed. If any required reviewer/chunk is missing or failed, output `REVIEW_INCOMPLETE` and stop.
 
 | Final category | Criteria |
 |---|---|
@@ -190,8 +262,28 @@ This phase only classifies findings. Required fixes are applied later by the def
 
 ## Integration output
 
+If review is incomplete, output only:
+
 ```markdown
 # Quality Review Result
+
+## Status
+REVIEW_INCOMPLETE
+
+## Missing or failed inputs
+- <reviewer/chunk/artifact> — <exact failure>
+
+## Next step
+- Stop before fixes, commits, pushes, or PR creation unless the user explicitly approves a degraded path.
+```
+
+If all required reviewers and chunks completed, output:
+
+```markdown
+# Quality Review Result
+
+## Status
+COMPLETE
 
 ## Required
 1. **file:line** — issue and fix
