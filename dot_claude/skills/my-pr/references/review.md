@@ -20,7 +20,7 @@ This reference is read-only for repository behavior. It collects and integrates 
 Use repo-local artifacts. Do not pass `/tmp` diff files to reviewers.
 
 ```bash
-eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_BRANCH")"
+eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_REF")"
 ```
 
 Read `MY_PR_SCOPE_SUMMARY` before launching reviewers. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
@@ -54,7 +54,7 @@ Chunk rules:
 
 1. Group files by subsystem or top-level directory.
 2. Keep each chunk near 2,000-3,000 diff lines when possible.
-3. Generate initial chunk artifacts with `${CLAUDE_SKILL_DIR}/scripts/split-review-chunks.sh "$BASE_BRANCH"`.
+3. Generate initial chunk artifacts with `${CLAUDE_SKILL_DIR}/scripts/split-review-chunks.sh "$BASE_REF"`.
 4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
 5. Integration must list all chunks for all reviewers and stop if any chunk is missing, failed, or inaccessible.
 
@@ -86,6 +86,7 @@ Prepare these values before launching reviewers:
 ```text
 BRANCH=<current branch>
 BASE_BRANCH=<default branch>
+BASE_REF=origin/<default branch>
 MY_PR_REVIEW_DIFF=<repo-local full review diff from prepare-review-artifacts.sh>
 MY_PR_CHANGED_FILES=<repo-local changed files list from prepare-review-artifacts.sh>
 MY_PR_SCOPE_SUMMARY=<repo-local scope summary from prepare-review-artifacts.sh>
@@ -127,6 +128,7 @@ You are a senior software engineer reviewing a pull request for correctness, sec
 <context>
 Branch: <BRANCH>
 Base branch: <BASE_BRANCH>
+Base ref: <BASE_REF>
 Changed files:
 <MY_PR_CHANGED_FILES contents>
 Review diff artifact:

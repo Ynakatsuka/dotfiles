@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-base_branch=${1:?Usage: split-review-chunks.sh <base-branch>}
+base_ref=${1:?Usage: split-review-chunks.sh <base-ref>}
 : "${MY_PR_ARTIFACT_DIR:?Run prepare-review-artifacts.sh first and export MY_PR_ARTIFACT_DIR}"
 
 repo_root=$(git rev-parse --show-toplevel)
@@ -40,7 +40,7 @@ while IFS= read -r group; do
     exit 1
   fi
 
-  git diff --binary "$base_branch"...HEAD -- "${files[@]}" >"$chunk_dir/branch.diff"
+  git diff --binary "$base_ref"...HEAD -- "${files[@]}" >"$chunk_dir/branch.diff"
   git diff --cached --binary -- "${files[@]}" >"$chunk_dir/staged.diff"
   git diff --binary -- "${files[@]}" >"$chunk_dir/unstaged.diff"
 

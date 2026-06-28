@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-base_branch=${1:?Usage: prepare-review-artifacts.sh <base-branch>}
+base_ref=${1:?Usage: prepare-review-artifacts.sh <base-ref>}
 if (( $# > 1 )); then
   echo "ERROR: unexpected argument: $2" >&2
   exit 1
 fi
-diff_range="$base_branch"...HEAD
+diff_range="$base_ref"...HEAD
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
@@ -58,7 +58,7 @@ git ls-files --others --exclude-standard >"$artifact_dir/untracked-files.txt"
 file_count=$(wc -l <"$artifact_dir/changed-files.txt" | tr -d ' ')
 untracked_count=$(wc -l <"$artifact_dir/untracked-files.txt" | tr -d ' ')
 review_lines=$(wc -l <"$artifact_dir/review.diff" | tr -d ' ')
-commit_count=$(git rev-list --count "$base_branch"..HEAD)
+commit_count=$(git rev-list --count "$base_ref"..HEAD)
 scope_gate=ok
 if (( file_count > 100 || review_lines > 10000 || commit_count > 20 )); then
   scope_gate=large
@@ -73,7 +73,7 @@ fi
 
 {
   printf 'Repository: %s\n' "$repo_root"
-  printf 'Base branch: %s\n' "$base_branch"
+  printf 'Base ref: %s\n' "$base_ref"
   printf 'Diff range: %s\n' "$diff_range"
   printf 'Artifact dir: %s\n' "$artifact_dir"
   printf 'Changed files: %s\n' "$file_count"
@@ -99,6 +99,7 @@ latest_env="$artifact_parent/latest-env.sh"
 {
   printf 'export MY_PR_ARTIFACT_DIR=%q\n' "$artifact_dir"
   printf 'export MY_PR_ARTIFACT_ENV=%q\n' "$artifact_env"
+  printf 'export MY_PR_BASE_REF=%q\n' "$base_ref"
   printf 'export MY_PR_REVIEW_DIFF=%q\n' "$artifact_dir/review.diff"
   printf 'export MY_PR_CHANGED_FILES=%q\n' "$artifact_dir/changed-files.txt"
   printf 'export MY_PR_SCOPE_SUMMARY=%q\n' "$artifact_dir/scope-summary.txt"

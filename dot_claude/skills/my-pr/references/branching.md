@@ -112,6 +112,19 @@ else
 fi
 ```
 
+## Base fetch safety
+
+When resolving the PR base branch, fetch only the remote-tracking ref. Do not update a local protected branch ref as a fetch side effect.
+
+```bash
+BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+BASE_REF="origin/$BASE_BRANCH"
+git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+git rev-parse --verify "$BASE_REF^{commit}" >/dev/null
+```
+
+Do not run `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"`. That can advance a checked-out protected branch ref from another worktree without updating its worktree/index, leaving the merged remote changes as staged or unstaged reverse diffs.
+
 ## Push destination safety
 
 Before every push, verify the destination branch.
