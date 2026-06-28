@@ -167,7 +167,6 @@ Installed plugins:
 
 - `tmux-plugins/tpm`
 - `tmux-plugins/tmux-sensible`
-- `Morantron/tmux-fingers`
 
 ## Encrypted Files
 

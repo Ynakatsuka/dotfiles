@@ -5,9 +5,6 @@
 # cache directory
 [[ -d "$HOME/.zsh/cache" ]] || mkdir -p "$HOME/.zsh/cache"
 
-# iterm2
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh" || true
-
 # cuda
 if [ -d "/usr/local/cuda/bin" ]; then
     export PATH="/usr/local/cuda/bin:$PATH"

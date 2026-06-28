@@ -66,7 +66,6 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
   - Installs Homebrew apps from `macos/Brewfile` (VS Code, Docker, Claude, ChatGPT, Discord, Zoom, etc.)
   - Applies system defaults (`20_defaults.sh`)
   - Applies pointer/trackpad settings from `macos/pointer/prefs/pointer_values.sh`
-  - Binds iTerm2 prefs if `bootstrap/iterm2/com.googlecode.iterm2.plist` exists
   - Sets Git identity, SSH, dotfiles (prezto/tpm/chezmoi/mise), then cleanup
 
 - Ubuntu 22.04 (full)
@@ -83,13 +82,12 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 
 - Apps: edit `bootstrap/macos/Brewfile`
 - Pointer: edit `bootstrap/macos/pointer/prefs/pointer_values.sh`
-- iTerm2: put `bootstrap/iterm2/com.googlecode.iterm2.plist` and re-run macOS setup
 
 ### Manual Steps
 
 - `gh auth login`, `tailscale up`
 - Re-login after adding user to Docker group
-- iTerm2 restart after prefs binding; Google Japanese IME may require macOS restart
+- Google Japanese IME may require macOS restart
 
 ### Support
 
@@ -100,7 +98,6 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 ## Troubleshooting
 
 - If a Brew cask name changes (e.g., third-party apps), update `bootstrap/macos/Brewfile` and re-run `brew bundle`.
-- If iTerm2 prefs do not apply, confirm the file exists: `bootstrap/iterm2/com.googlecode.iterm2.plist`, then re-run `bash bootstrap/macos/35_iterm_prefs.sh` and restart iTerm2.
 - Use `--dry-run` with Linux bootstrap to preview planned actions without executing.
 
 ## SSH Setup (Client vs Server)
