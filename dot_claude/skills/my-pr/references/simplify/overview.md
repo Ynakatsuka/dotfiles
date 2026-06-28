@@ -4,9 +4,15 @@ Use this reference from `my-pr` when running the `simplify` subcommand, `create`
 
 ## Executor
 
-Default executor is Codex via `/my-agent codex`. Use Claude/local execution only when the user explicitly asks for it.
+Default executor is Codex CLI with the simplify performance profile. Do not override the model; only lower reasoning effort for simplify:
 
-Do not silently switch from Codex to Claude if Codex fails. Report the failure and stop.
+```bash
+codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
+```
+
+Use the global Codex default effort only when the user explicitly asks for a full-effort simplify run. Use Claude/local execution only when the user explicitly asks for it.
+
+Do not silently switch from Codex to Claude if Codex fails or rejects the config override. Report the failure and stop.
 
 ## Modes
 
@@ -14,6 +20,15 @@ Do not silently switch from Codex to Claude if Codex fails. Report the failure a
 |---|---|
 | `review` | Analyze current PR changes and report findings only. Do not edit or write files. |
 | `apply` | Apply only Required behavior-preserving simplifications, then verify. |
+
+## Performance profile
+
+- Use `model_reasoning_effort="medium"` for simplify runs.
+- Keep the configured Codex model. Do not pass `--model` unless the user explicitly requests one.
+- For each run or chunk, report at most 5 Required and at most 5 Recommended findings.
+- Prioritize high-confidence, behavior-preserving simplifications with clear maintenance value.
+- For very large diffs that meet the chunking conditions in `references/review.md`, run simplify per chunk. Otherwise prefer one full-diff simplify run.
+- Avoid broad repository exploration. Read nearby docs, ADRs, specs, or tests only when design intent is unclear.
 
 ## Scope
 
@@ -49,6 +64,8 @@ If no language-specific reference exists, use this file's common rules only.
 ## Classification
 
 Each finding must be placed in exactly one category.
+
+Each run or chunk must return at most 5 Required and at most 5 Recommended findings. If more candidates exist, keep the safest and highest-value findings and omit style or preference-only items.
 
 ### Required
 
@@ -95,7 +112,11 @@ Stop and request approval before changing APIs, schemas, CLI/config contracts, p
 
 ## Codex prompt template
 
-Use this prompt with `/my-agent codex`.
+Use this prompt with the simplify performance profile:
+
+```bash
+codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
+```
 
 ```text
 Run the integrated my-pr simplify workflow in <review|apply> mode for the current repository changes.
@@ -104,6 +125,7 @@ Follow these constraints:
 - Preserve behavior. Do not change public APIs, schemas, CLI/config contracts, persistence formats, or error semantics without approval.
 - Target only the current conversation changes or current PR diff. Do not touch unrelated files.
 - Classify every finding as Required, Recommended, or Not needed. Put each finding in exactly one category.
+- Return at most 5 Required and at most 5 Recommended findings per run or chunk. Prioritize high-confidence, behavior-preserving simplifications.
 - In review mode, do not edit or write files anywhere, including .plans, .tmp, or /tmp.
 - In apply mode, apply only Required behavior-preserving simplifications. Do not apply Recommended changes.
 - Do not add fallbacks, default substitutions, broad catches, silent retries, mocks, or stub continuations.

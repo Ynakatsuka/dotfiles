@@ -43,7 +43,7 @@ Run the full workflow:
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
 4. Start all three quality reviewers concurrently
-   - integrated simplify review
+   - integrated simplify review (medium effort, chunked for large diffs, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
    - Codex review via `/my-agent codex`
 5. Wait for all reviewers; do not final-answer while background reviewers are running
@@ -62,7 +62,7 @@ Create/update a PR while skipping the local Claude/Codex correctness review stag
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
-4. Integrated simplify apply
+4. Integrated simplify apply (medium effort, capped findings)
 5. Commit simplification changes if any
 6. Create/update draft PR
 7. Verify checks and automated review comments
@@ -77,7 +77,7 @@ Run local quality review in read-only mode.
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
 4. Start all three quality reviewers concurrently
-   - integrated simplify review
+   - integrated simplify review (medium effort, chunked for large diffs, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
    - Codex review via `/my-agent codex`
 5. Wait for all reviewers
@@ -94,7 +94,7 @@ Fix only Required findings, verify, and commit without pushing.
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
 4. Start all three quality reviewers concurrently in read-only mode
-   - integrated simplify review
+   - integrated simplify review (medium effort, chunked for large diffs, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
    - Codex review via `/my-agent codex`
 5. Wait for all reviewers
@@ -113,7 +113,7 @@ Run only integrated simplify apply. This is a simplification-only command.
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
-4. Integrated simplify apply
+4. Integrated simplify apply (medium effort, capped findings)
 5. Commit simplification changes if any
 6. Stop
 

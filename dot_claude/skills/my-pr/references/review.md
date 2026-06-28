@@ -43,11 +43,12 @@ Never stage or commit `.tmp/my-pr/`.
 
 ## Large diff chunking
 
-If any condition is true, split Reviewer B and Reviewer C by file groups or top-level domains:
+Use the full `MY_PR_REVIEW_DIFF` by default. Split Reviewer A, Reviewer B, and Reviewer C by file groups or top-level domains only when any condition is true:
 
-- changed files > 40
-- review diff lines > 5,000
+- review diff lines > 10,000
 - a single reviewer cannot read the full artifact within tool limits
+
+Changed file count alone is not enough to chunk. Prefer one full-diff review when the artifact is readable within limits.
 
 Chunk rules:
 
@@ -55,11 +56,13 @@ Chunk rules:
 2. Keep each chunk near 2,000-3,000 diff lines when possible.
 3. Generate initial chunk artifacts with `${CLAUDE_SKILL_DIR}/scripts/split-review-chunks.sh "$BASE_BRANCH"`.
 4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
-5. Integration must list all chunks and stop if any chunk is missing, failed, or inaccessible.
+5. Integration must list all chunks for all reviewers and stop if any chunk is missing, failed, or inaccessible.
 
 If a generated chunk is still too large, split its `files.txt` into smaller subsystem-specific file lists and create additional chunk artifacts under `MY_PR_ARTIFACT_DIR/chunks/`.
 
 For small diffs, use the single `MY_PR_REVIEW_DIFF`.
+
+Reviewer A chunks run integrated simplify in `review` mode with the simplify performance profile from `references/simplify/overview.md`. Each Reviewer A run or chunk reports at most 5 Required and at most 5 Recommended findings. Integration deduplicates simplify findings across chunks.
 
 ## Review focus checklist
 
@@ -102,9 +105,9 @@ Reviewer B is host-aware:
 
 ## Reviewer A: integrated simplify review
 
-Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF`. Default executor is `/my-agent codex` unless the user explicitly requested Claude/local execution.
+Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Use the simplify performance profile: Codex CLI with `model_reasoning_effort="medium"` and capped findings. Do not use `/my-agent codex` for Reviewer A unless the user explicitly requests the global Codex default, because `/my-agent` intentionally preserves the global effort setting.
 
-If Codex fails, times out, lacks quota, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
+If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
 
 Keep its output categories as-is:
 
