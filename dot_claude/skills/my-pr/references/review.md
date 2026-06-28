@@ -89,6 +89,8 @@ MY_PR_SCOPE_SUMMARY=<repo-local scope summary from prepare-review-artifacts.sh>
 MY_PR_ARTIFACT_ENV=<sourceable env file for resuming the same artifact paths>
 ```
 
+Launch Reviewer A, Reviewer B, and Reviewer C concurrently. Do not run them sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all reviewer and chunk results before integration.
+
 ## Reviewer A: integrated simplify review
 
 Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF`. Default executor is `/my-agent codex` unless the user explicitly requested Claude/local execution.

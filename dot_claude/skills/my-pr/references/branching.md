@@ -64,17 +64,18 @@ MY_PR_PATHSPEC_FILE=/path/to/task-pathspecs.txt \
   ${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh "$BRANCH"
 ```
 
-The script transfers changes by binary patches, verifies the worktree diff matches the original staged/unstaged patches, and does not clean the original repository.
+The script transfers changes by binary patches, verifies the worktree diff matches the original staged/unstaged patches, and intentionally does not clean the original repository by itself.
 Explicitly listed untracked symlinks are rejected so the script cannot dereference a link to a file outside the repository.
 
-Clean the original protected branch only after reviewing the script output and confirming the worktree contains the intended changes.
+After a successful transfer, the orchestrator must clean the task-owned changes from the original protected branch before continuing. Do this only after reviewing the script output and confirming the worktree contains the intended changes.
+
+Set `STAGED_FILES`, `CHANGED_FILES`, and `TASK_CREATED_UNTRACKED_FILES` to exact task-owned paths only. Do not run cleanup commands with empty, unverified, or unrelated path lists. If ownership is unclear, stop and report before deleting or restoring anything.
 
 ```bash
 git -C "$ORIG_REPO" reset HEAD -- $STAGED_FILES
 git -C "$ORIG_REPO" checkout -- $CHANGED_FILES $STAGED_FILES
 
 # Delete only untracked files that were created during the current task and copied to the worktree.
-# If ownership is uncertain, leave the file in place and report it instead of deleting it.
 for f in $TASK_CREATED_UNTRACKED_FILES; do
   rm -f "$ORIG_REPO/$f"
 done
@@ -82,9 +83,11 @@ done
 git -C "$ORIG_REPO" status --short
 ```
 
+Do not continue to base branch resolution, review, simplify, commit, push, or PR creation until the original protected branch has no remaining task-owned staged, unstaged, or untracked changes. If unrelated changes remain, leave them untouched and report them. If task-owned changes remain after cleanup, stop and investigate instead of reconstructing changes from memory.
+
 If the move script fails, do not clean or reconstruct changes from memory. Stop and report the exact failure.
 
-Do not include unrelated untracked files in `TASK_CREATED_UNTRACKED_FILES`. If the original repository still has changes after cleanup, stop and investigate before continuing.
+Do not include unrelated untracked files in `TASK_CREATED_UNTRACKED_FILES`. If ownership is uncertain, stop and report before deleting.
 
 ## Upstream safety
 

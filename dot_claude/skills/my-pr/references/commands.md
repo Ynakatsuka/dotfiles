@@ -42,7 +42,7 @@ Run the full workflow:
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
-4. Parallel quality review
+4. Start all three quality reviewers concurrently
    - integrated simplify review
    - Claude Code review
    - Codex review via `/my-agent codex`
@@ -76,7 +76,7 @@ Run local quality review in read-only mode.
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
-4. Parallel quality review
+4. Start all three quality reviewers concurrently
    - integrated simplify review
    - Claude Code review
    - Codex review via `/my-agent codex`
@@ -93,7 +93,7 @@ Fix only Required findings, verify, and commit without pushing.
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review artifacts and pass the scope gate
-4. Parallel quality review in read-only mode
+4. Start all three quality reviewers concurrently in read-only mode
    - integrated simplify review
    - Claude Code review
    - Codex review via `/my-agent codex`
