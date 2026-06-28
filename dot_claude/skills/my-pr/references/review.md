@@ -97,8 +97,8 @@ Launch Reviewer A, Reviewer B, and Reviewer C concurrently. Do not run them sequ
 Reviewer B is host-aware:
 
 - In a Claude Code session with the Agent tool available, use the Agent tool.
-- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode: `claude --permission-mode plan -p "<PROMPT>"`.
-- Before using the CLI path, run `command -v claude`. If the command is unavailable, authentication is missing, permissions fail, the command times out, or the output is incomplete, return `REVIEW_INCOMPLETE` and stop before integration.
+- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`: `claude --permission-mode plan --tools Read --output-format=stream-json --verbose -p "<PROMPT>"`.
+- Parse the final `stream-json` result event before integration. Use its `result` field as the reviewer text. If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or the reviewer text is incomplete, return `REVIEW_INCOMPLETE` and stop before integration.
 - Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
 - Do not pass `--model` unless the user explicitly requested a model. Use the Claude Code configured default model and effort.
 - If a prompt file is needed for quoting, write it under `MY_PR_ARTIFACT_DIR` as an orchestration artifact. Do not use `/tmp`, and never stage or commit it.
@@ -155,8 +155,10 @@ Code quality, duplication, naming style, formatting, and efficiency are handled 
 <read_only_rules>
 Do not edit files.
 Do not write files anywhere, including the repository, .plans, .tmp, or /tmp.
-Do not run formatters, tests that update snapshots, generators, migrations, or commands with side effects.
-If you need a small reproduction, run it inline without writing a file.
+Do not use Bash or any shell command.
+Use only the Read tool and the supplied diff artifact.
+Do not run formatters, tests, generators, migrations, reproductions, grep, rg, git, or commands of any kind.
+If additional evidence would require a shell command or another unavailable tool, report the uncertainty in the finding or Non-findings instead of trying to execute it.
 </read_only_rules>
 
 <finding_policy>
