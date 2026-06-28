@@ -44,7 +44,7 @@ Run the full workflow:
 3. Prepare repo-local review artifacts and pass the scope gate
 4. Start all three quality reviewers concurrently
    - integrated simplify review
-   - Claude Code review
+   - Claude correctness review (host-aware Agent or Claude CLI)
    - Codex review via `/my-agent codex`
 5. Wait for all reviewers; do not final-answer while background reviewers are running
 6. Integrate findings
@@ -78,7 +78,7 @@ Run local quality review in read-only mode.
 3. Prepare repo-local review artifacts and pass the scope gate
 4. Start all three quality reviewers concurrently
    - integrated simplify review
-   - Claude Code review
+   - Claude correctness review (host-aware Agent or Claude CLI)
    - Codex review via `/my-agent codex`
 5. Wait for all reviewers
 6. Integrate findings
@@ -95,7 +95,7 @@ Fix only Required findings, verify, and commit without pushing.
 3. Prepare repo-local review artifacts and pass the scope gate
 4. Start all three quality reviewers concurrently in read-only mode
    - integrated simplify review
-   - Claude Code review
+   - Claude correctness review (host-aware Agent or Claude CLI)
    - Codex review via `/my-agent codex`
 5. Wait for all reviewers
 6. Integrate findings

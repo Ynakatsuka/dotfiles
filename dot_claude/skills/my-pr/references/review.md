@@ -91,6 +91,15 @@ MY_PR_ARTIFACT_ENV=<sourceable env file for resuming the same artifact paths>
 
 Launch Reviewer A, Reviewer B, and Reviewer C concurrently. Do not run them sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all reviewer and chunk results before integration.
 
+Reviewer B is host-aware:
+
+- In a Claude Code session with the Agent tool available, use the Agent tool.
+- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode: `claude --permission-mode plan -p "<PROMPT>"`.
+- Before using the CLI path, run `command -v claude`. If the command is unavailable, authentication is missing, permissions fail, the command times out, or the output is incomplete, return `REVIEW_INCOMPLETE` and stop before integration.
+- Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
+- Do not pass `--model` unless the user explicitly requested a model. Use the Claude Code configured default model and effort.
+- If a prompt file is needed for quoting, write it under `MY_PR_ARTIFACT_DIR` as an orchestration artifact. Do not use `/tmp`, and never stage or commit it.
+
 ## Reviewer A: integrated simplify review
 
 Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF`. Default executor is `/my-agent codex` unless the user explicitly requested Claude/local execution.
@@ -103,9 +112,9 @@ Keep its output categories as-is:
 - Recommended
 - Not needed
 
-## Reviewer B: Claude Code correctness review
+## Reviewer B: Claude correctness review
 
-Use an Agent with this prompt.
+Use the host-aware executor above with this prompt.
 
 ```text
 <role>
@@ -123,7 +132,7 @@ Review diff artifact:
 
 <scope>
 Review the full branch diff against the base branch. Do not review only the latest simplify changes.
-Use the review diff artifact as the source of truth. If you cannot read it, return BLOCKED and do not review current file state as a substitute.
+Use the review diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
 Focus on:
 1. Correctness bugs, edge cases, data loss, race conditions, and error semantics
 2. Unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures
@@ -176,6 +185,8 @@ Report every plausible issue you find, including low-severity or uncertain findi
 **Reasoning:** One or two technical sentences.
 </output_format>
 ```
+
+If the Claude Agent or CLI exits non-zero, lacks quota or authentication, cannot read the diff artifact, or returns incomplete output, stop before integration. Do not replace Claude review with Codex/local review without explicit user approval.
 
 ## Reviewer C: Codex correctness review
 
