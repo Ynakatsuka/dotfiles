@@ -206,6 +206,8 @@ Report every plausible issue you find, including low-severity or uncertain findi
 
 <output_format>
 ## PR understanding
+- Description: one sentence describing what the PR changes.
+- Purpose: one sentence explaining why the PR exists.
 - Problem: one sentence based on the PR context, or "Unavailable: no existing PR context".
 - Intended behavior: one sentence.
 - Prior discussion constraints: bullets, or "- none found".
@@ -274,6 +276,8 @@ Finding policy:
 Output exactly this structure:
 
 ## PR understanding
+- Description: one sentence describing what the PR changes.
+- Purpose: one sentence explaining why the PR exists.
 - Problem: one sentence based on the PR context, or "Unavailable: no existing PR context".
 - Intended behavior: one sentence.
 - Prior discussion constraints: bullets, or "- none found".
@@ -323,6 +327,8 @@ Deduplicate findings from simplify, Claude, and Codex. Put each finding in exact
 
 Before classifying, confirm all required reviewers and chunks completed. If any required reviewer/chunk is missing or failed, output `REVIEW_INCOMPLETE` and stop.
 
+Every integrated finding must include a severity: `critical`, `high`, `medium`, or `low`. Do not output a Required, Recommended, or Not needed item without severity. If a reviewer omits severity, assign severity from the impact and evidence, include it in the output, and set `Severity source: integration-inferred`.
+
 | Final category | Criteria |
 |---|---|
 | Required | Confirmed correctness/security/data-loss/fallback/downstream/cross-client/contract/operations/performance issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
@@ -333,8 +339,15 @@ This phase only classifies findings. Required fixes are applied later by the def
 
 ## Integration output
 
-For each Required and Recommended finding, write 3-5 concise sub-bullets, including metadata when present. Include:
+For `my-pr review`, create the final response as the review comment. Put the PR overview before findings, then group findings by severity sections in this exact order: Critical, High, Medium, Low. Include a section even when it has no findings, with `- none`.
 
+For each Required and Recommended finding, write 3-5 concise sub-bullets and always include:
+
+- Classification: Required | Recommended
+- Severity: critical | high | medium | low
+- Severity source: reviewer | integration-inferred
+- Signal: source simplify | Claude | Codex | multiple
+- Confidence: high | medium | low
 - Problem: what is wrong, missing, or risky in the current diff
 - Why: why the fix is required now, or why approval is needed before changing it
 - Ideal state: the invariant, behavior, or maintainability target the code should satisfy
@@ -363,29 +376,68 @@ If all required reviewers and chunks completed, output:
 ## Status
 COMPLETE
 
-## PR context
+## PR overview
+- Description: one sentence describing what the PR changes, based on PR body/conversation when available, otherwise the diff
+- Purpose: one sentence explaining why this PR exists
+- Problem to solve: one sentence based on PR body/conversation, or "Unavailable: no existing PR context"
+- Intended behavior: one sentence describing the expected user/system behavior after the PR
 - Context state: found | no_existing_pr
-- Problem understood: one sentence based on PR body/conversation, or "Unavailable: no existing PR context"
 - Prior discussion considered: key constraints or "- none found"
 
-## Required
+## Critical
 1. **file:line** — short title
-   - Signal: source simplify | Claude | Codex | multiple; severity critical | high | medium | low; confidence high | medium | low
-   - Problem: what is broken, missing, or unsafe
-   - Why required: concrete risk that makes this necessary before merge
-   - Ideal state: expected invariant, behavior, or contract
-   - Fix: concrete fix direction and verification
-
-## Recommended
-1. **file:line** — short title
+   - Classification: Required | Recommended
+   - Severity: critical
+   - Severity source: reviewer | integration-inferred
    - Signal: source simplify | Claude | Codex | multiple
+   - Confidence: high | medium | low
+   - Problem: what is broken, missing, or unsafe
+   - Why: concrete risk that makes this required now, or trade-off that needs approval
+   - Ideal state: expected invariant, behavior, or contract
+   - Fix/next step: concrete fix direction and verification
+
+## High
+1. **file:line** — short title
+   - Classification: Required | Recommended
+   - Severity: high
+   - Severity source: reviewer | integration-inferred
+   - Signal: source simplify | Claude | Codex | multiple
+   - Confidence: high | medium | low
    - Problem: what is suboptimal, risky, or uncertain
-   - Why approval is needed: trade-off or contract/design choice
+   - Why: concrete risk that makes this required now, or trade-off that needs approval
    - Ideal state: expected design, behavior, or maintainability target
-   - Next step: concrete option to approve, defer, or investigate
+   - Fix/next step: concrete option to fix, approve, defer, or investigate
+
+## Medium
+1. **file:line** — short title
+   - Classification: Required | Recommended
+   - Severity: medium
+   - Severity source: reviewer | integration-inferred
+   - Signal: source simplify | Claude | Codex | multiple
+   - Confidence: high | medium | low
+   - Problem: what is suboptimal, risky, or uncertain
+   - Why: concrete risk that makes this required now, or trade-off that needs approval
+   - Ideal state: expected design, behavior, or maintainability target
+   - Fix/next step: concrete option to fix, approve, defer, or investigate
+
+## Low
+1. **file:line** — short title
+   - Classification: Required | Recommended
+   - Severity: low
+   - Severity source: reviewer | integration-inferred
+   - Signal: source simplify | Claude | Codex | multiple
+   - Confidence: high | medium | low
+   - Problem: what is suboptimal, risky, or uncertain
+   - Why: concrete risk that makes this required now, or trade-off that needs approval
+   - Ideal state: expected design, behavior, or maintainability target
+   - Fix/next step: concrete option to fix, approve, defer, or investigate
 
 ## Not needed
 - **file:line** — ignored finding and reason
+  - Classification: Not needed
+  - Severity: critical | high | medium | low
+  - Severity source: reviewer | integration-inferred
+  - Signal: source simplify | Claude | Codex | multiple
 
 ## Verification plan
 - Commands/tests to run after fixes

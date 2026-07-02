@@ -128,7 +128,7 @@ Follow these constraints:
 - Target only the current conversation changes or current PR diff. Do not touch unrelated files.
 - Classify every finding as Required, Recommended, or Not needed. Put each finding in exactly one category.
 - Return at most 5 Required and at most 5 Recommended findings per run or chunk. Prioritize high-confidence, behavior-preserving simplifications.
-- For each Required and Recommended finding, use 3-5 concise lines that state the problem, why it matters or needs approval, the ideal state, and the concrete change direction.
+- For each Required and Recommended finding, include Severity (`critical`, `high`, `medium`, or `low`) and Confidence (`high`, `medium`, or `low`), then use 3-5 concise lines that state the problem, why it matters or needs approval, the ideal state, and the concrete change direction.
 - In review mode, do not edit or write files anywhere, including .plans, .tmp, or /tmp.
 - In apply mode, apply only Required behavior-preserving simplifications. Do not apply Recommended changes.
 - Do not add fallbacks, default substitutions, broad catches, silent retries, mocks, or stub continuations.
@@ -161,6 +161,8 @@ git diff --stat
 
 ## Required
 1. **file:line** — short title
+   - Severity: critical | high | medium | low
+   - Confidence: high | medium | low
    - Problem: what is duplicated, over-complex, dead, or inefficient
    - Why required: why this behavior-preserving change is needed before merge
    - Ideal state: simpler equivalent structure or invariant
@@ -169,6 +171,8 @@ git diff --stat
 
 ## Recommended
 1. **file:line** — short title
+   - Severity: critical | high | medium | low
+   - Confidence: high | medium | low
    - Problem: what is suboptimal or uncertain
    - Why approval is needed: trade-off or scope decision
    - Ideal state: simpler structure or clearer ownership
