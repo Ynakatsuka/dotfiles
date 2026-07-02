@@ -11,6 +11,7 @@ This reference is read-only for repository behavior. It collects and integrates 
 - Keep scope explicit: review the full PR diff against the base branch, not only the latest simplify changes.
 - Keep reviewer responsibilities separate. Simplify handles quality, duplication, and behavior-preserving micro-efficiency. Claude/Codex review correctness, security, performance regressions, and test risks.
 - Require line references, problem detail, why it matters, evidence, and a concrete fix strategy for every finding.
+- Do not collapse integrated findings into one-line verdicts. Each Required and Recommended item must include a clear 3-5 line explanation covering the problem, why it matters, the ideal state, and the fix or next step.
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
 - Do not continue with degraded evidence. If a diff artifact, reviewer, Codex run, or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path.
@@ -282,6 +283,13 @@ This phase only classifies findings. Required fixes are applied later by the def
 
 ## Integration output
 
+For each Required and Recommended finding, write 3-5 concise sub-bullets, including metadata when present. Include:
+
+- Problem: what is wrong, missing, or risky in the current diff
+- Why: why the fix is required now, or why approval is needed before changing it
+- Ideal state: the invariant, behavior, or maintainability target the code should satisfy
+- Fix/next step: concrete change direction, plus verification when useful
+
 If review is incomplete, output only:
 
 ```markdown
@@ -306,16 +314,20 @@ If all required reviewers and chunks completed, output:
 COMPLETE
 
 ## Required
-1. **file:line** — issue and fix
-   - Source: simplify | Claude | Codex | multiple
-   - Severity: critical | high | medium | low
-   - Confidence: high | medium | low
-   - Why required: reason
+1. **file:line** — short title
+   - Signal: source simplify | Claude | Codex | multiple; severity critical | high | medium | low; confidence high | medium | low
+   - Problem: what is broken, missing, or unsafe
+   - Why required: concrete risk that makes this necessary before merge
+   - Ideal state: expected invariant, behavior, or contract
+   - Fix: concrete fix direction and verification
 
 ## Recommended
-1. **file:line** — proposal
-   - Source: simplify | Claude | Codex | multiple
-   - Needs approval because: reason
+1. **file:line** — short title
+   - Signal: source simplify | Claude | Codex | multiple
+   - Problem: what is suboptimal, risky, or uncertain
+   - Why approval is needed: trade-off or contract/design choice
+   - Ideal state: expected design, behavior, or maintainability target
+   - Next step: concrete option to approve, defer, or investigate
 
 ## Not needed
 - **file:line** — ignored finding and reason
