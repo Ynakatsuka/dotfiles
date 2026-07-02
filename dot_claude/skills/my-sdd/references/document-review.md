@@ -4,7 +4,7 @@ SDD の `requirements.md` / `design.md` / `tasks.md` を、実装前に詰まり
 
 ## Spec review
 
-`requirements.md` と `design.md` 作成後、Phase 1-4 の外部レビュー前に実行する。
+`requirements.md` と `design.md` 作成後、Phase 1-4 の Codex review 前に実行する。
 
 ```text
 You are a spec document reviewer.

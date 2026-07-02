@@ -1,6 +1,6 @@
 # Senior/Staff Engineer Review Checklist
 
-Phase 1-0（Investigation）の調査範囲、Phase 1-3（Design）で `design.md` に反映すべき観点、Phase 1-4（External Review）のレビュープロンプトの根拠として使う。
+Phase 1-0（Investigation）の調査範囲、Phase 1-3（Design）で `design.md` に反映すべき観点、Phase 1-4（Codex Review）のレビュープロンプトの根拠として使う。
 
 設計時は全観点について「触れた／触れない理由がある」状態にする。`design.md` には **Risks & Mitigations / Rejected alternatives / Open Questions** を必ず含める。
 

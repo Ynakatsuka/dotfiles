@@ -1,6 +1,6 @@
-# External Review (Phase 1-4)
+# Codex Review (Phase 1-4)
 
-`requirements.md` と `design.md` がそろったあと、`codex` / `gemini` / `claude (subagent)` の 3 者で並列に red-team レビューを依頼する。
+`requirements.md` と `design.md` がそろったあと、`codex` で red-team review を依頼する。
 
 ## 出力先と TTL
 
@@ -8,8 +8,6 @@
 /tmp/sdd-reviews/{feature-name}/
 ├── _prompt.txt    # 共通プロンプト（再実行用）
 ├── codex.md       # codex 生レビュー
-├── gemini.md      # gemini 生レビュー
-├── claude.md      # claude subagent 生レビュー
 ├── decisions.md   # 採否の記録
 └── done           # 完了マーカー（mtime が TTL の基準）
 ```
@@ -37,7 +35,7 @@ mkdir -p /tmp/sdd-reviews/{feature-name}
 
 ## 共通プロンプト
 
-3 者に同じプロンプトを渡す。長いので一度ファイルに書き出して再利用する:
+長いので一度ファイルに書き出して再利用する:
 
 ```bash
 cat > /tmp/sdd-reviews/{feature-name}/_prompt.txt <<'EOF'
@@ -89,11 +87,9 @@ EOF
 
 `{feature-name}` はその場で実値に置換する。
 
-## 並列起動
+## 起動
 
-メインの応答内で、**1 メッセージ内に Bash 2 件 + Agent 1 件**を同時発行する。各 Bash は `timeout: 600000`（10 分）必須。
-
-### 1. Codex
+Bash は `timeout: 600000`（10 分）必須。
 
 ```bash
 codex exec "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
@@ -102,39 +98,16 @@ codex exec "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
 
 モデルは `~/.codex/config.toml` のデフォルト（`--model` 指定しない）。
 
-### 2. Gemini
-
-`my-agent` の Gemini preflight を満たすこと（`GEMINI_FORCE_FILE_STORAGE=true` と `~/.gemini/oauth_creds.json` または `~/.gemini/gemini-credentials.json` のいずれかが存在）。読み取り専用なので `--approval-mode plan`、信頼ディレクトリ外でも動かすため `--skip-trust` を必ず付ける（Gemini CLI 0.39+ で必須。詳細は `my-agent/references/gemini.md` Preflight #2）:
-
-```bash
-gemini --skip-trust --approval-mode plan -p "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
-  > /tmp/sdd-reviews/{feature-name}/gemini.md 2>&1
-```
-
-preflight 失敗時は `my-agent` のガイダンスに従い、本レビューでは gemini をスキップして残り 2 者で続行。
-
-### 3. Claude (subagent)
-
-`Agent` ツールを使う。Write が必要なので `subagent_type: general-purpose`:
-
-```
-Agent({
-  description: "Red-team review of spec (Phase 1-4)",
-  subagent_type: "general-purpose",
-  prompt: "<共通プロンプトの中身>\n\n結果を /tmp/sdd-reviews/{feature-name}/claude.md に書き出すこと。"
-})
-```
-
 ## 統合（メインが行う）
 
-3 ファイルがそろったら（または失敗を確認したら）main の Claude が:
+`codex.md` が生成されたら main の Claude が:
 
-1. `Read` で 3 ファイルを読み込む
-2. 共通指摘 / 個別指摘 / 矛盾を整理
+1. `Read` で `codex.md` を読み込む
+2. 指摘内容を整理
 3. 各指摘を **重要度（CRITICAL / IMPORTANT / SUGGESTION）** と **挙動・DB 変更の有無** で分類
 4. ユーザーに統合サマリーを提示
 
-**spec の編集は生レビューを別ファイルに保存してから行う**（書き換えながら読むと「何が指摘で何が反映済か」が分からなくなる）。同じ指摘が複数 reviewer から出た場合は `decisions.md` で `[codex,gemini]` のように出典をまとめる。
+**spec の編集は生レビューを別ファイルに保存してから行う**（書き換えながら読むと「何が指摘で何が反映済か」が分からなくなる）。
 
 ## 反映ルール
 
@@ -153,14 +126,12 @@ Agent({
 
 ## Auto-applied (no behavior/DB change)
 - [codex] <短い指摘> — applied to design.md §<セクション>
-- [gemini] ...
 
 ## User-confirmed (behavior/DB change)
-- [claude] <短い指摘> — user agreed on YYYY-MM-DD; applied to design.md §<セクション>
 - [codex] <短い指摘> — user agreed; applied with modification: <差分要旨>
 
 ## Rejected
-- [gemini] <短い指摘> — 理由: <不採用の根拠>
+- [codex] <短い指摘> — 理由: <不採用の根拠>
 ```
 
 ## 完了マーカー
@@ -175,9 +146,8 @@ touch /tmp/sdd-reviews/{feature-name}/done
 
 ## エラー時の対応
 
-最低成功数は **1 者以上**。0 件成功時は Phase 1-4 を **Blocked** とし `done` を作成しない。共通ルール「外部レビューを必ず通す」と整合させるため、Phase 2 への進行はユーザーが明示 override（「レビューなしで進める」と発話）した場合のみ許可し、判断を `decisions.md` の `User-confirmed` に「Phase 1-4 skipped per user request on YYYY-MM-DD」として記録する。
+Codex review が失敗した場合は Phase 1-4 を **Blocked** とし `done` を作成しない。共通ルール「Codex review を必ず通す」と整合させるため、Phase 2 への進行はユーザーが明示 override（「レビューなしで進める」と発話）した場合のみ許可し、判断を `decisions.md` の `User-confirmed` に「Phase 1-4 skipped per user request on YYYY-MM-DD」として記録する。
 
 | 失敗 | 対応 |
 |---|---|
-| いずれか 1-2 者失敗 | エラー通知し成功分のみで統合・反映。失敗分は `decisions.md` に「{provider} 失敗 — レビュー欠落」と記録 |
-| 3 者すべて失敗 | **Blocked**。原因（preflight / quota / network 等）と再実行手段をユーザーに報告。override しない限り Phase 2 へ進まない |
+| Codex review 失敗 | **Blocked**。原因（quota / network 等）と再実行手段をユーザーに報告。override しない限り Phase 2 へ進まない |
