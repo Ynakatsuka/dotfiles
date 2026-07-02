@@ -40,28 +40,28 @@ If currently on a protected branch, move the target tracked changes to a worktre
 ```bash
 ORIG_REPO=$(pwd)
 BRANCH="feat/example"
-${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh "$BRANCH"
+bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 For task-created untracked files, pass only an explicit list. Do not include unrelated untracked files.
 
 ```bash
 TASK_CREATED_UNTRACKED_FILES="path/created-by-this-task.txt" \
-  ${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh "$BRANCH"
+  bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 If paths contain spaces or many files are involved, write a newline-delimited list and pass it with `MY_PR_UNTRACKED_FILE_LIST`.
 
 ```bash
 MY_PR_UNTRACKED_FILE_LIST=/path/to/task-created-untracked-files.txt \
-  ${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh "$BRANCH"
+  bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 If unrelated tracked changes exist, restrict the transfer with `MY_PR_PATHSPEC_FILE`.
 
 ```bash
 MY_PR_PATHSPEC_FILE=/path/to/task-pathspecs.txt \
-  ${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh "$BRANCH"
+  bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 The script transfers changes by binary patches, verifies the worktree diff matches the original staged/unstaged patches, and intentionally does not clean the original repository by itself.
@@ -130,7 +130,7 @@ Do not run `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"`. That can advance a ch
 Before every push, verify the destination branch.
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/check-push-destination.sh
+bash "${CLAUDE_SKILL_DIR}/scripts/check-push-destination.sh"
 ```
 
 If the script reports a protected branch mismatch, stop and ask the user before pushing.

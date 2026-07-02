@@ -60,7 +60,7 @@ git log "$BASE_REF"..HEAD --oneline
 PR scope を確認する。未コミット差分だけでなく、base branch との差分量を必ず報告する。
 
 ```bash
-eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_REF")"
+eval "$(bash "${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"
 ```
 
 出力された `MY_PR_ARTIFACT_ENV` は再開用に source できる。`MY_PR_SCOPE_SUMMARY` を読む。`MY_PR_SCOPE_GATE` が `ok` 以外の場合は停止する。`large` はユーザーがそのブランチ全体を PR 対象として明示済みの場合だけ続行できる。`untracked` は対象ファイルを明示して stage / `git add -N` するか、対象外と確認してから artifact を作り直す。
@@ -68,7 +68,7 @@ eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_REF")"
 既存 PR の有無を確認する。
 
 ```bash
-eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-pr-context.sh)"
+eval "$(bash "${CLAUDE_SKILL_DIR}/scripts/prepare-pr-context.sh)"
 cat "$MY_PR_CONTEXT"
 ```
 
