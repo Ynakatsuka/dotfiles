@@ -120,8 +120,11 @@ AGENT_BROWSER_NATIVE = "1"
 description = "Update dotfiles and development environment"
 run = """
 set -e
-"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
 chezmoi git pull -- --ff-only
+chezmoi apply -v
+"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+# Keep mise's global lockfile tracked after upgrades.
+chezmoi add ~/mise.lock
 chezmoi apply -v
 """
 
@@ -138,8 +141,11 @@ description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packa
 run = """
 set -e
 
-"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
 chezmoi git pull -- --ff-only
+chezmoi apply -v
+"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+# Keep mise's global lockfile tracked after upgrades.
+chezmoi add ~/mise.lock
 chezmoi apply -v
 cursor-agent update
 if command -v brew >/dev/null 2>&1; then
