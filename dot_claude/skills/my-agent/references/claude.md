@@ -22,6 +22,9 @@ Always use print mode (`-p`/`--print`) for non-interactive execution; Claude can
 # Default
 claude -p "<PROMPT>"
 
+# With explicit Fable model alias
+claude --model fable -p "<PROMPT>"
+
 # With explicit model override
 claude --model <MODEL> -p "<PROMPT>"
 
@@ -39,7 +42,8 @@ claude -p --output-format json "<PROMPT>"
 ## Model Selection
 
 - **Default**: Do NOT specify `--model`. Claude Code's configured default is used.
-- **User-specified model**: Add `--model <MODEL>` only when the user explicitly requests one (e.g., "opusで実行して", "use sonnet").
+- **User-specified model**: Add `--model <MODEL>` only when the user explicitly requests one (e.g., "fableに相談して", "fableで実行して", "opusで実行して", "use sonnet").
+- **Fable alias**: If the user says "fable" as the provider, asks to use Claude Fable, or uses consultation phrasing such as "fableに相談" / "Fableに聞いて", use `claude --model fable -p "<PROMPT>"`. Do not expand `fable` to a dated model ID.
 
 ## Examples
 
@@ -53,8 +57,8 @@ claude --permission-mode plan -p "Review the changes in the current branch vs ma
 # Delegated implementation
 claude --permission-mode auto -p "Fix the type error in src/utils.ts and run the nearest relevant test."
 
-# Explicit model
-claude --model sonnet -p "Analyze the architecture of this project."
+# Explicit Fable model
+claude --model fable -p "Analyze the architecture of this project."
 ```
 
 ## Troubleshooting
