@@ -42,6 +42,34 @@ MY_PR_SCOPE_SUMMARY=<artifact dir>/scope-summary.txt
 
 Never stage or commit `.tmp/my-pr/`.
 
+## PR context and first-time reviewer orientation
+
+After preparing review artifacts, capture PR context:
+
+```bash
+eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-pr-context.sh)"
+```
+
+Use these generated paths:
+
+```text
+MY_PR_CONTEXT=<artifact dir>/pr-context.md
+MY_PR_CONTEXT_STATE=found|no_existing_pr
+MY_PR_METADATA=<artifact dir>/pr-metadata.json
+MY_PR_ISSUE_COMMENTS=<artifact dir>/pr-issue-comments.json
+MY_PR_REVIEWS=<artifact dir>/pr-reviews.json
+MY_PR_REVIEW_COMMENTS=<artifact dir>/pr-review-comments.json
+```
+
+If `MY_PR_CONTEXT_STATE=found`, reviewers must read `MY_PR_CONTEXT` before the diff. Treat the reviewer as seeing this PR for the first time:
+
+1. Understand the PR title, body, linked issues, comments, reviews, and inline review comments.
+2. Extract the problem the PR is trying to solve, intended behavior, explicit constraints, and decisions already made in discussion.
+3. Cross-check the diff against that intended behavior. Report mismatches between PR intent and implementation as findings.
+4. Avoid re-raising discussion items already resolved in the PR conversation unless the diff still violates the resolved decision.
+
+If `MY_PR_CONTEXT_STATE=no_existing_pr`, state that no PR body or prior GitHub conversation exists. Do not invent missing intent; infer only from the diff and repository files, and mark intent uncertainty in findings or Non-findings.
+
 ## Large diff chunking
 
 Use the full `MY_PR_REVIEW_DIFF` by default. Split Reviewer A, Reviewer B, and Reviewer C by file groups or top-level domains only when any condition is true:
@@ -63,7 +91,7 @@ If a generated chunk is still too large, split its `files.txt` into smaller subs
 
 For small diffs, use the single `MY_PR_REVIEW_DIFF`.
 
-Reviewer A chunks run integrated simplify in `review` mode with the simplify performance profile from `references/simplify/overview.md`. Each Reviewer A run or chunk reports at most 5 Required and at most 5 Recommended findings. Integration deduplicates simplify findings across chunks.
+Reviewer A chunks run integrated simplify in `review` mode with the simplify performance profile from `references/simplify/overview.md`. Include `MY_PR_CONTEXT` in the simplify prompt when it exists, so simplify also understands the PR's stated problem and prior discussion before proposing changes. Each Reviewer A run or chunk reports at most 5 Required and at most 5 Recommended findings. Integration deduplicates simplify findings across chunks.
 
 ## Review focus checklist
 
@@ -92,6 +120,8 @@ MY_PR_REVIEW_DIFF=<repo-local full review diff from prepare-review-artifacts.sh>
 MY_PR_CHANGED_FILES=<repo-local changed files list from prepare-review-artifacts.sh>
 MY_PR_SCOPE_SUMMARY=<repo-local scope summary from prepare-review-artifacts.sh>
 MY_PR_ARTIFACT_ENV=<sourceable env file for resuming the same artifact paths>
+MY_PR_CONTEXT=<repo-local PR context from prepare-pr-context.sh>
+MY_PR_CONTEXT_STATE=found|no_existing_pr
 ```
 
 Launch Reviewer A, Reviewer B, and Reviewer C concurrently. Do not run them sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all reviewer and chunk results before integration.
@@ -110,6 +140,8 @@ Reviewer B is host-aware:
 Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Use the simplify performance profile: Codex CLI with `model_reasoning_effort="medium"` and capped findings. Do not use `/my-agent codex` for Reviewer A unless the user explicitly requests the global Codex default, because `/my-agent` intentionally preserves the global effort setting.
 
 If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
+
+Pass the PR context artifact path in the prompt. Reviewer A must read it before the diff when it exists, and must not propose simplifications that conflict with the PR's stated problem, constraints, or resolved discussion.
 
 Keep its output categories as-is:
 
@@ -134,11 +166,14 @@ Changed files:
 <MY_PR_CHANGED_FILES contents>
 Review diff artifact:
 <MY_PR_REVIEW_DIFF>
+PR context artifact:
+<MY_PR_CONTEXT>
 </context>
 
 <scope>
 Review the full branch diff against the base branch. Do not review only the latest simplify changes.
 Use the review diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
+Read the PR context artifact before the diff. You are seeing this PR for the first time, so first identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
 Focus on:
 1. Correctness bugs, edge cases, data loss, race conditions, and error semantics
 2. Unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures
@@ -160,6 +195,7 @@ Do not edit files.
 Do not write files anywhere, including the repository, .plans, .tmp, or /tmp.
 Do not use Bash or any shell command.
 Use only the Read tool and the supplied diff artifact.
+Use the supplied PR context artifact as the source of truth for PR body and prior GitHub conversation. If it cannot be read, return REVIEW_INCOMPLETE.
 Do not run formatters, tests, generators, migrations, reproductions, grep, rg, git, or commands of any kind.
 If additional evidence would require a shell command or another unavailable tool, report the uncertainty in the finding or Non-findings instead of trying to execute it.
 </read_only_rules>
@@ -169,6 +205,11 @@ Report every plausible issue you find, including low-severity or uncertain findi
 </finding_policy>
 
 <output_format>
+## PR understanding
+- Problem: one sentence based on the PR context, or "Unavailable: no existing PR context".
+- Intended behavior: one sentence.
+- Prior discussion constraints: bullets, or "- none found".
+
 ## Strengths
 - Specific strengths in the diff, if any. Keep this short.
 
@@ -205,9 +246,13 @@ Run `/my-agent codex` with this prompt:
 ```text
 Review the diff in <MY_PR_REVIEW_DIFF> as a senior software engineer.
 
+Before reviewing code, read the PR context in <MY_PR_CONTEXT>. You are seeing this PR for the first time, so identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
+
 Scope:
 - Review the full branch diff against <BASE_BRANCH>.
 - Use the diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
+- Use the PR context artifact as the source of truth for PR body and prior GitHub conversation. If it cannot be read, return REVIEW_INCOMPLETE.
+- Cross-check the implementation against the PR intent. Report mismatches between the stated goal and the diff as findings.
 - Focus on correctness bugs, edge cases, data loss, race conditions, and error semantics.
 - Check for unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
 - Check downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files.
@@ -227,6 +272,11 @@ Finding policy:
 - Include severity and confidence for each finding.
 
 Output exactly this structure:
+
+## PR understanding
+- Problem: one sentence based on the PR context, or "Unavailable: no existing PR context".
+- Intended behavior: one sentence.
+- Prior discussion constraints: bullets, or "- none found".
 
 ## Strengths
 - Specific strengths in the diff, if any. Keep this short.
@@ -312,6 +362,11 @@ If all required reviewers and chunks completed, output:
 
 ## Status
 COMPLETE
+
+## PR context
+- Context state: found | no_existing_pr
+- Problem understood: one sentence based on PR body/conversation, or "Unavailable: no existing PR context"
+- Prior discussion considered: key constraints or "- none found"
 
 ## Required
 1. **file:line** — short title

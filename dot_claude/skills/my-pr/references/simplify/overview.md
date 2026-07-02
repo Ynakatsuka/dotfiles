@@ -36,6 +36,8 @@ Target only files changed in the current conversation or current PR diff. Do not
 
 When invoked from `my-pr`, use the repo-local `MY_PR_REVIEW_DIFF` artifact from `prepare-review-artifacts.sh`. Do not use `/tmp` diff files. If the artifact cannot be read, stop and report the failure instead of reviewing current file state as a substitute.
 
+When invoked from `my-pr` and `MY_PR_CONTEXT` is provided, read that repo-local PR context artifact before reviewing the diff. Use it to understand the PR's stated problem, intended behavior, explicit constraints, and resolved discussion. Do not propose simplifications that conflict with that intent.
+
 Before analysis, inspect:
 
 ```bash
@@ -134,6 +136,7 @@ Follow these constraints:
 - Run targeted verification from documented project commands. If no documented command exists, report it as unverified instead of inventing one.
 - Report changed files, skipped recommendations, and verification results.
 - If MY_PR_REVIEW_DIFF is provided and unreadable, return REVIEW_INCOMPLETE and stop.
+- If MY_PR_CONTEXT is provided, read it before the diff and preserve the PR's stated intent and discussion constraints.
 ```
 
 ## Verification

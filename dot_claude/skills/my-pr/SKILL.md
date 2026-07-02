@@ -68,17 +68,11 @@ eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_REF")"
 既存 PR の有無を確認する。
 
 ```bash
-ERR_FILE=$(mktemp -t my-pr-view.XXXXXX.err)
-trap 'rm -f "$ERR_FILE"' EXIT
-if gh pr view --json number,title,state 2>"$ERR_FILE"; then
-  echo "Existing PR found."
-elif rg -qi "no pull requests|not found" "$ERR_FILE"; then
-  echo "No existing PR for this branch."
-else
-  cat "$ERR_FILE"
-  exit 1
-fi
+eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-pr-context.sh)"
+cat "$MY_PR_CONTEXT"
 ```
+
+`MY_PR_CONTEXT_STATE=found` の場合は、PR 本文、top-level comments、reviews、inline review comments を review 入力として扱う。`no_existing_pr` の場合は、PR 本文と過去のやり取りが存在しないことを明示し、推測で補わない。
 
 ---
 

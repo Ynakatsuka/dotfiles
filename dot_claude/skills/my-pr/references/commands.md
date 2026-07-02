@@ -27,12 +27,13 @@ All commands except `verify` must complete these gates before review, simplify, 
 1. Resolve the base branch. Do not guess `main`.
 2. Fetch the base branch only into `refs/remotes/origin/$BASE_BRANCH`; never use `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` because it mutates the local protected branch ref without updating a checked-out worktree/index.
 3. Set `BASE_REF="origin/$BASE_BRANCH"` and run `eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh "$BASE_REF")"`.
-4. Read `MY_PR_SCOPE_SUMMARY`. Source `MY_PR_ARTIFACT_ENV` if resuming in a new shell.
-5. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
+4. Run `eval "$(${CLAUDE_SKILL_DIR}/scripts/prepare-pr-context.sh)"` to capture the current PR body and GitHub conversation when an existing PR is attached to the branch.
+5. Read `MY_PR_SCOPE_SUMMARY` and `MY_PR_CONTEXT`. Source `MY_PR_ARTIFACT_ENV` if resuming in a new shell.
+6. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
    - `large`: continue only when the user already clearly confirmed the whole current branch/diff is the target PR scope.
    - `untracked`: classify the untracked files. Stage or `git add -N` task-created files that belong in the PR, or confirm they are out of scope, then regenerate artifacts.
    - `large+untracked`: resolve both conditions before continuing.
-6. Use the generated repo-local artifacts for review and PR body work. Do not use `/tmp` review patches.
+7. Use the generated repo-local artifacts for review and PR body work. Do not use `/tmp` review patches.
 
 If any reviewer, artifact read, Codex invocation, or background review fails, the review is incomplete. Stop before Required fixes, commits, pushes, or PR creation unless the user explicitly approves a degraded path.
 
@@ -42,7 +43,7 @@ Run the full workflow:
 
 1. Safety gate
 2. Base and PR state
-3. Prepare repo-local review artifacts and pass the scope gate
+3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently
    - integrated simplify review (medium effort, chunked for large diffs, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
@@ -62,7 +63,7 @@ Create/update a PR while skipping the local Claude/Codex correctness review stag
 
 1. Safety gate
 2. Base and PR state
-3. Prepare repo-local review artifacts and pass the scope gate
+3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Integrated simplify apply (medium effort, capped findings)
 5. Commit simplification changes if any
 6. Create/update draft PR
@@ -76,7 +77,7 @@ Run local quality review in read-only mode.
 
 1. Safety gate
 2. Base and PR state
-3. Prepare repo-local review artifacts and pass the scope gate
+3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently
    - integrated simplify review (medium effort, chunked for large diffs, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
@@ -93,7 +94,7 @@ Fix only Required findings, verify, and commit without pushing.
 
 1. Safety gate
 2. Base and PR state
-3. Prepare repo-local review artifacts and pass the scope gate
+3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently in read-only mode
    - integrated simplify review (medium effort, chunked for large diffs, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
@@ -113,7 +114,7 @@ Run only integrated simplify apply. This is a simplification-only command.
 
 1. Safety gate
 2. Base and PR state
-3. Prepare repo-local review artifacts and pass the scope gate
+3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Integrated simplify apply (medium effort, capped findings)
 5. Commit simplification changes if any
 6. Stop
