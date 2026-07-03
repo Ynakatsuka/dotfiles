@@ -16,7 +16,6 @@ WITH_CLEANUP=0
 WITH_MISE_INSTALL=0
 XDG_ENGLISH_DIRS=0
 USER_ONLY=0
-DRY_RUN=0
 PLAN=""
 SKIP_AGE=0
 
@@ -67,7 +66,7 @@ while [ $# -gt 0 ]; do
       WITH_CLIS=1
       WITH_DOTFILES=1
       ;;
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     -h | --help)
       usage
       exit 0
@@ -116,14 +115,6 @@ if [ "$USER_ONLY" -eq 0 ]; then
 else
   require_ubuntu
 fi
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 # Build flag arrays up-front so module invocations can pass them quoted.
 # Arrays let us avoid SC2046 word-splitting warnings without disabling the check.

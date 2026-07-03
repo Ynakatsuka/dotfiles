@@ -4,29 +4,27 @@ Minimal, reproducible setup for new machines. Destructive actions always ask for
 
 ### Quick Start
 
-- macOS (apps included)
+- macOS (apps + system defaults included)
   ```bash
-  make -C bootstrap macos
+  make -C bootstrap full
   ```
 
-- Ubuntu 22.04
+- Ubuntu 22.04 (requires sudo)
   ```bash
-  make -C bootstrap linux
+  make -C bootstrap full
   ```
 
 ### Make Targets
 
 ```bash
-# Full setups
-make -C bootstrap macos        # macOS full bootstrap (apps included)
-make -C bootstrap linux        # Ubuntu 22.04 full bootstrap (requires sudo)
+# Full setup: system packages/apps + CLIs (with age) + dotfiles + mise install
+make -C bootstrap full
 
-# User-local setup (no sudo required)
-make -C bootstrap linux-user   # CLIs + dotfiles only, for non-admin users
+# Standard: CLIs (no age) + dotfiles + mise install (no sudo on Linux)
+make -C bootstrap standard
 
-# Dotfiles only
-make -C bootstrap macos-dotfiles
-make -C bootstrap linux-dotfiles
+# Minimal: dotfiles only (chezmoi apply)
+make -C bootstrap minimal
 ```
 
 ### Quick Setup (No Git Clone Required)
@@ -37,7 +35,7 @@ Set up user-local environment with a single command. Requires `curl`, `git`, and
 DOTFILES_SOURCE="$HOME/ghq/github.com/Ynakatsuka/dotfiles" && \
 sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin" && \
   "$HOME/.local/bin/chezmoi" -S "$DOTFILES_SOURCE" init --apply Ynakatsuka/dotfiles && \
-  make -C "$DOTFILES_SOURCE/bootstrap" linux-user
+  make -C "$DOTFILES_SOURCE/bootstrap" standard
 ```
 
 ### Pre‑clone Setup (Fresh Machines)
@@ -49,7 +47,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
   xcode-select --install
   git clone https://github.com/Ynakatsuka/dotfiles.git "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
   cd "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
-  make -C bootstrap macos
+  make -C bootstrap full
   ```
 
 - Ubuntu 22.04
@@ -57,7 +55,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
   sudo apt-get update && sudo apt-get install -y git curl
   git clone https://github.com/Ynakatsuka/dotfiles.git "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
   cd "$HOME/ghq/github.com/Ynakatsuka/dotfiles"
-  make -C bootstrap linux
+  make -C bootstrap full
   ```
 
 ### What It Does
@@ -109,11 +107,11 @@ This section documents a simple and repeatable SSH setup flow. Adjust hostnames 
 Generate a key and add it to your agent.
 
 ```bash
-# Generate a key (RSA to match your current workflow). Consider ed25519 for new setups.
-ssh-keygen -t rsa
+# Generate an ed25519 key (recommended for new setups)
+ssh-keygen -t ed25519
 
 # Add the key to your agent (macOS: adds to Keychain when supported)
-ssh-add -A ~/.ssh/id_rsa || ssh-add ~/.ssh/id_rsa
+ssh-add -A ~/.ssh/id_ed25519 || ssh-add ~/.ssh/id_ed25519
 ```
 
 Install `ssh-copy-id` and register your public key on servers.
@@ -122,14 +120,12 @@ Install `ssh-copy-id` and register your public key on servers.
 brew install ssh-copy-id   # macOS; on Linux use your distro package manager
 
 # Register your key on target servers
-ssh-copy-id yuki@192.168.11.11
-ssh-copy-id yuki@192.168.11.15
+ssh-copy-id <user>@<server-ip>
 ```
 
 Maintain a user SSH config (example guidance):
 
 - Reference: ssh-agent article (Japanese): https://zenn.dev/naoki_mochizuki/articles/ce381be617cd312ffe7f
-- Your detailed host config: https://www.notion.so/ssh-config-65a76bc48a77480ba01782c073ff5ca4?pvs=21
 
 ### Server Side (Linux)
 
@@ -144,14 +140,14 @@ sudo systemctl reload sshd                   # apply config changes
 After running `ssh-copy-id` from the client, confirm the key landed:
 
 ```bash
-sudo ls -l /home/yuki/.ssh/authorized_keys
+sudo ls -l /home/<user>/.ssh/authorized_keys
 ```
 
 Connectivity test from client:
 
 ```bash
 ssh -T git@github.com        # validates agent forwarding to GitHub if configured
-ssh yuki@192.168.11.11       # verify interactive shell login
+ssh <user>@<server-ip>       # verify interactive shell login
 ```
 
 Notes:

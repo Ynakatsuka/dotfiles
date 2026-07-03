@@ -6,6 +6,7 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 # shellcheck source=../../lib/common.sh
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
+# Bump VERSION manually when a new release is available; no auto-update.
 VERSION="3.69.0.0-1"
 PKG="expressvpn_${VERSION}_amd64.deb"
 URL="https://www.expressvpn.works/clients/linux/${PKG}"
@@ -27,6 +28,7 @@ require_cmd wget
 if confirm "Download and install ExpressVPN ${VERSION}?"; then
   run wget -O "$PKG" "$URL"
   run sudo dpkg -i "$PKG" || true
+  run rm -f "$PKG"
   warn "ExpressVPN often requires interactive login; follow vendor guidance."
 else
   warn "Skipped ExpressVPN installation"

@@ -7,7 +7,6 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../.." &>/dev/null && pwd)
 . "${ROOT_DIR}/bootstrap/lib/common.sh"
 
 PLAN=""
-DRY_RUN=0
 
 usage() {
   cat <<'USAGE'
@@ -29,7 +28,7 @@ while [ $# -gt 0 ]; do
       shift
       PLAN="$1"
       ;;
-    --dry-run) DRY_RUN=1 ;;
+    --dry-run) enable_dry_run ;;
     -h | --help)
       usage
       exit 0
@@ -50,14 +49,6 @@ if [ -z "$PLAN" ]; then
 fi
 
 require_macos
-
-run() {
-  if [ "$DRY_RUN" -eq 1 ]; then
-    echo "[DRY-RUN] $*"
-  else
-    "$@"
-  fi
-}
 
 resolve_brew() {
   if [ -x "/opt/homebrew/bin/brew" ]; then

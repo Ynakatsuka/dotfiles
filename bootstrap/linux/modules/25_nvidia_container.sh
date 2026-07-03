@@ -22,8 +22,16 @@ require_cmd curl
 require_cmd apt-get
 
 log "Installing NVIDIA Container Toolkit"
-run bash -c 'curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg'
-run bash -c 'curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed "s#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g" | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list'
+if [ -f /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg ]; then
+  log "NVIDIA Container Toolkit GPG keyring already present; skipping write"
+else
+  run bash -c 'curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg'
+fi
+if [ -f /etc/apt/sources.list.d/nvidia-container-toolkit.list ]; then
+  log "NVIDIA Container Toolkit sources list already present; skipping write"
+else
+  run bash -c 'curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sed "s#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g" | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list'
+fi
 run sudo apt update -y
 run sudo apt install -y nvidia-container-toolkit
 
