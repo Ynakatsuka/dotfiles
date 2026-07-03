@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Shared utility functions for bootstrap modules.
+#
+# Intentionally NO `set -euo pipefail` here: this file is sourced, so those
+# options would leak into and alter the calling script. Each entrypoint sets
+# its own strict mode.
 
 [[ -n "${_COMMON_SH_LOADED:-}" ]] && return 0
 _COMMON_SH_LOADED=1
