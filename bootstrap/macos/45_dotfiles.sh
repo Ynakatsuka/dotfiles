@@ -84,46 +84,9 @@ if [ "$(dscl . -read /Users/"$USER" UserShell 2>/dev/null | awk '{print $2}')" !
   fi
 fi
 
-# Install Claude Code (native installer)
-if ! command -v claude >/dev/null 2>&1; then
-  if confirm "Install Claude Code (native installer)?"; then
-    _install_script=$(mktemp)
-    curl --fail -fsSL https://claude.ai/install.sh -o "$_install_script"
-    bash "$_install_script"
-    rm -f "$_install_script"
-  else
-    warn "Skipped Claude Code installation"
-  fi
-else
-  log "Claude Code already installed"
-fi
-
-# Install Antigravity CLI (native installer)
-if ! command -v antigravity >/dev/null 2>&1; then
-  if confirm "Install Antigravity CLI (native installer)?"; then
-    _install_script=$(mktemp)
-    curl --fail -fsSL https://antigravity.google/cli/install.sh -o "$_install_script"
-    bash "$_install_script"
-    rm -f "$_install_script"
-  else
-    warn "Skipped Antigravity CLI installation"
-  fi
-else
-  log "Antigravity CLI already installed"
-fi
-
-# Install Cursor Agent CLI (native installer)
-if ! command -v cursor-agent >/dev/null 2>&1; then
-  if confirm "Install Cursor Agent CLI (native installer)?"; then
-    _install_script=$(mktemp)
-    curl --fail -fsSL https://cursor.com/install -o "$_install_script"
-    bash "$_install_script"
-    rm -f "$_install_script"
-  else
-    warn "Skipped Cursor Agent CLI installation"
-  fi
-else
-  log "Cursor Agent CLI already installed"
-fi
+# Install agent CLIs via their vendor install scripts
+install_cli_via_script claude "Claude Code" https://claude.ai/install.sh
+install_cli_via_script antigravity "Antigravity CLI" https://antigravity.google/cli/install.sh
+install_cli_via_script cursor-agent "Cursor Agent CLI" https://cursor.com/install
 
 log "Dotfiles setup completed"

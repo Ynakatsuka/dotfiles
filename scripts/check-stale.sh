@@ -69,18 +69,30 @@ for skill_md in home/dot_claude/skills/*/SKILL.md; do
   skill_dir="$(dirname "${skill_md}")"
 
   # 5a. paths mentioned in the skill's markdown must exist.
+  # Docs reference DEPLOYED names; chezmoi source names may carry attribute
+  # prefixes (executable_, private_), so check the prefixed variants too.
   # my-skill-creator is exempt: its guide is full of illustrative example
   # paths (scripts/fetch_data.py, references/aws.md, ...) that are not files.
   if [ "$(basename "${skill_dir}")" != "my-skill-creator" ]; then
     while IFS= read -r mention; do
-      [ -e "${skill_dir}/${mention}" ] || fail "${skill_dir}: docs mention missing file: ${mention}"
+      mention_dir="$(dirname "${mention}")"
+      mention_base="$(basename "${mention}")"
+      if [ ! -e "${skill_dir}/${mention}" ] &&
+        [ ! -e "${skill_dir}/${mention_dir}/executable_${mention_base}" ] &&
+        [ ! -e "${skill_dir}/${mention_dir}/private_${mention_base}" ]; then
+        fail "${skill_dir}: docs mention missing file: ${mention}"
+      fi
     done < <(grep -RhoE '(scripts|references)/[A-Za-z0-9._/-]+\.[A-Za-z0-9]+' \
       --include='*.md' "${skill_dir}" | sort -u)
   fi
 
-  # 5b. every script/reference file must be reachable from the skill's docs
+  # 5b. every script/reference file must be reachable from the skill's docs.
+  # Strip chezmoi attribute prefixes so a source file named
+  # executable_foo.sh matches docs that reference the deployed foo.sh.
   while IFS= read -r file; do
     base="$(basename "${file}")"
+    base="${base#executable_}"
+    base="${base#private_}"
     case "${base}" in
       LICENSE.txt) continue ;;
     esac
