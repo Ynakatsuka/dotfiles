@@ -17,7 +17,7 @@ allowed-tools: Bash, Read
 
 ## What it does
 
-Runs `~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch>`. The script:
+Runs `bash ~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch>`. The script:
 
 1. Resolves to the main (non-worktree) repo root.
 2. `git fetch origin --prune`.
@@ -27,15 +27,17 @@ Runs `~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch>`. The scr
 6. Creates new branches directly from that remote ref without an upstream.
 7. Creates the worktree at `${repo_root}-worktree/${branch//\//-}`.
 8. Copies `.env` / `.envrc` from the main repo and runs `direnv allow` when present.
+9. Runs `mise trust --all --yes` inside the new worktree when `mise` is installed.
+10. Registers the new worktree as a trusted Codex project: appends a `[projects."<worktree-path>"]` section with `trust_level = "trusted"` to `~/.codex/config.toml` (`$CODEX_HOME/config.toml`) unless already present.
 
 If a worktree for that branch already exists, prints the existing path and exits 0.
 
 ## How to use
 
 1. Confirm the branch name with the user if not supplied. Do not invent one.
-2. Run from inside the repo:
+2. Run from inside the repo (invoke via `bash`; deployed copies may lack the executable bit):
    ```bash
-   ~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch-name>
+   bash ~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch-name>
    ```
 3. The last stdout line is `WORKTREE_PATH=<absolute-path>`. Tell the user to `cd` there — Claude cannot change the user's shell cwd.
 
