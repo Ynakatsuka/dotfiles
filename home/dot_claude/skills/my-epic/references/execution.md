@@ -15,6 +15,31 @@ Operation node は migration、backfill、initial script、rollout、external co
 | Verification | 既存状態、data、log、metric、dashboard を確認するだけ | Evidence record |
 | Decision | Product、rollout、owner、risk の判断がないと実行できない | Recorded decision |
 
+## ブランチ安全性
+
+PR leaf の実装を始める前に、現在のブランチを確認する。
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+```
+
+- `CURRENT_BRANCH` が保護ブランチ（`main` / `master` / `staging` / `develop` / `production` / `release/*`）に一致する場合は、保護ブランチ上で実装しない。先に `origin/<base>` を起点に feature branch または worktree を作成してから実装する。
+
+```bash
+BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+
+# Feature branch:
+git switch -c "feat/{epic}-{leaf-id}" "origin/${BASE_BRANCH}"
+
+# または worktree:
+git worktree add -b "feat/{epic}-{leaf-id}" \
+  "{repo_root}-worktree/feat-{epic}-{leaf-id}" "origin/${BASE_BRANCH}"
+```
+
+- `CURRENT_BRANCH` が空（detached HEAD など）でブランチ検出に失敗した場合は、推測で進めず停止してユーザーに確認する。
+- 既に保護パターン外の feature branch / worktree 上にいる場合はそのまま実装してよい。
+
 ## 実装方式判断
 
 PR leaf ごとに 1 つの mode を選び、leaf の実行 log に記録する。
@@ -191,20 +216,26 @@ Preflight:
 
 ```bash
 BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
-git fetch origin "$BASE_BRANCH:$BASE_BRANCH"
-git diff "$BASE_BRANCH"..HEAD --stat
-git log "$BASE_BRANCH"..HEAD --oneline
+BASE_REF="origin/$BASE_BRANCH"
+git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+git rev-parse --verify "$BASE_REF^{commit}" >/dev/null
+git diff "$BASE_REF"...HEAD --stat
+git log "$BASE_REF"..HEAD --oneline
 ```
+
+Base branch は remote-tracking ref（`refs/remotes/origin/...`）にのみ fetch し、比較は `origin/$BASE_BRANCH` に対して行う。`git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` は実行しない。別 worktree で checked out された保護ブランチの ref だけが進み、その worktree/index が更新されず、マージ済みの remote 変更が staged / unstaged の逆差分として残るためである。
 
 Existing PR check:
 
 ```bash
-if gh pr view --json number,title,state 2>/tmp/epic-pr-view.err; then
+ERR_FILE=$(mktemp -t epic-pr-view.XXXXXX.err)
+trap 'rm -f "$ERR_FILE"' EXIT
+if gh pr view --json number,title,state 2>"$ERR_FILE"; then
   echo "Existing PR found."
-elif rg -qi "no pull requests|not found" /tmp/epic-pr-view.err; then
+elif grep -Eqi "no pull requests|not found" "$ERR_FILE"; then
   echo "No existing PR for this branch."
 else
-  cat /tmp/epic-pr-view.err
+  cat "$ERR_FILE"
   exit 1
 fi
 ```

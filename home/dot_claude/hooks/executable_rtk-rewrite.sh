@@ -47,8 +47,12 @@ if [ -z "$CMD" ]; then
 fi
 
 # Delegate all rewrite + permission logic to the Rust binary.
-REWRITTEN=$(rtk rewrite "$CMD" 2>/dev/null)
+# Capture stderr separately so unexpected failures can be surfaced below.
+RTK_STDERR_FILE=$(mktemp)
+REWRITTEN=$(rtk rewrite "$CMD" 2>"$RTK_STDERR_FILE")
 EXIT_CODE=$?
+RTK_STDERR=$(cat "$RTK_STDERR_FILE" 2>/dev/null)
+rm -f "$RTK_STDERR_FILE"
 
 case $EXIT_CODE in
   0)
@@ -69,6 +73,9 @@ case $EXIT_CODE in
     # Claude Code prompts the user for confirmation.
     ;;
   *)
+    # Unexpected exit code — rtk crashed or misbehaved. Fail open (pass the
+    # command through) but surface the cause so failures are not invisible.
+    echo "[rtk] WARNING: rtk rewrite exited with unexpected code ${EXIT_CODE}: ${RTK_STDERR//$'\n'/ }" >&2
     exit 0
     ;;
 esac

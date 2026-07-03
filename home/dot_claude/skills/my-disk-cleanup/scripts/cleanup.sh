@@ -281,9 +281,12 @@ cleanup_tmp() {
     report_category "__pycache__ (depth 4)" "$pycache_size"
     if $DRY_RUN; then
       echo "  [dry-run] find \"\$HOME\" -maxdepth 4 -name __pycache__ -type d -exec rm -rf {} +"
-    elif ! find "$HOME" -maxdepth 4 -name "__pycache__" -type d -exec rm -rf {} +; then
-      echo "  [WARN] command failed: remove __pycache__ directories" >&2
-      FAILED_STEPS=$((FAILED_STEPS + 1))
+    else
+      local rc=0
+      find "$HOME" -maxdepth 4 -name "__pycache__" -type d -exec rm -rf {} + || rc=$?
+      if ((rc != 0)); then
+        record_failure "$rc" "remove __pycache__ directories"
+      fi
     fi
   fi
 
@@ -298,9 +301,12 @@ cleanup_tmp() {
     report_category ".mypy_cache (depth 4)" "$mypy_size"
     if $DRY_RUN; then
       echo "  [dry-run] find \"\$HOME\" -maxdepth 4 -name .mypy_cache -type d -exec rm -rf {} +"
-    elif ! find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -exec rm -rf {} +; then
-      echo "  [WARN] command failed: remove .mypy_cache directories" >&2
-      FAILED_STEPS=$((FAILED_STEPS + 1))
+    else
+      local rc=0
+      find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -exec rm -rf {} + || rc=$?
+      if ((rc != 0)); then
+        record_failure "$rc" "remove .mypy_cache directories"
+      fi
     fi
   fi
 
@@ -327,6 +333,7 @@ else
 fi
 
 for cat in "${categories[@]}"; do
+  CURRENT_CATEGORY="$cat"
   echo "── $cat ──"
   case "$cat" in
     docker) cleanup_docker ;;
@@ -352,7 +359,11 @@ else
 fi
 echo "========================================="
 
-if ((FAILED_STEPS > 0)); then
-  echo "  $FAILED_STEPS cleanup step(s) failed. See [WARN] lines above." >&2
+if ((${#FAILURES[@]} > 0)); then
+  echo "" >&2
+  echo "Failed steps (${#FAILURES[@]}):" >&2
+  for failure in "${FAILURES[@]}"; do
+    echo "  - $failure" >&2
+  done
   exit 1
 fi

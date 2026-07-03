@@ -21,7 +21,7 @@ Cross-platform disk cleanup for macOS and Ubuntu. Cleans caches category-by-cate
 Run the cleanup script in dry-run mode to show current cache sizes without deleting anything:
 
 ```bash
-bash $SKILL_DIR/scripts/cleanup.sh --dry-run
+bash ${CLAUDE_SKILL_DIR:?}/scripts/cleanup.sh --dry-run
 ```
 
 Present the results to the user organized by category. Highlight the largest categories.
@@ -29,7 +29,7 @@ Present the results to the user organized by category. Highlight the largest cat
 ### 2. Confirm categories with user
 
 Ask which categories to clean. Available categories:
-- `docker` — Docker images, build cache, volumes, dangling containers
+- `docker` — Docker images, build cache, dangling containers (volumes only with `--include-volumes`)
 - `brew` — Homebrew download cache (macOS)
 - `apt` — APT package cache (Ubuntu)
 - `pip` — pip download cache
@@ -45,11 +45,16 @@ Run the script for selected categories:
 
 ```bash
 # All categories
-bash $SKILL_DIR/scripts/cleanup.sh
+bash ${CLAUDE_SKILL_DIR:?}/scripts/cleanup.sh
 
 # Specific categories (comma-separated)
-bash $SKILL_DIR/scripts/cleanup.sh --category docker,brew,pip
+bash ${CLAUDE_SKILL_DIR:?}/scripts/cleanup.sh --category docker,brew,pip
+
+# Also prune unused Docker volumes (opt-in; may delete DB data)
+bash ${CLAUDE_SKILL_DIR:?}/scripts/cleanup.sh --category docker --include-volumes
 ```
+
+`--include-volumes` deletes unused named Docker volumes (databases, persistent app data). NEVER pass it unless the user has explicitly confirmed volume deletion in this session.
 
 ### 4. Report results
 
@@ -60,7 +65,8 @@ The script outputs a before/after comparison. Summarize:
 
 ## Notes
 
-- Docker cleanup uses `docker system prune -af --volumes` and `docker builder prune -af` — this removes ALL unused images, containers, volumes, and build cache. Warn the user before running.
+- Docker cleanup uses `docker system prune -af` and `docker builder prune -af` — this removes ALL unused images, containers, and build cache. Warn the user before running.
+- Unused Docker volumes are pruned only when `--include-volumes` is passed. Volumes can hold database and application data, so ask the user for explicit confirmation before using this flag.
 - `sudo` is required for `apt-get clean` on Ubuntu.
 - The `tmp` category runs `find` with `-maxdepth 4` from `$HOME` to avoid excessive traversal.
 - ~/Library/Caches (macOS) is reported but NOT deleted automatically — only specific subdirectories (Xcode DerivedData, __pycache__, .mypy_cache) are removed.

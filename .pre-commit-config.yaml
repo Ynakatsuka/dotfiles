@@ -48,6 +48,7 @@ repos:
           (?x)^(
               .*\.tmpl|
               .*/executable_.*|
+              .*/hitl-loop\.template\.sh|
               bootstrap/lib/common\.sh|
               bootstrap/macos/22_pointer\.sh|
               bootstrap/macos/pointer/prefs/pointer_values\.sh
