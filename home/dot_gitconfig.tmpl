@@ -28,3 +28,8 @@
   # name differs from the current branch, preventing accidental pushes when a
   # topic branch was created with an unexpected upstream.
   default = simple
+[include]
+  # Machine-local settings that must survive `chezmoi apply` (e.g. the
+  # credential helpers written by `gh auth setup-git`). Keep such state in
+  # ~/.gitconfig.local instead of this managed file.
+  path = ~/.gitconfig.local

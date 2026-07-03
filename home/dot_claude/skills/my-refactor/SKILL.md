@@ -86,9 +86,13 @@ gh issue list --label refactor --state all --limit 500 \
 
 `state all` にするのは、closed 済み issue の fingerprint と照合して「一度 close した指摘を再提案しない」ためでもある。
 
+取得件数がちょうど 500 件の場合は `--limit` による打ち切りの可能性がある。その場合は「既存 issue の取得が上限 500 件で打ち切られ、重複判定が不完全な可能性がある」とユーザーに警告する。
+
 ## Phase S-2: スキャン
 
-読み取り専用で context を汚さないため、**Agent ツールで subagent_type=Explore を起動する**ことを推奨する。プロンプトには以下を含める: 対象ディレクトリ、`references/catalog.md` を読むよう指示、下記の findings フォーマット。
+読み取り専用で context を汚さないため、**Agent ツールで subagent_type=Explore を起動する**ことを推奨する。プロンプトには以下を含める: 対象ディレクトリ、`references/catalog.md` を読むよう指示、findings フォーマット（`references/sarif.md` の `results[]` に対応する項目）。
+
+**Explore subagent は Write できない**。subagent は所見を構造化テキスト（ruleId、location、指摘対象行、message、severity、effort、approach、risks）で返すだけにする。返ってきた所見を SARIF に整形し `findings.sarif.json` に書き込むのは **main agent の責務**。
 
 ### 検出の判断基準
 
@@ -108,72 +112,7 @@ gh issue list --label refactor --state all --limit 500 \
 
 ### SARIF 互換の出力
 
-scan 結果は **SARIF 2.1.0 互換のサブセット**として `"$SCAN_OUT_DIR/findings.sarif.json"` に保存する。これで Semgrep / Code Scanning / その他ツールに渡せる。
-
-ランタイムが出力する最低限の形:
-
-```json
-{
-  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
-  "version": "2.1.0",
-  "runs": [{
-    "tool": {
-      "driver": {
-        "name": "my-refactor",
-        "informationUri": "https://github.com/Ynakatsuka/dotfiles",
-        "rules": [
-          { "id": "remove-duplication", "shortDescription": { "text": "Duplicated logic across call sites" } },
-          { "id": "extract-function", "shortDescription": { "text": "Long or deeply nested function" } }
-          /* ... 他 catalog の category をそのまま rule id に ... */
-        ]
-      }
-    },
-    "results": [
-      {
-        "ruleId": "remove-duplication",
-        "level": "error",
-        "message": { "text": "Two near-identical auth header builders. Diverging bug-fixes already happened once (commit abc123)." },
-        "locations": [
-          { "physicalLocation": {
-              "artifactLocation": { "uri": "src/api/user.ts" },
-              "region": { "startLine": 42, "endLine": 58 } } },
-          { "physicalLocation": {
-              "artifactLocation": { "uri": "src/api/admin.ts" },
-              "region": { "startLine": 61, "endLine": 77 } } }
-        ],
-        "partialFingerprints": {
-          "refactorFingerprint/v1": "<sha1 of category + normalized_code_of_each_location>"
-        },
-        "properties": {
-          "severity": "high",
-          "effort_minutes": 30,
-          "suggested_approach": "Extract to src/api/_auth.ts::buildAuthHeader, import from both sites.",
-          "risks": ["Shared test coverage required before extraction."],
-          "suggested_title": "Extract shared auth header builder (2 copies in src/api/)"
-        }
-      }
-    ]
-  }]
-}
-```
-
-マッピングの決まり:
-
-- `ruleId` = catalog category（ハイフン形式、`category/` プレフィクスなし）
-- `level`: `critical`/`high` → `"error"`, `medium` → `"warning"`, `low` → `"note"`
-- `partialFingerprints["refactorFingerprint/v1"]`: `sha1(ruleId + "\n" + 各 location の正規化コード)`。空白の潰しと変数名の `$var` 化など軽い正規化を行う。行番号は含めない（shift 耐性のため）
-- `properties.severity`, `properties.effort_minutes`: my-refactor 固有の拡張プロパティ
-- `properties.suggested_title`, `properties.suggested_approach`, `properties.risks`: issue 本文の生成に使う
-
-findings.sarif.json は scan ごとに**上書き**する（run history は Git で追う）。
-
-**severity の基準**:
-- `critical`: バグ温床、セキュリティ、データ不整合に直結
-- `high`: 明確な重複・破綻した設計。放置で負債が急速に増える
-- `medium`: 可読性・保守性の低下。機能追加のたびに痛い
-- `low`: 軽微な整理。ただし Nice-to-have は **skip**
-
-**effort_minutes の基準**: 実装 + テスト修正 + レビュー反映までのざっくり見積（`< 30`, `30-120`, `120-480`, `> 480` の刻み）。480 超は issue を分割するようユーザーに相談する。
+scan 結果は **SARIF 2.1.0 互換のサブセット**として `"$SCAN_OUT_DIR/findings.sarif.json"` に保存する。JSON 構造、level / properties のマッピング、fingerprint の決定的計算規則、severity / effort_minutes の基準は **`references/sarif.md` を読んで従う**。findings.sarif.json は scan ごとに**上書き**する（run history は Git で追う）。
 
 ## Phase S-3: 重複排除と絞り込み
 
@@ -181,7 +120,7 @@ findings.sarif.json は scan ごとに**上書き**する（run history は Git 
 2. `existing-issues.json` の各 issue 本文から `RefactorFingerprint:` 行（Phase S-5 で埋め込む）を抽出
 3. fingerprint が一致する既存 issue（open/closed 問わず）があれば、新規スキャンから除外
 4. fingerprint が見つからない既存 issue については **location + ruleId の一致**でフォールバック判定
-5. `level` 優先（error → warning → note）でソート → `--max=N` で上位のみ残す（既定 10 件）
+5. `level` 優先（error → warning → note）、同一 level 内は `properties.severity`（critical → high → medium → low）を第 2 ソートキーにしてソート → `--max=N` で上位のみ残す（既定 10 件）。`critical` と `high` はどちらも `level=error` に潰れるため、この第 2 キーが必須
 6. `level=error` かつ `properties.severity=critical` は `--max` を超えても残す
 
 ## Phase S-4: レポート出力
@@ -298,8 +237,8 @@ Issue 本文の「提案するアプローチ」「想定リスク」「Refactor
 
 ### SARIF 出力
 
-- scan の出力は `SCAN_OUT_DIR/findings.sarif.json`。SARIF 2.1.0 サブセットとして他ツールに渡せる
-- fingerprint は行番号を含めない。空白正規化・変数名抽象化を行い、リネーム耐性を持たせる
+- scan の出力は `SCAN_OUT_DIR/findings.sarif.json`。SARIF 2.1.0 サブセットとして他ツールに渡せる。仕様は `references/sarif.md`
+- fingerprint は行番号を含めない。正規化は空白のみ（各行の trim + 連続空白の圧縮）。変数名抽象化は実行間で非決定的になるため行わない
 
 ### issue と fingerprint
 

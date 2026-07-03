@@ -14,85 +14,21 @@ argument-hint: "[artifact [name] | download <path> | schedule [list|create|delet
 
 CCV (Claude Code Viewer) のアーティファクト登録とリモートエージェントのスケジュール管理を行う統合スキル。
 
+## CCV Server
+
+全ワークフロー共通。API を呼ぶ前に base URL を一度だけ定義する（ポートは `CCV_PORT` 環境変数で上書き可、デフォルト 3434）:
+
+```bash
+BASE_URL="http://localhost:${CCV_PORT:-3434}"
+```
+
 ## Argument Routing
 
 Route based on `$ARGUMENTS`:
 
-1. **`schedule ...`**: → Schedule workflow (below)
-2. **`download ...`** or **`dl ...`**: → File download workflow (below)
+1. **`schedule ...`**: → Read `references/schedule.md` and follow the Schedule workflow
+2. **`download ...`** or **`dl ...`**: → Read `references/download.md` and follow the File Download workflow
 3. **`artifact ...`** or **no argument** or **other**: → Artifact workflow (below)
-
----
-
-# File Download Workflow
-
-CCV ローカル API を使って、登録済みプロジェクト内の特定ファイルをブラウザまたは `curl` でダウンロードできる URL を生成する。
-
-## CCV Server
-
-- Base URL: `http://localhost:3434`
-
-## Step 1: Identify the project
-
-```bash
-curl -s http://localhost:3434/api/projects | jq .
-```
-
-- `meta.projectPath` で現在のプロジェクトディレクトリと照合し、対象の `id` を特定する
-- 現在の作業ディレクトリ (`pwd`) と一致するプロジェクトを自動選択する
-- 一致しない場合はユーザーに確認する
-
-## Step 2: Determine the file path
-
-- `path` はプロジェクトルートからの相対パスを指定する
-- 絶対パスは指定しない
-- `../` でプロジェクト外へ出るパスは拒否される
-- `.env`, `*.pem`, `*.key`, credentials/secrets 系ファイルは拒否される
-
-## Step 3: Build the download URL
-
-ブラウザで開く URL:
-
-```text
-http://localhost:3434/api/projects/{projectId}/files/download?path={urlEncodedRelativePath}
-```
-
-URL エンコードは `jq` で行う:
-
-```bash
-REL_PATH="reports/result.csv"
-ENCODED_PATH=$(jq -rn --arg v "$REL_PATH" '$v|@uri')
-printf 'http://localhost:3434/api/projects/%s/files/download?path=%s\n' "$PROJECT_ID" "$ENCODED_PATH"
-```
-
-ブラウザでこの URL を開くと、サーバーは `Content-Disposition: attachment` を返し、ファイルダウンロードとして扱われる。
-
-## Step 4: Download with curl
-
-```bash
-REL_PATH="reports/result.csv"
-ENCODED_PATH=$(jq -rn --arg v "$REL_PATH" '$v|@uri')
-curl -fL -OJ "http://localhost:3434/api/projects/${PROJECT_ID}/files/download?path=${ENCODED_PATH}"
-```
-
-- `-O`: レスポンスのファイル名で保存
-- `-J`: `Content-Disposition` の `filename` を使う
-- `-f`: 4xx/5xx を失敗として扱う
-
-## File Download API Reference
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/projects/:projectId/files/download?path=:relativePath` | プロジェクト内ファイルを attachment として返す |
-
-## File Download Error Handling
-
-- CCV サーバーが起動していない場合: `curl: (7) Failed to connect` → ユーザーに CCV サーバーの起動を案内する
-- プロジェクトが見つからない場合: `/api/projects` の一覧を表示してユーザーに選択を求める
-- `400 Invalid path`: 絶対パスまたはプロジェクト外参照
-- `400 not_file`: 対象が通常ファイルではない
-- `403 sensitive_file`: sensitive file パターンに該当
-- `404 not_found`: ファイルが存在しない
 
 ---
 
@@ -100,14 +36,10 @@ curl -fL -OJ "http://localhost:3434/api/projects/${PROJECT_ID}/files/download?pa
 
 CCV ローカル API を使って HTML アーティファクトを作成・登録する。
 
-## CCV Server
-
-- Base URL: `http://localhost:3434`
-
 ## Step 1: Identify the project
 
 ```bash
-curl -s http://localhost:3434/api/projects | jq .
+curl -s "${BASE_URL}/api/projects" | jq .
 ```
 
 - `meta.projectPath` で現在のプロジェクトディレクトリと照合し、対象の `id` を特定する
@@ -130,13 +62,7 @@ HTML の要件:
 
 ## Step 3: Register the artifact
 
-```bash
-curl -s -X POST "http://localhost:3434/api/projects/{projectId}/artifacts" \
-  -H 'Content-Type: application/json' \
-  -d @/tmp/ccv-artifact.json
-```
-
-リクエストボディ (`/tmp/ccv-artifact.json`):
+リクエストボディ:
 ```json
 {
   "name": "DISPLAY_NAME",
@@ -149,13 +75,13 @@ curl -s -X POST "http://localhost:3434/api/projects/{projectId}/artifacts" \
 - `fileName`: 保存時のファイル名（英数字・ハイフン推奨、`.html` 拡張子必須）
 - `html`: 完全な HTML 文字列
 
-HTML が大きい場合は必ず一時ファイル経由で送信する。JSON の構築には `jq` を使い、エスケープ漏れを防ぐ:
+HTML が大きい場合は必ず一時ファイル経由で送信する。JSON の構築には `jq` を使い、エスケープ漏れを防ぐ。一時ファイル名は `$$-$RANDOM` で衝突を避ける:
 
 ```bash
 CCV_JSON="/tmp/ccv-artifact-$$-$RANDOM.json"
 jq -n --arg name "$NAME" --arg fileName "$FILENAME" --arg html "$(cat /tmp/artifact.html)" \
   '{name: $name, fileName: $fileName, html: $html}' > "$CCV_JSON"
-curl -s -X POST "http://localhost:3434/api/projects/{projectId}/artifacts" \
+curl -s -X POST "${BASE_URL}/api/projects/{projectId}/artifacts" \
   -H 'Content-Type: application/json' -d @"$CCV_JSON"
 rm -f "$CCV_JSON"
 ```
@@ -165,7 +91,7 @@ rm -f "$CCV_JSON"
 登録成功後、以下を報告する:
 
 1. アーティファクト ID（レスポンスの `id`）
-2. プレビュー URL: `http://localhost:3434/api/projects/{projectId}/artifacts/{artifactId}/html`
+2. プレビュー URL: `${BASE_URL}/api/projects/{projectId}/artifacts/{artifactId}/html`
 3. 登録内容の概要
 
 ## Artifact API Reference
@@ -189,147 +115,3 @@ rm -f "$CCV_JSON"
 - 既存アーティファクトの更新は PUT を使い、変更したいフィールドのみ送信する
 - `list` サブコマンド的に使われた場合は GET で一覧を返す
 - レスポンスの `id` は ULID 形式で自動生成される
-
----
-
-# Schedule Workflow
-
-CCV ローカル API (`http://localhost:3434/api/scheduler/jobs`) でスケジュールジョブを管理する。
-
-ジョブは CCV サーバー上でローカル実行される。ローカルマシンのファイルや環境にフルアクセスできる。
-
-## Schedule Sub-routing
-
-Route based on sub-argument after `schedule`:
-
-| Sub-argument | Action |
-|-------------|--------|
-| (none) / `list` | 登録済みジョブ一覧を表示 |
-| `create` | 新しいジョブを作成 |
-| `delete [id]` | ジョブを削除 |
-| `update [id]` | ジョブを更新 |
-
-## Schedule: List
-
-```bash
-curl -s http://localhost:3434/api/scheduler/jobs | jq .
-```
-
-見やすい形式で表示: 名前、スケジュール（cron式 + 人間が読める形式）、有効/無効、最終実行状況。
-ジョブが0件なら「登録済みのスケジュールジョブはありません」と表示。
-
-## Schedule: Create
-
-### Step 1: Identify the project
-
-```bash
-curl -s http://localhost:3434/api/projects | jq .
-```
-
-`meta.projectPath` で対象プロジェクトの `id` を特定する。
-
-### Step 2: Understand the goal
-
-ユーザーに以下を確認する:
-- 何をさせたいか（プロンプト内容）
-- 実行スケジュール（cron式 or 一回限りの予約実行）
-- 既存セッションの続行か新規セッションか
-
-### Step 3: Set the schedule
-
-**cron ジョブの場合:**
-- 標準5フィールド cron 式（分 時 日 月 曜日）
-- CCV サーバーのローカルタイムゾーンで解釈される
-- 同時実行ポリシー: `"skip"`（実行中ならスキップ）or `"run"`（並行実行）
-
-**予約実行の場合:**
-- ISO 8601 形式で日時を指定
-- 実行後に自動削除される
-
-### Step 4: Build and confirm
-
-設定全体をユーザーに提示し、確認を得る。
-
-### Step 5: Create the job
-
-**cron ジョブ:**
-```bash
-curl -s -X POST http://localhost:3434/api/scheduler/jobs \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "JOB_NAME",
-    "schedule": {
-      "type": "cron",
-      "expression": "CRON_EXPRESSION",
-      "concurrencyPolicy": "skip"
-    },
-    "message": {
-      "content": "PROMPT_HERE",
-      "projectId": "PROJECT_ID",
-      "baseSessionId": null
-    },
-    "enabled": true
-  }'
-```
-
-**予約実行:**
-```bash
-curl -s -X POST http://localhost:3434/api/scheduler/jobs \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "JOB_NAME",
-    "schedule": {
-      "type": "reserved",
-      "reservedExecutionTime": "2025-10-25T00:00:00Z"
-    },
-    "message": {
-      "content": "PROMPT_HERE",
-      "projectId": "PROJECT_ID",
-      "baseSessionId": null
-    },
-    "enabled": true
-  }'
-```
-
-- `baseSessionId`: 既存セッションを続行する場合にセッションIDを指定。新規セッションなら `null`。
-
-### Step 6: Report
-
-作成成功後:
-1. ジョブ ID
-2. スケジュールの要約（人間が読める形式）
-3. CCV UI で確認できることを案内: `http://localhost:3434`
-
-## Schedule: Update
-
-```bash
-curl -s -X PATCH "http://localhost:3434/api/scheduler/jobs/{id}" \
-  -H 'Content-Type: application/json' \
-  -d '{ "enabled": false }'
-```
-
-更新可能なフィールド: `name`, `schedule`, `message`, `enabled`。
-変更前後を提示して確認を得てから実行する。
-
-## Schedule: Delete
-
-```bash
-curl -s -X DELETE "http://localhost:3434/api/scheduler/jobs/{id}"
-```
-
-削除前に確認を得る。
-
-## Schedule API Reference
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/scheduler/jobs` | ジョブ一覧 |
-| POST | `/api/scheduler/jobs` | 新規作成 |
-| PATCH | `/api/scheduler/jobs/:id` | 更新（部分更新） |
-| DELETE | `/api/scheduler/jobs/:id` | 削除 |
-
-## Schedule Notes
-
-- ジョブは CCV サーバーが起動している間だけ実行される
-- 設定は `~/.claude-code-viewer/scheduler/schedules.json` に永続化される
-- 予約実行ジョブは実行後に自動削除される

@@ -11,6 +11,7 @@ description: >-
   epic. Do NOT use for a single small bug fix, one obvious PR, pure code
   review, ordinary SDD work that already fits in one spec/PR, or implementing
   an epic during the same first call that created it.
+argument-hint: "[epic-name|docs/epics/path|request]"
 ---
 
 # Epic Delivery Orchestrator
@@ -39,8 +40,9 @@ Phase 6 Program Closure
 ## 参照ファイル
 
 - `references/templates.md` — ドキュメント区分と `README.md` / `ai/` 配下各ファイルのテンプレート
+- `references/planning.md` — Phase 1 の README / 判断表の書き方、Phase 3 の分解ルール詳細
 - `references/harness.md` — PR leaf / operation node の verification harness / gates 設計
-- `references/execution.md` — PR leaf 実装、operation 実行、統合、PR 作成、失敗時停止条件
+- `references/execution.md` — ブランチ安全性、PR leaf 実装、operation 実行、統合、PR 作成、失敗時停止条件
 
 ## ドキュメント区分
 
@@ -135,52 +137,7 @@ docs/epics/{name}/
 - `README.md`: 現在地、目的、root goal、実装・実行・確認の Phase 計画、成功基準、主要リスク、node 一覧、承認待ち事項、承認履歴
 - `ai/program.md`: 状態、ゴール契約、スコープ、制約、既存情報、判断表、公開 contract、rollout / rollback 方針
 
-README.md の Phase 計画は、ユーザーが今回の目的を達成する作業順を理解するためのものにする。スキル内部の orchestration phase（Goal Contract、Architecture / Tech Choice、Delivery Tree、Harness Plan、Program Closure）をそのまま載せない。
-README.md の現在地も、この実装・実行・確認の Phase 計画上の現在行で表す。`Phase 1 Goal Contract` のような内部フェーズ名を現在地として載せない。
-
-Phase 計画に含める内容:
-
-- 現状確認、失敗再現、既存挙動調査
-- テスト、fixture、verification harness の準備
-- コード、設定、docs、script の実装
-- migration、backfill、初期 script、feature flag、manual operation の実行
-- unit / integration / contract / data / smoke / observability の確認
-- cleanup、rollback 確認、PR / CI 確認
-
-Phase 計画に含めない内容:
-
-- ユーザー承認そのもの
-- delivery tree 分解そのもの
-- leaf / operation ファイル作成そのもの
-- README.md や ai/program.md を承認可能にすること
-- このスキルの内部フェーズ名
-
-### 判断表の作り方
-
-Phase 0 の調査結果を `ai/program.md` に埋めてから判断表を作る。
-
-1. 証拠で確定した内容と確定できない内容を分ける
-2. 不明点ごとに、今決める理由、選択肢、推奨案、分岐後の処理を判断表に記録する
-3. ユーザーに聞くのは product decision、優先順位、破壊的変更の許容だけ。それ以外は `open` のまま後続 Phase の調査タスクへ送る
-4. ユーザー確認が必要な不明点を最大 3 問に圧縮し、`README.md` の承認待ち事項へ転記する
-5. 承認ビュー形式で root goal と質問を確認する
-
-分岐後の処理の書き方:
-
-```text
-If the user chooses A, set X as in-scope and plan node Y.
-If the user chooses B, mark X as non-goal and skip node Y.
-```
-
-進めてよい条件:
-
-- root goal が一文で説明できる
-- 目的と「なぜ今やるか」が README.md に書かれている
-- non-goals が明記されている
-- 成功判定がコード、テスト、データ、運用のいずれかで検証できる
-- Phase ごとの実装・実行・確認内容と成功基準が README.md から分かる
-- 判断表に選択肢と分岐後の処理が記録されている
-- ユーザー確認の結果が承認履歴と判断表に反映されている
+README.md の Phase 計画の書き方、判断表の作り方（Phase 0 調査結果の反映、質問の圧縮、分岐後の処理の記法）、Phase 1 を進めてよい条件は `references/planning.md` の Phase 1 節に従う。root goal と質問の確認は承認ビュー形式で行う。
 
 ## Phase 2: Architecture / Tech Choice
 
@@ -216,33 +173,7 @@ node 種別:
 - **Verification node**: 既存状態、データ、監視、移行結果を確認するだけの作業
 - **Decision node**: 実行前にユーザー、owner、運用担当の判断が必要な作業
 
-分解の形:
-
-```text
-Root Initiative
-├── Milestone A
-│   ├── PR A1: Harness / contract tests
-│   ├── PR A2: Backward-compatible implementation
-│   ├── OP A3: Run initial backfill script
-│   └── OP A4: Enable rollout flag
-└── Milestone B
-    ├── PR B1: Migration dry-run tooling
-    ├── OP B2: Execute production migration
-    └── VERIFY B3: Confirm data invariants and dashboards
-```
-
-分解ルール:
-
-- 1 PR leaf = 1 PR
-- PR leaf は 1〜3 日程度でレビュー可能なサイズを目安にする
-- operation node は PR として表現しない。runbook、実行条件、証跡、rollback を持つ独立 node にする
-- 先に harness / contract / migration dry-run / operation dry-run を置く
-- データ移行、script 実行、public contract、rollout、cleanup を 1 つの PR leaf に混ぜない
-- 依存関係は DAG として明記する
-- 並列化できる node は file touch map、contract 影響、operational state 影響を分ける
-- 1 PR で完結しない PR leaf はさらに分割する
-- 手動作業、one-off script、migration、external console 操作が必要なら operation node を作る
-- operation node は owner、実行環境、前提条件、exact command / action、expected evidence、rollback、実行してよい時間帯を明記する
+分解の形（milestone / PR / OP / VERIFY のツリー例）と分解ルールの詳細は `references/planning.md` の Phase 3 節に従う。
 
 ユーザー確認:
 
@@ -287,7 +218,7 @@ operation node 実行に進んでよい条件:
 PR leaf の実行手順:
 
 1. leaf ファイルを読み、依存 leaf が完了していることを確認する
-2. 作業ブランチまたは worktree の安全性を確認する
+2. `references/execution.md` の「ブランチ安全性」に従い、現在のブランチを検出する。保護ブランチ（`main` / `master` / `staging` / `develop` / `production` / `release/*`）上なら `origin/<base>` 起点の feature branch / worktree を先に作成し、検出に失敗したら停止してユーザーに確認する
 3. `references/execution.md` を読み、実装方法を決める
 4. 補助エージェントを使った場合は、その結果を差分レビューする
 5. leaf の Test / Data / Smoke gate を main 側で実行する

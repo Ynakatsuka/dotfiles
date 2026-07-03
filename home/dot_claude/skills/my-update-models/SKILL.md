@@ -3,7 +3,7 @@ name: my-update-models
 description: >-
   Check the latest Claude (Anthropic), OpenAI Codex, and Google Gemini model
   releases from official primary sources, then update model selections in this
-  dotfiles repo (home/dot_claude/settings.json, home/dot_codex/config.toml.tmpl,
+  dotfiles repo (home/dot_claude/settings.json, home/dot_codex/private_config.toml.tmpl,
   home/dot_gemini/settings.json). Also scans the invoking repository for hardcoded
   model IDs in GitHub Actions workflows, Python code, and shell scripts, and
   offers to bump them. Use when the user asks to "モデル更新", "モデルを最新に",
@@ -24,7 +24,7 @@ the invoking repository for any hardcoded model IDs that should be bumped too.
 Default: `all`.
 
 - `claude` — only Anthropic settings (`home/dot_claude/settings.json`)
-- `codex`  — only OpenAI Codex settings (`home/dot_codex/config.toml.tmpl`)
+- `codex`  — only OpenAI Codex settings (`home/dot_codex/private_config.toml.tmpl`)
 - `gemini` — only Google Gemini settings (`home/dot_gemini/settings.json`)
 - `all`    — all three providers
 
@@ -40,8 +40,8 @@ Always edit in the ghq repo, never in `~/`.
 |---|---|---|---|
 | `home/dot_claude/settings.json` | top-level `model` | `"opus"` | Default Claude Code model alias. Effort is managed separately via `env.CLAUDE_CODE_EFFORT_LEVEL`. |
 | `home/dot_claude/settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
-| `home/dot_codex/config.toml.tmpl` | `model` | `"gpt-5.5"` | Codex CLI default model (full ID, not an alias). |
-| `home/dot_codex/config.toml.tmpl` | `[tui.model_availability_nux]` key | `"gpt-5.5" = 4` | NUX banner suppression — must be bumped together with `model` to keep the key in sync. |
+| `home/dot_codex/private_config.toml.tmpl` | `model` | `"gpt-5.5"` | Codex CLI default model (full ID, not an alias). |
+| `home/dot_codex/private_config.toml.tmpl` | `[tui.model_availability_nux]` key | `"gpt-5.5" = 4` | NUX banner suppression — must be bumped together with `model` to keep the key in sync. |
 | `home/dot_gemini/settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
 
 Do NOT modify model IDs that appear inside skill examples
@@ -157,5 +157,5 @@ IDs that also need bumping.
   full IDs (`gemini-2.5-pro`, `gemini-3-pro-preview`). Aliases track the CLI
   default across releases — keep the alias unless the user wants pinning.
 - If the new model has different reasoning controls, also re-evaluate
-  `model_reasoning_effort` in `home/dot_codex/config.toml.tmpl` and the `[1m]`
+  `model_reasoning_effort` in `home/dot_codex/private_config.toml.tmpl` and the `[1m]`
   effort suffix on the Claude Code `model` field.

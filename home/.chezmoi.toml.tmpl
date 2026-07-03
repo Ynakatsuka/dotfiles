@@ -18,7 +18,9 @@ The logic is duplicated intentionally: this config template is rendered at
 {{- if and (not $ageCmd) $pathAge (not (contains "mise/shims/age" $pathAge)) -}}
 {{-   $ageCmd = $pathAge -}}
 {{- end -}}
-{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) -}}
+sourceDir = "{{ .chezmoi.homeDir }}/ghq/github.com/Ynakatsuka/dotfiles"
+{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
+
 encryption = "age"
 
 [age]
