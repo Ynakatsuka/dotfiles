@@ -9,7 +9,8 @@
 #   (check-yaml/toml/json, shellcheck, shfmt).
 # - Shell hooks match only `*.sh` so extensionless files such as dot_zshrc
 #   (zsh syntax, not well supported by shellcheck) are skipped.
-# - avgtime_zsh.sh is a zsh script saved with a .sh suffix; excluded explicitly.
+# - scripts/avgtime_zsh.sh is a zsh script saved with a .sh suffix; excluded
+#   explicitly.
 # - shfmt runs in write mode (`-w`). It rewrites files in place; review the
 #   diff before committing.
 
@@ -21,7 +22,7 @@ exclude: |
       .*\.age$|
       .*\.plist$|
       .*/encrypted_.*|
-      avgtime_zsh\.sh
+      scripts/avgtime_zsh\.sh
   )$
 
 repos:
@@ -64,7 +65,7 @@ repos:
           (?x)^(
               .*\.tmpl|
               .*/modify_[^/]+\.json|
-              private_dot_config/cmux/settings\.json
+              home/private_dot_config/cmux/settings\.json
           )$
 
   - repo: https://github.com/crate-ci/typos
@@ -87,3 +88,12 @@ repos:
         files: \.sh$
         exclude: \.tmpl$
         args: [-i, "2", -ci, -w]
+
+  - repo: local
+    hooks:
+      - id: check-stale
+        name: detect stale repo content
+        entry: bash scripts/check-stale.sh
+        language: system
+        pass_filenames: false
+        always_run: true
