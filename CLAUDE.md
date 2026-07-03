@@ -8,19 +8,39 @@ This is a **Chezmoi-based dotfiles management system** for macOS and Ubuntu 22.0
 
 ## Key Concepts
 
-### Chezmoi File Naming Conventions
+### Repository Layout
 
-- `dot_` prefix → deployed as `.` (e.g., `dot_zshrc` → `~/.zshrc`)
+- `.chezmoiroot` points chezmoi at `home/`: **only files under `home/` deploy to `$HOME`**.
+- Everything outside `home/` (`bootstrap/`, `scripts/`, `CLAUDE.md`, `README.md`, ...) is repo-only and never deployed.
+- `home/.chezmoiremove` declaratively deletes stale, previously deployed targets on `chezmoi apply`.
+- `home/.chezmoitemplates/` holds include-only sources (`mcp.json` manifest, shared `age-command.tmpl` resolution).
+
+### Chezmoi File Naming Conventions (inside `home/`)
+
+- `dot_` prefix → deployed as `.` (e.g., `home/dot_zshrc` → `~/.zshrc`)
 - `private_` prefix → restricted permissions (600)
 - `.tmpl` suffix → Go template files processed during deployment
-- Files in `private_dot_config/` → deployed to `~/.config/`
+- Files in `home/private_dot_config/` → deployed to `~/.config/`
 
 ### Directory Structure
 
-- `bootstrap/` - Platform-specific setup scripts (modular, numbered 00-99)
-- `dot_claude/` - Claude Code global configuration (deployed to `~/.claude/`)
-- `dot_cursor/` - Cursor editor configuration
-- `dot_hammerspoon/` - macOS window management (Lua)
+- `home/` - Chezmoi source state (everything deployed to `$HOME`)
+- `bootstrap/` - Platform-specific setup scripts (repo-only)
+- `scripts/` - Repo maintenance utilities (repo-only)
+- `home/dot_claude/` - Claude Code global configuration (deployed to `~/.claude/`)
+- `home/dot_hammerspoon/` - macOS window management (Lua)
+
+### Agent Instruction Pipeline
+
+`home/AGENTS.md` is the single source of global agent rules. It reaches every agent via chezmoi:
+
+- `~/AGENTS.md` (deployed verbatim)
+- `~/CLAUDE.md` (via `home/CLAUDE.md.tmpl`)
+- `~/.claude/CLAUDE.md` (via `home/dot_claude/CLAUDE.md.tmpl`)
+- `~/.codex/AGENTS.md` (via `home/dot_codex/AGENTS.md.tmpl`, which appends Codex-only extras)
+- `~/.gemini/GEMINI.md` (via `home/dot_gemini/GEMINI.md.tmpl`)
+
+Edit `home/AGENTS.md` once; never fork rule text into the templates. Claude-only domain detail lives in `home/dot_claude/rules/*.md` (path-scoped via `paths:` frontmatter where applicable). Repo-specific guidance stays in this file, which is intentionally NOT deployed.
 
 ## Common Commands
 
@@ -62,56 +82,57 @@ tmux source ~/.tmux.conf   # Reload tmux config
 ### Repository Location
 
 The authoritative repository and chezmoi source are both `~/ghq/github.com/Ynakatsuka/dotfiles/`.
-`~/.config/chezmoi/chezmoi.toml` sets `sourceDir` to that path, so `chezmoi apply` reads from the ghq clone.
+`~/.config/chezmoi/chezmoi.toml` sets `sourceDir` to that path; `.chezmoiroot` then narrows the source state to `home/`.
 
 ### Template Processing
 
 Files ending in `.tmpl` use Go templates. Common patterns:
-- `{{- include "AGENTS.md" -}}` - Include another file
-- Platform-conditional content using chezmoi's built-in variables
+- `{{- include "AGENTS.md" -}}` - Include another file (paths resolve relative to `home/`)
+- Platform-conditional content using chezmoi's built-in variables (`{{ if eq .chezmoi.os "darwin" }}`)
 
 ### Bootstrap Modules
 
-Bootstrap scripts are numbered for execution order:
-- `00_*` - Prerequisites (Xcode, Homebrew)
-- `10_*` - Core tools (Git)
-- `20-30_*` - System configuration
-- `40_*` - SSH and dotfiles deployment
+Each platform has its own numbered module set, orchestrated by `main.sh`:
+
+- `bootstrap/macos/`: `00_xcode_brew`, `10_git`, `20_defaults`, `22_pointer`, `25_hotcorners`, `31_cmux`, `40_ssh`, `45_dotfiles`
+- `bootstrap/linux/modules/`: `00_base`, `05_expressvpn`, `10_gpu_nvidia`, `20_docker`, `25_nvidia_container`, `30_clis`, `40_dotfiles`, `99_cleanup`
+
+Numbers control execution order only; see each `main.sh` for which modules a plan runs.
 
 ### Claude Configuration Structure
 
-The `dot_claude/` directory deploys as `~/.claude/`:
+The `home/dot_claude/` directory deploys as `~/.claude/`:
 - `CLAUDE.md.tmpl` → Global instructions (includes AGENTS.md)
-- `rules/` → Domain-specific rules (bigquery, python, gpu, git)
-- `skills/` → Skill definitions for Claude Code
+- `rules/` → Domain-specific rules (bigquery, git, gpu, python)
+- `skills/` → Skill definitions for Claude Code (also symlinked into `~/.codex/skills/` by a run_onchange script)
 
 ## Skill Authoring
 
-When creating or modifying skills (`dot_claude/skills/*/SKILL.md`), always use the `my-skill-creator` skill first to ensure compliance with the frontmatter spec and design guidelines.
+When creating or modifying skills (`home/dot_claude/skills/*/SKILL.md`), always use the `my-skill-creator` skill first to ensure compliance with the frontmatter spec and design guidelines.
 
 ## Critical Rules
 
 ### File Placement
 
-**NEVER create files directly under `~/` (e.g., `~/.claude/`, `~/.codex/`).** All configuration files MUST be created in this dotfiles repository (`dot_` prefixed) first, then deployed. Creating files outside this repo means they won't be tracked by Git.
+**NEVER create files directly under `~/` (e.g., `~/.claude/`, `~/.codex/`).** All configuration files MUST be created in this dotfiles repository (under `home/`) first, then deployed. Creating files outside this repo means they won't be tracked by Git.
 
-- `~/.claude/` files → create in `dot_claude/`
-- `~/.codex/` files → create in `dot_codex/`
-- `~/.config/` files → create in `private_dot_config/`
+- `~/.claude/` files → create in `home/dot_claude/`
+- `~/.codex/` files → create in `home/dot_codex/`
+- `~/.config/` files → create in `home/private_dot_config/`
 
-After editing, manually copy to the deploy target or run `chezmoi apply`.
+After editing, run `chezmoi apply` (or `chezmoi diff` first to preview).
 
 ## When Editing
 
-### Shell Configuration (`dot_zshrc`)
+### Shell Configuration
 
-Contains extensive FZF integrations, git worktree management, and tool initialization. Changes require `source ~/.zshrc` to test.
+`home/dot_zshrc` is a thin loader; the actual FZF integrations, git worktree helpers, and tool initialization live in `home/private_dot_config/zsh/*.zsh` modules. Changes require `source ~/.zshrc` to test.
 
-### Adding New Tools to mise (`dot_mise.toml`)
+### Adding New Tools to mise (`home/dot_mise.toml`)
 
 After editing, run `mise install` to install new tools.
 
-### Hammerspoon (`dot_hammerspoon/init.lua`)
+### Hammerspoon (`home/dot_hammerspoon/init.lua`)
 
 After editing, the config must be reloaded inside the running Hammerspoon app (see reload commands below). The repo enables both reload paths via `require("hs.ipc")` and `hs.allowAppleScript(true)`:
 

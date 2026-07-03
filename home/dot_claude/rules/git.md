@@ -1,14 +1,12 @@
 ## GitHub
 
-- Use the `gh` command-line tool for **all** GitHub operations: cloning, branching, committing, creating pull requests, etc.
-- Follow standard conventional commit message guidelines (see Git Workflow section). Branch names should be descriptive (e.g., `feat/add-user-auth`, `fix/resolve-login-bug`).
+- Branch names should be descriptive (e.g., `feat/add-user-auth`, `fix/resolve-login-bug`).
 - Keep local and remote repositories synchronized frequently.
 
 ## Git Workflow
 
 ### General Principles
 
-- Never commit automatically without explicit user approval.
 - Commit **only** relevant files related to the change. Avoid committing unrelated files, IDE configuration, or empty commits.
 - Use `git commit -am` (stage and commit in one step) **only** when you are certain **all** modified files should be included in the commit. Be cautious.
 - **Always** use the `-u` flag when pushing a new branch (`git push -u origin <branch-name>`).

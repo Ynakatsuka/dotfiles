@@ -26,9 +26,9 @@
 
 ## No Implicit Fallbacks
 
-Default to surfacing failures as errors. Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, workaround paths, or silent retries during code changes unless the user explicitly approves that fallback in the current task.
-
-If a fallback seems necessary, stop before editing and propose it. Name the failure mode, exact fallback behavior, trade-off, and what erroring out would look like.
+- Default to surfacing failures as errors.
+- Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, workaround paths, or silent retries unless the user explicitly approves that fallback in the current task.
+- If a fallback seems necessary, stop before editing and propose it: name the failure mode, the exact fallback behavior, the trade-off, and what erroring out would look like.
 
 Avoid these patterns unless explicitly approved:
 
@@ -39,7 +39,7 @@ Avoid these patterns unless explicitly approved:
 - Guessing alternate config paths, branches, models, endpoints, parsers, or commands.
 - Treating partial results as complete success without surfacing the missing or failed part.
 
-Do not preserve or broaden existing fallback logic when modifying nearby code unless that behavior is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask before changing it.
+- Do not preserve or broaden existing fallback logic when modifying nearby code unless it is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask first.
 
 ## Critical Thinking
 
@@ -53,8 +53,7 @@ Do not preserve or broaden existing fallback logic when modifying nearby code un
 
 ## Solution Scope
 
-Choose the narrowest implementation that solves the real problem without creating avoidable future drag.
-
+- Choose the narrowest implementation that solves the real problem without creating avoidable future drag.
 - Prefer local fixes for isolated behavior, shared improvements for repeated problems, and new abstractions only when there is a clear contract and real consumer.
 - When scope materially affects API shape, data model, ownership, or long-term maintenance and evidence cannot resolve it, ask before editing.
 
@@ -97,6 +96,11 @@ Choose the narrowest implementation that solves the real problem without creatin
 - When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` before reporting it as missing.
 - When creating or editing `dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.
 
+## Managed Dotfiles
+
+- Configuration under `~/` (e.g. `~/.claude/`, `~/.codex/`, `~/.config/`, shell rc files) is deployed by chezmoi from `~/ghq/github.com/Ynakatsuka/dotfiles/home/`.
+- Edit the chezmoi source and run `chezmoi apply`. Never edit the deployed copies directly; direct edits are untracked and get overwritten.
+
 ## Autonomy
 
 - Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
@@ -112,6 +116,7 @@ Choose the narrowest implementation that solves the real problem without creatin
 
 ## Git
 
+- Never commit automatically without explicit user approval.
 - Do not revert user changes unless explicitly asked.
 - Ignore unrelated dirty worktree changes.
 - Before `git push` without an explicit remote and refspec, resolve `@{push}`. If a topic branch would push to a protected branch (`main`, `master`, `staging`, `develop`, `production`, `release/*`), stop and report. Explicitly requested pushes from a protected branch to itself are allowed.
@@ -122,5 +127,5 @@ Choose the narrowest implementation that solves the real problem without creatin
 ## Domain Rules
 
 - Python: use `uv`, modern typing, Ruff, Mypy, and Pytest.
-- BigQuery / `.sql`: use `bq`, show the current project/account before execution, and run `--dry_run` before expensive queries.
+- BigQuery / `.sql`: use `bq`, show the current project/account before execution, and run `--dry_run` with user confirmation before queries estimated to scan over 50GB.
 - GPU Python: check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
