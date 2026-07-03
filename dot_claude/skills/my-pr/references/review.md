@@ -9,11 +9,12 @@ This reference is read-only for repository behavior. It collects and integrates 
 - Separate finding from filtering. Reviewers should surface potential issues with severity and confidence; integration decides what is Required, Recommended, or Not needed.
 - Ask for coverage, not only high-severity findings. Do not let reviewers silently drop plausible bugs because they think they are not important enough.
 - Keep scope explicit: review the full PR diff against the base branch, not only the latest simplify changes.
-- Keep reviewer responsibilities separate. Simplify handles quality, duplication, and behavior-preserving micro-efficiency. Claude/Codex review correctness, security, performance regressions, and test risks.
+- Keep reviewer responsibilities separate. Simplify handles quality, duplication, and behavior-preserving micro-efficiency. Claude/Codex review approach fit, correctness, security, performance regressions, and test risks.
 - Require line references, problem detail, why it matters, evidence, and a concrete fix strategy for every finding.
 - Do not collapse integrated findings into one-line verdicts. Each Required and Recommended item must include a clear 3-5 line explanation covering the problem, why it matters, the ideal state, and the fix or next step.
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
+- Check approach fit against the PR problem: whether the chosen solution actually solves the stated issue, and whether a simpler, safer, or existing path would solve it better. Report alternatives only when there is concrete evidence, such as an existing extension point, duplicated implementation, violated constraint, or avoidable operational/maintenance risk.
 - Do not continue with degraded evidence. If a diff artifact, reviewer, Codex run, or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path.
 
 ## Artifact and scope gate
@@ -98,6 +99,7 @@ Reviewer A chunks run integrated simplify in `review` mode with the simplify per
 Use this checklist for Claude/Codex correctness review. Exclude style or preference-only findings, but keep plausible low-severity or uncertain risks for integration. Put inspected-but-safe areas in Non-findings when useful.
 
 - Fallbacks: unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
+- Approach fit: whether the implementation directly solves the PR's stated problem under its constraints, whether it bypasses the intended architecture or extension point, and whether a simpler or safer existing implementation should have been reused or extended.
 - Downstream impact: changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files consumed by later processing.
 - Cross-client reference parity: existing implementations, helpers, schemas, flows, fixtures, or tests in other clients/SDKs that should have been reused or matched.
 - Cross-client compatibility: behavior changes that can break other clients, shared libraries, generated code, API callers, CLI users, configuration consumers, or migration paths.
@@ -175,15 +177,16 @@ Review the full branch diff against the base branch. Do not review only the late
 Use the review diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
 Read the PR context artifact before the diff. You are seeing this PR for the first time, so first identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
 Focus on:
-1. Correctness bugs, edge cases, data loss, race conditions, and error semantics
-2. Unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures
-3. Downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files
-4. Cross-client impact: ignored reusable/reference implementations in other clients/SDKs, or changes that can break other clients, shared libraries, generated code, API callers, CLI users, configuration consumers, or migration paths
-5. Security issues, secret leakage, injection, unsafe shell/file/path handling, authorization mistakes, dependency trust, permissions, and data exposure
-6. Public contract and backward compatibility risks in exported functions, types, schemas, API responses, CLI flags, config keys, migrations, or documented error semantics
-7. Operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes
-8. Performance regressions: algorithmic complexity, N+1 queries, redundant I/O or network calls, blocking work on hot paths, missing pagination/streaming, unbounded memory growth, large allocations or copies inside loops, or lost caching/batching
-9. Missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage
+1. Approach fit: whether the current implementation is a sound way to solve the stated PR problem, whether it leaves the problem partly unsolved, violates explicit constraints, bypasses the intended architecture, or ignores a simpler, safer, or already-existing implementation path
+2. Correctness bugs, edge cases, data loss, race conditions, and error semantics
+3. Unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures
+4. Downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files
+5. Cross-client impact: ignored reusable/reference implementations in other clients/SDKs, or changes that can break other clients, shared libraries, generated code, API callers, CLI users, configuration consumers, or migration paths
+6. Security issues, secret leakage, injection, unsafe shell/file/path handling, authorization mistakes, dependency trust, permissions, and data exposure
+7. Public contract and backward compatibility risks in exported functions, types, schemas, API responses, CLI flags, config keys, migrations, or documented error semantics
+8. Operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes
+9. Performance regressions: algorithmic complexity, N+1 queries, redundant I/O or network calls, blocking work on hot paths, missing pagination/streaming, unbounded memory growth, large allocations or copies inside loops, or lost caching/batching
+10. Missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage
 </scope>
 
 <out_of_scope>
@@ -218,7 +221,7 @@ Report every plausible issue you find, including low-severity or uncertain findi
 ## Findings
 
 1. **file:line** — short title
-   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | performance | tests
+   - Category: approach | correctness | fallback | downstream | cross-client | security | contract | operations | performance | tests
    - Severity: critical | high | medium | low
    - Confidence: high | medium | low
    - Impact: what can break or become unsafe
@@ -255,6 +258,7 @@ Scope:
 - Use the diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
 - Use the PR context artifact as the source of truth for PR body and prior GitHub conversation. If it cannot be read, return REVIEW_INCOMPLETE.
 - Cross-check the implementation against the PR intent. Report mismatches between the stated goal and the diff as findings.
+- Assess whether the chosen approach is a sound way to solve the stated PR problem. Report when it leaves the problem partly unsolved, violates explicit constraints, bypasses the intended architecture, or ignores a simpler, safer, or already-existing implementation path.
 - Focus on correctness bugs, edge cases, data loss, race conditions, and error semantics.
 - Check for unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
 - Check downstream processing impact from changed output shape, ordering, timing, side effects, idempotency, error semantics, event names, metrics, logs, artifacts, or files.
@@ -288,7 +292,7 @@ Output exactly this structure:
 ## Findings
 
 1. **file:line** — short title
-   - Category: correctness | fallback | downstream | cross-client | security | contract | operations | performance | tests
+   - Category: approach | correctness | fallback | downstream | cross-client | security | contract | operations | performance | tests
    - Severity: critical | high | medium | low
    - Confidence: high | medium | low
    - Impact: what can break or become unsafe
@@ -331,8 +335,8 @@ Every integrated finding must include a severity: `critical`, `high`, `medium`, 
 
 | Final category | Criteria |
 |---|---|
-| Required | Confirmed correctness/security/data-loss/fallback/downstream/cross-client/contract/operations/performance issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
-| Recommended | Plausible but uncertain issue; design/API/schema/config change; approval-worthy operational design/config change; simplify Recommended; useful but approval-worthy test expansion |
+| Required | Confirmed approach mismatch that leaves the stated problem unsolved or violates explicit constraints; confirmed correctness/security/data-loss/fallback/downstream/cross-client/contract/operations/performance issue; test gap for changed behavior that can hide a bug; behavior-preserving simplify Required |
+| Recommended | Plausible but uncertain approach issue; simpler or safer alternative that needs design approval; design/API/schema/config change; approval-worthy operational design/config change; simplify Recommended; useful but approval-worthy test expansion |
 | Not needed | Style preference; readability-only nit covered by no clear risk; false positive; issue outside this PR's scope |
 
 This phase only classifies findings. Required fixes are applied later by the default or `fix` workflow. Recommended and Not needed findings are not applied by this skill.
