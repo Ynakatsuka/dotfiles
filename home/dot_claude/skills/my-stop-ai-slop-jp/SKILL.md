@@ -7,7 +7,6 @@ description: >-
   reviewing Japanese text, or when the user asks to strip AI臭 / AIっぽさ — e.g.
   "AI臭を消して", "この文章をレビューして", "公開前チェック", "下書きを直して".
   Do NOT use for English prose or for non-prose code review.
-license: MIT
 metadata:
   language: ja
   author: Daichi Nagashima (https://genshi.ai/)

@@ -9,7 +9,10 @@ echo "# PR view"
 gh pr view "$pr_number" --json reviews,comments,latestReviews,reviewDecision
 
 echo "# Review comments"
-gh api "repos/{owner}/{repo}/pulls/$pr_number/comments"
+# --paginate emits one JSON array per page; --slurp wraps them into an array of
+# arrays, and jq flattens it back into a single flat array (same approach as
+# prepare-pr-context.sh).
+gh api --paginate --slurp "repos/{owner}/{repo}/pulls/$pr_number/comments" | jq '[.[][]]'
 
 echo "# Review threads"
 after=""

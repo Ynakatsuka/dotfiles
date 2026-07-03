@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = ["pyyaml"]
+# ///
 """
 Quick validation script for skills - minimal version
 """
@@ -38,8 +42,12 @@ def validate_skill(skill_path):
     except yaml.YAMLError as e:
         return False, f"Invalid YAML in frontmatter: {e}"
 
-    # Define allowed properties
-    ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 'metadata'}
+    # Define allowed properties (synced to SKILL.md frontmatter spec table)
+    ALLOWED_PROPERTIES = {
+        'name', 'description', 'license', 'allowed-tools', 'metadata',
+        'argument-hint', 'disable-model-invocation', 'model', 'effort',
+        'context', 'agent', 'compatibility',
+    }
 
     # Check for unexpected properties (excluding nested keys under metadata)
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES

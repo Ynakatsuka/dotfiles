@@ -80,4 +80,4 @@ Output:
 
 - 挙動・契約が変わらない修正: 自動で該当文書へ反映
 - 挙動・API・schema・config・CLI・error semantics が変わる修正: ユーザー承認後に反映
-- 不採用: `decisions.md` に理由を記録
+- 不採用: `docs/specs/{feature-name}/decisions.md` に理由を記録

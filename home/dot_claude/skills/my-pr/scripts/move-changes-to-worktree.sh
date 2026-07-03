@@ -4,7 +4,7 @@ set -euo pipefail
 branch=${1:?Usage: move-changes-to-worktree.sh <new-branch> [worktree-dir]}
 
 case "$branch" in
-  main|master|staging|production|develop|release/*)
+  main | master | staging | production | develop | release/*)
     echo "ERROR: refusing to create protected branch for PR worktree: $branch" >&2
     exit 1
     ;;
@@ -28,7 +28,7 @@ transfer_complete=false
 cleanup() {
   status=$?
   rm -rf "$tmp_dir"
-  if (( status != 0 )) && [[ "$worktree_created" == true && "$transfer_complete" == false ]]; then
+  if ((status != 0)) && [[ "$worktree_created" == true && "$transfer_complete" == false ]]; then
     echo "ERROR: removing incomplete worktree: $worktree_dir" >&2
     if ! git worktree remove --force "$worktree_dir" >&2; then
       echo "ERROR: failed to remove incomplete worktree: $worktree_dir" >&2
@@ -58,9 +58,16 @@ elif [[ -n "${MY_PR_PATHS:-}" ]]; then
 fi
 mapfile -t pathspecs <"$pathspec_list"
 
-git diff --cached --binary -- "${pathspecs[@]}" >"$staged_patch"
-git diff --binary -- "${pathspecs[@]}" >"$unstaged_patch"
-git diff --name-only --diff-filter=A -- "${pathspecs[@]}" >"$intent_to_add_list"
+# Only append the `--` separator and pathspecs when at least one pathspec is
+# present. An empty array would otherwise leave a bare trailing `--`.
+diff_pathspec_args=()
+if ((${#pathspecs[@]})); then
+  diff_pathspec_args=(-- "${pathspecs[@]}")
+fi
+
+git diff --cached --binary "${diff_pathspec_args[@]}" >"$staged_patch"
+git diff --binary "${diff_pathspec_args[@]}" >"$unstaged_patch"
+git diff --name-only --diff-filter=A "${diff_pathspec_args[@]}" >"$intent_to_add_list"
 
 : >"$untracked_list"
 if [[ -n "${MY_PR_UNTRACKED_FILE_LIST:-}" ]]; then
@@ -73,7 +80,7 @@ fi
 validate_untracked_path() {
   local file_path=$1
   case "$file_path" in
-    /*|../*|*/../*|.)
+    /* | ../* | */../* | .)
       echo "ERROR: unsafe untracked path: $file_path" >&2
       exit 1
       ;;
@@ -116,8 +123,8 @@ while IFS= read -r file_path; do
   cmp "$orig_repo/$file_path" "$worktree_dir/$file_path" >/dev/null
 done <"$untracked_list"
 
-git -C "$worktree_dir" diff --cached --binary -- "${pathspecs[@]}" >"$tmp_dir/worktree-staged.patch"
-git -C "$worktree_dir" diff --binary -- "${pathspecs[@]}" >"$tmp_dir/worktree-unstaged.patch"
+git -C "$worktree_dir" diff --cached --binary "${diff_pathspec_args[@]}" >"$tmp_dir/worktree-staged.patch"
+git -C "$worktree_dir" diff --binary "${diff_pathspec_args[@]}" >"$tmp_dir/worktree-unstaged.patch"
 
 cmp "$staged_patch" "$tmp_dir/worktree-staged.patch" >/dev/null
 cmp "$unstaged_patch" "$tmp_dir/worktree-unstaged.patch" >/dev/null
@@ -125,7 +132,7 @@ transfer_complete=true
 
 printf 'WORKTREE_DIR=%s\n' "$worktree_dir"
 printf 'BRANCH=%s\n' "$branch"
-if (( ${#pathspecs[@]} > 0 )); then
+if ((${#pathspecs[@]} > 0)); then
   printf 'Pathspec-limited transfer:\n'
   printf -- '- %s\n' "${pathspecs[@]}"
 fi

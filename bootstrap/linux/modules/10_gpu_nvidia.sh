@@ -9,9 +9,9 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../../.." &>/dev/null && pwd)
 DRIVER_FIXED="570" # fallback option from memo; guarded by prompt
 
 # CUDA version constants — update these manually when upgrading CUDA.
-CUDA_VERSION="12.4.0"        # full version, e.g. 12.4.0
-CUDA_DRIVER="550.54.14"      # bundled driver version in the local repo package
-CUDA_PKG_SERIES="12-4"       # used in package names: cuda-toolkit-12-4, repo dir 12-4-local
+CUDA_VERSION="12.4.0"   # full version, e.g. 12.4.0
+CUDA_DRIVER="550.54.14" # bundled driver version in the local repo package
+CUDA_PKG_SERIES="12-4"  # used in package names: cuda-toolkit-12-4, repo dir 12-4-local
 CUDA_DEB="cuda-repo-ubuntu2204-${CUDA_PKG_SERIES}-local_${CUDA_VERSION}-${CUDA_DRIVER}-1_amd64.deb"
 
 while [ $# -gt 0 ]; do

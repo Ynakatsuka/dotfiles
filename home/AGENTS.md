@@ -94,7 +94,7 @@ Avoid these patterns unless explicitly approved:
 ## Skills
 
 - When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` before reporting it as missing.
-- When creating or editing `dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.
+- When creating or editing `home/dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.
 
 ## Managed Dotfiles
 

@@ -40,28 +40,35 @@ If currently on a protected branch, move the target tracked changes to a worktre
 ```bash
 ORIG_REPO=$(pwd)
 BRANCH="feat/example"
-bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+bash "${CLAUDE_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 For task-created untracked files, pass only an explicit list. Do not include unrelated untracked files.
 
 ```bash
 TASK_CREATED_UNTRACKED_FILES="path/created-by-this-task.txt" \
-  bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "${CLAUDE_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 If paths contain spaces or many files are involved, write a newline-delimited list and pass it with `MY_PR_UNTRACKED_FILE_LIST`.
 
 ```bash
 MY_PR_UNTRACKED_FILE_LIST=/path/to/task-created-untracked-files.txt \
-  bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "${CLAUDE_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 If unrelated tracked changes exist, restrict the transfer with `MY_PR_PATHSPEC_FILE`.
 
 ```bash
 MY_PR_PATHSPEC_FILE=/path/to/task-pathspecs.txt \
-  bash "${CLAUDE_SKILL_DIR}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "${CLAUDE_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+```
+
+For a short pathspec list whose paths contain no whitespace, pass a whitespace-separated list with `MY_PR_PATHS` instead. The value is split on whitespace, so it cannot express paths containing spaces; use `MY_PR_PATHSPEC_FILE` for those. When both are set, `MY_PR_PATHSPEC_FILE` takes precedence and `MY_PR_PATHS` is ignored.
+
+```bash
+MY_PR_PATHS="src/feature.py tests/test_feature.py" \
+  bash "${CLAUDE_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
 ```
 
 The script transfers changes by binary patches, verifies the worktree diff matches the original staged/unstaged patches, and intentionally does not clean the original repository by itself.
@@ -104,7 +111,7 @@ if UPSTREAM=$(git rev-parse --abbrev-ref @{upstream} 2>"$ERR_FILE"); then
       exit 1
       ;;
   esac
-elif rg -qi "no upstream|no such branch|upstream" "$ERR_FILE"; then
+elif grep -Eqi "no upstream|no such branch|upstream" "$ERR_FILE"; then
   echo "No upstream branch is configured yet."
 else
   cat "$ERR_FILE"
@@ -130,7 +137,7 @@ Do not run `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"`. That can advance a ch
 Before every push, verify the destination branch.
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/check-push-destination.sh"
+bash "${CLAUDE_SKILL_DIR:?}/scripts/check-push-destination.sh"
 ```
 
 If the script reports a protected branch mismatch, stop and ask the user before pushing.

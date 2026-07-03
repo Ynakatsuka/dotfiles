@@ -66,7 +66,7 @@ gemini --skip-trust -y -o stream-json -p "<PROMPT>"
 ## Model Selection
 
 - **Default**: Do NOT specify `-m`. The Gemini CLI default is used.
-- **User-specified model**: Add `-m <MODEL>` only when the user explicitly requests one (e.g., "gemini-2.5-proで実行して").
+- **User-specified model**: Add `-m <model>` only when the user explicitly requests one. Resolve the current value from `~/.gemini/settings.json`; omit `-m` to use the CLI default.
 
 ## Examples
 
@@ -80,8 +80,8 @@ gemini --skip-trust -y -p "Add input validation to src/auth/handler.py: email fo
 # Code review (read-only)
 gemini --skip-trust --approval-mode plan -p "Review the changes in the current branch vs main. Focus on security and performance."
 
-# Explicit model
-gemini --skip-trust -y -m gemini-2.5-pro -p "Analyze the architecture of this project"
+# Explicit model (resolve current ID from ~/.gemini/settings.json, or omit -m to use CLI default)
+gemini --skip-trust -y -m <model> -p "Analyze the architecture of this project"
 ```
 
 ## Troubleshooting

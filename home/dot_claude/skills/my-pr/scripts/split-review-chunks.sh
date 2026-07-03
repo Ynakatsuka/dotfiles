@@ -35,7 +35,7 @@ while IFS= read -r group; do
     "$chunk_dir/files.txt" "$changed_files" >"$chunk_dir/files-not-covered.txt"
 
   mapfile -t files <"$chunk_dir/files.txt"
-  if (( ${#files[@]} == 0 )); then
+  if ((${#files[@]} == 0)); then
     echo "ERROR: empty chunk for group: $group" >&2
     exit 1
   fi

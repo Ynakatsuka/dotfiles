@@ -23,7 +23,7 @@ codex resume --last
 ## Model Selection
 
 - **Default**: Do NOT specify `--model`. The model in `~/.codex/config.toml` is used automatically.
-- **User-specified model**: Add `--model <MODEL>` only when the user explicitly requests one (e.g., "gpt-5.4で実行して", "use gpt-5.3-codex").
+- **User-specified model**: Add `--model <model>` only when the user explicitly requests one. Resolve the current default from `~/.codex/config.toml`; omit `-m` to use the CLI default.
 
 ## Configuration
 
@@ -48,6 +48,6 @@ codex exec "Add input validation to src/auth/handler.py: email format and passwo
 # Code review
 codex exec "Review the changes in the current branch vs main. Focus on security and performance."
 
-# Explicit model
-codex exec --model gpt-5.4 "Analyze the architecture of this project"
+# Explicit model (resolve current ID from ~/.codex/config.toml, or omit --model to use CLI default)
+codex exec --model <model> "Analyze the architecture of this project"
 ```

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (( $# > 0 )); then
+if (($# > 0)); then
   echo "ERROR: unexpected argument: $1" >&2
   exit 1
 fi
@@ -55,7 +55,7 @@ else
   ' "$metadata_json" >/dev/null
 
   pr_number=$(jq -r '.number' "$metadata_json")
-  repo_nwo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+  repo_now=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 
   fetch_paginated_array() {
     local endpoint=$1
@@ -67,9 +67,9 @@ else
     rm -f "$paged_output"
   }
 
-  fetch_paginated_array "repos/${repo_nwo}/issues/${pr_number}/comments" "$issue_comments_json"
-  fetch_paginated_array "repos/${repo_nwo}/pulls/${pr_number}/reviews" "$reviews_json"
-  fetch_paginated_array "repos/${repo_nwo}/pulls/${pr_number}/comments" "$review_comments_json"
+  fetch_paginated_array "repos/${repo_now}/issues/${pr_number}/comments" "$issue_comments_json"
+  fetch_paginated_array "repos/${repo_now}/pulls/${pr_number}/reviews" "$reviews_json"
+  fetch_paginated_array "repos/${repo_now}/pulls/${pr_number}/comments" "$review_comments_json"
 
   {
     jq -r '

@@ -18,7 +18,7 @@ for i in $(seq 1 "$max_iterations"); do
     rm -f "$err_file"
   else
     status=$?
-    if rg -qi "no checks|checks have not been created|not found" "$err_file"; then
+    if grep -Eqi "no checks|checks have not been created|not found" "$err_file"; then
       rm -f "$err_file"
       echo "No checks are configured for this PR."
       checks_clear=1

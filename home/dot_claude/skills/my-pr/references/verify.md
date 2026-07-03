@@ -31,7 +31,7 @@ Do not describe `none configured` as CI passing. Report it separately.
 Use the polling script instead of `gh pr checks --watch`.
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/poll-pr-checks.sh" "$PR_NUMBER"
+bash "${CLAUDE_SKILL_DIR:?}/scripts/poll-pr-checks.sh" "$PR_NUMBER"
 ```
 
 If the script reports failed checks, inspect logs, fix root cause, test, commit, run push destination safety, push, then poll again.
@@ -57,7 +57,7 @@ Final wording must use `GitHub checks: none configured`, not `CI passed`.
 Fetch review bodies, top-level comments, and review threads.
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/scripts/fetch-review-threads.sh" "$PR_NUMBER"
+bash "${CLAUDE_SKILL_DIR:?}/scripts/fetch-review-threads.sh" "$PR_NUMBER"
 ```
 
 Classify findings:
@@ -78,7 +78,7 @@ Before every push, verify that the push destination is safe and that the current
 ```bash
 CURRENT_BRANCH=$(git branch --show-current)
 test "$CURRENT_BRANCH" = "$HEAD_BRANCH"
-bash "${CLAUDE_SKILL_DIR}/scripts/check-push-destination.sh"
+bash "${CLAUDE_SKILL_DIR:?}/scripts/check-push-destination.sh"
 ```
 
 If no push destination is configured, push only to the matching remote branch after the current branch check succeeds.

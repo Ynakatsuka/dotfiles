@@ -2,7 +2,7 @@
 set -euo pipefail
 
 base_ref=${1:?Usage: prepare-review-artifacts.sh <base-ref>}
-if (( $# > 1 )); then
+if (($# > 1)); then
   echo "ERROR: unexpected argument: $2" >&2
   exit 1
 fi
@@ -60,10 +60,10 @@ untracked_count=$(wc -l <"$artifact_dir/untracked-files.txt" | tr -d ' ')
 review_lines=$(wc -l <"$artifact_dir/review.diff" | tr -d ' ')
 commit_count=$(git rev-list --count "$base_ref"..HEAD)
 scope_gate=ok
-if (( file_count > 100 || review_lines > 10000 || commit_count > 20 )); then
+if ((file_count > 100 || review_lines > 10000 || commit_count > 20)); then
   scope_gate=large
 fi
-if (( untracked_count > 0 )); then
+if ((untracked_count > 0)); then
   if [[ "$scope_gate" == "large" ]]; then
     scope_gate=large+untracked
   else
@@ -88,7 +88,7 @@ fi
     sort |
     uniq -c |
     sort -rn
-  if (( untracked_count > 0 )); then
+  if ((untracked_count > 0)); then
     printf '\n## Untracked files\n'
     cat "$artifact_dir/untracked-files.txt"
   fi

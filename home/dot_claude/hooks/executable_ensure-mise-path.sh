@@ -29,7 +29,7 @@ SHIMS="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
 
 # Skip if the user's shims are already prepended (idempotent across chained hooks).
 case "$CMD" in
-  *"PATH=\"$SHIMS:"*|*"PATH=$SHIMS:"*) exit 0 ;;
+  *"PATH=\"$SHIMS:"* | *"PATH=$SHIMS:"*) exit 0 ;;
 esac
 
 # Skip if the shims dir doesn't exist on this host.

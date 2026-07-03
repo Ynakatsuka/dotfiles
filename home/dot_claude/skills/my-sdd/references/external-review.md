@@ -4,15 +4,20 @@
 
 ## 出力先と TTL
 
+一時成果物（プロンプト・生レビュー・完了マーカー）は `/tmp`、採否の記録は spec と同じ場所に永続化する。
+
 ```
 /tmp/sdd-reviews/{feature-name}/
 ├── _prompt.txt    # 共通プロンプト（再実行用）
 ├── codex.md       # codex 生レビュー
-├── decisions.md   # 採否の記録
 └── done           # 完了マーカー（mtime が TTL の基準）
+
+docs/specs/{feature-name}/
+└── decisions.md   # 採否の記録（requirements/design/tasks と並ぶ永続ファイル・コミット対象）
 ```
 
-- `/tmp` 配下のためコミットされない。永続性は OS 依存（macOS は 3 日経過で消去、Linux は再起動で消失）
+- `/tmp` 配下は一時成果物のみ。コミットされず、永続性は OS 依存（macOS は 3 日経過で消去、Linux は再起動で消失）
+- `decisions.md` は後から参照する記録のため `/tmp` に置かない。必ず `docs/specs/{feature-name}/decisions.md` に書く
 - `done` の **mtime + 7 日** が有効期限。期限切れ・OS 都合で消えた場合は次回 `/my-sdd` 起動時に自動再レビュー
 - TTL を変えたい場合は判定の `-mtime -7` を `-mtime -14` 等に変更
 
@@ -121,6 +126,8 @@ codex exec "$(cat /tmp/sdd-reviews/{feature-name}/_prompt.txt)" \
 
 ### decisions.md フォーマット
 
+`docs/specs/{feature-name}/decisions.md` に書く。
+
 ```markdown
 # Phase 1-4 Review Decisions
 
@@ -146,7 +153,7 @@ touch /tmp/sdd-reviews/{feature-name}/done
 
 ## エラー時の対応
 
-Codex review が失敗した場合は Phase 1-4 を **Blocked** とし `done` を作成しない。共通ルール「Codex review を必ず通す」と整合させるため、Phase 2 への進行はユーザーが明示 override（「レビューなしで進める」と発話）した場合のみ許可し、判断を `decisions.md` の `User-confirmed` に「Phase 1-4 skipped per user request on YYYY-MM-DD」として記録する。
+Codex review が失敗した場合は Phase 1-4 を **Blocked** とし `done` を作成しない。共通ルール「Codex review を必ず通す」と整合させるため、Phase 2 への進行はユーザーが明示 override（「レビューなしで進める」と発話）した場合のみ許可し、判断を `docs/specs/{feature-name}/decisions.md` の `User-confirmed` に「Phase 1-4 skipped per user request on YYYY-MM-DD」として記録する。
 
 | 失敗 | 対応 |
 |---|---|

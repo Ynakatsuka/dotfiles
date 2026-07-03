@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Disk cleanup script for macOS and Ubuntu
-# Usage: cleanup.sh [--dry-run] [--category CATEGORY]
+# Usage: cleanup.sh [--dry-run] [--category CATEGORY] [--include-volumes]
 # Categories: docker, brew, apt, pip, npm, yarn, tmp, all
+# --include-volumes: also prune unused Docker volumes (may delete DB data).
 set -euo pipefail
 
 DRY_RUN=false
 CATEGORY="all"
+INCLUDE_VOLUMES=false
 OS_TYPE="$(uname -s)"
+CURRENT_CATEGORY=""
+FAILURES=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,6 +22,10 @@ while [[ $# -gt 0 ]]; do
       CATEGORY="$2"
       shift 2
       ;;
+    --include-volumes)
+      INCLUDE_VOLUMES=true
+      shift
+      ;;
     *)
       echo "Unknown option: $1"
       exit 1
@@ -27,23 +35,22 @@ done
 
 bytes_to_human() {
   local bytes=$1
+  # Use awk for float division so this works without bc installed.
   if ((bytes >= 1073741824)); then
-    printf "%.1f GB" "$(echo "scale=1; $bytes / 1073741824" | bc)"
+    awk -v b="$bytes" 'BEGIN { printf "%.1f GB", b / 1073741824 }'
   elif ((bytes >= 1048576)); then
-    printf "%.1f MB" "$(echo "scale=1; $bytes / 1048576" | bc)"
+    awk -v b="$bytes" 'BEGIN { printf "%.1f MB", b / 1048576 }'
   elif ((bytes >= 1024)); then
-    printf "%.1f KB" "$(echo "scale=1; $bytes / 1024" | bc)"
+    awk -v b="$bytes" 'BEGIN { printf "%.1f KB", b / 1024 }'
   else
     printf "%d B" "$bytes"
   fi
 }
 
 get_disk_available() {
-  if [[ "$OS_TYPE" == "Darwin" ]]; then
-    df -k / | awk 'NR==2 {print $4 * 1024}'
-  else
-    df -k / | awk 'NR==2 {print $4 * 1024}'
-  fi
+  # printf "%d" avoids awk emitting large byte counts in scientific notation,
+  # which would break the integer arithmetic in bytes_to_human.
+  df -k / | awk 'NR==2 {printf "%d", $4 * 1024}'
 }
 
 dir_size_bytes() {
@@ -62,12 +69,61 @@ report_category() {
   printf "  %-25s %s\n" "$name" "$(bytes_to_human "$size")"
 }
 
+# Record a failed step (warn immediately, list again in the final summary).
+record_failure() {
+  local exit_code="$1" description="$2"
+  echo "  [WARN] command failed (exit ${exit_code}): ${description}" >&2
+  FAILURES+=("${CURRENT_CATEGORY:-general}: ${description} (exit ${exit_code})")
+}
+
+# Run a command from its argument vector (no eval, no stderr suppression).
+# On failure, warn and record it, but keep going through remaining steps.
 run_or_dry() {
   if $DRY_RUN; then
     echo "  [dry-run] $*"
-  else
-    eval "$*" 2>/dev/null || true
+    return 0
   fi
+  # Record the failure but return 0 so `set -e` does not abort remaining steps.
+  # The recorded failures drive the final exit code.
+  local rc=0
+  "$@" || rc=$?
+  if ((rc != 0)); then
+    record_failure "$rc" "$*"
+  fi
+  return 0
+}
+
+# Run a command that genuinely needs a shell (pipelines, globs) via bash -c.
+# Same failure handling as run_or_dry. Usage:
+#   run_or_dry_shell <description> <shell_code> [bash_arg ...]
+# Positional bash args are exposed to <shell_code> as $1, $2, ... (the leading
+# _ occupies $0), so paths are passed as data rather than interpolated.
+run_or_dry_shell() {
+  local description="$1"
+  local shell_code="$2"
+  shift 2
+  if $DRY_RUN; then
+    echo "  [dry-run] $description"
+    return 0
+  fi
+  # Record the failure but return 0 so `set -e` does not abort remaining steps.
+  local rc=0
+  bash -c "$shell_code" _ "$@" || rc=$?
+  if ((rc != 0)); then
+    record_failure "$rc" "$description"
+  fi
+  return 0
+}
+
+# Delete the contents of a directory, guarded so an empty/unset path can never
+# expand into a destructive `rm -rf /*`.
+remove_dir_contents() {
+  local dir="$1"
+  if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+    echo "  [skip] not a directory: ${dir:-<empty>}"
+    return 0
+  fi
+  run_or_dry_shell "rm -rf ${dir}/*" 'rm -rf "$1"/*' "$dir"
 }
 
 # ── Docker ──
@@ -83,8 +139,14 @@ cleanup_docker() {
   local before
   before=$(docker system df --format '{{.Reclaimable}}' 2>/dev/null | head -1 || echo "unknown")
   echo "  Docker reclaimable (approx): $before"
-  run_or_dry "docker system prune -af --volumes"
-  run_or_dry "docker builder prune -af"
+  # Volumes often hold data (DBs, etc.); only prune them with explicit opt-in.
+  if $INCLUDE_VOLUMES; then
+    run_or_dry docker system prune -af --volumes
+  else
+    run_or_dry docker system prune -af
+    echo "  (volumes kept; pass --include-volumes to prune them)"
+  fi
+  run_or_dry docker builder prune -af
   echo "  Docker cleanup done"
 }
 
@@ -94,13 +156,19 @@ cleanup_brew() {
     echo "  brew: not installed, skipping"
     return
   fi
-  local cache_dir
-  cache_dir="$(brew --cache 2>/dev/null)"
+  local cache_dir rc=0
+  cache_dir="$(brew --cache)" || rc=$?
+  # Guard: an empty cache_dir would otherwise turn the removal below into a
+  # destructive path expansion. Record the failure instead of proceeding.
+  if [[ -z "$cache_dir" ]]; then
+    record_failure "$rc" "brew --cache returned no cache directory; skipping Homebrew cleanup"
+    return
+  fi
   local size
   size=$(dir_size_bytes "$cache_dir")
   report_category "Homebrew cache" "$size"
-  run_or_dry "brew cleanup --prune=all -s"
-  run_or_dry "rm -rf '$cache_dir'/*"
+  run_or_dry brew cleanup --prune=all -s
+  remove_dir_contents "$cache_dir"
   echo "  Homebrew cleanup done"
 }
 
@@ -113,8 +181,8 @@ cleanup_apt() {
   local size
   size=$(dir_size_bytes "/var/cache/apt/archives")
   report_category "APT cache" "$size"
-  run_or_dry "sudo apt-get clean -y"
-  run_or_dry "sudo apt-get autoremove -y"
+  run_or_dry sudo apt-get clean -y
+  run_or_dry sudo apt-get autoremove -y
   echo "  APT cleanup done"
 }
 
@@ -132,7 +200,7 @@ cleanup_pip() {
     local size
     size=$(dir_size_bytes "$cache_dir")
     report_category "pip cache" "$size"
-    run_or_dry "$pip_cmd cache purge"
+    run_or_dry "$pip_cmd" cache purge
   else
     echo "  pip cache: not found"
   fi
@@ -150,7 +218,7 @@ cleanup_npm() {
   local size
   size=$(dir_size_bytes "$cache_dir")
   report_category "npm cache" "$size"
-  run_or_dry "npm cache clean --force"
+  run_or_dry npm cache clean --force
   echo "  npm cleanup done"
 }
 
@@ -166,7 +234,7 @@ cleanup_yarn() {
     local size
     size=$(dir_size_bytes "$cache_dir")
     report_category "yarn cache" "$size"
-    run_or_dry "yarn cache clean"
+    run_or_dry yarn cache clean
   fi
   echo "  yarn cleanup done"
 }
@@ -188,7 +256,7 @@ cleanup_tmp() {
     if ((size > 0)); then
       report_category "Xcode DerivedData" "$size"
       total=$((total + size))
-      run_or_dry "rm -rf '$xcode_dd'/*"
+      remove_dir_contents "$xcode_dd"
     fi
 
     # System logs
@@ -211,8 +279,11 @@ cleanup_tmp() {
   done < <(find "$HOME" -maxdepth 4 -name "__pycache__" -type d -print0 2>/dev/null)
   if ((pycache_size > 0)); then
     report_category "__pycache__ (depth 4)" "$pycache_size"
-    if ! $DRY_RUN; then
-      find "$HOME" -maxdepth 4 -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+    if $DRY_RUN; then
+      echo "  [dry-run] find \"\$HOME\" -maxdepth 4 -name __pycache__ -type d -exec rm -rf {} +"
+    elif ! find "$HOME" -maxdepth 4 -name "__pycache__" -type d -exec rm -rf {} +; then
+      echo "  [WARN] command failed: remove __pycache__ directories" >&2
+      FAILED_STEPS=$((FAILED_STEPS + 1))
     fi
   fi
 
@@ -225,8 +296,11 @@ cleanup_tmp() {
   done < <(find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -print0 2>/dev/null)
   if ((mypy_size > 0)); then
     report_category ".mypy_cache (depth 4)" "$mypy_size"
-    if ! $DRY_RUN; then
-      find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -exec rm -rf {} + 2>/dev/null || true
+    if $DRY_RUN; then
+      echo "  [dry-run] find \"\$HOME\" -maxdepth 4 -name .mypy_cache -type d -exec rm -rf {} +"
+    elif ! find "$HOME" -maxdepth 4 -name ".mypy_cache" -type d -exec rm -rf {} +; then
+      echo "  [WARN] command failed: remove .mypy_cache directories" >&2
+      FAILED_STEPS=$((FAILED_STEPS + 1))
     fi
   fi
 
@@ -277,3 +351,8 @@ else
   echo "  Space freed:           (negligible or N/A)"
 fi
 echo "========================================="
+
+if ((FAILED_STEPS > 0)); then
+  echo "  $FAILED_STEPS cleanup step(s) failed. See [WARN] lines above." >&2
+  exit 1
+fi

@@ -22,7 +22,7 @@ This reference is read-only for repository behavior. It collects and integrates 
 Use repo-local artifacts. Do not pass `/tmp` diff files to reviewers.
 
 ```bash
-eval "$(bash "${CLAUDE_SKILL_DIR}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"
+eval "$(bash "${CLAUDE_SKILL_DIR:?}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"
 ```
 
 Read `MY_PR_SCOPE_SUMMARY` before launching reviewers. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
@@ -48,7 +48,7 @@ Never stage or commit `.tmp/my-pr/`.
 After preparing review artifacts, capture PR context:
 
 ```bash
-eval "$(bash "${CLAUDE_SKILL_DIR}/scripts/prepare-pr-context.sh)"
+eval "$(bash "${CLAUDE_SKILL_DIR:?}/scripts/prepare-pr-context.sh")"
 ```
 
 Use these generated paths:
@@ -84,7 +84,7 @@ Chunk rules:
 
 1. Group files by subsystem or top-level directory.
 2. Keep each chunk near 2,000-3,000 diff lines when possible.
-3. Generate initial chunk artifacts with `bash "${CLAUDE_SKILL_DIR}/scripts/split-review-chunks.sh" "$BASE_REF"`.
+3. Generate initial chunk artifacts with `bash "${CLAUDE_SKILL_DIR:?}/scripts/split-review-chunks.sh" "$BASE_REF"`.
 4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
 5. Integration must list all chunks for all reviewers and stop if any chunk is missing, failed, or inaccessible.
 

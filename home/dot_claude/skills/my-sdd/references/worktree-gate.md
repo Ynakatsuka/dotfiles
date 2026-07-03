@@ -1,6 +1,6 @@
 # Phase 3-0: Worktree Gate
 
-Phase 3 開始時、保護ブランチ（`main` / `master` / `staging` / `develop` / `release/*` / `hotfix/*`）上にいる場合は worktree を作成して移動してから Phase 3-1 へ進む。パス命名・ベース判定は zsh の `gw` 関数の規約に揃えるが、`gw` には依存せず Bash ツールから git コマンドを直接実行する。
+Phase 3 開始時、保護ブランチ（`main` / `master` / `staging` / `develop` / `production` / `release/*`）上にいる場合は worktree を作成して移動してから Phase 3-1 へ進む。パス命名・ベース判定は zsh の `gw` 関数の規約に揃えるが、`gw` には依存せず Bash ツールから git コマンドを直接実行する。
 
 ## スキップ条件
 
@@ -19,22 +19,24 @@ current_root=$(git rev-parse --show-toplevel)
 current_branch=$(git branch --show-current)
 
 case "$current_branch" in
-  main|master|staging|develop|release/*|hotfix/*) protected=true ;;
+  main|master|staging|develop|production|release/*) protected=true ;;
   *) protected=false ;;
 esac
 
-# ベースブランチ（staging > main）と base ref の解決
-# remote ref があれば origin/<branch>、無ければ local ref。両方無ければ main にフォールバック。
+# ベースブランチと base ref の解決。候補は優先順に
+# origin/staging → origin/main → origin/master のみ。
 if git show-ref --verify --quiet refs/remotes/origin/staging; then
   base_branch=staging; base_ref=origin/staging
-elif git show-ref --verify --quiet refs/heads/staging; then
-  base_branch=staging; base_ref=staging
 elif git show-ref --verify --quiet refs/remotes/origin/main; then
   base_branch=main; base_ref=origin/main
+elif git show-ref --verify --quiet refs/remotes/origin/master; then
+  base_branch=master; base_ref=origin/master
 else
-  base_branch=main; base_ref=main
+  base_branch=""; base_ref=""
 fi
 ```
+
+候補がどれも存在しない（`base_ref` が空の）場合は、推測やローカル ref への代替をせず**停止してユーザーにベースブランチを確認する**。回答が得られるまで worktree 作成へ進まない。
 
 ## ユーザー提示
 

@@ -213,6 +213,22 @@ Start with the resources identified in Step 2. This step may require user input 
 
 ### Step 5: Test and Iterate
 
+#### Validate and package
+
+Before iterating on real usage, validate the skill structure and frontmatter:
+
+```bash
+uv run scripts/quick_validate.py <skill-directory>
+```
+
+`quick_validate.py` checks that `SKILL.md` exists, the YAML frontmatter parses, `name` is kebab-case, `description` is present and within limits, and only allowed frontmatter keys are used. To produce a distributable `.skill` archive (which also runs validation first), run:
+
+```bash
+uv run scripts/package_skill.py <skill-directory> [output-directory]
+```
+
+Skip packaging for skills managed in-repo via chezmoi; use it only when distributing a standalone skill.
+
 #### Testing Checklist
 
 1. **Triggering tests**: Does the skill trigger on obvious tasks? On paraphrased requests? Does it NOT trigger on unrelated topics? (Target: 90% trigger rate on relevant queries)
