@@ -26,7 +26,7 @@ if ! command -v claude >/dev/null 2>&1; then
   exit 0
 fi
 
-{{- $manifest := (include "mcp.json" | fromJson) }}
+{{- $manifest := (include ".chezmoitemplates/mcp.json" | fromJson) }}
 {{- range $name, $cfg := $manifest.mcpServers }}
 
 echo "Reconciling MCP server: {{ $name }}"

@@ -1,0 +1,28 @@
+{{- /*
+Keep this age resolution in sync with .chezmoitemplates/age-command.tmpl.
+The logic is duplicated intentionally: this config template is rendered at
+`chezmoi init` time and must stay self-contained.
+*/ -}}
+{{- $ageCmd := "" -}}
+{{- range $candidate := list "/usr/bin/age" "/usr/local/bin/age" "/opt/homebrew/bin/age" (joinPath .chezmoi.homeDir ".local/bin/age") -}}
+{{-   if and (not $ageCmd) (stat $candidate) -}}
+{{-     $ageCmd = $candidate -}}
+{{-   end -}}
+{{- end -}}
+{{- range $candidate := concat (glob (joinPath .chezmoi.homeDir ".local/share/mise/installs/age/*/bin/age")) (glob (joinPath .chezmoi.homeDir ".local/share/mise/installs/age/*/age/age")) -}}
+{{-   if not $ageCmd -}}
+{{-     $ageCmd = $candidate -}}
+{{-   end -}}
+{{- end -}}
+{{- $pathAge := lookPath "age" -}}
+{{- if and (not $ageCmd) $pathAge (not (contains "mise/shims/age" $pathAge)) -}}
+{{-   $ageCmd = $pathAge -}}
+{{- end -}}
+{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) -}}
+encryption = "age"
+
+[age]
+    identity = "~/.config/chezmoi/key.txt"
+    recipient = "age1w5ek6kq90p7cgs3k4s47ug2lz8p82l5lnac8pckapv45zxyygvnq9ec0pe"
+    command = {{ $ageCmd | quote }}
+{{- end }}

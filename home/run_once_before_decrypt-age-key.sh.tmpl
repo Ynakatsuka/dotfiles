@@ -12,7 +12,10 @@ resolve_age_cmd() {
             return 0
         fi
     done
-    for candidate in "$HOME"/.local/share/mise/installs/age/*/bin/age; do
+    # mise installs age under either <version>/bin/age or <version>/age/age
+    # depending on the backend, so both layouts are checked.
+    for candidate in "$HOME"/.local/share/mise/installs/age/*/bin/age \
+        "$HOME"/.local/share/mise/installs/age/*/age/age; do
         if [ -x "$candidate" ]; then
             printf '%s\n' "$candidate"
             return 0
