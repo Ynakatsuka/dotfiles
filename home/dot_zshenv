@@ -10,6 +10,22 @@ if [[ ( "$SHLVL" -eq 1 && ! -o LOGIN ) && -s "${ZDOTDIR:-$HOME}/.zprofile" ]]; t
   source "${ZDOTDIR:-$HOME}/.zprofile"
 fi
 
+# Locale — set early so all shells (interactive and non-interactive) share the same locale.
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+
+# Static, hardware-independent PATH additions.
+# $HOME/.local/bin: user-installed binaries (pip --user, manual scripts, etc.)
+# Go bin: tools installed via `go install`; GOPATH is also consumed by tools.zsh.
+export GOPATH="$HOME/go"
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+  export PATH="$HOME/.local/bin:$PATH"
+fi
+if [[ ":$PATH:" != *":$GOPATH/bin:"* ]]; then
+  export PATH="$PATH:$GOPATH/bin"
+fi
+
 # Enable mise-managed tools in non-interactive shells (SSH exec, agents, scripts).
 # Shim resolution only, no precmd hook or tool initialization overhead.
 if [[ -d "$HOME/.local/share/mise/shims" ]]; then

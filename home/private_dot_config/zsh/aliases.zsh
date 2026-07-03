@@ -17,6 +17,8 @@ alias reload='exec zsh'
 # docker (fzf-driven helpers — abbreviations live in abbr.zsh)
 alias de='docker exec -it $(docker ps | fzf | awk "{print \$1}") /bin/bash'
 
+# Clear any alias named dce (e.g. from abbr.zsh or prezto) so the function
+# definition below takes precedence. bash has its own dce in dot_bashrc.
 unalias dce 2>/dev/null
 dce() {
   local service

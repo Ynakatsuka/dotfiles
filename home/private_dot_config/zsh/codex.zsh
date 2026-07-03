@@ -171,12 +171,18 @@ _codex_flatten_sync_impl() {
 
 # Default repo sync
 codex-sync() {
-  local guessed_src
+  local git_root guessed_src src
   if git_root=$(git rev-parse --show-toplevel 2>/dev/null); then
     guessed_src="$git_root/.claude/commands"
   fi
-  local fallback_src="/home/claude-code/Documents/src/github.com/Revie0701/insightx/.claude/commands"
-  local src="${1:-${guessed_src:-$fallback_src}}"
+  if [[ -n "$1" ]]; then
+    src="$1"
+  elif [[ -n "$guessed_src" ]]; then
+    src="$guessed_src"
+  else
+    echo "Error: cannot determine source directory: not inside a git repository and no argument given" >&2
+    return 1
+  fi
   local dest="${2:-$HOME/.codex/prompts}"
   _codex_flatten_sync_impl "$src" "$dest"
 }

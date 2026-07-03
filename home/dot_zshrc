@@ -7,13 +7,6 @@ if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
   source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
 fi
 
-#
-# Locale
-#
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-
 # Source modular zsh configuration files
 _zsh_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/zsh"
 if [[ -d "$_zsh_config_dir" ]]; then

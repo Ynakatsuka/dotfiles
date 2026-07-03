@@ -5,14 +5,17 @@
 # cache directory
 [[ -d "$HOME/.zsh/cache" ]] || mkdir -p "$HOME/.zsh/cache"
 
-# cuda
+# CUDA PATH stays here (interactive-only) because it is hardware-dependent:
+# it must be skipped on CPU-only machines and non-interactive shells alike.
 if [ -d "/usr/local/cuda/bin" ]; then
     export PATH="/usr/local/cuda/bin:$PATH"
     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
 fi
 
-# .local
-export PATH="$HOME/.local/bin:$PATH"
+# $HOME/.local/bin and GOPATH/bin are set in dot_zshenv for non-interactive shells.
+# GOPATH is re-exported here so interactive subprocesses pick it up if zshenv
+# was somehow skipped (e.g. nested zsh with --no-rcs).
+export GOPATH="$HOME/go"
 
 # Older mise versions do not support settings.task.run_auto_install.
 if command -v mise > /dev/null 2>&1; then
@@ -41,10 +44,6 @@ fi
 if [[ $(uname -m) == "arm64" ]]; then
   export DOCKER_DEFAULT_PLATFORM=linux/amd64
 fi
-
-# go
-export GOPATH=$HOME/go
-export PATH=$PATH:$GOPATH/bin
 
 # initialize runtime tools
 autoload -Uz add-zsh-hook

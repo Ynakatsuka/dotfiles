@@ -113,11 +113,14 @@ if ! shopt -oq posix; then
 fi
 
 # docker alias
+# NOTE: zsh equivalents live in private_dot_config/zsh/abbr.zsh — update both files together.
 alias dc='docker compose'
 alias dcps='docker compose ps'
 alias dcud='docker compose up -d'
 alias dcudf='docker compose up -d --force-recreate'
 alias dcudb='docker compose up -d --build'
+# Intentional divergence from zsh: bash dce() omits the `unalias dce` guard
+# (no alias to clear in bash) and is otherwise identical to the zsh version.
 dce() {
   local service
   service=$(docker compose ps --services 2>/dev/null | fzf --prompt="Service> " --height=40% --reverse)
@@ -135,6 +138,8 @@ alias gal='gcloud auth application-default login'
 alias gcsp='gcloud config set project'
 
 # claude code
+# Intentional divergence from zsh: zsh cl() injects MCP config and --dangerously-skip-permissions;
+# bash gets a plain alias because the helper function depends on zsh-only syntax.
 alias cl='claude'
 
 # codex
