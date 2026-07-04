@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Shared utility functions for bootstrap modules.
+#
+# Intentionally NO `set -euo pipefail` here: this file is sourced, so those
+# options would leak into and alter the calling script. Each entrypoint sets
+# its own strict mode.
 
 [[ -n "${_COMMON_SH_LOADED:-}" ]] && return 0
 _COMMON_SH_LOADED=1
@@ -54,6 +58,21 @@ require_cmd() {
 
 has_nvidia_gpu() {
   lspci 2>/dev/null | grep -qi nvidia
+}
+
+# Install a CLI via its vendor's install script when not already present.
+# Usage: install_cli_via_script <command> <display name> <script URL>
+install_cli_via_script() {
+  local cmd="$1" name="$2" url="$3"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    log "$name already installed, skipping"
+    return 0
+  fi
+  if ! confirm "Install $name (native installer)?"; then
+    warn "Skipped $name installation"
+    return 0
+  fi
+  run bash -lc '_s=$(mktemp) && curl --fail -fsSL "$1" -o "$_s" && bash "$_s" && rm -f "$_s"' _ "$url"
 }
 
 require_macos() {

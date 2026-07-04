@@ -59,22 +59,8 @@ elif confirm "Install Tailscale? (login needs manual 'tailscale up')"; then
   warn "Run 'sudo tailscale up' manually after installation."
 fi
 
-if command -v claude >/dev/null 2>&1; then
-  log "claude already installed, skipping"
-elif confirm "Install Claude Code (native installer)?"; then
-  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://claude.ai/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
-fi
-
-if command -v antigravity >/dev/null 2>&1; then
-  log "antigravity already installed, skipping"
-elif confirm "Install Antigravity CLI (native installer)?"; then
-  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://antigravity.google/cli/install.sh -o "$_s" && bash "$_s" && rm -f "$_s"'
-fi
-
-if command -v cursor-agent >/dev/null 2>&1; then
-  log "cursor-agent already installed, skipping"
-elif confirm "Install Cursor Agent CLI (native installer)?"; then
-  run bash -lc '_s=$(mktemp) && curl --fail -fsSL https://cursor.com/install -o "$_s" && bash "$_s" && rm -f "$_s"'
-fi
+install_cli_via_script claude "Claude Code" https://claude.ai/install.sh
+install_cli_via_script antigravity "Antigravity CLI" https://antigravity.google/cli/install.sh
+install_cli_via_script cursor-agent "Cursor Agent CLI" https://cursor.com/install
 
 log "CLIs module completed"

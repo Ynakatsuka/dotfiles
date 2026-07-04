@@ -1,0 +1,24 @@
+{{- /*
+Resolve a usable age binary path; output is the path, or empty if not found.
+mise installs age under either <version>/bin/age or <version>/age/age
+depending on the backend, so both layouts are globbed.
+Shared by .chezmoiignore and private_chezmoi.toml.tmpl via includeTemplate.
+.chezmoi.toml.tmpl duplicates this logic intentionally: the config template
+is rendered at `chezmoi init` time and must stay self-contained.
+*/ -}}
+{{- $ageCmd := "" -}}
+{{- range $candidate := list "/usr/bin/age" "/usr/local/bin/age" "/opt/homebrew/bin/age" (joinPath .chezmoi.homeDir ".local/bin/age") -}}
+{{-   if and (not $ageCmd) (stat $candidate) -}}
+{{-     $ageCmd = $candidate -}}
+{{-   end -}}
+{{- end -}}
+{{- range $candidate := concat (glob (joinPath .chezmoi.homeDir ".local/share/mise/installs/age/*/bin/age")) (glob (joinPath .chezmoi.homeDir ".local/share/mise/installs/age/*/age/age")) -}}
+{{-   if not $ageCmd -}}
+{{-     $ageCmd = $candidate -}}
+{{-   end -}}
+{{- end -}}
+{{- $pathAge := lookPath "age" -}}
+{{- if and (not $ageCmd) $pathAge (not (contains "mise/shims/age" $pathAge)) -}}
+{{-   $ageCmd = $pathAge -}}
+{{- end -}}
+{{- $ageCmd -}}

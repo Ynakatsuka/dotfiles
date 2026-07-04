@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[INFO] Configuring Hot Corners (bottom-right → Start Screen Saver)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+. "${SCRIPT_DIR}/../lib/common.sh"
+
+log "Configuring Hot Corners (bottom-right → Start Screen Saver)"
 
 # Values: 0=none, 2=Mission Control, 3=Application windows, 4=Desktop,
 # 5=Start screen saver, 6=Disable screen saver, 7=Dashboard (legacy),
@@ -10,7 +14,7 @@ echo "[INFO] Configuring Hot Corners (bottom-right → Start Screen Saver)"
 defaults write com.apple.dock wvous-br-corner -int 5
 defaults write com.apple.dock wvous-br-modifier -int 0
 
-echo "[INFO] Restarting Dock"
+log "Restarting Dock"
 killall Dock || true
 
-echo "[INFO] Hot Corners configured"
+log "Hot Corners configured"

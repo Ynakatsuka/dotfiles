@@ -23,9 +23,17 @@ require_cmd apt-get
 
 log "Configuring Docker APT repository"
 run sudo install -m 0755 -d /etc/apt/keyrings
-run bash -c 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg'
-run sudo chmod a+r /etc/apt/keyrings/docker.gpg
-run bash -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null'
+if [ -f /etc/apt/keyrings/docker.gpg ]; then
+  log "Docker GPG keyring already present; skipping write"
+else
+  run bash -c 'curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg'
+  run sudo chmod a+r /etc/apt/keyrings/docker.gpg
+fi
+if [ -f /etc/apt/sources.list.d/docker.list ]; then
+  log "Docker sources list already present; skipping write"
+else
+  run bash -c 'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \"$VERSION_CODENAME\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null'
+fi
 run sudo apt-get update -y
 run sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 

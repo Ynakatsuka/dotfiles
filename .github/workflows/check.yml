@@ -1,0 +1,25 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly staleness sweep (Sat 06:00 JST) so rot is caught even
+    # without new commits.
+    - cron: "0 21 * * 5"
+
+jobs:
+  stale-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect stale repo content
+        run: bash scripts/check-stale.sh
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run pre-commit hooks on all files
+        run: pipx run pre-commit run --all-files --show-diff-on-failure

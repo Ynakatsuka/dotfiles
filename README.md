@@ -10,8 +10,18 @@ This repository bootstraps a working shell and development environment for macOS
 - Git workflow: aliases, worktree helpers
 - Terminal tools: `tmux`, `mise`, `direnv`, CLI setup
 - Desktop automation: Hammerspoon window layouts
-- AI tooling: Claude Code / Codex related config
+- AI tooling: Claude Code / Codex / Gemini related config
 - Secrets with encryption: SSH and gcloud config via `age`
+
+## Repository Layout
+
+`.chezmoiroot` points chezmoi at `home/`, so only files under `home/` deploy to `$HOME`:
+
+| Path | Purpose |
+|------|---------|
+| `home/` | Chezmoi source state (deployed to `$HOME`) |
+| `bootstrap/` | Machine setup scripts (repo-only) |
+| `scripts/` | Repo maintenance utilities (repo-only) |
 
 ## Quick Start
 
@@ -179,9 +189,9 @@ The repository stores the `age` private key itself as a passphrase-protected fil
 
 | Source | Deployed To |
 |--------|-------------|
-| `private_dot_ssh/encrypted_private_config.age` | `~/.ssh/config` |
-| `private_dot_config/gcloud/configurations/encrypted_config_*.age` | `~/.config/gcloud/configurations/` |
-| `.age-key.age` | `~/.config/chezmoi/key.txt` |
+| `home/private_dot_ssh/encrypted_private_config.age` | `~/.ssh/config` |
+| `home/private_dot_config/gcloud/configurations/encrypted_config_*.age` | `~/.config/gcloud/configurations/` |
+| `home/.age-key.age` | `~/.config/chezmoi/key.txt` |
 
 ### Add a New Encrypted File
 

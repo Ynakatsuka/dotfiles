@@ -1,0 +1,22 @@
+# Targets listed here are removed from $HOME on `chezmoi apply`.
+# Used to clean up files that were deployed before the .chezmoiroot
+# restructure moved repo-only files out of the chezmoi source state.
+
+# Repo-only files that used to leak into $HOME
+bootstrap
+avgtime_zsh.sh
+mcp.json
+
+# Removed managed files (chezmoi does not clean up targets whose source
+# was deleted, so list them here)
+.claude/rules/writing.md
+
+{{- if ne .chezmoi.os "darwin" }}
+
+# macOS-only configs deployed before OS guards existed.
+# Bare directory names would be suppressed by the matching .chezmoiignore
+# entries, so contents are matched with /** (empty dirs may remain).
+.hammerspoon/**
+.raycast/**
+Library/Application Support/com.mitchellh.ghostty
+{{- end }}

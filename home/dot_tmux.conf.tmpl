@@ -1,0 +1,61 @@
+# setting for mouse mode
+set-option -g mouse on
+set-option -g focus-events on
+set-hook -g client-focus-in 'run-shell "tmux set mouse on"'
+
+# scroll settings for smoother experience
+set-option -g @scroll-speed-num-lines-per-scroll 3
+set-option -g @emulate-scroll-for-no-mouse-alternate-buffer on
+
+# copy mode settings
+# Enable clipboard integration with system clipboard
+set-option -g set-clipboard on
+
+{{ if eq .chezmoi.os "darwin" }}
+# macOS: pipe selections to pbcopy for system clipboard integration.
+# Exit copy mode after selection with mouse
+unbind -T copy-mode-vi MouseDragEnd1Pane
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
+
+# Double click to select word and copy
+bind-key -T copy-mode-vi DoubleClick1Pane select-pane \; send-keys -X select-word \; send-keys -X copy-pipe-and-cancel "pbcopy"
+bind-key -n DoubleClick1Pane select-pane \; copy-mode -M \; send-keys -X select-word \; send-keys -X copy-pipe-and-cancel "pbcopy"
+{{ else }}
+# Linux: use tmux's built-in OSC 52 clipboard support (set-clipboard on, above).
+# copy-selection-and-cancel exits copy mode and lets the terminal forward the
+# selection via OSC 52 without requiring xclip/xsel/pbcopy.
+set -s set-clipboard on
+unbind -T copy-mode-vi MouseDragEnd1Pane
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel
+
+# Double click to select word and copy
+bind-key -T copy-mode-vi DoubleClick1Pane select-pane \; send-keys -X select-word \; send-keys -X copy-selection-and-cancel
+bind-key -n DoubleClick1Pane select-pane \; copy-mode -M \; send-keys -X select-word \; send-keys -X copy-selection-and-cancel
+{{ end }}
+
+# Smooth scrolling with mouse wheel
+set-option -g @scroll-without-changing-pane on
+set-option -g @prevent-scroll-for-fullscreen-alternate-buffer on
+
+# support 256 color in tmux
+set-option -g default-terminal screen-256color
+
+# status line
+set-option -g status-interval 1
+set-option -g status-justify "centre"
+set-option -g status-bg "colour238"
+set-option -g status-fg "colour255"
+set-option -g status-left-length 20
+set-option -g status-left "#[fg=colour255,bg=colour241]Session: #S #[default]"
+set-option -g status-right-length 60
+set-option -g status-right "#[fg=colour255,bg=colour241] #h | LA: #(cut -d' ' -f-3 /proc/loadavg) | %m/%d %H:%M:%S#[default]"
+set-window-option -g window-status-format " #I: #W "
+set-window-option -g window-status-current-format "#[fg=colour255,bg=colour27,bold] #I: #W #[default]"
+
+# plugins
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+set -g @plugin 'nhdaly/tmux-better-mouse-mode'
+
+# Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
+run '~/.tmux/plugins/tpm/tpm'

@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+. "${SCRIPT_DIR}/../lib/common.sh"
+
 SSH_DIR="$HOME/.ssh"
-KEY_FILE="$SSH_DIR/id_rsa"
+KEY_FILE="$SSH_DIR/id_ed25519"
 
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
 
 if [ ! -f "$KEY_FILE" ]; then
-  echo "[INFO] Creating a new SSH key (RSA 4096)"
-  read -r -p "Key comment (e.g., yuki@mac): " comment
+  log "Creating a new SSH key (ed25519)"
+  read -r -p "Key comment (e.g., user@mac): " comment
   comment=${comment:-"$(whoami)@$(hostname)"}
-  ssh-keygen -t rsa -b 4096 -C "$comment" -f "$KEY_FILE" -N ""
+  ssh-keygen -t ed25519 -C "$comment" -f "$KEY_FILE" -N ""
 else
-  echo "[INFO] SSH key already exists: $KEY_FILE"
+  log "SSH key already exists: $KEY_FILE"
 fi
 
-echo "[INFO] Adding key to agent with Keychain support"
+log "Adding key to agent with Keychain support"
 eval "$(/usr/bin/ssh-agent -s)" >/dev/null 2>&1 || true
 ssh-add --apple-use-keychain "$KEY_FILE" || ssh-add -K "$KEY_FILE" || true
 
@@ -27,12 +31,12 @@ if ! grep -q "UseKeychain yes" "$CONFIG_FILE" 2>/dev/null; then
     echo "  AddKeysToAgent yes"
     echo "  IgnoreUnknown UseKeychain"
     echo "  UseKeychain yes"
-    echo "  IdentityFile ~/.ssh/id_rsa"
+    echo "  IdentityFile ~/.ssh/id_ed25519"
   } >>"$CONFIG_FILE"
   chmod 600 "$CONFIG_FILE"
-  echo "[INFO] Appended default SSH config to $CONFIG_FILE"
+  log "Appended default SSH config to $CONFIG_FILE"
 else
-  echo "[INFO] SSH config already contains UseKeychain setting"
+  log "SSH config already contains UseKeychain setting"
 fi
 
-echo "[INFO] To copy your key to a server: brew install ssh-copy-id && ssh-copy-id user@host"
+log "To copy your key to a server: brew install ssh-copy-id && ssh-copy-id user@host"

@@ -1,0 +1,17 @@
+{{- if ne .chezmoi.os "darwin" }}
+# macOS-only configuration
+.hammerspoon
+.raycast
+Library
+{{- end }}
+
+# Python bytecode cache — never deploy
+**/__pycache__
+
+{{- $ageCmd := includeTemplate "age-command.tmpl" . -}}
+{{- if not (and (eq .chezmoi.config.encryption "age") $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt"))) }}
+.ssh/config
+.ssh/config.age
+.config/gcloud/configurations/config_*
+.config/gcloud/configurations/config_*.age
+{{- end }}

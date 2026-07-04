@@ -1,0 +1,11 @@
+{{- $ageCmd := includeTemplate "age-command.tmpl" . -}}
+sourceDir = "{{ .chezmoi.homeDir }}/ghq/github.com/Ynakatsuka/dotfiles"
+{{- if and $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt")) }}
+
+encryption = "age"
+
+[age]
+    identity = "~/.config/chezmoi/key.txt"
+    recipient = "age1w5ek6kq90p7cgs3k4s47ug2lz8p82l5lnac8pckapv45zxyygvnq9ec0pe"
+    command = {{ $ageCmd | quote }}
+{{- end }}

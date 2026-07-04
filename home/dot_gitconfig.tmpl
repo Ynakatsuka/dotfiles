@@ -1,0 +1,35 @@
+[user]
+  name = {{ .git.name }}
+  email = {{ .git.email }}
+[alias]
+  st = status
+  ch = checkout
+  chb = checkout -b
+  ps = push
+  pl = pull
+  ft = fetch
+  cm = commit
+  br = branch
+[color]
+  ui = auto
+  diff = auto
+  grep = auto
+  status = auto
+  branch = auto
+  interactive = auto
+{{- if eq .chezmoi.os "darwin" }}
+[url "git@github.com:"]
+  insteadOf = https://github.com/
+[credential]
+  helper = osxkeychain
+{{- end }}
+[push]
+  # `simple` (git >= 2.0 default) refuses to push when the upstream branch
+  # name differs from the current branch, preventing accidental pushes when a
+  # topic branch was created with an unexpected upstream.
+  default = simple
+[include]
+  # Machine-local settings that must survive `chezmoi apply` (e.g. the
+  # credential helpers written by `gh auth setup-git`). Keep such state in
+  # ~/.gitconfig.local instead of this managed file.
+  path = ~/.gitconfig.local
