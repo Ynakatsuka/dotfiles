@@ -1,3 +1,8 @@
 [settings]
 # Trust user-owned workspaces to avoid blocking non-interactive agents.
 trusted_config_paths = ["~"]
+
+# Let mise authenticate GitHub API requests without calling the mise-managed
+# gh shim. This prevents latest-version resolution from exhausting the
+# unauthenticated GitHub rate limit.
+github.credential_command = "sh -lc 'for gh in \"$HOME\"/.local/share/mise/installs/gh/latest/*/bin/gh \"$HOME\"/.local/share/mise/installs/gh/*/*/bin/gh; do [ -x \"$gh\" ] && exec \"$gh\" auth token; done; exit 1'"
