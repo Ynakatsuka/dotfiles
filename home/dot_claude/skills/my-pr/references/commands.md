@@ -26,8 +26,8 @@ All commands except `verify` must complete these gates before review, simplify, 
 
 1. Resolve the base branch. Do not guess `main`.
 2. Fetch the base branch only into `refs/remotes/origin/$BASE_BRANCH`; never use `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` because it mutates the local protected branch ref without updating a checked-out worktree/index.
-3. Set `BASE_REF="origin/$BASE_BRANCH"` and run `eval "$(bash "${CLAUDE_SKILL_DIR:?}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"`.
-4. Run `eval "$(bash "${CLAUDE_SKILL_DIR:?}/scripts/prepare-pr-context.sh")"` to capture the current PR body and GitHub conversation when an existing PR is attached to the branch.
+3. Set `BASE_REF="origin/$BASE_BRANCH"` and run `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"`.
+4. Run `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/prepare-pr-context.sh")"` to capture the current PR body and GitHub conversation when an existing PR is attached to the branch.
 5. Read `MY_PR_SCOPE_SUMMARY` and `MY_PR_CONTEXT`. Source `MY_PR_ARTIFACT_ENV` if resuming in a new shell.
 6. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
    - `large`: continue only when the user already clearly confirmed the whole current branch/diff is the target PR scope.
