@@ -3,7 +3,7 @@ name: my-refactor
 description: >-
   Scan a codebase for refactoring opportunities, write a SARIF-compatible report, and register
   each finding as a GitHub issue labelled by severity, effort, and Fowler category. After issue
-  creation, users are directed to `/my-sdd <feature-name>` to plan and implement each refactor
+  creation, users are directed to `/my-sdd [feature-name]` to plan and implement each refactor
   (one issue = one spec = one PR).
   Use when the user asks to "リファクタリング候補洗い出し", "技術的負債リスト化", "refactor scan",
   "refactoring issues", or requests surveying a repo for refactor work.

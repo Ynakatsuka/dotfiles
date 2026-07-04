@@ -10,8 +10,8 @@
 #
 # Scope:
 #   - Links every directory under dot_claude/skills/ that ships a SKILL.md.
-#   - Prunes stale user skill directories under ~/.claude/skills/ that are no
-#     longer present in dot_claude/skills/.
+#   - Leaves ~/.claude/skills/ directories untouched unless chezmoi manages
+#     them directly. Unmanaged user skills must not be deleted by this sync.
 #   - Never touches ~/.codex/skills/.system/ (Codex-managed system skills).
 #   - Prunes stale symlinks that previously pointed into ~/.claude/skills/ but
 #     whose source skill no longer exists.
@@ -46,26 +46,17 @@ is_managed_skill() {
   return 1
 }
 
-# Prune stale Claude Code user skill directories. Keep this before linking
-# Codex skills so stale Codex symlinks can be pruned in the next block.
-shopt -s nullglob
-for entry in "${CLAUDE_SKILLS}"/*; do
-  [[ -d "${entry}" ]] || continue
-  [[ -e "${entry}/SKILL.md" ]] || continue
-  name="$(basename "${entry}")"
-  if ! is_managed_skill "${name}"; then
-    echo "Pruning stale Claude skill: ${entry}"
-    rm -rf -- "${entry}"
-  fi
-done
-shopt -u nullglob
-
 for skill in "${skills[@]}"; do
   src="${CLAUDE_SKILLS}/${skill}"
   dst="${CODEX_SKILLS}/${skill}"
   if [[ ! -d "${src}" ]]; then
     echo "Source skill missing, skipping: ${src}" >&2
     continue
+  fi
+  if [[ -e "${dst}" && ! -L "${dst}" ]]; then
+    echo "ERROR: Codex skill destination exists and is not a symlink: ${dst}" >&2
+    echo "Move or delete it manually before re-running chezmoi apply." >&2
+    exit 1
   fi
   ln -sfn "${src}" "${dst}"
   echo "Linked ${dst} -> ${src}"
