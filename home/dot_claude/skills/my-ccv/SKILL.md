@@ -1,18 +1,19 @@
 ---
 name: my-ccv
 description: >-
-  Manage Claude Code Viewer (CCV): register HTML artifacts or schedule jobs via CCV local API.
-  Use when user asks to create dashboards, register artifacts to CCV, manage CCV artifacts,
-  download project files through CCV, schedule CCV jobs, or manage CCV scheduler
-  (e.g., "CCVに登録", "アーティファクト作成", "CCV artifact", "定性評価を登録",
-  "ファイルDL", "CCV download", "スケジュール登録", "定期実行", "CCV schedule").
-  Do NOT use for general HTML creation, static site generation, or Anthropic remote triggers.
-argument-hint: "[artifact [name] | download <path> | schedule [list|create|delete|update]]"
+  Manage Claude Code Viewer (CCV): preview in-progress CCV changes on ccv-preview,
+  register HTML artifacts, download files, or schedule jobs via CCV local API.
+  Use when user asks for CCV preview, ccv-preview, browser visual QA, UI/UX validation,
+  CCV artifacts, CCV file download, or CCV scheduler jobs. Treat preview/プレビュー
+  as the CCV app preview service first; use artifacts only when the user explicitly
+  asks for artifact/dashboard/report HTML. Do NOT use for generic web app previews
+  outside CCV, production deployment, Cloudflare config, or Anthropic remote triggers.
+argument-hint: "[preview [worktree-path] | artifact [name] | download <path> | schedule [list|create|delete|update]]"
 ---
 
 # CCV — Claude Code Viewer Management
 
-CCV (Claude Code Viewer) のアーティファクト登録とリモートエージェントのスケジュール管理を行う統合スキル。
+CCV (Claude Code Viewer) の preview 環境、アーティファクト登録、ファイルダウンロード、リモートエージェントのスケジュール管理を行う統合スキル。
 
 ## CCV Server
 
@@ -26,9 +27,17 @@ BASE_URL="http://localhost:${CCV_PORT:-3434}"
 
 Route based on `$ARGUMENTS`:
 
-1. **`schedule ...`**: → Read `references/schedule.md` and follow the Schedule workflow
-2. **`download ...`** or **`dl ...`**: → Read `references/download.md` and follow the File Download workflow
-3. **`artifact ...`** or **no argument** or **other**: → Artifact workflow (below)
+1. **`preview ...`**, **`ccv-preview ...`**, **`プレビュー ...`**, **`ブラウザ確認 ...`**, **visual/UX QA for CCV**: → Read `references/preview.md` and follow the CCV App Preview workflow
+2. **`schedule ...`**: → Read `references/schedule.md` and follow the Schedule workflow
+3. **`download ...`** or **`dl ...`**: → Read `references/download.md` and follow the File Download workflow
+4. **`artifact ...`** or explicit dashboard/report/HTML artifact creation: → Artifact workflow (below)
+5. **no argument** or **other**: → Artifact workflow (below)
+
+## Preview First Rule
+
+- 「preview」「プレビュー」だけなら、まず CCV app preview service (`ccv-preview`) と解釈する
+- HTML artifact preview と解釈するのは、ユーザーが `artifact`、`dashboard`、`report`、`HTML`、`アーティファクト登録` を明示した場合だけ
+- CCV 以外の一般的な Web アプリ preview には使わない
 
 ---
 
@@ -52,7 +61,7 @@ curl -s "${BASE_URL}/api/projects" | jq .
 
 - **定性評価ダッシュボード**: データの可視化、比較表
 - **レポート**: 分析結果のまとめ
-- **プレビュー**: UI モックアップ
+- **HTML モックアップ**: UI の静的確認用 HTML
 
 HTML の要件:
 - 単一ファイルで完結する（外部リソースへの依存なし）
@@ -91,7 +100,7 @@ rm -f "$CCV_JSON"
 登録成功後、以下を報告する:
 
 1. アーティファクト ID（レスポンスの `id`）
-2. プレビュー URL: `${BASE_URL}/api/projects/{projectId}/artifacts/{artifactId}/html`
+2. HTML 表示 URL: `${BASE_URL}/api/projects/{projectId}/artifacts/{artifactId}/html`
 3. 登録内容の概要
 
 ## Artifact API Reference
