@@ -11,13 +11,22 @@ cleanup() {
   fi
 }
 
-resolve_gh_cmd() {
-  local candidate
+find_github_token_from_gh() {
+  local candidate output
 
-  for candidate in "$HOME"/.local/share/mise/installs/gh/*/bin/gh /usr/bin/gh /usr/local/bin/gh /opt/homebrew/bin/gh "$HOME/.local/bin/gh"; do
+  for candidate in \
+    "$HOME"/.local/share/mise/installs/gh/latest/*/bin/gh \
+    "$HOME"/.local/share/mise/installs/gh/*/*/bin/gh \
+    "$HOME"/.local/share/mise/installs/gh/*/bin/gh \
+    /usr/bin/gh \
+    /usr/local/bin/gh \
+    /opt/homebrew/bin/gh \
+    "$HOME/.local/bin/gh"; do
     if [ -x "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return 0
+      if output="$("$candidate" auth token 2>/dev/null)" && is_github_token "$output"; then
+        printf '%s\n' "$output"
+        return 0
+      fi
     fi
   done
 
@@ -25,18 +34,43 @@ resolve_gh_cmd() {
   case "$candidate" in
     "" | *"/mise/shims/gh") return 1 ;;
     *)
-      printf '%s\n' "$candidate"
-      return 0
+      if output="$("$candidate" auth token 2>/dev/null)" && is_github_token "$output"; then
+        printf '%s\n' "$output"
+        return 0
+      fi
       ;;
   esac
+
+  return 1
+}
+
+is_github_token() {
+  local token="$1"
+
+  [ -n "$token" ] && [[ "$token" != *[!A-Za-z0-9_-]* ]]
+}
+
+resolve_github_token() {
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    if ! is_github_token "$GITHUB_TOKEN"; then
+      echo "[ERROR] GITHUB_TOKEN contains characters that cannot be used in an HTTP Authorization header" >&2
+      return 2
+    fi
+    printf '%s\n' "$GITHUB_TOKEN"
+    return 0
+  fi
+
+  find_github_token_from_gh
 }
 
 main() {
-  local gh_cmd status token
+  local status token
 
-  token="${GITHUB_TOKEN:-}"
-  if [ -z "$token" ] && gh_cmd="$(resolve_gh_cmd)"; then
-    token="$("$gh_cmd" auth token 2>/dev/null || true)"
+  token=""
+  if token="$(resolve_github_token)"; then
+    :
+  elif [ "$?" -eq 2 ]; then
+    return 2
   fi
 
   LOG_FILE="$(mktemp)"

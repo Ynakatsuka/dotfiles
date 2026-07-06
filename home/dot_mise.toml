@@ -150,7 +150,7 @@ chezmoi apply -v
 # Keep mise's global lockfile tracked after upgrades.
 chezmoi add ~/mise.lock
 chezmoi apply -v
-cursor-agent update
+"$(chezmoi source-path ~/.local/bin/dotfiles-cursor-agent-upgrade)"
 if command -v brew >/dev/null 2>&1; then
   "$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
 else

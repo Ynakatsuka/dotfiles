@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Install or upgrade Cursor Agent CLI using the official installer.
+
+set -euo pipefail
+
+INSTALLER=""
+
+cleanup() {
+  if [ -n "$INSTALLER" ]; then
+    rm -f "$INSTALLER"
+  fi
+}
+
+main() {
+  INSTALLER="$(mktemp)"
+  trap cleanup EXIT
+
+  curl --fail --location --silent --show-error https://cursor.com/install -o "$INSTALLER"
+  bash "$INSTALLER"
+}
+
+main "$@"

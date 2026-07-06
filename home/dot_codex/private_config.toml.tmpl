@@ -49,7 +49,7 @@ trust_level = "trusted"
 {{- end }}
 {{- end }}
 {{- end }}
-{{/* Preserve Codex's runtime hook trust state across chezmoi applies. */}}
+{{/* Preserve Codex's runtime hook trust state across chezmoi applies. */ -}}
 {{- $codexConfig := joinPath .chezmoi.homeDir ".codex/config.toml" }}
 {{- if stat $codexConfig }}
 {{- $hookState := trim (output "awk" "BEGIN { in_hooks = 0 } /^\\[hooks\\.state\\]$/ { in_hooks = 1; print; next } in_hooks && /^\\[/ && $0 !~ /^\\[hooks\\.state(\\]|\\.)/ { in_hooks = 0 } in_hooks { print }" $codexConfig) }}
@@ -58,3 +58,6 @@ trust_level = "trusted"
 {{ $hookState -}}
 {{- end }}
 {{- end }}
+
+[projects.{{ .chezmoi.homeDir | quote }}]
+trust_level = "trusted"
