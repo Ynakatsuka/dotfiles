@@ -36,14 +36,15 @@ url = "https://github.com/ast-grep/ast-grep/releases/download/0.44.1/app-aarch64
 url_api = "https://api.github.com/repos/ast-grep/ast-grep/releases/assets/466368358"
 
 [[tools.aws]]
-version = "2.35.15"
+version = "2.35.16"
 backend = "aqua:aws/aws-cli"
 
 [tools.aws."platforms.linux-x64"]
-url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.35.15.zip"
+url = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.35.16.zip"
 
 [tools.aws."platforms.macos-arm64"]
-url = "https://awscli.amazonaws.com/AWSCLIV2-2.35.15.pkg"
+checksum = "blake3:3fd8155d94914db1e7c3f68f58ab914dc6be5062a370d668689c90fe4692ece6"
+url = "https://awscli.amazonaws.com/AWSCLIV2-2.35.16.pkg"
 
 [[tools.bun]]
 version = "1.3.14"
