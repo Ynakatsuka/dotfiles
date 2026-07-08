@@ -112,7 +112,7 @@ chezmoi -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init --apply https://githu
 | `lb` | Select a branch with FZF |
 | `gw` | Create or switch a worktree with FZF, newest first |
 | `gw <branch>` | Open or create a worktree for a branch |
-| `gwai-cmux` | Create an AI-named worktree from cmux and start Claude/Codex |
+| `gwai-cmux` | Create an AI-named cmux tab/worktree from the top cmux tab and start Claude/Codex |
 | `gwc [-j jobs]` | Remove worktrees in parallel with multi-select confirmation |
 | `gwt` | `git worktree` |
 | `gwta` | `git worktree add` |

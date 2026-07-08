@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Open a cmux workspace tab immediately, then create an AI-named git worktree
+# Create an AI-named cmux workspace, then create the matching git worktree
 # inside it and start an agent with the original prompt.
 
 set -euo pipefail
@@ -9,14 +9,15 @@ readonly BRANCH_NAME_MODEL="${GWAI_BRANCH_MODEL:-haiku}"
 
 usage() {
   cat <<'USAGE'
-Usage: gwai-cmux [--provider claude|codex] [--base-dir DIR] <prompt>
+Usage: gwai-cmux [--provider claude|codex] [--base-dir DIR] [--branch-name NAME] <prompt>
 
-Opens a new cmux workspace tab first, then generates a branch name with a
-lightweight Claude model, creates or reuses a worktree via gw-create-worktree,
+Generates a branch name with a lightweight Claude model, opens a cmux workspace
+named after that branch, creates or reuses a worktree via gw-create-worktree,
 and starts cl/cdx with <prompt> as the first message.
 
-If --base-dir is omitted, the current cmux workspace directory is used.
+If --base-dir is omitted, the top cmux workspace directory is used.
 If --provider is omitted, codex is used.
+--branch-name is intended for the handoff into the new cmux workspace.
 USAGE
 }
 
@@ -55,19 +56,33 @@ resolve_script_path() {
   command -v "$script_path" || die "failed to resolve script path: $script_path"
 }
 
-resolve_cmux_base_dir() {
-  local workspace_json base_dir
+resolve_cmux_top_base_dir() {
+  local workspaces_json top_workspace_json base_dir
 
-  workspace_json=$("$CMUX_BIN" --json current-workspace) ||
-    die "failed to read current cmux workspace"
+  workspaces_json=$("$CMUX_BIN" --json workspace list) ||
+    die "failed to read cmux workspace list"
 
-  base_dir=$(printf '%s\n' "$workspace_json" | jq -r '.workspace.current_directory // empty') ||
-    die "failed to parse current cmux workspace"
+  top_workspace_json=$(printf '%s\n' "$workspaces_json" |
+    jq -c '.workspaces | sort_by(.index) | .[0] // empty') ||
+    die "failed to parse cmux workspace list"
+
+  [[ -n "$top_workspace_json" && "$top_workspace_json" != "null" ]] ||
+    die "cmux workspace list is empty"
+
+  base_dir=$(printf '%s\n' "$top_workspace_json" | jq -r '.current_directory // empty') ||
+    die "failed to parse top cmux workspace"
 
   [[ -n "$base_dir" ]] ||
-    die "cmux current workspace did not report current_directory"
+    die "top cmux workspace did not report current_directory"
 
   printf '%s\n' "$base_dir"
+}
+
+validate_branch_name() {
+  local branch_name="$1"
+
+  [[ "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]] ||
+    die "branch name is invalid: $branch_name"
 }
 
 generate_branch_name() {
@@ -106,8 +121,7 @@ Task: ${prompt}"
     die "generated branch slug is invalid: $branch_slug"
 
   branch_name="${branch_type}-${branch_slug}"
-  [[ "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]] ||
-    die "generated branch name is invalid: $branch_name"
+  validate_branch_name "$branch_name"
 
   printf '%s\n' "$branch_name"
 }
@@ -152,13 +166,14 @@ open_cmux_workspace() {
   local provider="$1"
   local base_dir="$2"
   local prompt="$3"
+  local branch_name="$4"
   local script_path command workspace_json workspace_ref
 
   script_path=$(resolve_script_path)
-  command="$(quote_zsh_single_arg "$script_path") --inside-tab --provider $(quote_zsh_single_arg "$provider") --base-dir $(quote_zsh_single_arg "$base_dir") -- $(quote_zsh_single_arg "$prompt")"
+  command="$(quote_zsh_single_arg "$script_path") --inside-tab --provider $(quote_zsh_single_arg "$provider") --base-dir $(quote_zsh_single_arg "$base_dir") --branch-name $(quote_zsh_single_arg "$branch_name") -- $(quote_zsh_single_arg "$prompt")"
 
-  workspace_json=$("$CMUX_BIN" --json new-workspace \
-    --name "gwai-cmux" \
+  workspace_json=$("$CMUX_BIN" --json workspace create \
+    --name "$branch_name" \
     --cwd "$base_dir" \
     --command "$command" \
     --focus true) ||
@@ -193,6 +208,7 @@ start_agent() {
 
 provider="${GWAI_CMUX_PROVIDER:-codex}"
 base_dir=""
+branch_name=""
 inside_tab=0
 prompt_parts=()
 
@@ -216,6 +232,14 @@ while (($# > 0)); do
       ;;
     --base-dir=*)
       base_dir="${1#--base-dir=}"
+      ;;
+    --branch-name)
+      shift
+      (($# > 0)) || die "--branch-name requires a branch name"
+      branch_name="$1"
+      ;;
+    --branch-name=*)
+      branch_name="${1#--branch-name=}"
       ;;
     -h | --help)
       usage
@@ -261,7 +285,7 @@ require_command jq
 
 if [[ -z "$base_dir" && "$inside_tab" -eq 0 ]]; then
   [[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
-  base_dir=$(resolve_cmux_base_dir)
+  base_dir=$(resolve_cmux_top_base_dir)
 fi
 if [[ -z "$base_dir" ]]; then
   base_dir=$(pwd)
@@ -273,18 +297,30 @@ git -C "$base_dir" rev-parse --show-toplevel >/dev/null 2>&1 ||
 
 if [[ "$inside_tab" -eq 0 ]]; then
   [[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
-  workspace_ref=$(open_cmux_workspace "$provider" "$base_dir" "$prompt")
-  printf 'Started setup in cmux workspace %s from %s\n' "$workspace_ref" "$base_dir"
+  if [[ -z "$branch_name" ]]; then
+    require_command claude
+    branch_name=$(generate_branch_name "$prompt")
+  fi
+  validate_branch_name "$branch_name"
+
+  workspace_ref=$(open_cmux_workspace "$provider" "$base_dir" "$prompt" "$branch_name")
+  printf 'Started setup in cmux workspace %s for %s from %s\n' "$workspace_ref" "$branch_name" "$base_dir"
   exit 0
 fi
 
-require_command claude
 require_command gw-create-worktree
+if [[ -z "$branch_name" ]]; then
+  require_command claude
+fi
 
 printf '[gwai-cmux] Provider: %s\n' "$provider"
 printf '[gwai-cmux] Base: %s\n' "$base_dir"
-printf '[gwai-cmux] Generating branch name with claude %s...\n' "$BRANCH_NAME_MODEL"
-branch_name=$(generate_branch_name "$prompt")
+if [[ -z "$branch_name" ]]; then
+  printf '[gwai-cmux] Generating branch name with claude %s...\n' "$BRANCH_NAME_MODEL"
+  branch_name=$(generate_branch_name "$prompt")
+else
+  validate_branch_name "$branch_name"
+fi
 printf '[gwai-cmux] Branch: %s\n' "$branch_name"
 printf '[gwai-cmux] Creating worktree...\n'
 
