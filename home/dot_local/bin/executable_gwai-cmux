@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Create an AI-named cmux workspace, then create the matching git worktree
-# inside it and start an agent with the original prompt.
+# Create a visible cmux tab, then create the matching git worktree inside it
+# and start an agent with the original prompt.
 
 set -euo pipefail
 
@@ -11,13 +11,13 @@ usage() {
   cat <<'USAGE'
 Usage: gwai-cmux [--provider claude|codex] [--base-dir DIR] [--branch-name NAME] <prompt>
 
-Generates a branch name with a lightweight Claude model, opens a cmux workspace
-named after that branch, creates or reuses a worktree via gw-create-worktree,
-and starts cl/cdx with <prompt> as the first message.
+Opens a new cmux terminal tab first, then generates a branch name with a
+lightweight Claude model, creates or reuses a worktree via gw-create-worktree,
+and starts cl/cdx with <prompt> as the first message inside that tab.
 
 If --base-dir is omitted, the top cmux workspace directory is used.
 If --provider is omitted, codex is used.
---branch-name is intended for the handoff into the new cmux workspace.
+--branch-name is intended for the handoff into the new cmux tab.
 USAGE
 }
 
@@ -31,10 +31,8 @@ require_command() {
   command -v "$name" >/dev/null 2>&1 || die "$name not found in PATH"
 }
 
-quote_zsh_single_arg() {
-  local value="$1"
-  value=${value//\'/\'\\\'\'}
-  printf "'%s'" "$value"
+quote_zsh_arg() {
+  printf '%q' "$1"
 }
 
 resolve_script_path() {
@@ -162,30 +160,126 @@ create_worktree() {
   printf '%s\n' "$worktree_dir"
 }
 
-open_cmux_workspace() {
+create_prompt_file() {
+  local prompt="$1"
+  local prompt_file
+
+  prompt_file=$(mktemp "${TMPDIR:-/tmp}/gwai-cmux-prompt.XXXXXX") ||
+    die "failed to create prompt file"
+  chmod 600 "$prompt_file" || {
+    rm -f "$prompt_file"
+    die "failed to secure prompt file: $prompt_file"
+  }
+  printf '%s' "$prompt" >"$prompt_file" || {
+    rm -f "$prompt_file"
+    die "failed to write prompt file: $prompt_file"
+  }
+
+  printf '%s\n' "$prompt_file"
+}
+
+read_prompt_file() {
+  local prompt_file="$1"
+  local file_prompt
+
+  [[ -f "$prompt_file" ]] ||
+    die "prompt file does not exist: $prompt_file"
+  [[ -r "$prompt_file" ]] ||
+    die "prompt file is not readable: $prompt_file"
+
+  file_prompt=$(cat "$prompt_file") ||
+    die "failed to read prompt file: $prompt_file"
+  rm -f "$prompt_file" ||
+    die "failed to remove prompt file: $prompt_file"
+
+  printf '%s' "$file_prompt"
+}
+
+parse_surface_ref() {
+  jq -r '.surface_ref // .surface.ref // .ref // empty'
+}
+
+rename_cmux_tab() {
+  local surface_ref="$1"
+  local title="$2"
+
+  "$CMUX_BIN" rename-tab --surface "$surface_ref" --title "$title" >/dev/null
+}
+
+rename_current_cmux_tab() {
+  local title="$1"
+
+  [[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
+
+  if [[ -n "${CMUX_SURFACE_ID:-}" ]]; then
+    rename_cmux_tab "$CMUX_SURFACE_ID" "$title" ||
+      die "failed to rename current cmux tab: $title"
+  else
+    "$CMUX_BIN" rename-tab --title "$title" >/dev/null ||
+      die "failed to rename current cmux tab: $title"
+  fi
+}
+
+send_command_to_surface() {
+  local surface_ref="$1"
+  local command="$2"
+  local attempt
+
+  for attempt in {1..20}; do
+    if "$CMUX_BIN" send --surface "$surface_ref" "${command}\\r"; then
+      return 0
+    fi
+    printf '[gwai-cmux] Waiting for cmux tab input (%d/20)...\n' "$attempt" >&2
+    sleep 0.2
+  done
+
+  return 1
+}
+
+open_cmux_tab() {
   local provider="$1"
   local base_dir="$2"
-  local prompt="$3"
+  local prompt_file="$3"
   local branch_name="$4"
-  local script_path command workspace_json workspace_ref
+  local script_path command surface_json surface_ref tab_title
 
   script_path=$(resolve_script_path)
-  command="$(quote_zsh_single_arg "$script_path") --inside-tab --provider $(quote_zsh_single_arg "$provider") --base-dir $(quote_zsh_single_arg "$base_dir") --branch-name $(quote_zsh_single_arg "$branch_name") -- $(quote_zsh_single_arg "$prompt")"
+  command="$(quote_zsh_arg "$script_path") --inside-tab --provider $(quote_zsh_arg "$provider") --base-dir $(quote_zsh_arg "$base_dir") --prompt-file $(quote_zsh_arg "$prompt_file")"
+  if [[ -n "$branch_name" ]]; then
+    command+=" --branch-name $(quote_zsh_arg "$branch_name")"
+    tab_title="$branch_name"
+  else
+    tab_title="gwai-cmux setup"
+  fi
 
-  workspace_json=$("$CMUX_BIN" --json workspace create \
-    --name "$branch_name" \
-    --cwd "$base_dir" \
-    --command "$command" \
-    --focus true) ||
-    die "failed to create cmux workspace"
+  surface_json=$("$CMUX_BIN" --json new-surface \
+    --type terminal \
+    --working-directory "$base_dir" \
+    --focus true) || {
+    rm -f "$prompt_file"
+    die "failed to create cmux tab"
+  }
 
-  workspace_ref=$(printf '%s\n' "$workspace_json" | jq -r '.workspace_ref // .workspace.ref // empty') ||
-    die "failed to parse new cmux workspace"
+  surface_ref=$(printf '%s\n' "$surface_json" | parse_surface_ref) || {
+    rm -f "$prompt_file"
+    die "failed to parse new cmux tab"
+  }
 
-  [[ -n "$workspace_ref" ]] ||
-    die "cmux did not report new workspace_ref"
+  [[ -n "$surface_ref" ]] || {
+    rm -f "$prompt_file"
+    die "cmux did not report new surface_ref"
+  }
 
-  printf '%s\n' "$workspace_ref"
+  if ! rename_cmux_tab "$surface_ref" "$tab_title"; then
+    rm -f "$prompt_file"
+    die "failed to name cmux tab"
+  fi
+  if ! send_command_to_surface "$surface_ref" "$command"; then
+    rm -f "$prompt_file"
+    die "failed to start setup in cmux tab"
+  fi
+
+  printf '%s\n' "$surface_ref"
 }
 
 start_agent() {
@@ -202,13 +296,14 @@ start_agent() {
 
   require_command zsh
 
-  command="cd $(quote_zsh_single_arg "$worktree_dir") && ${launcher} $(quote_zsh_single_arg "$prompt")"
+  command="cd $(quote_zsh_arg "$worktree_dir") && ${launcher} $(quote_zsh_arg "$prompt")"
   exec zsh -lic "$command"
 }
 
 provider="${GWAI_CMUX_PROVIDER:-codex}"
 base_dir=""
 branch_name=""
+prompt_file=""
 inside_tab=0
 prompt_parts=()
 
@@ -241,6 +336,14 @@ while (($# > 0)); do
     --branch-name=*)
       branch_name="${1#--branch-name=}"
       ;;
+    --prompt-file)
+      shift
+      (($# > 0)) || die "--prompt-file requires a file path"
+      prompt_file="$1"
+      ;;
+    --prompt-file=*)
+      prompt_file="${1#--prompt-file=}"
+      ;;
     -h | --help)
       usage
       exit 0
@@ -265,8 +368,20 @@ case "$provider" in
   *) die "provider must be claude or codex" ;;
 esac
 
-prompt="${prompt_parts[*]}"
-if [[ ! -t 0 ]]; then
+if [[ -n "$prompt_file" && "${#prompt_parts[@]}" -gt 0 ]]; then
+  die "--prompt-file cannot be combined with prompt arguments"
+fi
+if [[ -n "$prompt_file" && ! -t 0 ]]; then
+  die "--prompt-file cannot be combined with stdin prompt"
+fi
+
+if [[ -n "$prompt_file" ]]; then
+  prompt=$(read_prompt_file "$prompt_file")
+else
+  prompt="${prompt_parts[*]}"
+fi
+
+if [[ -z "$prompt_file" && ! -t 0 ]]; then
   stdin_prompt=$(cat)
   if [[ -n "$stdin_prompt" ]]; then
     if [[ -n "$prompt" ]]; then
@@ -280,11 +395,9 @@ fi
 
 [[ -n "$prompt" ]] || die "prompt is empty"
 
-require_command git
-require_command jq
-
 if [[ -z "$base_dir" && "$inside_tab" -eq 0 ]]; then
   [[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
+  require_command jq
   base_dir=$(resolve_cmux_top_base_dir)
 fi
 if [[ -z "$base_dir" ]]; then
@@ -292,26 +405,26 @@ if [[ -z "$base_dir" ]]; then
 fi
 
 [[ -d "$base_dir" ]] || die "base directory does not exist: $base_dir"
-git -C "$base_dir" rev-parse --show-toplevel >/dev/null 2>&1 ||
-  die "base directory is not in a git repository: $base_dir"
 
 if [[ "$inside_tab" -eq 0 ]]; then
   [[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
-  if [[ -z "$branch_name" ]]; then
-    require_command claude
-    branch_name=$(generate_branch_name "$prompt")
-  fi
-  validate_branch_name "$branch_name"
+  require_command jq
+  [[ -z "$branch_name" ]] || validate_branch_name "$branch_name"
 
-  workspace_ref=$(open_cmux_workspace "$provider" "$base_dir" "$prompt" "$branch_name")
-  printf 'Started setup in cmux workspace %s for %s from %s\n' "$workspace_ref" "$branch_name" "$base_dir"
+  prompt_file=$(create_prompt_file "$prompt")
+  surface_ref=$(open_cmux_tab "$provider" "$base_dir" "$prompt_file" "$branch_name")
+  printf 'Started setup in cmux tab %s from %s\n' "$surface_ref" "$base_dir"
   exit 0
 fi
 
+require_command git
 require_command gw-create-worktree
 if [[ -z "$branch_name" ]]; then
   require_command claude
 fi
+
+git -C "$base_dir" rev-parse --show-toplevel >/dev/null 2>&1 ||
+  die "base directory is not in a git repository: $base_dir"
 
 printf '[gwai-cmux] Provider: %s\n' "$provider"
 printf '[gwai-cmux] Base: %s\n' "$base_dir"
@@ -321,6 +434,7 @@ if [[ -z "$branch_name" ]]; then
 else
   validate_branch_name "$branch_name"
 fi
+rename_current_cmux_tab "$branch_name"
 printf '[gwai-cmux] Branch: %s\n' "$branch_name"
 printf '[gwai-cmux] Creating worktree...\n'
 

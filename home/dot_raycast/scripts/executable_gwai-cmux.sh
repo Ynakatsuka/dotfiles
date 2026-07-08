@@ -11,7 +11,7 @@
 # @raycast.packageName Git
 
 # Documentation:
-# @raycast.description Create an AI-named worktree from the active cmux workspace and start Claude or Codex with the prompt.
+# @raycast.description Open a visible cmux tab, create an AI-named worktree, and start Claude or Codex with the prompt.
 # @raycast.author yuki
 
 set -euo pipefail
