@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Create a visible cmux tab, then create the matching git worktree inside it
-# and start an agent with the original prompt.
+# Create a visible left-sidebar cmux workspace tab, then create the matching
+# git worktree inside it and start an agent with the original prompt.
 
 set -euo pipefail
 
@@ -11,13 +11,14 @@ usage() {
   cat <<'USAGE'
 Usage: gwai-cmux [--provider claude|codex] [--base-dir DIR] [--branch-name NAME] <prompt>
 
-Opens a new cmux terminal tab first, then generates a branch name with a
-lightweight Claude model, creates or reuses a worktree via gw-create-worktree,
-and starts cl/cdx with <prompt> as the first message inside that tab.
+Opens a new cmux workspace tab in the left sidebar first, then generates a
+branch name with a lightweight Claude model, creates or reuses a worktree via
+gw-create-worktree, and starts cl/cdx with <prompt> as the first message inside
+that workspace.
 
 If --base-dir is omitted, the top cmux workspace directory is used.
 If --provider is omitted, codex is used.
---branch-name is intended for the handoff into the new cmux tab.
+--branch-name is intended for the handoff into the new cmux workspace tab.
 USAGE
 }
 
@@ -195,91 +196,119 @@ read_prompt_file() {
   printf '%s' "$file_prompt"
 }
 
-parse_surface_ref() {
-  jq -r '.surface_ref // .surface.ref // .ref // empty'
+parse_workspace_ref() {
+  jq -r '.workspace_ref // .workspace.ref // .ref // empty'
 }
 
-rename_cmux_tab() {
-  local surface_ref="$1"
+resolve_workspace_terminal_surface() {
+  local workspace_ref="$1"
+  local surface_ref
+
+  surface_ref=$("$CMUX_BIN" --json tree --workspace "$workspace_ref" |
+    jq -r '.. | objects | select(.type? == "terminal" and (.ref? | strings | startswith("surface:"))) | .ref' |
+    head -1) ||
+    return 1
+
+  [[ -n "$surface_ref" ]] || return 1
+  printf '%s\n' "$surface_ref"
+}
+
+rename_cmux_workspace() {
+  local workspace_ref="$1"
   local title="$2"
 
-  "$CMUX_BIN" rename-tab --surface "$surface_ref" --title "$title" >/dev/null
+  "$CMUX_BIN" workspace rename "$workspace_ref" --title "$title" >/dev/null
 }
 
-rename_current_cmux_tab() {
+rename_current_cmux_workspace() {
   local title="$1"
+  local workspace_ref="${2:-}"
 
   [[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
 
-  if [[ -n "${CMUX_SURFACE_ID:-}" ]]; then
-    rename_cmux_tab "$CMUX_SURFACE_ID" "$title" ||
-      die "failed to rename current cmux tab: $title"
+  if [[ -n "$workspace_ref" ]]; then
+    rename_cmux_workspace "$workspace_ref" "$title" ||
+      die "failed to rename current cmux workspace tab: $title"
+  elif [[ -n "${CMUX_WORKSPACE_ID:-}" ]]; then
+    rename_cmux_workspace "$CMUX_WORKSPACE_ID" "$title" ||
+      die "failed to rename current cmux workspace tab: $title"
   else
-    "$CMUX_BIN" rename-tab --title "$title" >/dev/null ||
-      die "failed to rename current cmux tab: $title"
+    "$CMUX_BIN" rename-workspace --title "$title" >/dev/null ||
+      die "failed to rename current cmux workspace tab: $title"
   fi
 }
 
 send_command_to_surface() {
-  local surface_ref="$1"
-  local command="$2"
+  local workspace_ref="$1"
+  local surface_ref="$2"
+  local command="$3"
   local attempt
 
   for attempt in {1..20}; do
-    if "$CMUX_BIN" send --surface "$surface_ref" "${command}\\r"; then
+    if "$CMUX_BIN" send --workspace "$workspace_ref" --surface "$surface_ref" "${command}\\r"; then
       return 0
     fi
-    printf '[gwai-cmux] Waiting for cmux tab input (%d/20)...\n' "$attempt" >&2
+    printf '[gwai-cmux] Waiting for cmux workspace input (%d/20)...\n' "$attempt" >&2
     sleep 0.2
   done
 
   return 1
 }
 
-open_cmux_tab() {
+open_cmux_workspace_tab() {
   local provider="$1"
   local base_dir="$2"
   local prompt_file="$3"
   local branch_name="$4"
-  local script_path command surface_json surface_ref tab_title
+  local script_path command workspace_json workspace_ref surface_ref workspace_title attempt
 
   script_path=$(resolve_script_path)
   command="$(quote_zsh_arg "$script_path") --inside-tab --provider $(quote_zsh_arg "$provider") --base-dir $(quote_zsh_arg "$base_dir") --prompt-file $(quote_zsh_arg "$prompt_file")"
   if [[ -n "$branch_name" ]]; then
     command+=" --branch-name $(quote_zsh_arg "$branch_name")"
-    tab_title="$branch_name"
+    workspace_title="$branch_name"
   else
-    tab_title="gwai-cmux setup"
+    workspace_title="gwai-cmux setup"
   fi
 
-  surface_json=$("$CMUX_BIN" --json new-surface \
-    --type terminal \
-    --working-directory "$base_dir" \
+  workspace_json=$("$CMUX_BIN" --json workspace create \
+    --name "$workspace_title" \
+    --cwd "$base_dir" \
     --focus true) || {
     rm -f "$prompt_file"
-    die "failed to create cmux tab"
+    die "failed to create cmux workspace tab"
   }
 
-  surface_ref=$(printf '%s\n' "$surface_json" | parse_surface_ref) || {
+  workspace_ref=$(printf '%s\n' "$workspace_json" | parse_workspace_ref) || {
     rm -f "$prompt_file"
-    die "failed to parse new cmux tab"
+    die "failed to parse new cmux workspace tab"
   }
 
-  [[ -n "$surface_ref" ]] || {
+  [[ -n "$workspace_ref" ]] || {
     rm -f "$prompt_file"
-    die "cmux did not report new surface_ref"
+    die "cmux did not report new workspace_ref"
   }
+  command+=" --workspace-ref $(quote_zsh_arg "$workspace_ref")"
 
-  if ! rename_cmux_tab "$surface_ref" "$tab_title"; then
+  for attempt in {1..20}; do
+    if surface_ref=$(resolve_workspace_terminal_surface "$workspace_ref"); then
+      break
+    fi
+    printf '[gwai-cmux] Waiting for cmux workspace terminal (%d/20)...\n' "$attempt" >&2
+    sleep 0.2
+  done
+
+  if [[ -z "${surface_ref:-}" ]]; then
     rm -f "$prompt_file"
-    die "failed to name cmux tab"
+    die "failed to resolve terminal surface in cmux workspace tab: $workspace_ref"
   fi
-  if ! send_command_to_surface "$surface_ref" "$command"; then
+
+  if ! send_command_to_surface "$workspace_ref" "$surface_ref" "$command"; then
     rm -f "$prompt_file"
-    die "failed to start setup in cmux tab"
+    die "failed to start setup in cmux workspace tab"
   fi
 
-  printf '%s\n' "$surface_ref"
+  printf '%s\n' "$workspace_ref"
 }
 
 start_agent() {
@@ -304,6 +333,7 @@ provider="${GWAI_CMUX_PROVIDER:-codex}"
 base_dir=""
 branch_name=""
 prompt_file=""
+workspace_ref=""
 inside_tab=0
 prompt_parts=()
 
@@ -343,6 +373,14 @@ while (($# > 0)); do
       ;;
     --prompt-file=*)
       prompt_file="${1#--prompt-file=}"
+      ;;
+    --workspace-ref)
+      shift
+      (($# > 0)) || die "--workspace-ref requires a cmux workspace ref"
+      workspace_ref="$1"
+      ;;
+    --workspace-ref=*)
+      workspace_ref="${1#--workspace-ref=}"
       ;;
     -h | --help)
       usage
@@ -412,8 +450,8 @@ if [[ "$inside_tab" -eq 0 ]]; then
   [[ -z "$branch_name" ]] || validate_branch_name "$branch_name"
 
   prompt_file=$(create_prompt_file "$prompt")
-  surface_ref=$(open_cmux_tab "$provider" "$base_dir" "$prompt_file" "$branch_name")
-  printf 'Started setup in cmux tab %s from %s\n' "$surface_ref" "$base_dir"
+  workspace_ref=$(open_cmux_workspace_tab "$provider" "$base_dir" "$prompt_file" "$branch_name")
+  printf 'Started setup in cmux workspace tab %s from %s\n' "$workspace_ref" "$base_dir"
   exit 0
 fi
 
@@ -434,7 +472,7 @@ if [[ -z "$branch_name" ]]; then
 else
   validate_branch_name "$branch_name"
 fi
-rename_current_cmux_tab "$branch_name"
+rename_current_cmux_workspace "$branch_name" "$workspace_ref"
 printf '[gwai-cmux] Branch: %s\n' "$branch_name"
 printf '[gwai-cmux] Creating worktree...\n'
 
