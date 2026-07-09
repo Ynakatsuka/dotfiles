@@ -10,6 +10,8 @@ mcp.json
 # Removed managed files (chezmoi does not clean up targets whose source
 # was deleted, so list them here)
 .claude/rules/writing.md
+.claude/skills/my-guided-tour
+.claude/skills/my-sdd
 
 {{- if ne .chezmoi.os "darwin" }}
 
