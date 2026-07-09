@@ -15,6 +15,12 @@ export LC_ALL=en_US.UTF-8
 export LANG=en_US.UTF-8
 export LANGUAGE=en_US.UTF-8
 
+# cmux writes per-surface CLI shims before .zshrc loads. Keep that generated
+# write compatible with Prezto's later noclobber setting.
+if [[ -n "${CMUX_SHELL_INTEGRATION_DIR:-}" && -n "${CMUX_SURFACE_ID:-}" ]]; then
+  setopt CLOBBER
+fi
+
 # Static, hardware-independent PATH additions.
 # $HOME/.local/bin: user-installed binaries (pip --user, manual scripts, etc.)
 # Go bin: tools installed via `go install`; GOPATH is also consumed by tools.zsh.

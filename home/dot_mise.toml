@@ -85,7 +85,8 @@ gcloud = "latest"
 fzf = "latest"
 
 # eza - Modern replacement for ls
-eza = "latest"
+# asdf-eza's eza 0.23.5 quickinstall asset is currently missing for macOS arm64.
+eza = "0.23.4"
 
 # ghq -
 ghq = "latest"
