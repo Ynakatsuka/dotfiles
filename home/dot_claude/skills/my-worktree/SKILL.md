@@ -7,8 +7,7 @@ description: >-
   user asks to create a new worktree or start work on a new branch in a worktree (e.g. "ワークツリー作って",
   "worktree 作成", "新しい作業ブランチ", "新規ブランチで作業").
   Do NOT use for removing/listing worktrees (use `gwc` / `git worktree list`),
-  for the PR flow (use my-pr — it creates its own worktree on protected branches),
-  or for SDD-driven feature work (use my-sdd — Phase 3-0 has its own worktree gate).
+  or for the PR flow (use my-pr — it creates its own worktree on protected branches).
 argument-hint: "<branch-name>"
 allowed-tools: Bash, Read
 ---
@@ -54,5 +53,4 @@ Surface failures, do not paper over them (per `no_implicit_fallbacks`):
 
 - `gw` (zsh function in `private_dot_config/zsh/git-worktree.zsh`) — interactive sibling that delegates creation to the same helper.
 - **my-pr** — creates its own worktree before committing on a protected branch.
-- **my-sdd** — Phase 3-0 creates a worktree as part of the spec-driven gate.
 - For removing worktrees, use `gwc`; for listing, `git worktree list`.

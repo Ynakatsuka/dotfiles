@@ -3,18 +3,18 @@ name: my-refactor
 description: >-
   Scan a codebase for refactoring opportunities, write a SARIF-compatible report, and register
   each finding as a GitHub issue labelled by severity, effort, and Fowler category. After issue
-  creation, users are directed to `/my-sdd [feature-name]` to plan and implement each refactor
-  (one issue = one spec = one PR).
+  creation, report the created issues and suggested feature names without choosing an implementation
+  workflow.
   Use when the user asks to "リファクタリング候補洗い出し", "技術的負債リスト化", "refactor scan",
   "refactoring issues", or requests surveying a repo for refactor work.
-  Do NOT use for applying refactors (delegate to `/my-sdd`), code review of a specific PR
-  (use `my-pr review`), or for fixing a specific bug.
+  Do NOT use for applying refactors, code review of a specific PR (use `my-pr review`), or for
+  fixing a specific bug.
 argument-hint: "[scan] [path] [--dry-run] [--max=N]"
 ---
 
 # Refactor — 検出と issue 登録
 
-コードベースをスキャンしてリファクタリング候補を検出し、**1候補=1 GitHub issue** として登録する。登録済みの issue は `/my-sdd` で spec 駆動に消化する（1 issue = 1 spec = 1 PR）。
+コードベースをスキャンしてリファクタリング候補を検出し、**1候補=1 GitHub issue** として登録する。登録済み issue の実装ワークフローは、このスキルでは選ばない。
 
 ## サブコマンド
 
@@ -25,7 +25,7 @@ argument-hint: "[scan] [path] [--dry-run] [--max=N]"
 | 省略 or `scan` | scan フロー（Phase S-1 〜 S-5） |
 | その他の文字列 | scan の引数（パス）として扱い、scan を実行 |
 
-issue を消化する apply 相当は **`/my-sdd` に委譲**する。検出〜起票はこのスキル、計画〜実装は SDD スキル、という責務分離。
+issue を消化する apply 相当はこのスキルの対象外。検出〜起票までで止め、計画〜実装の進め方は別途選ぶ。
 
 ---
 
@@ -203,9 +203,9 @@ gh issue create \
 - rate limit 回避のため、作成ごとに `sleep 1` を挟む
 - 作成失敗で以降を中断し、作成済み番号をユーザーに報告する
 
-### 作成後のサマリ（`/my-sdd` への引き継ぎ）
+### 作成後のサマリ
 
-issue を作ったら必ず次の形式で出力し、**ユーザーを `/my-sdd` に誘導する**。実装はこのスキルではなく SDD スキルに任せる。
+issue を作ったら必ず次の形式で出力する。実装はこのスキルでは扱わない。
 
 ```markdown
 # Created N refactor issues
@@ -215,18 +215,10 @@ issue を作ったら必ず次の形式で出力し、**ユーザーを `/my-sdd
 
 SARIF: `.tmp/refactor/findings.sarif.json`
 
-## 次のステップ: `/my-sdd` で消化
+## 次のステップ
 
-各 issue を計画→実装するには、issue ごとに次のコマンドを実行してください:
-
-    /my-sdd refactor-issue-123-extract-auth-header
-
-もしくは自然言語でも OK:
-
-    /my-sdd Issue #123 のリファクタを設計して実装して
-
-SDD は requirements.md / design.md / tasks.md をスペックディレクトリに書き出し、テストファーストで実装します。
-Issue 本文の「提案するアプローチ」「想定リスク」「RefactorFingerprint」をそのまま参照材料にすると効率的です。
+各 issue の実装は、この scan とは別の作業として扱ってください。
+Issue 本文の「提案するアプローチ」「想定リスク」「RefactorFingerprint」を実装時の参照材料にすると効率的です。
 ```
 
 各 issue について、**ケバブケースの feature-name を 1 つ提案する**こと（`refactor-issue-<num>-<short-slug>` 形式）。ユーザーがそのままコピペできる。
@@ -251,4 +243,4 @@ Issue 本文の「提案するアプローチ」「想定リスク」「Refactor
 - すべての issue タイトル・本文は日本語。ラベル・ファイル名は英語
 - `references/catalog.md` を **必ず読んで** category 分類の根拠にする。category/other の濫用を避ける
 - 480 分を超える effort の issue を提示する前に、ユーザーへ分割を提案する
-- このスキルは issue 起票までで止まる。実装フローは `/my-sdd` に委譲する（重複させない）
+- このスキルは issue 起票までで止まる。実装フローは別途選ぶ（重複させない）
