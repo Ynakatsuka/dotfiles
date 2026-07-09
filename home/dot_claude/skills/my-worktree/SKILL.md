@@ -14,6 +14,13 @@ allowed-tools: Bash, Read
 
 # my-worktree
 
+## Repo state at invocation
+
+- Current branch: !`git branch --show-current`
+- Existing worktrees: !`git worktree list`
+
+Use this snapshot only to sanity-check the request (e.g., the branch already has a worktree). The script below remains the authoritative path; always run it.
+
 ## What it does
 
 Runs `bash ~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch>`. The script:

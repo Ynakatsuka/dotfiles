@@ -188,7 +188,8 @@ description: What it does. Use when user asks to [specific phrases].
 - Suggested: author, version, mcp-server
 
 **allowed-tools** (optional):
-- Restrict tool access, e.g., `"Bash(python:*) Bash(npm:*) WebFetch"`
+- Pre-approve tools so they run without permission prompts while the skill is active, e.g., `"Bash(python:*) Bash(npm:*) WebFetch"`
+- Does NOT restrict other tools; use `disallowed-tools` to remove tools from the pool
 
 #### Security Restrictions
 
@@ -200,7 +201,7 @@ Forbidden in frontmatter:
 
 #### Principle of Least Privilege
 
-Use `allowed-tools` in frontmatter to restrict tool access to only what the skill requires:
+`allowed-tools` grants the listed tools without permission prompts while the skill is active. It does not limit which tools are available — permission settings still govern everything not listed. Pre-approve only narrowly-scoped commands the skill actually needs:
 
 ```yaml
 ---
@@ -210,7 +211,7 @@ allowed-tools: "Bash(python:*) Read Write"
 ---
 ```
 
-This prevents the skill from accidentally invoking tools it does not need (e.g., network access, git operations).
+To actively remove tools from Claude's pool while the skill is active (e.g., no `AskUserQuestion` in an autonomous loop), list them in `disallowed-tools`. The restriction clears on the next user message.
 
 #### Isolate Network-Dependent Operations
 

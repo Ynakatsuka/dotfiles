@@ -22,6 +22,7 @@ Consult these based on your needs:
 - **Complete official guide**: See `references/complete-guide.md` for Anthropic's full skill-building guide (fundamentals, planning, testing, distribution, 5 design patterns, troubleshooting)
 - **Workflow patterns**: See `references/workflows.md` for sequential and conditional workflow design
 - **Output patterns**: See `references/output-patterns.md` for template and example patterns
+- **Eval-driven iteration**: See `references/evaluating-skills.md` for the evals.json format, baseline comparison, grading, and the improvement loop
 
 ## Core Principles
 
@@ -67,12 +68,19 @@ argument-hint: "[arg-name]"  # Shown in autocomplete UI (optional)
 | Field | Purpose |
 |---|---|
 | `argument-hint` | Autocomplete hint (e.g., `[url]`, `<issue-number>`, `[create\|review]`) |
-| `disable-model-invocation` | `true` to prevent auto-triggering (manual `/name` only) |
-| `allowed-tools` | Restrict tools (e.g., `Read, Grep, Bash(gh *)`) |
+| `when_to_use` | Extra trigger context appended to `description` in the skill listing. Combined text is truncated at 1,536 chars — put the key use case first |
+| `arguments` | Named positional arguments for `$name` substitution (space-separated string or YAML list; names map to positions in order) |
+| `disable-model-invocation` | `true` to prevent auto-triggering (manual `/name` only). Also removes the description from Claude's context |
+| `user-invocable` | `false` to hide from the `/` menu. For background knowledge only Claude should invoke |
+| `allowed-tools` | Pre-approve listed tools (no permission prompt) while the skill is active. Does NOT restrict other tools |
+| `disallowed-tools` | Remove tools from Claude's available pool while the skill is active (clears on the next user message) |
 | `model` | Model override when skill is active |
 | `effort` | Effort level: `low`, `medium`, `high`, `xhigh`, `max` |
 | `context` | `fork` to run in isolated subagent |
 | `agent` | Subagent type when `context: fork` (e.g., `Explore`, `Plan`) |
+| `paths` | Glob patterns; auto-load the skill only when working with matching files |
+| `hooks` | Hooks scoped to this skill's lifecycle |
+| `shell` | Shell for dynamic injection commands: `bash` (default) or `powershell` |
 | `license` | License identifier (e.g., `MIT`) |
 | `compatibility` | Environment requirements (1-500 chars) |
 | `metadata` | Custom key-value pairs (`author`, `version`, `mcp-server`) |
@@ -84,10 +92,26 @@ Use these variables in skill body to reference user arguments:
 | Variable | Description |
 |---|---|
 | `$ARGUMENTS` | All arguments as a single string |
-| `$0`, `$1`, ... | Individual arguments by index |
+| `$ARGUMENTS[N]`, `$N` | Individual arguments by 0-based index (`$0`, `$1`, ...) |
+| `$name` | Named argument declared in the `arguments` frontmatter field |
 | `${CLAUDE_SKILL_DIR}` | Directory containing SKILL.md |
+| `${CLAUDE_PROJECT_DIR}` | Project root directory (also usable in `allowed-tools` rules) |
+| `${CLAUDE_SESSION_ID}` | Current session ID (logging, session-scoped files) |
+| `${CLAUDE_EFFORT}` | Active effort level (`low` ... `max`) |
 
 If `$ARGUMENTS` is not referenced in the body, arguments are auto-appended as `ARGUMENTS: <value>`.
+
+#### Dynamic context injection
+
+`` !`command` `` runs a shell command BEFORE the skill content reaches Claude; the output replaces the placeholder, so the prompt arrives grounded in live state (git status, current tags, open PRs). For multi-line commands, use a fenced block opened with ` ```! `.
+
+Rules:
+
+- Recognized only at line start or after whitespace (`` KEY=!`cmd` `` stays literal).
+- Commands run on EVERY invocation, including auto-invocation: keep them fast, read-only, and side-effect free.
+- Command failure output is injected as-is — that is desirable (surfaces errors instead of hiding them). Do not wrap commands in `|| echo` fallbacks.
+- Output is not re-scanned for further placeholders.
+- Label injected sections as a snapshot taken at invocation time; skill content stays in context across turns and is not re-rendered.
 
 **Description is the primary triggering mechanism.** Structure: `[What it does] + [When to use it] + [Negative triggers]`
 
@@ -194,7 +218,8 @@ The skill is for another Claude instance to use. Include information that is ben
 - **All "when to use" information goes in the description**, not the body. The body is only loaded after triggering.
 - Be specific and actionable: provide exact commands with parameters, not vague instructions
 - Include error handling for common failure modes
-- Scope permissions minimally: use `allowed-tools` in frontmatter to restrict tool access to only what the skill needs
+- Pre-approve narrowly: `allowed-tools` grants the listed tools without permission prompts — it does not restrict anything. List only safe, narrowly-scoped commands (e.g., `Bash(git status *)`, not `Bash(*)`). To remove tools while the skill is active, use `disallowed-tools`
+- Write standing instructions, not one-time steps: skill content stays in context for the rest of the session and is not re-read on later turns
 - Separate network-dependent operations: isolate steps that require network access (API calls, package installs) from steps that perform local file operations, so failures in one do not cascade
 - Reference bundled resources clearly with paths and context for when to read them
 
@@ -229,14 +254,18 @@ uv run scripts/package_skill.py <skill-directory> [output-directory]
 
 Skip packaging for skills managed in-repo via chezmoi; use it only when distributing a standalone skill.
 
+#### Eval-driven iteration
+
+For skills worth maintaining, author test cases in `evals/evals.json` inside the skill directory and run each prompt twice in fresh subagent contexts — once with the skill, once without (or against the previous version). Grade assertions with evidence, aggregate pass rate / tokens / time, and feed failures back into the skill. See `references/evaluating-skills.md` for the file format, workspace layout, grading rules, and the full loop.
+
 #### Testing Checklist
 
 1. **Triggering tests**: Does the skill trigger on obvious tasks? On paraphrased requests? Does it NOT trigger on unrelated topics? (Target: 90% trigger rate on relevant queries)
 2. **Functional tests**: Are outputs correct? Do scripts work? Are edge cases handled?
-3. **Performance comparison**: Measure concrete metrics with vs. without the skill:
-   - Token consumption (target: 30-50% reduction)
+3. **Performance comparison**: Run the eval loop above and compare with-skill vs without-skill:
+   - Assertion pass rate (the delta is what the skill buys)
+   - Token consumption and duration (what the skill costs)
    - API/tool call failure rate (target: 0 failures)
-   - End-to-end task completion rate
    - Number of user interventions required
 
 Debugging trigger issues: Ask Claude "When would you use the [skill name] skill?" — Claude will quote the description back. Adjust based on what's missing.

@@ -19,6 +19,14 @@ argument-hint: "[create|review|fix|simplify|verify]"
 
 PR 作成を安全に進めるため、ブランチ準備、簡素化、レビュー、修正、PR作成、PR後検証を明確に分ける。
 
+## リポジトリ状態(呼び出し時点のスナップショット)
+
+```!
+git status --short --branch
+```
+
+このスナップショットはモード判定と Safety gate の初期判断にのみ使う。以後の各ステップでは、規定のコマンド・スクリプトで取得する最新状態を正とする。
+
 ## 0. モード判定
 
 `$ARGUMENTS` の先頭を確認し、`references/commands.md` を読んで実行パスを決める。

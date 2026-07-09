@@ -13,11 +13,17 @@ argument-hint: "[patch|minor|major|<version>]"
 
 マージ済み PR とコミット履歴からリリースノートを生成する。
 
+## リリース状態(呼び出し時点のスナップショット)
+
+- 最後の公開リリースタグ: !`gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName'`
+- 直近のタグ: !`git tag --sort=-creatordate | head -n 5`
+
 ## 手順1: 情報収集
 
+上記スナップショットの「最後の公開リリースタグ」を `LAST_TAG` として使う。注入値がエラー出力(gh 未認証、リポジトリ外など)の場合は、そのエラーを報告して停止する。
+
 ```bash
-# Get last release tag (published releases only)
-LAST_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName')
+LAST_TAG=vX.Y.Z  # Set to the injected tag value above
 ```
 
 `LAST_TAG` が空（公開済みリリースが存在しない）の場合は**ここで停止し、初回リリースの対象範囲（開始 commit / tag、または「全履歴」）をユーザーに確認する**。空の `LAST_TAG` のまま `git log ${LAST_TAG}..HEAD` を実行してはならない（`..HEAD` が空 range に化けて変更ゼロと誤認する）。
