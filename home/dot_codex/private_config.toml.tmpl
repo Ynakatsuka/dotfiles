@@ -2,7 +2,7 @@ hide_agent_reasoning = true
 network_access = true
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
 service_tier = "default"
 suppress_unstable_features_warning = true
@@ -38,7 +38,7 @@ status_line = [
 # Suppress model-availability NUX banners by pinning shown_count to the
 # MAX_SHOW_COUNT (4) defined in codex-rs/tui/src/app/startup_prompts.rs.
 [tui.model_availability_nux]
-"gpt-5.5" = 4
+"gpt-5.6-sol" = 4
 
 {{- if lookPath "ghq" }}
 {{- range $repo := (splitList "\n" (trim (output "ghq" "list" "-p"))) }}
