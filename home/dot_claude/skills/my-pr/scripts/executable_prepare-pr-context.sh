@@ -143,9 +143,11 @@ fi
 
 artifact_env="${MY_PR_ARTIFACT_ENV:-$MY_PR_ARTIFACT_DIR/artifact.env}"
 context_env="$MY_PR_ARTIFACT_DIR/pr-context.env"
+context_bytes=$(wc -c <"$context_md" | tr -d ' ')
 {
   printf 'export MY_PR_CONTEXT=%q\n' "$context_md"
   printf 'export MY_PR_CONTEXT_STATE=%q\n' "$context_state"
+  printf 'export MY_PR_CONTEXT_BYTES=%q\n' "$context_bytes"
   printf 'export MY_PR_METADATA=%q\n' "$metadata_json"
   printf 'export MY_PR_ISSUE_COMMENTS=%q\n' "$issue_comments_json"
   printf 'export MY_PR_REVIEWS=%q\n' "$reviews_json"

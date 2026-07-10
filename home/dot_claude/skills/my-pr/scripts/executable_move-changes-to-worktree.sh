@@ -56,7 +56,10 @@ elif [[ -n "${MY_PR_PATHS:-}" ]]; then
   # shellcheck disable=SC2086
   printf '%s\n' $MY_PR_PATHS >"$pathspec_list"
 fi
-mapfile -t pathspecs <"$pathspec_list"
+pathspecs=()
+while IFS= read -r pathspec || [[ -n "$pathspec" ]]; do
+  [[ -n "$pathspec" ]] && pathspecs+=("$pathspec")
+done <"$pathspec_list"
 
 # Only append the `--` separator and pathspecs when at least one pathspec is
 # present. An empty array would otherwise leave a bare trailing `--`.
@@ -112,7 +115,10 @@ if [[ -s "$unstaged_patch" ]]; then
 fi
 
 if [[ -s "$intent_to_add_list" ]]; then
-  mapfile -t intent_to_add_files <"$intent_to_add_list"
+  intent_to_add_files=()
+  while IFS= read -r file_path || [[ -n "$file_path" ]]; do
+    [[ -n "$file_path" ]] && intent_to_add_files+=("$file_path")
+  done <"$intent_to_add_list"
   git -C "$worktree_dir" add -N -- "${intent_to_add_files[@]}"
 fi
 

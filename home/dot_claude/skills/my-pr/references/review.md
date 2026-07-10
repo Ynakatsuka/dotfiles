@@ -37,6 +37,7 @@ Use these generated paths:
 MY_PR_ARTIFACT_DIR=<repo-local artifact dir>
 MY_PR_ARTIFACT_ENV=<artifact dir>/artifact.env
 MY_PR_REVIEW_DIFF=<artifact dir>/review.diff
+MY_PR_REVIEW_BYTES=<review diff bytes>
 MY_PR_CHANGED_FILES=<artifact dir>/changed-files.txt
 MY_PR_SCOPE_SUMMARY=<artifact dir>/scope-summary.txt
 ```
@@ -56,6 +57,7 @@ Use these generated paths:
 ```text
 MY_PR_CONTEXT=<artifact dir>/pr-context.md
 MY_PR_CONTEXT_STATE=found|no_existing_pr
+MY_PR_CONTEXT_BYTES=<PR context bytes>
 MY_PR_METADATA=<artifact dir>/pr-metadata.json
 MY_PR_ISSUE_COMMENTS=<artifact dir>/pr-issue-comments.json
 MY_PR_REVIEWS=<artifact dir>/pr-reviews.json
@@ -73,9 +75,10 @@ If `MY_PR_CONTEXT_STATE=no_existing_pr`, state that no PR body or prior GitHub c
 
 ## Large diff chunking
 
-Use the full `MY_PR_REVIEW_DIFF` by default. Split Reviewer A, Reviewer B, and Reviewer C by file groups or top-level domains only when any condition is true:
+Use the full `MY_PR_REVIEW_DIFF` by default. Split Reviewer A, Reviewer B, and Reviewer C by file groups or top-level domains when any condition is true:
 
 - review diff lines > 10,000
+- review diff bytes > 98,304
 - a single reviewer cannot read the full artifact within tool limits
 
 Changed file count alone is not enough to chunk. Prefer one full-diff review when the artifact is readable within limits.
@@ -83,16 +86,44 @@ Changed file count alone is not enough to chunk. Prefer one full-diff review whe
 Chunk rules:
 
 1. Group files by subsystem or top-level directory.
-2. Keep each chunk near 2,000-3,000 diff lines when possible.
-3. Generate initial chunk artifacts with `bash "${MY_PR_SKILL_DIR:?}/scripts/split-review-chunks.sh" "$BASE_REF"`.
+2. Keep each chunk at or below 98,304 bytes. Line count is not a safety bound because Markdown and generated content can contain long lines.
+3. Generate chunk artifacts with `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/split-review-chunks.sh" "$BASE_REF")"`. The script packs complete file diffs, verifies file coverage, and is compatible with macOS Bash 3.2.
 4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
 5. Integration must list all chunks for all reviewers and stop if any chunk is missing, failed, or inaccessible.
 
-If a generated chunk is still too large, split its `files.txt` into smaller subsystem-specific file lists and create additional chunk artifacts under `MY_PR_ARTIFACT_DIR/chunks/`.
+For a chunked run, tell each reviewer to review only the supplied `Files covered` as its assigned portion of the full PR. Do not ask one chunk to claim full-diff coverage. Integration establishes full coverage from the manifest and all completed chunk results.
+
+If one file diff exceeds the byte limit or a generated Codex prompt exceeds 196,608 bytes, stop before launching reviewers. Do not split in the middle of a file or silently raise the limit.
 
 For small diffs, use the single `MY_PR_REVIEW_DIFF`.
 
 Reviewer A chunks run integrated simplify in `review` mode with the simplify performance profile from `references/simplify/overview.md`. Include `MY_PR_CONTEXT` in the simplify prompt when it exists, so simplify also understands the PR's stated problem and prior discussion before proposing changes. Each Reviewer A run or chunk reports at most 5 Required and at most 5 Recommended findings. Integration deduplicates simplify findings across chunks.
+
+## Codex review input integrity
+
+Reviewer A and Reviewer C must use `scripts/run-codex-review.sh`. Do not pass artifact paths to Codex and ask Codex to read them with `cat`, `sed`, `Read`, or another tool.
+
+The runner:
+
+- embeds the complete PR context and assigned diff directly into Codex stdin
+- caps the generated prompt at 196,608 bytes before launch
+- runs from an isolated artifact-local Git repository instead of the review target repository
+- disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox
+- stores stdout/stderr under `MY_PR_ARTIFACT_DIR` instead of streaming token-heavy output to the parent tool
+- requires JSON Schema output with matching SHA-256 receipts and an unpredictable nonce disclosed only after the final diff boundary
+- exits non-zero on missing input, oversized prompt, Codex failure, incomplete status, or receipt mismatch
+
+Write the role-specific prompt under `MY_PR_ARTIFACT_DIR`, then invoke one runner process per assigned chunk:
+
+```bash
+bash "${MY_PR_SKILL_DIR:?}/scripts/run-codex-review.sh" \
+  reviewer-a "$CHUNK_ID" "$CHUNK_COUNT" "$REVIEWER_A_PROMPT" "$MY_PR_CONTEXT" "$CHUNK_DIFF"
+
+bash "${MY_PR_SKILL_DIR:?}/scripts/run-codex-review.sh" \
+  reviewer-c "$CHUNK_ID" "$CHUNK_COUNT" "$REVIEWER_C_PROMPT" "$MY_PR_CONTEXT" "$CHUNK_DIFF"
+```
+
+Use the emitted `MY_PR_CODEX_REVIEW_MARKDOWN` file as reviewer output. Never use a partial stdout/stderr log as review output. Do not retry a failed chunk or switch executors unless the user explicitly approves it.
 
 ## Review focus checklist
 
@@ -119,14 +150,16 @@ BRANCH=<current branch>
 BASE_BRANCH=<default branch>
 BASE_REF=origin/<default branch>
 MY_PR_REVIEW_DIFF=<repo-local full review diff from prepare-review-artifacts.sh>
+MY_PR_REVIEW_BYTES=<review diff bytes>
 MY_PR_CHANGED_FILES=<repo-local changed files list from prepare-review-artifacts.sh>
 MY_PR_SCOPE_SUMMARY=<repo-local scope summary from prepare-review-artifacts.sh>
 MY_PR_ARTIFACT_ENV=<sourceable env file for resuming the same artifact paths>
 MY_PR_CONTEXT=<repo-local PR context from prepare-pr-context.sh>
 MY_PR_CONTEXT_STATE=found|no_existing_pr
+MY_PR_CONTEXT_BYTES=<PR context bytes>
 ```
 
-Launch Reviewer A, Reviewer B, and Reviewer C concurrently. Do not run them sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all reviewer and chunk results before integration.
+Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all reviewer and chunk results before integration.
 
 Reviewer B is host-aware:
 
@@ -139,11 +172,11 @@ Reviewer B is host-aware:
 
 ## Reviewer A: integrated simplify review
 
-Read `references/simplify/overview.md`. Run integrated simplify in `review` mode against `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Use the simplify performance profile: Codex CLI with `model_reasoning_effort="medium"` and capped findings. Do not use `/my-agent codex` for Reviewer A unless the user explicitly requests the global Codex default, because `/my-agent` intentionally preserves the global effort setting.
+Read `references/simplify/overview.md`. Write its review-mode prompt to `MY_PR_ARTIFACT_DIR`, then run `scripts/run-codex-review.sh reviewer-a` against `MY_PR_REVIEW_DIFF` or each assigned chunk. The runner applies `model_reasoning_effort="medium"`, embeds the complete inputs, disables nested delegation, and validates the receipt. Do not invoke Codex directly for Reviewer A.
 
 If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
 
-Pass the PR context artifact path in the prompt. Reviewer A must read it before the diff when it exists, and must not propose simplifications that conflict with the PR's stated problem, constraints, or resolved discussion.
+The runner embeds the PR context before the diff. Reviewer A must use that embedded context and must not propose simplifications that conflict with the PR's stated problem, constraints, or resolved discussion.
 
 Keep its output categories as-is:
 
@@ -173,8 +206,9 @@ PR context artifact:
 </context>
 
 <scope>
-Review the full branch diff against the base branch. Do not review only the latest simplify changes.
-Use the review diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
+Review the supplied full branch diff or assigned chunk against the base branch. Do not review only the latest simplify changes.
+For an assigned chunk, report findings only for `Files covered`; do not claim coverage of `Files not covered`.
+Use the review diff artifact as the source of truth. If you cannot read it completely, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
 Read the PR context artifact before the diff. You are seeing this PR for the first time, so first identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
 Focus on:
 1. Approach fit: whether the current implementation is a sound way to solve the stated PR problem, whether it leaves the problem partly unsolved, violates explicit constraints, bypasses the intended architecture, or ignores a simpler, safer, or already-existing implementation path
@@ -230,7 +264,7 @@ Report every plausible issue you find, including low-severity or uncertain findi
    - Verification: test or command that should catch this
 
 ## Non-findings
-- Optional: notable risks inspected but not reported, with reason.
+- Notable risks inspected but not reported, with reason. Use `- none` when there are none.
 
 ## Assessment
 
@@ -244,19 +278,20 @@ If the Claude Agent or CLI exits non-zero, lacks quota or authentication, cannot
 
 ## Reviewer C: Codex correctness review
 
-Use the repo-local `MY_PR_REVIEW_DIFF`. Do not create `/tmp` diff files.
+Use the repo-local `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Do not create `/tmp` diff files.
 
-Run `/my-agent codex` with this prompt:
+Write the following prompt under `MY_PR_ARTIFACT_DIR`, then run it with `scripts/run-codex-review.sh reviewer-c`. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
 
 ```text
-Review the diff in <MY_PR_REVIEW_DIFF> as a senior software engineer.
+Review the supplied diff as a senior software engineer.
 
-Before reviewing code, read the PR context in <MY_PR_CONTEXT>. You are seeing this PR for the first time, so identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
+Before reviewing code, read the supplied PR context. You are seeing this PR for the first time, so identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
 
 Scope:
-- Review the full branch diff against <BASE_BRANCH>.
-- Use the diff artifact as the source of truth. If you cannot read it, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
-- Use the PR context artifact as the source of truth for PR body and prior GitHub conversation. If it cannot be read, return REVIEW_INCOMPLETE.
+- Review the supplied full diff, or the supplied assigned chunk, against <BASE_BRANCH>.
+- For an assigned chunk, report findings only for `Files covered`; treat `Files not covered` as explicit scope metadata for integration.
+- Use the embedded diff as the source of truth. If it is incomplete, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
+- Use the embedded PR context as the source of truth for PR body and prior GitHub conversation. If it is incomplete, return REVIEW_INCOMPLETE.
 - Cross-check the implementation against the PR intent. Report mismatches between the stated goal and the diff as findings.
 - Assess whether the chosen approach is a sound way to solve the stated PR problem. Report when it leaves the problem partly unsolved, violates explicit constraints, bypasses the intended architecture, or ignores a simpler, safer, or already-existing implementation path.
 - Focus on correctness bugs, edge cases, data loss, race conditions, and error semantics.
@@ -271,6 +306,7 @@ Scope:
 - Do not report code quality, duplication, naming style, formatting, or efficiency issues; integrated simplify handles those separately.
 - Do not report issues already enforced by CI, generated files, lockfiles, vendored dependencies, snapshots, or preference-only nits unless the diff creates a concrete correctness or security risk.
 - Do not edit or write files anywhere. Do not create notes under .plans, .tmp, or /tmp.
+- Do not call tools, run shell commands, read repository files, delegate, or spawn subagents. All review inputs are embedded in the prompt.
 
 Finding policy:
 - Report every plausible issue you find, including low-severity or uncertain findings.
@@ -310,7 +346,7 @@ Output exactly this structure:
 **Reasoning:** One or two technical sentences.
 ```
 
-If Codex exits non-zero, lacks quota, cannot read the diff, or returns incomplete output, stop before integration. Do not replace Codex with Claude/local review without explicit user approval.
+If the runner exits non-zero, Codex lacks quota, the generated prompt is oversized, the receipt does not match, or Codex returns incomplete output, stop before integration. Do not replace Codex with Claude/local review without explicit user approval.
 
 ## Background execution rule
 

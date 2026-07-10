@@ -4,13 +4,15 @@ Use this reference from `my-pr` when running the `simplify` subcommand, `create`
 
 ## Executor
 
-Default executor is Codex CLI with the simplify performance profile. Do not override the model; only lower reasoning effort for simplify:
+Default apply-mode executor is Codex CLI with the simplify performance profile. Do not override the model; only lower reasoning effort for simplify:
 
 ```bash
 codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
 ```
 
 Use the global Codex default effort only when the user explicitly asks for a full-effort simplify run. Use Claude/local execution only when the user explicitly asks for it.
+
+For `my-pr` review mode, do not invoke Codex directly. Write this reference's review prompt under `MY_PR_ARTIFACT_DIR` and use `scripts/run-codex-review.sh reviewer-a`; the runner embeds context and diff through stdin, applies medium effort, disables nested delegation, and verifies complete-input receipts.
 
 Do not silently switch from Codex to Claude if Codex fails or rejects the config override. Report the failure and stop.
 
@@ -27,18 +29,18 @@ Do not silently switch from Codex to Claude if Codex fails or rejects the config
 - Keep the configured Codex model. Do not pass `--model` unless the user explicitly requests one.
 - For each run or chunk, report at most 5 Required and at most 5 Recommended findings.
 - Prioritize high-confidence, behavior-preserving simplifications with clear maintenance value.
-- For very large diffs that meet the chunking conditions in `references/review.md`, run simplify per chunk. Otherwise prefer one full-diff simplify run.
+- For diffs that meet the line or byte chunking conditions in `references/review.md`, run simplify per file-boundary chunk. Otherwise prefer one full-diff simplify run.
 - Avoid broad repository exploration. Read nearby docs, ADRs, specs, or tests only when design intent is unclear.
 
 ## Scope
 
 Target only files changed in the current conversation or current PR diff. Do not touch unrelated staged, unstaged, or untracked files.
 
-When invoked from `my-pr`, use the repo-local `MY_PR_REVIEW_DIFF` artifact from `prepare-review-artifacts.sh`. Do not use `/tmp` diff files. If the artifact cannot be read, stop and report the failure instead of reviewing current file state as a substitute.
+When invoked from `my-pr`, use the repo-local `MY_PR_REVIEW_DIFF` artifact from `prepare-review-artifacts.sh`. Do not use `/tmp` diff files. In review mode, the runner embeds that artifact directly; do not ask Codex to read it with tools. If the artifact cannot be embedded and receipt-validated, stop instead of reviewing current file state as a substitute.
 
-When invoked from `my-pr` and `MY_PR_CONTEXT` is provided, read that repo-local PR context artifact before reviewing the diff. Use it to understand the PR's stated problem, intended behavior, explicit constraints, and resolved discussion. Do not propose simplifications that conflict with that intent.
+When invoked from `my-pr` in review mode, read the PR context embedded by the runner before the diff. In apply mode, read `MY_PR_CONTEXT` when provided. Use the context to understand the PR's stated problem, intended behavior, explicit constraints, and resolved discussion. Do not propose simplifications that conflict with that intent.
 
-Before analysis, inspect:
+In apply mode, before analysis, inspect:
 
 ```bash
 git status --short
@@ -48,7 +50,7 @@ git diff --cached --stat
 git diff --cached --name-only
 ```
 
-If design intent is unclear, read the nearest README, AGENTS.md, CLAUDE.md, ADR, spec, and tests before proposing or applying a simplification.
+In apply mode, if design intent is unclear, read the nearest README, AGENTS.md, CLAUDE.md, ADR, spec, and tests before proposing or applying a simplification. In review mode, use only the embedded PR context and diff; report missing intent instead of calling tools.
 
 ## Language-specific references
 
@@ -130,13 +132,15 @@ Follow these constraints:
 - Return at most 5 Required and at most 5 Recommended findings per run or chunk. Prioritize high-confidence, behavior-preserving simplifications.
 - For each Required and Recommended finding, include Severity (`critical`, `high`, `medium`, or `low`) and Confidence (`high`, `medium`, or `low`), then use 3-5 concise lines that state the problem, why it matters or needs approval, the ideal state, and the concrete change direction.
 - In review mode, do not edit or write files anywhere, including .plans, .tmp, or /tmp.
+- In review mode, do not call tools, read repository files, delegate, or spawn subagents. Use only the context and diff embedded by the runner.
 - In apply mode, apply only Required behavior-preserving simplifications. Do not apply Recommended changes.
 - Do not add fallbacks, default substitutions, broad catches, silent retries, mocks, or stub continuations.
 - Respect AGENTS.md, CLAUDE.md, ADRs, specs, nearby tests, and project conventions.
-- Run targeted verification from documented project commands. If no documented command exists, report it as unverified instead of inventing one.
+- In apply mode, run targeted verification from documented project commands. If no documented command exists, report it as unverified instead of inventing one.
+- In review mode, do not run verification commands; report a verification plan or unverified item instead.
 - Report changed files, skipped recommendations, and verification results.
 - If MY_PR_REVIEW_DIFF is provided and unreadable, return REVIEW_INCOMPLETE and stop.
-- If MY_PR_CONTEXT is provided, read it before the diff and preserve the PR's stated intent and discussion constraints.
+- In review mode, read the embedded PR context before the embedded diff. In apply mode, read MY_PR_CONTEXT when provided. Preserve the PR's stated intent and discussion constraints.
 ```
 
 ## Verification

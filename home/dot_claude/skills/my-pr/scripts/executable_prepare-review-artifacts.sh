@@ -29,15 +29,27 @@ fi
 git status --short >"$artifact_dir/status.txt"
 
 git diff --stat "$diff_range" >"$artifact_dir/branch.diffstat"
-git diff --name-only "$diff_range" >"$artifact_dir/branch.changed-files.txt"
+nul_paths_to_lines() {
+  perl -0ne '
+    chomp;
+    die "ERROR: my-pr does not support file names containing newlines\n" if /\n/;
+    print "$_\n";
+  '
+}
+
+git -c core.quotePath=false diff --name-only -z "$diff_range" |
+  nul_paths_to_lines >"$artifact_dir/branch.changed-files.txt"
 git diff --binary "$diff_range" >"$artifact_dir/branch.diff"
 
 git diff --cached --binary >"$artifact_dir/staged.diff"
-git diff --name-only --cached >"$artifact_dir/staged.changed-files.txt"
+git -c core.quotePath=false diff --name-only --cached -z |
+  nul_paths_to_lines >"$artifact_dir/staged.changed-files.txt"
 
 git diff --binary >"$artifact_dir/unstaged.diff"
-git diff --name-only >"$artifact_dir/unstaged.changed-files.txt"
-git ls-files --others --exclude-standard >"$artifact_dir/untracked-files.txt"
+git -c core.quotePath=false diff --name-only -z |
+  nul_paths_to_lines >"$artifact_dir/unstaged.changed-files.txt"
+git -c core.quotePath=false ls-files --others --exclude-standard -z |
+  nul_paths_to_lines >"$artifact_dir/untracked-files.txt"
 
 {
   printf '%s\n' '# Branch diff'
@@ -53,11 +65,12 @@ git ls-files --others --exclude-standard >"$artifact_dir/untracked-files.txt"
   cat "$artifact_dir/branch.changed-files.txt"
   cat "$artifact_dir/staged.changed-files.txt"
   cat "$artifact_dir/unstaged.changed-files.txt"
-} | sort -u >"$artifact_dir/changed-files.txt"
+} | LC_ALL=C sort -u >"$artifact_dir/changed-files.txt"
 
 file_count=$(wc -l <"$artifact_dir/changed-files.txt" | tr -d ' ')
 untracked_count=$(wc -l <"$artifact_dir/untracked-files.txt" | tr -d ' ')
 review_lines=$(wc -l <"$artifact_dir/review.diff" | tr -d ' ')
+review_bytes=$(wc -c <"$artifact_dir/review.diff" | tr -d ' ')
 commit_count=$(git rev-list --count "$base_ref"..HEAD)
 scope_gate=ok
 if ((file_count > 100 || review_lines > 10000 || commit_count > 20)); then
@@ -79,6 +92,7 @@ fi
   printf 'Changed files: %s\n' "$file_count"
   printf 'Untracked files: %s\n' "$untracked_count"
   printf 'Review diff lines: %s\n' "$review_lines"
+  printf 'Review diff bytes: %s\n' "$review_bytes"
   printf 'Commits ahead of base: %s\n' "$commit_count"
   printf 'Scope gate: %s\n' "$scope_gate"
   printf '\n## Branch diff shortstat\n'
@@ -101,6 +115,7 @@ latest_env="$artifact_parent/latest-env.sh"
   printf 'export MY_PR_ARTIFACT_ENV=%q\n' "$artifact_env"
   printf 'export MY_PR_BASE_REF=%q\n' "$base_ref"
   printf 'export MY_PR_REVIEW_DIFF=%q\n' "$artifact_dir/review.diff"
+  printf 'export MY_PR_REVIEW_BYTES=%q\n' "$review_bytes"
   printf 'export MY_PR_CHANGED_FILES=%q\n' "$artifact_dir/changed-files.txt"
   printf 'export MY_PR_SCOPE_SUMMARY=%q\n' "$artifact_dir/scope-summary.txt"
   printf 'export MY_PR_SCOPE_GATE=%q\n' "$scope_gate"

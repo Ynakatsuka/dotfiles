@@ -45,9 +45,9 @@ Run the full workflow:
 2. Base and PR state
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently
-   - integrated simplify review (medium effort, chunked for large diffs, capped findings)
+   - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
-   - Codex review via `/my-agent codex`
+   - stdin-embedded Codex review via `scripts/run-codex-review.sh`
 5. Wait for all reviewers; do not final-answer while background reviewers are running
 6. Integrate findings
 7. Fix Required findings
@@ -79,9 +79,9 @@ Run local quality review in read-only mode.
 2. Base and PR state
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently
-   - integrated simplify review (medium effort, chunked for large diffs, capped findings)
+   - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
-   - Codex review via `/my-agent codex`
+   - stdin-embedded Codex review via `scripts/run-codex-review.sh`
 5. Wait for all reviewers
 6. Integrate findings
 7. Stop
@@ -96,9 +96,9 @@ Fix only Required findings, verify, and commit without pushing.
 2. Base and PR state
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently in read-only mode
-   - integrated simplify review (medium effort, chunked for large diffs, capped findings)
+   - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
-   - Codex review via `/my-agent codex`
+   - stdin-embedded Codex review via `scripts/run-codex-review.sh`
 5. Wait for all reviewers
 6. Integrate findings
 7. Fix Required findings only
