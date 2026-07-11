@@ -50,18 +50,6 @@ fi
 
 require_macos
 
-resolve_brew() {
-  if [ -x "/opt/homebrew/bin/brew" ]; then
-    echo "/opt/homebrew/bin/brew"
-  elif [ -x "/usr/local/bin/brew" ]; then
-    echo "/usr/local/bin/brew"
-  elif command -v brew >/dev/null 2>&1; then
-    command -v brew
-  else
-    echo ""
-  fi
-}
-
 install_chezmoi_standalone() {
   if command -v chezmoi >/dev/null 2>&1; then
     return 0
@@ -74,29 +62,12 @@ run_dotfiles() {
   run bash "${SCRIPT_DIR}/45_dotfiles.sh"
 }
 
-run_mise_install() {
-  local mise_cmd=""
-  if command -v mise >/dev/null 2>&1; then
-    mise_cmd="mise"
-  elif [ -x "$HOME/.local/bin/mise" ]; then
-    mise_cmd="$HOME/.local/bin/mise"
-  fi
-
-  if [ -n "$mise_cmd" ]; then
-    log "Running mise install"
-    run "$mise_cmd" install
-  else
-    warn "mise not found. Skipping mise install."
-  fi
-}
-
 case "$PLAN" in
   full)
     log "Plan: full"
     run bash "${SCRIPT_DIR}/00_xcode_brew.sh"
 
-    BREW=$(resolve_brew)
-    if [ -z "$BREW" ]; then
+    if ! BREW=$(resolve_brew); then
       warn "Homebrew not found after install. Aborting."
       exit 1
     fi
@@ -119,8 +90,7 @@ case "$PLAN" in
     log "Plan: standard"
     run bash "${SCRIPT_DIR}/00_xcode_brew.sh"
 
-    BREW=$(resolve_brew)
-    if [ -z "$BREW" ]; then
+    if ! BREW=$(resolve_brew); then
       warn "Homebrew not found after install. Aborting."
       exit 1
     fi

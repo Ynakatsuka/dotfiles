@@ -24,45 +24,7 @@ _gw_copy_env() {
 
 _gw_worktree_created_at() {
     local worktree_path="$1"
-    local created_at
-    local operating_system
-
-    if [ ! -d "$worktree_path" ]; then
-        echo "Error: worktree path does not exist: $worktree_path" >&2
-        echo "Run 'git worktree prune' to remove stale worktree metadata." >&2
-        return 1
-    fi
-
-    if ! operating_system=$(uname -s); then
-        echo "Error: failed to determine operating system for worktree creation time" >&2
-        return 1
-    fi
-
-    case "$operating_system" in
-        Darwin)
-            created_at=$(stat -f "%B" "$worktree_path") || {
-                echo "Error: failed to read creation time for worktree: $worktree_path" >&2
-                return 1
-            }
-            ;;
-        Linux)
-            created_at=$(stat -c "%W" "$worktree_path") || {
-                echo "Error: failed to read creation time for worktree: $worktree_path" >&2
-                return 1
-            }
-            ;;
-        *)
-            echo "Error: unsupported operating system for worktree creation time: $operating_system" >&2
-            return 1
-            ;;
-    esac
-
-    if [[ ! "$created_at" =~ '^[0-9]+$' ]] || [ "$created_at" -le 0 ]; then
-        echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
-        return 1
-    fi
-
-    echo "$created_at"
+    dotfiles-worktree-created-at "$worktree_path"
 }
 
 _gw_worktree_format_created_at() {
@@ -180,24 +142,7 @@ if [ -z "$worktree_path" ]; then
     exit 0
 fi
 
-if [ ! -d "$worktree_path" ]; then
-    echo "Error: worktree path does not exist: $worktree_path" >&2
-    exit 1
-fi
-
-if created_epoch=$(stat -f "%B" "$worktree_path" 2>/dev/null); then
-    :
-elif created_epoch=$(stat -c "%W" "$worktree_path" 2>/dev/null); then
-    :
-else
-    echo "Error: failed to read creation time for worktree: $worktree_path" >&2
-    exit 1
-fi
-
-if ! printf '%s\n' "$created_epoch" | grep -Eq '^[0-9]+$' || [ "$created_epoch" -le 0 ]; then
-    echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
-    exit 1
-fi
+created_epoch=$(dotfiles-worktree-created-at "$worktree_path") || exit 1
 
 if created_at=$(date -r "$created_epoch" "+%Y-%m-%d %H:%M:%S" 2>/dev/null); then
     :
@@ -746,6 +691,74 @@ EOF
     _gwc_remove_selected_worktrees "$max_jobs"
 }
 
+_gbc_collect_branches() {
+    local current_branch="$1"
+    local branches_with_status=""
+    local branch
+    local branch_status
+
+    while read -r branch; do
+        if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+            branch_status="[L+R]"
+        else
+            branch_status="[L]  "
+        fi
+
+        branches_with_status+="${branch_status} ${branch}"$'\n'
+    done < <(git branch --format='%(refname:short)' | grep -v "^${current_branch}$")
+
+    printf '%s' "$branches_with_status"
+}
+
+_gbc_select_branches() {
+    local branches_with_status="$1"
+    local current_branch="$2"
+
+    echo "$branches_with_status" | fzf \
+        -m \
+        --height=60% \
+        --reverse \
+        --prompt="削除するブランチを選択 (Tab: 複数選択): " \
+        --header="現在のブランチ: $current_branch | [L]=Local only, [L+R]=Local+Remote | Tab: 選択/解除" \
+        --preview='git log --oneline -10 $(echo {} | awk "{print \$2}")'
+}
+
+_gbc_confirm_removal() {
+    local selected_lines="$1"
+    local branch_count
+    local confirmation
+
+    branch_count=$(echo "$selected_lines" | wc -l | tr -d ' ')
+    echo "削除予定のブランチ (${branch_count}件):"
+    echo "$selected_lines" | while read -r line; do
+        echo "  $line"
+    done
+    echo -n "本当に削除しますか？ (y/N): "
+    read -r confirmation
+    [[ "$confirmation" =~ ^[yY]$ ]]
+}
+
+_gbc_remove_branches() {
+    local selected_branches="$1"
+
+    echo "$selected_branches" | while read -r branch; do
+        echo ""
+        echo "ブランチを削除中: $branch"
+        if git branch -d "$branch" 2>/dev/null; then
+            echo "✅ ブランチが削除されました: $branch"
+        elif git branch -D "$branch" 2>/dev/null; then
+            echo "⚠️ ブランチを強制削除しました: $branch"
+        else
+            echo "❌ ブランチの削除に失敗しました: $branch"
+        fi
+    done
+
+    echo ""
+    echo "=========================================="
+    echo "削除完了"
+    echo "=========================================="
+}
+
 # Git local branch cleanup function
 function gbc() {
     if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -753,85 +766,32 @@ function gbc() {
         return 1
     fi
 
-    local current_branch=$(git branch --show-current)
+    local current_branch
+    local branches_with_status
+    local selected_lines
+    local selected_branches
 
+    current_branch=$(git branch --show-current)
     git fetch --prune >/dev/null 2>&1
-
-    local branches_with_status=""
-    while read -r branch; do
-        local status=""
-        local has_local=true
-        local has_remote=false
-
-        if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-            has_remote=true
-        fi
-
-        if [ "$has_local" = true ] && [ "$has_remote" = true ]; then
-            status="[L+R]"
-        else
-            status="[L]  "
-        fi
-
-        branches_with_status+="${status} ${branch}"$'\n'
-    done < <(git branch --format='%(refname:short)' | grep -v "^${current_branch}$")
-
-    branches_with_status=$(echo "$branches_with_status" | sed '/^$/d')
+    branches_with_status=$(_gbc_collect_branches "$current_branch")
 
     if [ -z "$branches_with_status" ]; then
         echo "削除可能なブランチがありません（現在のブランチ: $current_branch）"
         return 1
     fi
 
-    local selected_lines=$(echo "$branches_with_status" | fzf \
-        -m \
-        --height=60% \
-        --reverse \
-        --prompt="削除するブランチを選択 (Tab: 複数選択): " \
-        --header="現在のブランチ: $current_branch | [L]=Local only, [L+R]=Local+Remote | Tab: 選択/解除" \
-        --preview='git log --oneline -10 $(echo {} | awk "{print \$2}")')
+    selected_lines=$(_gbc_select_branches "$branches_with_status" "$current_branch")
 
     if [ -z "$selected_lines" ]; then
         echo "ブランチが選択されませんでした"
         return 1
     fi
 
-    local selected_branches=$(echo "$selected_lines" | awk '{print $2}')
-
-    local branch_count=$(echo "$selected_branches" | wc -l | tr -d ' ')
-
-    echo "削除予定のブランチ (${branch_count}件):"
-    echo "$selected_lines" | while read -r line; do
-        echo "  $line"
-    done
-    echo -n "本当に削除しますか？ (y/N): "
-    read confirmation
-
-    if [[ "$confirmation" =~ ^[yY]$ ]]; then
-        local success_count=0
-        local fail_count=0
-
-        echo "$selected_branches" | while read -r branch; do
-            echo ""
-            echo "ブランチを削除中: $branch"
-            if git branch -d "$branch" 2>/dev/null; then
-                echo "✅ ブランチが削除されました: $branch"
-                ((success_count++))
-            elif git branch -D "$branch" 2>/dev/null; then
-                echo "⚠️ ブランチを強制削除しました: $branch"
-                ((success_count++))
-            else
-                echo "❌ ブランチの削除に失敗しました: $branch"
-                ((fail_count++))
-            fi
-        done
-
-        echo ""
-        echo "=========================================="
-        echo "削除完了"
-        echo "=========================================="
-    else
+    if ! _gbc_confirm_removal "$selected_lines"; then
         echo "削除をキャンセルしました"
         return 0
     fi
+
+    selected_branches=$(echo "$selected_lines" | awk '{print $2}')
+    _gbc_remove_branches "$selected_branches"
 }

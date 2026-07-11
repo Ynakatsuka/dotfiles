@@ -176,20 +176,7 @@ if [ "$WITH_DOTFILES" -eq 1 ]; then
 fi
 
 if [ "$WITH_MISE_INSTALL" -eq 1 ]; then
-  # mise may have been just installed; try common paths
-  MISE_CMD=""
-  if command -v mise >/dev/null 2>&1; then
-    MISE_CMD="mise"
-  elif [ -x "$HOME/.local/bin/mise" ]; then
-    MISE_CMD="$HOME/.local/bin/mise"
-  fi
-
-  if [ -n "$MISE_CMD" ]; then
-    log "Running mise install"
-    run "$MISE_CMD" install
-  else
-    warn "mise not found. Skipping mise install."
-  fi
+  run_mise_install
 fi
 
 # Post-mise tasks (need tools provided by `mise install`).

@@ -6,15 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "${SCRIPT_DIR}/../lib/common.sh"
 
 # Ensure brew is available in PATH
-if ! command -v brew >/dev/null 2>&1; then
-  if [ -x "/opt/homebrew/bin/brew" ]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
-  elif [ -x "/usr/local/bin/brew" ]; then
-    eval "$(/usr/local/bin/brew shellenv)"
-  else
-    warn "Homebrew not found. Please install Homebrew first."
-    exit 1
-  fi
+if ! activate_brew; then
+  warn "Homebrew not found. Please install Homebrew first."
+  exit 1
 fi
 
 log "Dotfiles setup (prezto/tpm/chezmoi/mise)"

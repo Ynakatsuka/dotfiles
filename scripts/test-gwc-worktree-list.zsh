@@ -93,6 +93,8 @@ case "$TEST_OS:$1:$2:$3" in
 esac
 EOF
 
+cp "$repo_root/home/dot_local/bin/executable_dotfiles-worktree-created-at" \
+    "$tmp_dir/bin/dotfiles-worktree-created-at"
 chmod +x "$tmp_dir/bin/"*
 export PATH="$tmp_dir/bin:/usr/bin:/bin"
 export TEST_ROOT="$tmp_dir"

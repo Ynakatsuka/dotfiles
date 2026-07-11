@@ -75,12 +75,47 @@ install_cli_via_script() {
   run bash -lc '_s=$(mktemp) && curl --fail -fsSL "$1" -o "$_s" && bash "$_s" && rm -f "$_s"' _ "$url"
 }
 
+resolve_brew() {
+  if [ -x "/opt/homebrew/bin/brew" ]; then
+    echo "/opt/homebrew/bin/brew"
+  elif [ -x "/usr/local/bin/brew" ]; then
+    echo "/usr/local/bin/brew"
+  elif command -v brew >/dev/null 2>&1; then
+    command -v brew
+  else
+    return 1
+  fi
+}
+
+activate_brew() {
+  if command -v brew >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local brew_cmd
+  brew_cmd=$(resolve_brew) || return 1
+  eval "$("$brew_cmd" shellenv)"
+}
+
+run_mise_install() {
+  local mise_cmd=""
+  if command -v mise >/dev/null 2>&1; then
+    mise_cmd="mise"
+  elif [ -x "$HOME/.local/bin/mise" ]; then
+    mise_cmd="$HOME/.local/bin/mise"
+  fi
+
+  if [ -n "$mise_cmd" ]; then
+    log "Running mise install"
+    run "$mise_cmd" install
+  else
+    warn "mise not found. Skipping mise install."
+  fi
+}
+
 require_macos() {
   if [[ "$(uname -s)" != "Darwin" ]]; then
     echo "[ERROR] This script requires macOS." >&2
     exit 1
   fi
 }
-
-is_linux() { [[ "$(uname -s)" == "Linux" ]]; }
-is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }

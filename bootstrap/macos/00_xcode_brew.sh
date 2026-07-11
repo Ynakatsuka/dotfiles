@@ -39,12 +39,8 @@ else
 fi
 
 # Ensure Homebrew is in PATH for subsequent commands
-if command -v brew >/dev/null 2>&1; then
+if activate_brew; then
   log "Homebrew is available in PATH"
-elif [ -x "/opt/homebrew/bin/brew" ]; then
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-elif [ -x "/usr/local/bin/brew" ]; then
-  eval "$(/usr/local/bin/brew shellenv)"
 else
   warn "Homebrew installation failed or not found"
   exit 1
