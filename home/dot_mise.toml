@@ -111,6 +111,7 @@ dotenvx = "latest"
 
 [settings]
 experimental = true
+lockfile = false
 # Always use the latest version when running `mise up`
 always_keep_download = false
 always_keep_install = false
@@ -131,9 +132,6 @@ set -e
 chezmoi git pull -- --ff-only
 chezmoi apply -v
 "$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
-# Keep mise's global lockfile tracked after upgrades.
-chezmoi add ~/mise.lock
-chezmoi apply -v
 """
 
 [tasks.update-brew]
@@ -152,9 +150,6 @@ set -e
 chezmoi git pull -- --ff-only
 chezmoi apply -v
 "$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
-# Keep mise's global lockfile tracked after upgrades.
-chezmoi add ~/mise.lock
-chezmoi apply -v
 "$(chezmoi source-path ~/.local/bin/dotfiles-cursor-agent-upgrade)"
 if command -v brew >/dev/null 2>&1; then
   "$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
