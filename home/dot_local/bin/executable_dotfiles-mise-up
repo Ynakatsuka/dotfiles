@@ -66,6 +66,12 @@ resolve_github_token() {
 main() {
   local status token
 
+  if mise self-update --help >/dev/null 2>&1; then
+    mise self-update -y
+  else
+    echo "[INFO] mise self-update is unavailable; the system package manager must update mise"
+  fi
+
   token=""
   if token="$(resolve_github_token)"; then
     :
@@ -89,9 +95,11 @@ main() {
   fi
 
   if [ "$status" -eq 0 ]; then
+    mise reshim --force
     if [ -s "$LOG_FILE" ]; then
       cat "$LOG_FILE"
     fi
+    "$HOME/.local/bin/dotfiles-agent-env-check"
     return 0
   fi
 

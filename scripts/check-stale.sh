@@ -8,8 +8,9 @@
 #   4. template include/includeTemplate targets that no longer exist
 #   5. skill files referenced in docs but missing, and orphan skill files
 #   6. Makefile targets mentioned in docs that do not exist
-#   7. CLI tools mandated by AGENTS.md missing from mise management
-#   8. rules/*.md files not mentioned in CLAUDE.md
+#   7. preferred agent CLI tools missing from mise management
+#   8. rules/*.md files not mentioned in repository instructions
+#   9. oversized, duplicated, or conflicting global agent instruction sources
 #
 # Detection only: nothing is deleted here. Stale deployed files are removed
 # declaratively via home/.chezmoiremove on `chezmoi apply`.
@@ -30,7 +31,7 @@ fail() {
 # --- 1. Top-level layout -----------------------------------------------------
 # .chezmoiroot narrows the chezmoi source to home/; anything else at the top
 # level is repo-only. New entries must be added here deliberately.
-ALLOWED_TOP_LEVEL=".chezmoiroot .github .gitignore .pre-commit-config.yaml CLAUDE.md README.md bootstrap home scripts"
+ALLOWED_TOP_LEVEL=".chezmoiroot .github .gitignore .pre-commit-config.yaml AGENTS.md CLAUDE.md README.md bootstrap home scripts"
 while IFS= read -r entry; do
   case " ${ALLOWED_TOP_LEVEL} " in
     *" ${entry} "*) ;;
@@ -53,6 +54,7 @@ done < <(find home -type d -empty -print)
 # include paths resolve relative to home/, includeTemplate relative to
 # home/.chezmoitemplates/.
 while IFS= read -r tmpl; do
+  [ -f "${tmpl}" ] || continue
   while IFS= read -r target; do
     [ -e "home/${target}" ] || fail "${tmpl}: include target missing: home/${target}"
   done < <(grep -oE 'include "[^"]+"' "${tmpl}" | sed -e 's/^include "//' -e 's/"$//')
@@ -103,27 +105,49 @@ done
 
 # --- 6. Makefile target drift ---------------------------------------------------
 makefile_targets="$(grep -oE '^[a-z][a-z-]*:' bootstrap/Makefile | tr -d ':')"
-for doc in README.md CLAUDE.md bootstrap/README.md; do
+for doc in README.md AGENTS.md CLAUDE.md bootstrap/README.md; do
   while IFS= read -r target; do
     grep -qx "${target}" <<<"${makefile_targets}" ||
       fail "${doc}: mentions non-existent Makefile target: make -C bootstrap ${target}"
   done < <(grep -oE 'make -C [^ ]*bootstrap"? [a-z][a-z-]*' "${doc}" | awk '{print $NF}' | sort -u)
 done
 
-# --- 7. AGENTS.md tool expectations vs mise -------------------------------------
-# AGENTS.md instructs agents to use these CLIs; they must stay mise-managed.
+# --- 7. Agent tool expectations vs mise ------------------------------------------
+# Agent instructions prefer these CLIs when available; keep them mise-managed.
 for pair in rg:ripgrep fd:fd ast-grep:ast-grep jq:jq yq:yq; do
   mise_name="${pair#*:}"
   grep -qE "^\"?${mise_name}\"? = " home/dot_mise.toml ||
     fail "AGENTS.md relies on '${pair%%:*}' but '${mise_name}' is not in home/dot_mise.toml"
 done
 
-# --- 8. rules/*.md drift against CLAUDE.md ---------------------------------------
+# --- 8. rules/*.md drift against repository instructions --------------------------
 for rule in home/dot_claude/rules/*.md; do
   base="$(basename "${rule}" .md)"
-  grep -q "${base}" CLAUDE.md ||
-    fail "CLAUDE.md rules list does not mention rules/${base}.md"
+  grep -q "${base}" AGENTS.md ||
+    fail "AGENTS.md does not mention rules/${base}.md"
 done
+
+# --- 9. Agent instruction integrity ---------------------------------------------
+agents_lines="$(wc -l <home/AGENTS.md)"
+agents_bytes="$(wc -c <home/AGENTS.md)"
+[ "${agents_lines}" -le 200 ] || fail "home/AGENTS.md exceeds 200 lines: ${agents_lines}"
+[ "${agents_bytes}" -le 32768 ] || fail "home/AGENTS.md exceeds 32 KiB: ${agents_bytes} bytes"
+
+for template in \
+  home/dot_claude/CLAUDE.md.tmpl \
+  home/dot_codex/AGENTS.md.tmpl \
+  home/dot_gemini/GEMINI.md.tmpl; do
+  include_count="$(grep -c 'include "AGENTS.md"' "${template}" || true)"
+  [ "${include_count}" -eq 1 ] || fail "${template}: expected exactly one AGENTS.md include, found ${include_count}"
+done
+
+[ ! -e home/CLAUDE.md.tmpl ] || fail "home/CLAUDE.md.tmpl duplicates ~/.claude/CLAUDE.md for repositories under HOME"
+grep -qx 'CLAUDE.md' home/.chezmoiremove || fail "home/.chezmoiremove must remove the former ~/CLAUDE.md target"
+grep -q '^@AGENTS\.md$' CLAUDE.md || fail "CLAUDE.md must import the repository AGENTS.md"
+
+if grep -Eqi 'chezmoi|dotfiles|Ynakatsuka/dotfiles|ghq/github.com/Ynakatsuka/dotfiles' home/AGENTS.md; then
+  fail "home/AGENTS.md contains repository-specific dotfiles guidance"
+fi
 
 # --- Summary ----------------------------------------------------------------------
 if [ "${FAILURES}" -gt 0 ]; then

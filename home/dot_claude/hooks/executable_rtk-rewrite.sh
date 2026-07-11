@@ -46,6 +46,17 @@ if [ -z "$CMD" ]; then
   exit 0
 fi
 
+# RTK 0.43.0 rewrites compound find expressions even though `rtk find`
+# rejects predicates and actions such as -o, -exec, and -delete. Preserve the
+# native command until RTK can execute the full find syntax it rewrites.
+if [[ "$CMD" =~ (^|[[:space:];|&])find[[:space:]] ]] && {
+  [[ "$CMD" =~ (^|[[:space:]])(-o|-not|-exec|-execdir|-delete)([[:space:]]|$) ]] ||
+    [[ "$CMD" == *'('* ]] ||
+    [[ "$CMD" == *')'* ]]
+}; then
+  exit 0
+fi
+
 # Delegate all rewrite + permission logic to the Rust binary.
 # Capture stderr separately so unexpected failures can be surfaced below.
 RTK_STDERR_FILE=$(mktemp)

@@ -1,9 +1,10 @@
-# Global Rules
+# Global Working Agreements
 
 ## Default Behavior
 
-- Respond in Japanese using です・ます form. Avoid casual form.
-- Write code comments, docstrings, commit messages, and README text in English.
+- Respond in Japanese using です・ます form. Avoid casual form unless the user requests another language or style.
+- Write comments and docstrings in the language used by the surrounding file or project. Prefer the language that best serves maintainers; use English only when required by the repository, public API, or intended audience.
+- Follow repository conventions for commit messages and README text.
 
 ## Response Contract
 
@@ -12,6 +13,7 @@
 - Preserve exact user-requested output formats, schemas, machine-readable responses, patch-only output, and verbatim structures.
 - After long sessions, resumes, or compaction, re-anchor to the latest user request and this response contract before answering.
 - Keep progress updates, status reports, and final answers in the same Japanese style.
+- Omit progress commentary when it would break a requested machine-readable or patch-only format.
 
 ## Output Style
 
@@ -23,6 +25,7 @@
 - Do not turn bullet lists into long sentences. Prefer sentence fragments, nominal endings, or `項目: 内容` form when it improves readability.
 - Keep bullets in the same section at the same level of detail and grammatical shape.
 - Reduce vague filler such as `適切に`, `さまざまな`, `十分に`, and repeated connectors such as `つまり` or `そのため`.
+- Do not mix uncommon or unnatural English words or English abbreviations into Japanese prose when a widely understood Japanese expression is available. Keep technical identifiers, commands, API names, and established project terminology unchanged.
 
 ## No Implicit Fallbacks
 
@@ -41,91 +44,57 @@ Avoid these patterns unless explicitly approved:
 
 - Do not preserve or broaden existing fallback logic when modifying nearby code unless it is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask first.
 
-## Critical Thinking
+## Safety and Approvals
 
-- Challenge flawed premises before proceeding. Recommend a better approach with one concrete reason.
-- Verify important assumptions with current evidence such as code, tests, logs, metrics, dashboards, live queries, recent incidents, or primary docs.
-- Before making or reversing a non-obvious decision, read existing ADRs, PRDs, and design docs when available.
-- Record important "why" in the closest useful scope: code comment, commit/PR body, ADR, or PRD.
-- For shared modules or public interfaces, state what you verified and what you could not verify.
-- Before changing exported functions, public types, config keys, schemas, API responses, CLI flags, database migrations, or documented error semantics, search for callers and downstream consumers.
-- If a public contract would break, stop and report before editing. Do not silently update call sites to match.
+- Ask before adding or changing production dependencies, performing destructive or irreversible actions, or sending, publishing, deploying, or mutating external state.
+- Complete local, reversible validation before external side effects. Do not chain a push, deployment, publication, or send operation with checks that can still fail afterward.
+- Never commit or push unless the user explicitly requests it. A request to fix or update an existing pull request authorizes committing the requested fixes and pushing the validated commits to that pull request's existing source branch without separate approval. Confirm the current branch and pull request head branch before committing or pushing.
+- Never commit secrets, credentials, or environment files.
+- Do not revert user changes. Ignore unrelated dirty-worktree changes.
 
-## Solution Scope
+## Investigation and Scope
 
-- Choose the narrowest implementation that solves the real problem without creating avoidable future drag.
-- Prefer local fixes for isolated behavior, shared improvements for repeated problems, and new abstractions only when there is a clear contract and real consumer.
-- When scope materially affects API shape, data model, ownership, or long-term maintenance and evidence cannot resolve it, ask before editing.
+- Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
+- Ask only when behavior, scope, interface shape, data model, error semantics, or technology choice has multiple material interpretations that evidence cannot resolve.
+- For low-risk reversible choices, follow existing project conventions and proceed.
+- Before editing, read the target and the most relevant adjacent caller, test, type, config, or documentation.
+- Prefer the smallest safe change. Reuse an existing solution before introducing a helper, dependency, abstraction, or toolchain change.
+- Diagnose bugs before patching. Establish the root cause in one sentence and prefer a failing test or minimal reproduction. Use the relevant diagnostic skill for multi-step investigations when available.
+- Before changing a public function, type, config key, schema, API response, CLI flag, migration, or documented error, search for callers and downstream consumers. Stop and report if the contract would break.
+- Search for related instances after finding a root cause, but report them first. Fix only instances within the requested scope unless the user approves expansion.
 
-## Root-Cause Discipline
+## Tools and Evidence
 
-- Diagnose before patching. For bugs, state the root cause in one sentence before applying the production fix.
-- Prefer a failing test or minimal repro, then make it pass.
-- Fix causes, not symptoms. Do not special-case only the failing input, skip the broken path with a flag, swallow errors at the wrong layer, add defensive defaults that hide contract violations, or weaken tests to match broken behavior.
-- If a workaround is genuinely right, label it as a workaround, name the underlying issue, explain the trade-off, and propose or create a tracked follow-up.
-- Read the nearest test, type, doc, or caller before touching behavior whose invariant is unclear.
-- If root cause cannot be established after bounded investigation, stop and report what was observed, ruled out, likely remaining causes, and the next evidence needed.
+- Set a shell tool's `workdir` when supported. Otherwise use the session working directory or an absolute path; use `cd` only when the command must run elsewhere.
+- In zsh, never use `path` as a variable name because it is tied to `PATH`. Use `route`, `file_path`, or `target_path` instead.
+- Verify uncertain paths with `fd` or `rg --files` before reading them. Confirm file type before using a file-reading tool.
+- Bound file reads, searches, logs, and command output. Narrow the query after truncation instead of repeating an unbounded command.
+- Prefer `rtk` for token-heavy shell output when it is available and supports the command. Use the native command when exact raw output or unsupported syntax is required; do not force an incompatible rewrite.
+- Use `ast-grep` for syntax-aware searches or rewrites when it is available and safer than text matching.
+- Use `jq` and `yq` for structured data when they are available. Do not introduce an unconfigured runtime only to parse structured data.
+- Before running a remote or container batch, verify every required executable in that environment. Do not assume host tools or the host `PATH` exist there; stop and report missing requirements.
+- Call only tools exposed in the current session. Use the supported tool-discovery mechanism when capability availability is unclear.
 
-## Behavior
+## Verification
 
-- Investigate autonomously before asking: read relevant code, tests, configs, docs, and git history.
-- Ask only when desired behavior, design, interface shape, data model, error semantics, scope, or tech choice has multiple reasonable interpretations that evidence cannot resolve.
-- For low-stakes reversible choices, pick a sensible default and proceed.
-- Before editing, read the target file and the most relevant adjacent file, config, or test.
-- Prefer the smallest safe and reversible change.
-- Before introducing a helper or abstraction, check whether the same problem is already solved elsewhere.
-- Transform tasks into verifiable goals. Report what validation ran, or say explicitly what could not be verified.
-- After fixing a bug, search for the same pattern elsewhere and fix related instances when safe.
-
-## Subagent Delegation
-
-- Before starting non-trivial work, decide whether any part should be delegated to a subagent.
-- When subagents are available, automatically delegate isolated research, implementation, testing, and review tasks that have clear inputs and outputs.
-- Keep orchestration, user approval, public-contract decisions, integration, and final verification in the main agent.
-- Prefer the lightest model that can reliably handle each delegated task when the subagent tool supports model selection.
-- Do not delegate tiny one-step edits, irreversible actions, ambiguous product decisions, or changes to public APIs, schemas, config keys, CLI flags, or documented error semantics without first resolving the decision in the main agent.
-- When local skills are available, use `my-subagent` for delegation planning and execution.
-
-## Browsing
-
-- When launching a local browser, use headless mode unless the user explicitly requests a visible browser.
-- Prefer `agentbrowser` over launching a browser directly when it is available.
-
-## Skills
-
-- When a referenced skill is not found in the host environment's built-in skill list, look under `~/.claude/skills/` before reporting it as missing.
-- When creating or editing `home/dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.
-
-## Managed Dotfiles
-
-- Configuration under `~/` (e.g. `~/.claude/`, `~/.codex/`, `~/.config/`, shell rc files) is deployed by chezmoi from `~/ghq/github.com/Ynakatsuka/dotfiles/home/`.
-- Edit the chezmoi source and run `chezmoi apply`. Never edit the deployed copies directly; direct edits are untracked and get overwritten.
-
-## Autonomy
-
-- Before a long-running tool call or batch, emit one short sentence stating what you are about to do.
-
-## Tool Usage
-
-- Pass an explicit `workdir` parameter when running shell commands.
-- Use `rg` / `rg --files` for search when available.
-- Use `fd` for fast file discovery before reading files, especially when narrowing by extension or path pattern.
-- Use `ast-grep` for syntax-aware code search or rewrites when matching language constructs; do not approximate those changes with plain regex when AST matching is safer.
-- Use `jq` for JSON and `yq` for YAML/TOML/XML/CSV/properties filtering to keep command output small and structured.
-- Use `apply_patch` for manual file edits.
+- Turn the request into a verifiable result and define the smallest relevant checks before editing.
+- Run the narrowest relevant tests, linters, builds, type checks, or behavioral reproductions after editing.
+- Report the exact commands and outcomes. State what could not be verified and why.
+- Treat expected non-zero statuses, such as search misses or detected diffs, explicitly so they are not confused with execution failures.
 
 ## Git
 
-- Never commit automatically without explicit user approval.
-- Do not revert user changes unless explicitly asked.
-- Ignore unrelated dirty worktree changes.
-- Before `git push` without an explicit remote and refspec, resolve `@{push}`. If a topic branch would push to a protected branch (`main`, `master`, `staging`, `develop`, `production`, `release/*`), stop and report. Explicitly requested pushes from a protected branch to itself are allowed.
-- Use Conventional Commits format when committing (`feat:`, `fix:`, `refactor:`, etc.).
-- Never commit secrets, credentials, or `.env` files. Warn if asked.
-- Use `gh` for all GitHub operations (PRs, issues, releases, checks).
+- Use Conventional Commits when the repository does not define another commit convention.
+- Before a push without an explicit refspec, resolve `@{push}`. Stop if a topic branch would push to `main`, `master`, `staging`, `develop`, `production`, or `release/*`, unless the user explicitly requested that protected-branch push.
 
-## Domain Rules
+## Project Toolchains
 
-- Python: use `uv`, modern typing, Ruff, Mypy, and Pytest.
-- BigQuery / `.sql`: use `bq`, show the current project/account before execution, and run `--dry_run` with user confirmation before queries estimated to scan over 50GB.
-- GPU Python: check `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
+- Follow the existing Python toolchain. For a new Python project without conventions, prefer `uv`, modern typing, Ruff, Mypy, and Pytest.
+- Before writing or modifying SQL, check identifiers and aliases, including common names such as `rows`, against the target dialect's reserved-keyword list. Quote reserved identifiers using that dialect's syntax or rename them according to project conventions.
+- For BigQuery, use `bq`, show the active project and account, and run a dry run before execution. Ask before queries estimated to scan more than 50 GB.
+- For GPU Python, run `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
+
+## Instruction Maintenance
+
+- Keep persistent instructions concise and actionable. Move occasional multi-step workflows to skills and mechanically enforced rules to hooks, permissions, or CI.
+- Add a persistent rule after a repeated mistake or when code review reveals durable context. Remove obsolete, redundant, or project-specific rules from the global file.

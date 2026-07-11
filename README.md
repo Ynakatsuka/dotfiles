@@ -81,6 +81,39 @@ For a forced re-init:
 chezmoi -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init --apply https://github.com/Ynakatsuka/dotfiles.git --force
 ```
 
+### Agent Instructions
+
+Agent instructions are layered by scope. Root files describe only this repository. Files under `home/` are deployed globally and therefore must not contain dotfiles- or chezmoi-specific rules:
+
+| Source | Scope / Destination |
+|--------|---------------------|
+| `AGENTS.md` | This repository, shared across compatible agents |
+| `CLAUDE.md` | This repository, Claude-specific additions |
+| `home/AGENTS.md` | Global shared rules → `~/AGENTS.md` |
+| `home/dot_claude/CLAUDE.md.tmpl` | Global Claude additions → `~/.claude/CLAUDE.md` |
+| `home/dot_codex/AGENTS.md.tmpl` | Global Codex additions → `~/.codex/AGENTS.md` |
+| `home/dot_gemini/GEMINI.md.tmpl` | Global Gemini additions → `~/.gemini/GEMINI.md` |
+
+Run these checks after changing agent instructions or shell tool management:
+
+```bash
+mise run check-agent-environment
+bash scripts/test-rtk-rewrite-hook.sh
+codex exec --ephemeral --sandbox read-only -c 'approval_policy="never"' \
+  "Summarize the current instructions and list their source files. Do not modify files."
+```
+
+For interactive clients, use `/memory` in Claude Code and `/memory show` in Gemini CLI to inspect the loaded instruction context. Restart an active session after changing persistent instructions.
+
+### RTK Command Rewriting
+
+RTK reduces token-heavy shell output. Codex is instructed to invoke it directly, while Claude Code uses the ordered Bash `PreToolUse` hooks in `home/dot_claude/settings.json`:
+
+1. `ensure-mise-path.sh` exposes mise-managed tools.
+2. `rtk-rewrite.sh` delegates supported commands to `rtk rewrite`.
+
+The rewrite hook deliberately bypasses compound `find` syntax that RTK 0.43.0 rewrites but cannot execute correctly. Run `bash scripts/test-rtk-rewrite-hook.sh` after changing RTK, either hook, or their ordering.
+
 ## Shortcuts
 
 ### Shell Keybindings
