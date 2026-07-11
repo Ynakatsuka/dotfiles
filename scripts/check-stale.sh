@@ -116,8 +116,8 @@ done
 # Agent instructions prefer these CLIs when available; keep them mise-managed.
 for pair in rg:ripgrep fd:fd ast-grep:ast-grep jq:jq yq:yq; do
   mise_name="${pair#*:}"
-  grep -qE "^\"?${mise_name}\"? = " home/dot_mise.toml ||
-    fail "AGENTS.md relies on '${pair%%:*}' but '${mise_name}' is not in home/dot_mise.toml"
+  grep -qE "^\"?${mise_name}\"? = " home/private_dot_config/mise/config.toml ||
+    fail "AGENTS.md relies on '${pair%%:*}' but '${mise_name}' is not in home/private_dot_config/mise/config.toml"
 done
 
 # --- 8. rules/*.md drift against repository instructions --------------------------

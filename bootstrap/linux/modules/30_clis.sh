@@ -30,7 +30,7 @@ elif [ "$SKIP_AGE" -eq 0 ] && has_apt && confirm "Install age (file encryption)?
   run sudo apt-get install -y age
 fi
 
-# gh is managed by mise (see dot_mise.toml). gh-dash extension is installed
+# gh is managed by mise (see private_dot_config/mise/config.toml). gh-dash extension is installed
 # from main.sh after `mise install` completes.
 
 if command -v uv >/dev/null 2>&1; then
@@ -50,7 +50,7 @@ elif confirm "Install mise (via official installer)?"; then
   warn "Restart your shell or source the activation in your rc to use mise."
 fi
 
-# rye, direnv, and gcloud are managed by mise (see dot_mise.toml).
+# rye, direnv, and gcloud are managed by mise (see private_dot_config/mise/config.toml).
 
 if command -v tailscale >/dev/null 2>&1; then
   log "tailscale already installed, skipping"

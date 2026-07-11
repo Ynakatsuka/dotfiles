@@ -70,7 +70,7 @@ bash scripts/test-rtk-rewrite-hook.sh
 
 ## RTK Integration
 
-- RTK is installed through `home/dot_mise.toml` and updated by maintenance.
+- RTK is installed through `home/private_dot_config/mise/config.toml` and updated by maintenance.
 - Claude Bash commands pass through two ordered `PreToolUse` hooks configured in `home/dot_claude/settings.json`: `ensure-mise-path.sh` first, then `rtk-rewrite.sh`.
 - `home/dot_claude/hooks/executable_rtk-rewrite.sh` delegates supported rewrites and permission decisions to `rtk rewrite`. It requires `jq` and RTK 0.23.0 or newer.
 - Preserve the rewrite protocol: exit 0 rewrites and auto-allows, exit 1 or 2 passes through, exit 3 rewrites without auto-allowing so Claude can ask, and unexpected failures emit a warning before passing through.
@@ -80,6 +80,6 @@ bash scripts/test-rtk-rewrite-hook.sh
 
 ## Specialized Changes
 
-- When adding a tool to `home/dot_mise.toml`, run `mise install` and ensure shims resolve in a clean shell.
+- When adding a tool to `home/private_dot_config/mise/config.toml`, run `mise install` and ensure shims resolve in a clean shell.
 - When editing `home/dot_claude/skills/*/SKILL.md`, use the available skill-authoring workflow first.
 - Keep the deployed Claude rule files documented and intact: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.

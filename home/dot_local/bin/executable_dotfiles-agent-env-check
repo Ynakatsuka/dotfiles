@@ -5,7 +5,7 @@ set -euo pipefail
 ZSH_BIN="$(command -v zsh)"
 CURRENT_USER="${USER:-$(id -un)}"
 CURRENT_LOGNAME="${LOGNAME:-$CURRENT_USER}"
-REQUIRED_COMMANDS="gh uv ruff gcloud jq yq fd rg ast-grep rtk"
+REQUIRED_COMMANDS="codex gh uv ruff gcloud jq yq fd rg ast-grep rtk"
 
 env -i \
   HOME="$HOME" \
@@ -26,6 +26,22 @@ env -i \
       printf "Missing commands in a clean non-interactive zsh: %s\n" "$missing" >&2
       exit 1
     fi
+
+    external_dir="$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-agent-env-check.XXXXXX")"
+    cleanup() {
+      rm -rf -- "$external_dir"
+    }
+    trap cleanup EXIT
+
+    case "$external_dir" in
+      "$HOME"/*)
+        printf "Agent environment probe must run outside HOME: %s\n" "$external_dir" >&2
+        exit 1
+        ;;
+    esac
+
+    cd "$external_dir"
+    codex --version >/dev/null
   '
 
 echo "dotfiles-agent-env-check: OK"

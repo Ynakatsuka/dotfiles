@@ -13,6 +13,7 @@ mcp.json
 .claude/skills/my-guided-tour
 .claude/skills/my-sdd
 CLAUDE.md
+.mise.toml
 mise.lock
 
 {{- if ne .chezmoi.os "darwin" }}

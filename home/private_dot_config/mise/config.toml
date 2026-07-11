@@ -1,3 +1,114 @@
+[tools]
+# RTK - Rust Token Killer (reduces LLM token consumption)
+"github:rtk-ai/rtk" = "latest"
+
+# OpenAI Codex CLI
+"npm:@openai/codex" = "latest"
+
+# OpenCode CLI
+# Pinned to the last macos-arm64 release with GitHub attestations.
+"github:anomalyco/opencode" = "1.17.7"
+
+# vsce - Visual Studio Code Extension CLI
+"npm:@vscode/vsce" = "latest"
+
+# bun - Bun package manager
+bun = "latest"
+
+# ni - use the right package manager
+"npm:@antfu/ni" = "latest"
+
+# difit - Git diff viewer with GitHub-like UI
+"npm:difit" = "latest"
+
+# python - Python runtime
+python = "3.12"
+
+# uv - Fast Python package installer and resolver
+uv = "latest"
+
+# rye - Python package manager
+rye = "latest"
+
+# ruff - Python code formatter and linter
+ruff = "latest"
+
+# Task - Task runner
+task = "latest"
+
+# typos - Source code spell checker
+typos = "latest"
+
+# prek - Rust-based drop-in replacement for pre-commit
+prek = "latest"
+
+# Node.js - JavaScript runtime
+node = "24.9"
+
+# Volta - JavaScript tool manager
+"aqua:volta-cli/volta" = "latest"
+
+# Go - The Go programming language
+go = "latest"
+
+# Terraform - Infrastructure as Code
+terraform = "latest"
+
+# gh - GitHub CLI
+gh = "latest"
+
+# age - File encryption tool used by chezmoi secrets
+age = "1.3.1"
+
+# fd - Fast file finder that respects ignore files
+fd = "latest"
+
+# ripgrep - Fast line-oriented search tool; AGENTS.md instructs agents to use rg
+ripgrep = "latest"
+
+# ast-grep - Syntax-aware code search and rewrite
+ast-grep = "latest"
+
+# jq - Command-line JSON processor
+jq = "latest"
+
+# yq - Command-line YAML, JSON, XML, CSV, TOML and properties processor
+yq = "latest"
+
+# aws - AWS CLI
+aws = "latest"
+
+# gcloud - Google Cloud CLI
+gcloud = "latest"
+
+# fzf - Fuzzy Finder
+fzf = "latest"
+
+# eza - Modern replacement for ls
+# asdf-eza's eza 0.23.5 quickinstall asset is currently missing for macOS arm64.
+eza = "0.23.4"
+
+# ghq -
+ghq = "latest"
+
+# direnv - Directory-based environment management
+direnv = "latest"
+
+# k9s - Kubernetes CLI dashboard
+k9s = "latest"
+
+# dotenvx - Environment variable management
+dotenvx = "latest"
+
+# gopls - Go language server
+"go:golang.org/x/tools/gopls" = { version = "latest" }
+
+# agent-browser - Browser automation CLI for AI agents
+"github:vercel-labs/agent-browser" = "latest"
+
+# sdf - SDF CLI
+"github:sdf-labs/sdf-cli" = { version = "latest", matching = "sdf-*.tar.gz", exe = "sdf" }
+
 [settings]
 # Trust user-owned workspaces to avoid blocking non-interactive agents.
 trusted_config_paths = ["~"]
@@ -6,3 +117,59 @@ trusted_config_paths = ["~"]
 # gh shim. This prevents latest-version resolution from exhausting the
 # unauthenticated GitHub rate limit.
 github.credential_command = "sh -lc 'for gh in \"$HOME\"/.local/share/mise/installs/gh/latest/*/bin/gh \"$HOME\"/.local/share/mise/installs/gh/*/*/bin/gh; do [ -x \"$gh\" ] && exec \"$gh\" auth token; done; exit 1'"
+
+experimental = true
+lockfile = false
+# Always use the latest version when running `mise up`
+always_keep_download = false
+always_keep_install = false
+legacy_version_file = true
+plugin_autoupdate_last_check_duration = "7 days"
+minimum_release_age_excludes = [
+    "npm:@openai/codex",
+    "npm:@anthropic-ai/claude-code",
+]
+
+[env]
+AGENT_BROWSER_NATIVE = "1"
+
+[tasks.update-dotfiles]
+description = "Update dotfiles and development environment"
+run = """
+set -e
+chezmoi git pull -- --ff-only
+chezmoi apply -v
+"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+"""
+
+[tasks.update-brew]
+description = "Update Homebrew and all installed packages"
+run = """
+set -e
+
+"$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
+"""
+
+[tasks.maintenance]
+description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packages"
+run = """
+set -e
+
+chezmoi git pull -- --ff-only
+chezmoi apply -v
+"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+"$(chezmoi source-path ~/.local/bin/dotfiles-cursor-agent-upgrade)"
+if command -v brew >/dev/null 2>&1; then
+  "$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
+else
+  echo "[INFO] brew not found, skipping Homebrew updates"
+fi
+"""
+
+[tasks.clean-mise-cache]
+description = "Clean mise cache files manually"
+run = "mise cache clean"
+
+[tasks.check-agent-environment]
+description = "Verify required tools in a clean non-interactive agent shell"
+run = "dotfiles-agent-env-check"
