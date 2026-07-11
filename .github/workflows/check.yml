@@ -18,6 +18,10 @@ jobs:
         run: bash scripts/check-stale.sh
       - name: Test RTK rewrite hook guards
         run: bash scripts/test-rtk-rewrite-hook.sh
+      - name: Test mise upgrade wrapper
+        run: |
+          command -v jq >/dev/null
+          bash scripts/test-dotfiles-mise-up.sh
 
   pre-commit:
     runs-on: ubuntu-latest
