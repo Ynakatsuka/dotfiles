@@ -12,6 +12,7 @@ mcp.json
 .claude/rules/writing.md
 .claude/skills/my-guided-tour
 .claude/skills/my-sdd
+CLAUDE.md
 
 {{- if ne .chezmoi.os "darwin" }}
 

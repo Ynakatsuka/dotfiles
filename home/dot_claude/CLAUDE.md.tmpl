@@ -1,1 +1,12 @@
-{{- include "AGENTS.md" -}}
+{{- include "AGENTS.md" }}
+
+## Claude Code Usage
+
+- Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
+- Delegate isolated research or verification only when the user and current runtime policy permit it and a separate context materially helps. Keep approvals, public-contract decisions, integration, and final verification in the main agent.
+- The Bash tool has no `workdir` argument. Prefer the session working directory or absolute paths; use `cd` only when necessary.
+- A `PreToolUse` hook rewrites supported Bash commands through `rtk` to reduce output tokens. Use native commands for exact raw output or syntax that RTK does not support, and surface hook warnings rather than assuming a rewrite succeeded.
+- Before reading a large file, search for the relevant section or use `offset` and `limit`.
+- Use a headless browser unless the user explicitly requests a visible browser.
+- When a referenced skill is not in the surfaced skill list, check `~/.claude/skills/` before reporting it missing.
+- When creating or editing `home/dot_claude/skills/*/SKILL.md`, use the skill-authoring workflow first.

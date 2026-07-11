@@ -1,1 +1,7 @@
-{{- include "AGENTS.md" -}}
+{{- include "AGENTS.md" }}
+
+## Gemini CLI Usage
+
+- Use the session working directory or absolute paths for shell commands because the shell tool does not expose a separate `workdir` argument.
+- Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
+- Inspect the active instruction context with `/memory show` and reload it with `/memory reload` after changing instruction files.

@@ -2,5 +2,8 @@
 
 ## Codex Tool Usage
 
+- Pass an explicit `workdir` to shell command tools.
 - Use `rtk` for token-heavy shell output: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
 - Use `rtk proxy` only when raw output is required.
+- Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
+- Delegate work only when the user and current runtime policy permit it. Keep approvals, public-contract decisions, integration, and final verification in the main agent.
