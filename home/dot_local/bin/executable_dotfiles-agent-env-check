@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ZSH_BIN="$(command -v zsh)"
+CURRENT_USER="${USER:-$(id -un)}"
+CURRENT_LOGNAME="${LOGNAME:-$CURRENT_USER}"
+REQUIRED_COMMANDS="gh uv ruff gcloud jq yq fd rg ast-grep rtk"
+
+env -i \
+  HOME="$HOME" \
+  USER="$CURRENT_USER" \
+  LOGNAME="$CURRENT_LOGNAME" \
+  SHELL="$ZSH_BIN" \
+  PATH="/usr/local/bin:/usr/bin:/bin" \
+  TERM="${TERM:-dumb}" \
+  REQUIRED_COMMANDS="$REQUIRED_COMMANDS" \
+  "$ZSH_BIN" -lc '
+    missing=""
+    for command_name in ${=REQUIRED_COMMANDS}; do
+      if ! command -v "$command_name" >/dev/null 2>&1; then
+        missing="${missing}${missing:+ }${command_name}"
+      fi
+    done
+    if [ -n "$missing" ]; then
+      printf "Missing commands in a clean non-interactive zsh: %s\n" "$missing" >&2
+      exit 1
+    fi
+  '
+
+echo "dotfiles-agent-env-check: OK"

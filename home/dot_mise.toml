@@ -166,3 +166,7 @@ fi
 [tasks.clean-mise-cache]
 description = "Clean mise cache files manually"
 run = "mise cache clean"
+
+[tasks.check-agent-environment]
+description = "Verify required tools in a clean non-interactive agent shell"
+run = "dotfiles-agent-env-check"
