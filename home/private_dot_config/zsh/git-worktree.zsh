@@ -25,6 +25,7 @@ _gw_copy_env() {
 _gw_worktree_created_at() {
     local worktree_path="$1"
     local created_at
+    local operating_system
 
     if [ ! -d "$worktree_path" ]; then
         echo "Error: worktree path does not exist: $worktree_path" >&2
@@ -32,31 +33,73 @@ _gw_worktree_created_at() {
         return 1
     fi
 
-    if created_at=$(stat -f "%B" "$worktree_path" 2>/dev/null); then
-        if [[ "$created_at" =~ '^[0-9]+$' ]] && [ "$created_at" -gt 0 ]; then
-            echo "$created_at"
-            return 0
-        fi
+    if ! operating_system=$(uname -s); then
+        echo "Error: failed to determine operating system for worktree creation time" >&2
+        return 1
+    fi
 
+    case "$operating_system" in
+        Darwin)
+            created_at=$(stat -f "%B" "$worktree_path") || {
+                echo "Error: failed to read creation time for worktree: $worktree_path" >&2
+                return 1
+            }
+            ;;
+        Linux)
+            created_at=$(stat -c "%W" "$worktree_path") || {
+                echo "Error: failed to read creation time for worktree: $worktree_path" >&2
+                return 1
+            }
+            ;;
+        *)
+            echo "Error: unsupported operating system for worktree creation time: $operating_system" >&2
+            return 1
+            ;;
+    esac
+
+    if [[ ! "$created_at" =~ '^[0-9]+$' ]] || [ "$created_at" -le 0 ]; then
         echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
         return 1
     fi
 
-    if created_at=$(stat -c "%W" "$worktree_path" 2>/dev/null); then
-        if [[ "$created_at" =~ '^[0-9]+$' ]] && [ "$created_at" -gt 0 ]; then
-            echo "$created_at"
-            return 0
-        fi
-
-        echo "Error: creation time is unavailable for worktree: $worktree_path" >&2
-        return 1
-    fi
-
-    echo "Error: failed to read creation time for worktree: $worktree_path" >&2
-    return 1
+    echo "$created_at"
 }
 
-_gw_worktree_list_newest_first() {
+_gw_worktree_format_created_at() {
+    local created_at="$1"
+    local operating_system
+
+    if [[ ! "$created_at" =~ '^[0-9]+$' ]] || [ "$created_at" -le 0 ]; then
+        echo "Error: invalid worktree creation time: $created_at" >&2
+        return 1
+    fi
+
+    if ! operating_system=$(uname -s); then
+        echo "Error: failed to determine operating system for worktree creation time" >&2
+        return 1
+    fi
+
+    case "$operating_system" in
+        Darwin)
+            date -r "$created_at" "+%Y/%m/%d %H:%M" || {
+                echo "Error: failed to format worktree creation time: $created_at" >&2
+                return 1
+            }
+            ;;
+        Linux)
+            date -d "@$created_at" "+%Y/%m/%d %H:%M" || {
+                echo "Error: failed to format worktree creation time: $created_at" >&2
+                return 1
+            }
+            ;;
+        *)
+            echo "Error: unsupported operating system for worktree creation time: $operating_system" >&2
+            return 1
+            ;;
+    esac
+}
+
+_gw_worktree_list_with_created_epoch() {
     if [ "${1:-}" = "--prune-stale" ]; then
         if ! git worktree prune; then
             echo "Error: failed to prune stale worktree metadata" >&2
@@ -67,20 +110,66 @@ _gw_worktree_list_newest_first() {
     local line
     local worktree_path
     local created_at
+    local worktree_list
     local -a entries
 
+    if ! worktree_list=$(git worktree list); then
+        echo "Error: failed to list git worktrees" >&2
+        return 1
+    fi
+
     while IFS= read -r line; do
+        [ -n "$line" ] || continue
         worktree_path="${line%%[[:space:]]*}"
         if ! created_at=$(_gw_worktree_created_at "$worktree_path"); then
             return 1
         fi
 
         entries+=("${created_at}"$'\t'"${line}")
-    done < <(git worktree list)
+    done <<< "$worktree_list"
 
     if [ ${#entries[@]} -gt 0 ]; then
-        printf '%s\n' "${entries[@]}" | sort -rn -k1,1 | cut -f2-
+        printf '%s\n' "${entries[@]}" | sort -rn -k1,1
     fi
+}
+
+_gw_worktree_list_newest_first() {
+    local entries
+
+    if ! entries=$(_gw_worktree_list_with_created_epoch "$@"); then
+        return 1
+    fi
+
+    if [ -n "$entries" ]; then
+        printf '%s\n' "$entries" | cut -f2-
+    fi
+}
+
+_gwc_worktree_list_newest_first() {
+    local current_root="$1"
+    shift
+
+    local entries
+    local created_at
+    local line
+    local worktree_path
+    local formatted_created_at
+
+    if ! entries=$(_gw_worktree_list_with_created_epoch "$@"); then
+        return 1
+    fi
+
+    while IFS=$'\t' read -r created_at line; do
+        [ -n "$line" ] || continue
+        worktree_path="${line%%[[:space:]]*}"
+        [ "$worktree_path" != "$current_root" ] || continue
+
+        if ! formatted_created_at=$(_gw_worktree_format_created_at "$created_at"); then
+            return 1
+        fi
+
+        printf '%s\t%s%s\n' "$worktree_path" "$formatted_created_at" "${line#"$worktree_path"}"
+    done <<< "$entries"
 }
 
 _gw_worktree_fzf_preview_command() {
@@ -626,11 +715,11 @@ EOF
     local worktree_base="${git_root}-worktree"
     local worktree_list
 
-    if ! worktree_list=$(_gw_worktree_list_newest_first --prune-stale); then
+    if ! worktree_list=$(_gwc_worktree_list_newest_first "$git_root" --prune-stale); then
         return 1
     fi
 
-    local worktrees=$(printf '%s\n' "$worktree_list" | awk -v current_root="$(git rev-parse --show-toplevel)" '$1 != current_root')
+    local worktrees="$worktree_list"
 
     if [ -z "$worktrees" ]; then
         echo "削除可能なworktreeが見つかりません"
