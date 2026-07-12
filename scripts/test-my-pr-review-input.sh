@@ -6,6 +6,7 @@ split_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_split-r
 runner_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_run-codex-review.sh"
 prepare_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_prepare-review-artifacts.sh"
 reviewer_b_validator="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_validate-reviewer-b-output.sh"
+reviewer_b_schema="$repo_root/home/dot_claude/skills/my-pr/assets/claude-review-result.schema.json"
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/my-pr-review-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -487,7 +488,23 @@ EOF
   assert_file_contains "$tmp_dir/reviewer-b-summary-error.txt" "missing required section"
 }
 
+test_reviewer_b_schema() {
+  jq -e '
+    has("$schema") | not
+  ' "$reviewer_b_schema" >/dev/null ||
+    fail "Reviewer B schema must not declare a dialect unsupported by Claude CLI"
+
+  jq -e '
+    .type == "object" and
+    .additionalProperties == false and
+    .required == ["review_markdown"] and
+    .properties.review_markdown.type == "string"
+  ' "$reviewer_b_schema" >/dev/null ||
+    fail "Reviewer B schema does not require review_markdown"
+}
+
 test_chunking
 test_runner
 test_reviewer_b_validator
+test_reviewer_b_schema
 echo "PASS: my-pr review input tests"
