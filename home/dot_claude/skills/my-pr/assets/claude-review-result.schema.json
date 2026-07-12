@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["review_markdown"],
+  "properties": {
+    "review_markdown": {
+      "type": "string",
+      "minLength": 120,
+      "pattern": "^## PR understanding[\\s\\S]*## Strengths[\\s\\S]*## Findings[\\s\\S]*## Non-findings[\\s\\S]*## Assessment[\\s\\S]*\\*\\*Ready to merge\\?\\*\\*[\\s\\S]*\\*\\*Reasoning:\\*\\*"
+    }
+  }
+}

@@ -35,7 +35,7 @@ All commands except `verify` must complete these gates before review, simplify, 
    - `large+untracked`: resolve both conditions before continuing.
 7. Use the generated repo-local artifacts for review and PR body work. Do not use `/tmp` review patches.
 
-If any reviewer, artifact read, Codex invocation, or background review fails, the review is incomplete. Stop before Required fixes, commits, pushes, or PR creation unless the user explicitly approves a degraded path.
+If Reviewer A/C, an artifact read, a Codex invocation, or a background review fails, the review is incomplete. Reviewer B execution/input failures are also incomplete. A Reviewer B Markdown structure failure follows the bounded correction and skip policy in `review.md`; after one failed correction, integrate A/C as `COMPLETE_WITH_SKIPS` without substituting another reviewer.
 
 ## default
 

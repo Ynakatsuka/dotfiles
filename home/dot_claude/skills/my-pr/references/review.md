@@ -15,7 +15,7 @@ This reference is read-only for repository behavior. It collects and integrates 
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
 - Check approach fit against the PR problem: whether the chosen solution actually solves the stated issue, and whether a simpler, safer, or existing path would solve it better. Report alternatives only when there is concrete evidence, such as an existing extension point, duplicated implementation, violated constraint, or avoidable operational/maintenance risk.
-- Do not continue with degraded evidence. If a diff artifact, reviewer, Codex run, or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path.
+- Do not continue with degraded evidence. If a diff artifact, Reviewer A/C, Codex run, or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path. The only standing exception is a structurally invalid Reviewer B result after the bounded format-correction step below: skip Reviewer B, disclose the skip, and integrate Reviewer A/C.
 
 ## Artifact and scope gate
 
@@ -78,7 +78,7 @@ If `MY_PR_CONTEXT_STATE=no_existing_pr`, state that no PR body or prior GitHub c
 Use the full `MY_PR_REVIEW_DIFF` by default. Split Reviewer A, Reviewer B, and Reviewer C by file groups or top-level domains when any condition is true:
 
 - review diff lines > 10,000
-- review diff bytes > 98,304
+- review diff bytes > 196,608
 - a single reviewer cannot read the full artifact within tool limits
 
 Changed file count alone is not enough to chunk. Prefer one full-diff review when the artifact is readable within limits.
@@ -86,14 +86,16 @@ Changed file count alone is not enough to chunk. Prefer one full-diff review whe
 Chunk rules:
 
 1. Group files by subsystem or top-level directory.
-2. Keep each chunk at or below 98,304 bytes. Line count is not a safety bound because Markdown and generated content can contain long lines.
-3. Generate chunk artifacts with `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/split-review-chunks.sh" "$BASE_REF")"`. The script packs complete file diffs, verifies file coverage, and is compatible with macOS Bash 3.2.
+2. Keep each chunk at or below 196,608 bytes. Line count is not a safety bound because Markdown and generated content can contain long lines.
+3. Generate chunk artifacts with `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/split-review-chunks.sh" "$BASE_REF")"`. The script packs complete file diffs, verifies reviewable-file coverage, records oversized files under `MY_PR_SKIPPED_FILES`, and is compatible with macOS Bash 3.2.
 4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
-5. Integration must list all chunks for all reviewers and stop if any chunk is missing, failed, or inaccessible.
+5. Integration must list all chunks for Reviewer A/C and stop if any is missing, failed, or inaccessible. If any Reviewer B chunk remains structurally invalid after format correction, skip the entire Reviewer B family instead of integrating partial B coverage. Also list every skipped file with its byte count and state that those files were not reviewed.
 
 For a chunked run, tell each reviewer to review only the supplied `Files covered` as its assigned portion of the full PR. Do not ask one chunk to claim full-diff coverage. Integration establishes full coverage from the manifest and all completed chunk results.
 
-If one file diff exceeds the byte limit or a generated Codex prompt exceeds 196,608 bytes, stop before launching reviewers. Do not split in the middle of a file or silently raise the limit.
+The script reserves 8,192 bytes per chunk for metadata. If one complete file diff exceeds the remaining payload limit, skip only that file, record it in `MY_PR_SKIPPED_FILES` and `MY_PR_SKIPPED_FILE_SUMMARY`, and continue reviewing the remaining files. Do not split in the middle of a file or treat a skipped file as reviewed. If a generated Codex prompt exceeds 393,216 bytes, stop before launching that reviewer.
+
+If every changed file is skipped, do not launch empty reviewer runs. Return a review result that lists every skipped file and clearly states that no file content was reviewed.
 
 For small diffs, use the single `MY_PR_REVIEW_DIFF`.
 
@@ -106,7 +108,7 @@ Reviewer A and Reviewer C must use `scripts/run-codex-review.sh`. Do not pass ar
 The runner:
 
 - embeds the complete PR context and assigned diff directly into Codex stdin
-- caps the generated prompt at 196,608 bytes before launch
+- caps the generated prompt at 393,216 bytes before launch
 - runs from an isolated artifact-local Git repository instead of the review target repository
 - disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox
 - stores stdout/stderr under `MY_PR_ARTIFACT_DIR` instead of streaming token-heavy output to the parent tool
@@ -159,13 +161,15 @@ MY_PR_CONTEXT_STATE=found|no_existing_pr
 MY_PR_CONTEXT_BYTES=<PR context bytes>
 ```
 
-Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all reviewer and chunk results before integration.
+Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all launched reviewer and chunk results before integration.
 
 Reviewer B is host-aware:
 
 - In a Claude Code session with the Agent tool available, use the Agent tool.
-- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`: `claude --permission-mode plan --tools Read --output-format=stream-json --verbose -p "<PROMPT>"`.
-- Parse the final `stream-json` result event before integration. Use its `result` field as the reviewer text. If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or the reviewer text is incomplete, return `REVIEW_INCOMPLETE` and stop before integration.
+- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`. Pass `assets/claude-review-result.schema.json` through `--json-schema` so the final event contains `structured_output.review_markdown` with the complete review body: `claude --permission-mode plan --tools Read --output-format=stream-json --verbose --json-schema "$(jq -c . "${MY_PR_SKILL_DIR:?}/assets/claude-review-result.schema.json")" -p "<PROMPT>"`.
+- For Agent output, save the final response verbatim under `MY_PR_ARTIFACT_DIR/reviewer-results/reviewer-b/<chunk-id>/review.md`. For CLI output, extract only `structured_output.review_markdown` from the final `stream-json` result event into the same path. Do not use an interim message, handoff summary, or shortened recap as the reviewer body.
+- Validate every Reviewer B Markdown file with `bash "${MY_PR_SKILL_DIR:?}/scripts/validate-reviewer-b-output.sh" "$REVIEWER_B_REVIEW"` before integration.
+- If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or Reviewer B reports that the diff/context was inaccessible, return `REVIEW_INCOMPLETE` and stop before integration.
 - Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
 - Do not pass `--model` unless the user explicitly requested a model. Use the Claude Code configured default model and effort.
 - If a prompt file is needed for quoting, write it under `MY_PR_ARTIFACT_DIR` as an orchestration artifact. Do not use `/tmp`, and never stage or commit it.
@@ -242,6 +246,9 @@ Report every plausible issue you find, including low-severity or uncertain findi
 </finding_policy>
 
 <output_format>
+Your final response must contain the complete Markdown structure below and nothing else. Do not return a progress report, handoff summary, shortened recap, or a statement that the review was completed. Use `- none` in `Strengths`, `Findings`, or `Non-findings` when that section has no entries.
+When the executor supplies a JSON Schema, put this complete Markdown verbatim in `review_markdown`. Do not put a summary in that field.
+
 ## PR understanding
 - Description: one sentence describing what the PR changes.
 - Purpose: one sentence explaining why the PR exists.
@@ -274,7 +281,11 @@ Report every plausible issue you find, including low-severity or uncertain findi
 </output_format>
 ```
 
-If the Claude Agent or CLI exits non-zero, lacks quota or authentication, cannot read the diff artifact, or returns incomplete output, stop before integration. Do not replace Claude review with Codex/local review without explicit user approval.
+If Reviewer B completes its review but `validate-reviewer-b-output.sh` rejects the final Markdown, request one format-only correction in the same Agent conversation or CLI session. Tell Reviewer B to re-emit its already completed review using the exact output format, without rereading files, calling tools, changing findings, or returning a summary. Validate the corrected body once.
+
+If the corrected body is still invalid, skip the entire Reviewer B family, record the exact validation failure, and integrate Reviewer A/C. Do not retry again and do not replace Claude review with Codex or local review. This format-only skip is an explicitly approved degraded path and does not produce `REVIEW_INCOMPLETE`.
+
+If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times out, cannot read the diff/context artifact, or explicitly reports incomplete input, stop before integration. These execution and input failures are not format-only failures.
 
 ## Reviewer C: Codex correctness review
 
@@ -365,7 +376,7 @@ If the environment provides a background monitor, register the task before the f
 
 Deduplicate findings from simplify, Claude, and Codex. Put each finding in exactly one category.
 
-Before classifying, confirm all required reviewers and chunks completed. If any required reviewer/chunk is missing or failed, output `REVIEW_INCOMPLETE` and stop.
+Before classifying, confirm all Reviewer A/C chunks completed. If any required A/C chunk is missing or failed, output `REVIEW_INCOMPLETE` and stop. Reviewer B is also required unless its completed result failed only the Markdown structure validation after one format-correction attempt. In that case, omit all Reviewer B results, mark it skipped, and continue classification using Reviewer A/C.
 
 Every integrated finding must include a severity: `critical`, `high`, `medium`, or `low`. Do not output a Required, Recommended, or Not needed item without severity. If a reviewer omits severity, assign severity from the impact and evidence, include it in the output, and set `Severity source: integration-inferred`.
 
@@ -379,106 +390,93 @@ This phase only classifies findings. Required fixes are applied later by the def
 
 ## Integration output
 
-For `my-pr review`, create the final response as the review comment. Put the PR overview before findings, then group findings by severity sections in this exact order: Critical, High, Medium, Low. Include a section even when it has no findings, with `- none`.
+For `my-pr review`, create the final response as the review comment. Optimize for the decisions a reviewer or fixer must make. Group findings by action (`Required`, then `Recommended`), not by severity. Sort findings within each action by severity: critical, high, medium, low.
 
-For each Required and Recommended finding, write 3-5 concise sub-bullets and always include:
+The first line must identify the reviewed PR URL again, before the title or status. Read it from `.url` in `MY_PR_METADATA`. Do not reconstruct or guess it. If `MY_PR_CONTEXT_STATE=no_existing_pr`, write `Review URL: unavailable (no existing PR)` instead.
 
-- Classification: Required | Recommended
-- Severity: critical | high | medium | low
-- Severity source: reviewer | integration-inferred
-- Signal: source simplify | Claude | Codex | multiple
-- Confidence: high | medium | low
-- Problem: what is wrong, missing, or risky in the current diff
-- Why: why the fix is required now, or why approval is needed before changing it
-- Ideal state: the invariant, behavior, or maintainability target the code should satisfy
-- Fix/next step: concrete change direction, plus verification when useful
+Separate execution coverage from the code decision:
+
+- Review status: `COMPLETE`, `COMPLETE_WITH_SKIPS`, or `REVIEW_INCOMPLETE`
+- Code assessment: `CHANGES_REQUIRED` when any Required finding exists; `NEEDS_DECISION` when no Required finding exists but at least one Recommended finding exists; otherwise `NO_ACTION`
+
+Assign stable IDs in output order:
+
+- Required: `R1`, `R2`, ...
+- Recommended: `A1`, `A2`, ...
+
+For each Required and Recommended finding, include only:
+
+- Problem / impact: what is wrong and what can break or become unsafe
+- Evidence: the concrete diff/code evidence; include uncertainty here when relevant
+- Action: the concrete fix or decision, plus focused verification when useful
+- Signal: `simplify`, `Claude`, `Codex`, or `multiple`
+
+Keep severity in the finding heading. Do not include Confidence in the integrated output. Include `Severity source: integration-inferred` only when integration had to infer a missing severity; otherwise omit severity-source metadata.
+
+Omit empty Required and Recommended sections. Summarize Not needed findings as a count under `Excluded / reference`; list an individual Not needed item only when recording why a potentially important finding was rejected prevents confusion. Do not emit empty severity sections.
 
 If review is incomplete, output only:
 
 ```markdown
-# Quality Review Result
+Review URL: <PR URL or unavailable (no existing PR)>
 
-## Status
-REVIEW_INCOMPLETE
+# Review result
+
+## Decision
+- Review status: REVIEW_INCOMPLETE
+- Code assessment: unavailable
 
 ## Missing or failed inputs
-- <reviewer/chunk/artifact> — <exact failure>
+- <reviewer/chunk/artifact>: <exact failure>
 
 ## Next step
 - Stop before fixes, commits, pushes, or PR creation unless the user explicitly approves a degraded path.
 ```
 
-If all required reviewers and chunks completed, output:
+If Reviewer B or any oversized file was skipped, use `COMPLETE_WITH_SKIPS`; otherwise use `COMPLETE`. A format-only Reviewer B skip does not add a retry request or `Next step` section.
+
+For a complete review, use this structure:
 
 ```markdown
-# Quality Review Result
+Review URL: <PR URL or unavailable (no existing PR)>
 
-## Status
-COMPLETE
+# Review result
+
+## Decision
+- Review status: <COMPLETE or COMPLETE_WITH_SKIPS>
+- Code assessment: <CHANGES_REQUIRED, NEEDS_DECISION, or NO_ACTION>
+- Findings: Required <count> / Recommended <count>
+- Coverage: <reviewed file count> / <changed file count> files
+- Skipped: <count> inputs
 
 ## PR overview
-- Description: one sentence describing what the PR changes, based on PR body/conversation when available, otherwise the diff
-- Purpose: one sentence explaining why this PR exists
-- Problem to solve: one sentence based on PR body/conversation, or "Unavailable: no existing PR context"
-- Intended behavior: one sentence describing the expected user/system behavior after the PR
-- Context state: found | no_existing_pr
-- Prior discussion considered: key constraints or "- none found"
+- Purpose: why the PR exists, based on PR context when available
+- Main changes: concise summary of the implemented changes
+- Main risk: the most important risk, or `none identified`
 
-## Critical
-1. **file:line** — short title
-   - Classification: Required | Recommended
-   - Severity: critical
-   - Severity source: reviewer | integration-inferred
-   - Signal: source simplify | Claude | Codex | multiple
-   - Confidence: high | medium | low
-   - Problem: what is broken, missing, or unsafe
-   - Why: concrete risk that makes this required now, or trade-off that needs approval
-   - Ideal state: expected invariant, behavior, or contract
-   - Fix/next step: concrete fix direction and verification
+## Required
 
-## High
-1. **file:line** — short title
-   - Classification: Required | Recommended
-   - Severity: high
-   - Severity source: reviewer | integration-inferred
-   - Signal: source simplify | Claude | Codex | multiple
-   - Confidence: high | medium | low
-   - Problem: what is suboptimal, risky, or uncertain
-   - Why: concrete risk that makes this required now, or trade-off that needs approval
-   - Ideal state: expected design, behavior, or maintainability target
-   - Fix/next step: concrete option to fix, approve, defer, or investigate
+### R1 [High] `file:line` — short title
+- Problem / impact: what is broken, missing, or unsafe and what can happen
+- Evidence: why this follows from the diff or code
+- Action: concrete fix direction and focused verification
+- Signal: Claude | Codex | simplify | multiple
 
-## Medium
-1. **file:line** — short title
-   - Classification: Required | Recommended
-   - Severity: medium
-   - Severity source: reviewer | integration-inferred
-   - Signal: source simplify | Claude | Codex | multiple
-   - Confidence: high | medium | low
-   - Problem: what is suboptimal, risky, or uncertain
-   - Why: concrete risk that makes this required now, or trade-off that needs approval
-   - Ideal state: expected design, behavior, or maintainability target
-   - Fix/next step: concrete option to fix, approve, defer, or investigate
+## Recommended
 
-## Low
-1. **file:line** — short title
-   - Classification: Required | Recommended
-   - Severity: low
-   - Severity source: reviewer | integration-inferred
-   - Signal: source simplify | Claude | Codex | multiple
-   - Confidence: high | medium | low
-   - Problem: what is suboptimal, risky, or uncertain
-   - Why: concrete risk that makes this required now, or trade-off that needs approval
-   - Ideal state: expected design, behavior, or maintainability target
-   - Fix/next step: concrete option to fix, approve, defer, or investigate
-
-## Not needed
-- **file:line** — ignored finding and reason
-  - Classification: Not needed
-  - Severity: critical | high | medium | low
-  - Severity source: reviewer | integration-inferred
-  - Signal: source simplify | Claude | Codex | multiple
+### A1 [Medium] `file:line` — short title
+- Problem / impact: what is uncertain or approval-worthy
+- Evidence: why this deserves consideration
+- Action: concrete decision or follow-up
+- Signal: Claude | Codex | simplify | multiple
 
 ## Verification plan
-- Commands/tests to run after fixes
+- Commands or tests to run after Required fixes
+
+## Excluded / reference
+- Skipped reviewer: Reviewer B — <exact structural validation failure after one correction attempt>
+- Skipped file: <file> — <bytes> bytes; single-file review limit exceeded
+- Not needed: <count> findings
 ```
+
+Omit `Required`, `Recommended`, `Verification plan`, or `Excluded / reference` when the section has no content. For `NO_ACTION`, the Decision and PR overview are sufficient.

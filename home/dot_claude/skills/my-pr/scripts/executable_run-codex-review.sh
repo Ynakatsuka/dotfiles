@@ -46,9 +46,9 @@ for input_file in "$prompt_file" "$context_file" "$diff_file"; do
   fi
 done
 
-max_prompt_bytes=${MY_PR_CODEX_PROMPT_MAX_BYTES:-196608}
-if [[ ! "$max_prompt_bytes" =~ ^[1-9][0-9]*$ ]] || ((max_prompt_bytes > 196608)); then
-  echo "ERROR: MY_PR_CODEX_PROMPT_MAX_BYTES must be an integer from 1 through 196608" >&2
+max_prompt_bytes=${MY_PR_CODEX_PROMPT_MAX_BYTES:-393216}
+if [[ ! "$max_prompt_bytes" =~ ^[1-9][0-9]*$ ]] || ((max_prompt_bytes > 393216)); then
+  echo "ERROR: MY_PR_CODEX_PROMPT_MAX_BYTES must be an integer from 1 through 393216" >&2
   exit 1
 fi
 

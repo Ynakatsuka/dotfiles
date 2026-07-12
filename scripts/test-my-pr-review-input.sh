@@ -5,6 +5,7 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 split_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_split-review-chunks.sh"
 runner_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_run-codex-review.sh"
 prepare_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_prepare-review-artifacts.sh"
+reviewer_b_validator="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_validate-reviewer-b-output.sh"
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/my-pr-review-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -18,6 +19,14 @@ assert_file_contains() {
   local file=$1
   local pattern=$2
   grep -Fq -- "$pattern" "$file" || fail "$file does not contain: $pattern"
+}
+
+assert_file_not_contains() {
+  local file=$1
+  local pattern=$2
+  if grep -Fq -- "$pattern" "$file"; then
+    fail "$file unexpectedly contains: $pattern"
+  fi
 }
 
 test_chunking() {
@@ -86,13 +95,13 @@ test_chunking() {
   if (
     cd "$test_repo"
     MY_PR_ARTIFACT_DIR="$artifact_dir" \
-      MY_PR_REVIEW_CHUNK_MAX_BYTES=98305 \
+      MY_PR_REVIEW_CHUNK_MAX_BYTES=196609 \
       /bin/bash "$split_script" "$base_ref" \
       >"$tmp_dir/raised-chunk-cap-output.txt" 2>"$tmp_dir/raised-chunk-cap-error.txt"
   ); then
     fail "raised chunk cap unexpectedly succeeded"
   fi
-  assert_file_contains "$tmp_dir/raised-chunk-cap-error.txt" "8193 through 98304"
+  assert_file_contains "$tmp_dir/raised-chunk-cap-error.txt" "8193 through 196608"
 
   awk 'BEGIN { for (i = 1; i <= 11000; i++) print "+0123456789" }' >"$test_repo/docs/oversized.md"
   git -C "$test_repo" add docs/oversized.md
@@ -104,15 +113,69 @@ test_chunking() {
     printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/oversized-artifact-path.txt"
   )
   oversized_artifact="$test_repo/$(cat "$tmp_dir/oversized-artifact-path.txt")"
-  if (
+  (
     cd "$test_repo"
     MY_PR_ARTIFACT_DIR="$oversized_artifact" \
       /bin/bash "$split_script" "$base_ref" \
       >"$tmp_dir/oversized-file-output.txt" 2>"$tmp_dir/oversized-file-error.txt"
-  ); then
-    fail "oversized file diff unexpectedly succeeded"
-  fi
-  assert_file_contains "$tmp_dir/oversized-file-error.txt" "one file diff exceeds chunk byte limit"
+  )
+  assert_file_contains "$oversized_artifact/chunks/all-covered.txt" "docs/oversized.md"
+  [[ ! -s "$oversized_artifact/chunks/skipped-files.txt" ]] ||
+    fail "a file below the raised default limit was skipped"
+
+  awk 'BEGIN { for (i = 1; i <= 22000; i++) print "+0123456789" }' >"$test_repo/docs/too-large.json"
+  git -C "$test_repo" add docs/too-large.json
+  git -C "$test_repo" commit -qm "test: add skipped review fixture"
+  local skipped_artifact
+  (
+    cd "$test_repo"
+    eval "$(/bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/skipped-prepare-error.txt")"
+    printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/skipped-artifact-path.txt"
+  )
+  skipped_artifact="$test_repo/$(cat "$tmp_dir/skipped-artifact-path.txt")"
+  (
+    cd "$test_repo"
+    MY_PR_ARTIFACT_DIR="$skipped_artifact" \
+      /bin/bash "$split_script" "$base_ref" \
+      >"$tmp_dir/skipped-file-output.txt" 2>"$tmp_dir/skipped-file-error.txt"
+  )
+  assert_file_contains "$skipped_artifact/chunks/skipped-files.txt" "docs/too-large.json"
+  assert_file_contains "$skipped_artifact/chunks/skipped-files-summary.txt" "bytes: docs/too-large.json"
+  assert_file_contains "$skipped_artifact/chunks/all-covered.txt" "docs/oversized.md"
+  assert_file_not_contains "$skipped_artifact/chunks/all-covered.txt" "docs/too-large.json"
+  assert_file_contains "$tmp_dir/skipped-file-error.txt" "skipping oversized file diff"
+
+  local skipped_only_repo="$tmp_dir/skipped only repo"
+  local skipped_only_base
+  local skipped_only_artifact
+  mkdir -p "$skipped_only_repo"
+  git -C "$skipped_only_repo" init -q
+  git -C "$skipped_only_repo" config user.name "Test User"
+  git -C "$skipped_only_repo" config user.email "test@example.com"
+  printf 'base\n' >"$skipped_only_repo/base.txt"
+  git -C "$skipped_only_repo" add base.txt
+  git -C "$skipped_only_repo" commit -qm "chore: add base"
+  skipped_only_base=$(git -C "$skipped_only_repo" rev-parse HEAD)
+  awk 'BEGIN { for (i = 1; i <= 22000; i++) print "+0123456789" }' >"$skipped_only_repo/only-large.json"
+  git -C "$skipped_only_repo" add only-large.json
+  git -C "$skipped_only_repo" commit -qm "test: add only skipped fixture"
+  (
+    cd "$skipped_only_repo"
+    eval "$(/bin/bash "$prepare_script" "$skipped_only_base" 2>"$tmp_dir/skipped-only-prepare-error.txt")"
+    printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/skipped-only-artifact-path.txt"
+  )
+  skipped_only_artifact="$skipped_only_repo/$(cat "$tmp_dir/skipped-only-artifact-path.txt")"
+  (
+    cd "$skipped_only_repo"
+    MY_PR_ARTIFACT_DIR="$skipped_only_artifact" \
+      /bin/bash "$split_script" "$skipped_only_base" \
+      >"$tmp_dir/skipped-only-output.txt" 2>"$tmp_dir/skipped-only-error.txt"
+  )
+  [[ ! -s "$skipped_only_artifact/chunks/manifest.txt" ]] ||
+    fail "an all-skipped diff unexpectedly produced review chunks"
+  [[ ! -s "$skipped_only_artifact/chunks/reviewable-files.txt" ]] ||
+    fail "an all-skipped diff unexpectedly produced reviewable files"
+  assert_file_contains "$skipped_only_artifact/chunks/skipped-files.txt" "only-large.json"
 
   local newline_file=$'src/line\nbreak.txt'
   printf 'newline path\n' >"$test_repo/$newline_file"
@@ -292,14 +355,14 @@ test_runner() {
 
   if MY_PR_ARTIFACT_DIR="$artifact_dir" \
     MY_PR_CODEX_BIN="$fake_codex" \
-    MY_PR_CODEX_PROMPT_MAX_BYTES=196609 \
+    MY_PR_CODEX_PROMPT_MAX_BYTES=393217 \
     FAKE_ARGS="$tmp_dir/raised-cap-args.txt" \
     FAKE_CAPTURE="$tmp_dir/raised-cap-input.md" \
     /bin/bash "$runner_script" reviewer-c raised-cap 1 "$prompt_file" "$context_file" "$diff_file" \
     >"$tmp_dir/raised-cap-output.txt" 2>"$tmp_dir/raised-cap-error.txt"; then
     fail "raised prompt cap unexpectedly succeeded"
   fi
-  assert_file_contains "$tmp_dir/raised-cap-error.txt" "1 through 196608"
+  assert_file_contains "$tmp_dir/raised-cap-error.txt" "1 through 393216"
 
   if MY_PR_ARTIFACT_DIR="$artifact_dir" \
     MY_PR_CODEX_BIN="$fake_codex" \
@@ -391,6 +454,40 @@ test_runner() {
   assert_file_contains "$tmp_dir/short-markdown-error.txt" "missing required section"
 }
 
+test_reviewer_b_validator() {
+  local valid="$tmp_dir/reviewer-b-valid.md"
+  local summary="$tmp_dir/reviewer-b-summary.md"
+
+  cat >"$valid" <<'EOF'
+## PR understanding
+- Description: test
+
+## Strengths
+- none
+
+## Findings
+- none
+
+## Non-findings
+- none
+
+## Assessment
+
+**Ready to merge?** Yes
+
+**Reasoning:** No findings.
+EOF
+  printf '%s\n' 'Reviewer B completed the review and found no blocking issues.' >"$summary"
+
+  /bin/bash "$reviewer_b_validator" "$valid"
+  if /bin/bash "$reviewer_b_validator" "$summary" \
+    >"$tmp_dir/reviewer-b-summary-output.txt" 2>"$tmp_dir/reviewer-b-summary-error.txt"; then
+    fail "Reviewer B summary unexpectedly passed validation"
+  fi
+  assert_file_contains "$tmp_dir/reviewer-b-summary-error.txt" "missing required section"
+}
+
 test_chunking
 test_runner
+test_reviewer_b_validator
 echo "PASS: my-pr review input tests"
