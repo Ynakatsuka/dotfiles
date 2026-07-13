@@ -55,8 +55,9 @@ Avoid these patterns unless explicitly approved:
 ## Investigation and Scope
 
 - Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
-- Ask only when behavior, scope, interface shape, data model, error semantics, or technology choice has multiple material interpretations that evidence cannot resolve.
-- For low-risk reversible choices, follow existing project conventions and proceed.
+- Ask only when behavior, scope, interface shape, data model, error semantics, or technology choice has multiple material interpretations that evidence cannot resolve. Do not ask about arbitrary preferences with no material effect.
+- For low-risk reversible choices, follow existing project conventions and proceed without confirmation. Examples include branch and worktree names, temporary names, private identifiers and helpers, formatting, test fixture values, and the order of equivalent local steps.
+- When the user omits a branch or worktree name, derive a concise, task-based name from repository conventions instead of asking for one.
 - Before editing, read the target and the most relevant adjacent caller, test, type, config, or documentation.
 - Prefer the smallest safe change. Reuse an existing solution before introducing a helper, dependency, abstraction, or toolchain change.
 - Diagnose bugs before patching. Establish the root cause in one sentence and prefer a failing test or minimal reproduction. Use the relevant diagnostic skill for multi-step investigations when available.

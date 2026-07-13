@@ -40,7 +40,7 @@ If a worktree for that branch already exists, prints the existing path and exits
 
 ## How to use
 
-1. Confirm the branch name with the user if not supplied. Do not invent one.
+1. If the branch name is not supplied, derive a concise, task-based name from repository conventions. Do not ask solely to choose the branch or worktree name.
 2. Run from inside the repo (invoke via `bash`; deployed copies may lack the executable bit):
    ```bash
    bash ~/.claude/skills/my-worktree/scripts/create-worktree.sh <branch-name>
