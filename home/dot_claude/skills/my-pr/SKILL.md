@@ -7,12 +7,10 @@ description: >-
   Subcommands: `create` (simplify + PR, skip code review), `review`
   (read-only findings only), `fix` (Required fixes + commit, no push),
   `simplify` (simplification only), `verify` (existing PR checks/reviews only).
-  Use when creating PRs, self-reviewing changes, simplifying PR changes, or
-  requesting "PR作成", "レビュー", "簡素化". Do NOT use for responding to others'
-  review comments, reviewing others' or external PRs (perform the built-in
-  /review instead, even when my-pr was invoked explicitly), or a lightweight
-  review of the current working diff without the PR workflow (use the built-in
-  /code-review instead).
+  Use when creating or reviewing PRs, self-reviewing changes, simplifying PR
+  changes, or requesting "PR作成", "レビュー", "簡素化". Do NOT use for responding
+  to review comments or a lightweight review of the current working diff
+  without the PR workflow (use the built-in /code-review instead).
 argument-hint: "[create|review|fix|simplify|verify]"
 ---
 
@@ -27,22 +25,6 @@ git status --short --branch
 ```
 
 このスナップショットはモード判定と Safety gate の初期判断にのみ使う。以後の各ステップでは、規定のコマンド・スクリプトで取得する最新状態を正とする。
-
-## 他者作成 PR の通常レビューへの切り替え
-
-レビュー対象の PR がある場合は、最初に GitHub のログインユーザーと PR 作成者を取得する。取得に失敗した場合は、作成者を推測せずエラーとして停止する。
-
-```bash
-LOGIN=$(gh api user --jq .login)
-PR_AUTHOR=$(gh pr view --json author --jq .author.login)
-```
-
-`LOGIN` と `PR_AUTHOR` が異なる場合は、my-pr ワークフローを開始しない。組み込みの `/review` に相当する通常の読み取り専用レビューに切り替え、そのまま指摘を返す。対象外の理由だけを報告して終了しない。
-
-- 実施すること: PR 差分の通常レビュー
-- 実施しないこと: my-pr の artifact 作成、3 reviewer 統合、simplify、ファイル変更、検証、commit、push、PR 更新
-
-`LOGIN` と `PR_AUTHOR` が一致する場合だけ、以下の my-pr モード判定へ進む。
 
 ## 0. モード判定
 
