@@ -18,6 +18,16 @@ argument-hint: "[epic-name|docs/epics/path|request]"
 
 中〜大規模の開発ゴールを、検証可能な PR 単位のツリーへ分解し、ユーザー確認を挟みながら実装と PR 作成まで進める。
 
+## PR 作成の委譲
+
+PR leaf の draft PR を作成または更新するときは、必ず `my-pr` スキルを `create` 引数で明示的に呼び出す（`/my-pr create` と同等）。このスキルから `git commit`、`git push`、`gh pr create`、`gh pr edit` を直接実行して代替しない。
+
+- 呼び出し条件: PR leaf の Test / Data / Smoke gate、Spec compliance review、Code quality review が完了し、PR 作成のユーザー承認がある
+- 委譲する処理: simplify、必要な commit、push、draft PR の作成または更新、CI と自動レビューの確認
+- 委譲前に渡す情報: leaf ID と goal、依存関係、検証結果、rollout / rollback、残存リスク
+- 委譲後に記録する情報: PR URL、最終 commit、`my-pr` の検証結果、blocker / follow-up
+- 失敗時: 直接コマンドへ切り替えず、`my-pr` が報告した失敗を対象 node の blocker として記録して停止する
+
 ## 初回呼び出しの境界
 
 新規 epic を作成する最初の呼び出しでは、scope を epic 作成と承認待ちの提示だけに限定する。
@@ -74,14 +84,14 @@ docs/epics/{name}/
 
 ## 共通原則
 
-- **このスキルの責務**: 分解、合意、依存管理、PR leaf 実装、operation 実行、検証ゲート、統合、PR 作成判断
+- **このスキルの責務**: 分解、合意、依存管理、PR leaf 実装、operation 実行、検証ゲート、統合、PR 作成判断と `my-pr` への handoff
 - **記述言語**: epic ドキュメントは日本語で書く。コードコメント、docstring、commit message、コマンド、識別子は英語を維持する
 - **実装方針**: 実装または operation 実行は、ユーザーが Phase 5 の開始または特定 node の実行を明示した後にだけ進める。必要なら Codex CLI などの外部実装エージェントを補助的に使う
 - **PR leaf の定義**: 単独でレビュー・マージ可能で、受入基準と検証ゲートが明確な最小成果物
 - **確認単位**: root goal、主要分岐、PR leaf goal、operation 実行内容、技術選定、破壊的変更、PR 作成前
 - **自律性**: コード・テスト・docs・履歴から判断できることはユーザーに聞かない
 - **停止方針**: 推測で進めない。失敗、曖昧な仕様、契約変更、検証不能は停止して確認する
-- **外部スキル非依存**: 他スキル呼び出しを前提にしない。PR 作成、検証、状態更新はこのスキルの手順内で行う
+- **スキル連携**: PR 作成・更新は `my-pr create` に委譲する。それ以外の検証と epic 状態更新はこのスキルの手順内で行う
 - **補助エージェント**: Codex CLI などは、PR leaf が大きい、並列化したい、第二実装案が欲しい場合だけ使う
 
 ## 引数と状態検出
@@ -226,8 +236,10 @@ PR leaf の実行手順:
 7. 実行部の実装記録を記録する
 8. 失敗した場合は root cause を特定し、1 回だけ修正サイクルを回す
 9. まだ失敗する、または設計矛盾がある場合は停止する
-10. gate が全て通ったら `ai/tree.md` の node 表と `README.md` の進捗を更新する
-11. `gh` で draft PR を作成・更新し、CI と自動レビューを確認する
+10. gate が全て通ったら leaf の実行記録を更新する。PR 作成が完了するまで node は完了扱いにしない
+11. 「PR 作成の委譲」に従い、`my-pr` スキルを `create` 引数で呼び出す
+12. `my-pr` の結果から PR URL、最終 commit、検証結果、blocker / follow-up を leaf の実行記録へ反映する
+13. `my-pr` が成功した場合だけ `ai/tree.md` の node 表と `README.md` の進捗を更新する
 
 operation node の実行手順:
 
