@@ -18,6 +18,8 @@ jobs:
         run: bash scripts/check-stale.sh
       - name: Test RTK rewrite hook guards
         run: bash scripts/test-rtk-rewrite-hook.sh
+      - name: Test my-pr worktree transfer
+        run: bash scripts/test-my-pr-worktree-move.sh
       - name: Test mise upgrade wrapper
         run: |
           command -v jq >/dev/null

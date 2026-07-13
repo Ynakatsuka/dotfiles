@@ -61,16 +61,17 @@ while IFS= read -r pathspec || [[ -n "$pathspec" ]]; do
   [[ -n "$pathspec" ]] && pathspecs+=("$pathspec")
 done <"$pathspec_list"
 
-# Only append the `--` separator and pathspecs when at least one pathspec is
-# present. An empty array would otherwise leave a bare trailing `--`.
-diff_pathspec_args=()
 if ((${#pathspecs[@]})); then
-  diff_pathspec_args=(-- "${pathspecs[@]}")
+  git diff --cached --binary -- "${pathspecs[@]}" >"$staged_patch"
+  git diff --binary -- "${pathspecs[@]}" >"$unstaged_patch"
+  git diff --name-only --diff-filter=A -- "${pathspecs[@]}" >"$intent_to_add_list"
+else
+  # Bash 3.2 treats an empty array expansion as an unbound variable under
+  # `set -u`, so do not pass an optional array to git in this branch.
+  git diff --cached --binary >"$staged_patch"
+  git diff --binary >"$unstaged_patch"
+  git diff --name-only --diff-filter=A >"$intent_to_add_list"
 fi
-
-git diff --cached --binary "${diff_pathspec_args[@]}" >"$staged_patch"
-git diff --binary "${diff_pathspec_args[@]}" >"$unstaged_patch"
-git diff --name-only --diff-filter=A "${diff_pathspec_args[@]}" >"$intent_to_add_list"
 
 : >"$untracked_list"
 if [[ -n "${MY_PR_UNTRACKED_FILE_LIST:-}" ]]; then
@@ -129,8 +130,13 @@ while IFS= read -r file_path; do
   cmp "$orig_repo/$file_path" "$worktree_dir/$file_path" >/dev/null
 done <"$untracked_list"
 
-git -C "$worktree_dir" diff --cached --binary "${diff_pathspec_args[@]}" >"$tmp_dir/worktree-staged.patch"
-git -C "$worktree_dir" diff --binary "${diff_pathspec_args[@]}" >"$tmp_dir/worktree-unstaged.patch"
+if ((${#pathspecs[@]})); then
+  git -C "$worktree_dir" diff --cached --binary -- "${pathspecs[@]}" >"$tmp_dir/worktree-staged.patch"
+  git -C "$worktree_dir" diff --binary -- "${pathspecs[@]}" >"$tmp_dir/worktree-unstaged.patch"
+else
+  git -C "$worktree_dir" diff --cached --binary >"$tmp_dir/worktree-staged.patch"
+  git -C "$worktree_dir" diff --binary >"$tmp_dir/worktree-unstaged.patch"
+fi
 
 cmp "$staged_patch" "$tmp_dir/worktree-staged.patch" >/dev/null
 cmp "$unstaged_patch" "$tmp_dir/worktree-unstaged.patch" >/dev/null
