@@ -1,12 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-base_ref=${1:?Usage: split-review-chunks.sh <base-ref>}
-if (($# > 1)); then
-  echo "ERROR: unexpected argument: $2" >&2
+usage='Usage: split-review-chunks.sh <artifact-env-file>'
+if (($# != 1)); then
+  echo "ERROR: $usage" >&2
   exit 1
 fi
-: "${MY_PR_ARTIFACT_DIR:?Run prepare-review-artifacts.sh first and export MY_PR_ARTIFACT_DIR}"
+
+artifact_env=$1
+if [[ ! -f "$artifact_env" ]]; then
+  echo "ERROR: artifact state file not found: $artifact_env" >&2
+  exit 1
+fi
+artifact_env=$(cd "$(dirname "$artifact_env")" && pwd -P)/$(basename "$artifact_env")
+# shellcheck source=/dev/null
+source "$artifact_env"
+: "${MY_PR_ARTIFACT_DIR:?Invalid artifact state: MY_PR_ARTIFACT_DIR is missing}"
+: "${MY_PR_ARTIFACT_ENV:?Invalid artifact state: MY_PR_ARTIFACT_ENV is missing}"
+: "${MY_PR_BASE_REF:?Invalid artifact state: MY_PR_BASE_REF is missing}"
+if [[ "$MY_PR_ARTIFACT_ENV" != "$artifact_env" ]]; then
+  echo "ERROR: artifact state path mismatch: expected=$artifact_env actual=$MY_PR_ARTIFACT_ENV" >&2
+  exit 1
+fi
+base_ref=$MY_PR_BASE_REF
 
 max_chunk_bytes=${MY_PR_REVIEW_CHUNK_MAX_BYTES:-196608}
 if [[ ! "$max_chunk_bytes" =~ ^[1-9][0-9]*$ ]] || ((max_chunk_bytes <= 8192 || max_chunk_bytes > 196608)); then
@@ -222,8 +238,17 @@ reviewable_review="$chunks_dir/reviewable.diff"
   cat "$chunks_dir/combined.unstaged.diff"
 } >"$reviewable_review"
 
-printf 'MY_PR_CHUNKS_DIR=%q\n' "$chunks_dir"
-printf 'MY_PR_CHUNK_MANIFEST=%q\n' "$manifest_file"
-printf 'MY_PR_REVIEWABLE_DIFF=%q\n' "$reviewable_review"
-printf 'MY_PR_SKIPPED_FILES=%q\n' "$skipped_files"
-printf 'MY_PR_SKIPPED_FILE_SUMMARY=%q\n' "$skipped_summary"
+chunks_env="$chunks_dir/chunks.env"
+{
+  printf 'export MY_PR_CHUNKS_DIR=%q\n' "$chunks_dir"
+  printf 'export MY_PR_CHUNK_MANIFEST=%q\n' "$manifest_file"
+  printf 'export MY_PR_REVIEWABLE_DIFF=%q\n' "$reviewable_review"
+  printf 'export MY_PR_SKIPPED_FILES=%q\n' "$skipped_files"
+  printf 'export MY_PR_SKIPPED_FILE_SUMMARY=%q\n' "$skipped_summary"
+} >"$chunks_env"
+cat "$chunks_env" >>"$artifact_env"
+latest_env="$(dirname "$MY_PR_ARTIFACT_DIR")/latest-env.sh"
+if [[ -f "$latest_env" ]]; then
+  cp "$artifact_env" "$latest_env"
+fi
+printf '%s\n' "$artifact_env"

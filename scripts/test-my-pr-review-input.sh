@@ -2,11 +2,34 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-split_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_split-review-chunks.sh"
-runner_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_run-codex-review.sh"
-prepare_script="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_prepare-review-artifacts.sh"
-reviewer_b_validator="$repo_root/home/dot_claude/skills/my-pr/scripts/executable_validate-reviewer-b-output.sh"
-reviewer_b_schema="$repo_root/home/dot_claude/skills/my-pr/assets/claude-review-result.schema.json"
+if (($# > 1)); then
+  echo "Usage: test-my-pr-review-input.sh [my-pr-skill-root]" >&2
+  exit 1
+fi
+skill_root=${1:-"$repo_root/home/dot_claude/skills/my-pr"}
+resolve_skill_script() {
+  local script_name=$1
+  local source_path="$skill_root/scripts/executable_${script_name}"
+  local deployed_path="$skill_root/scripts/$script_name"
+
+  if [[ -f "$source_path" && ! -e "$deployed_path" ]]; then
+    printf '%s\n' "$source_path"
+    return
+  fi
+  if [[ -f "$deployed_path" && ! -e "$source_path" ]]; then
+    printf '%s\n' "$deployed_path"
+    return
+  fi
+  echo "ERROR: expected exactly one my-pr script path: $source_path or $deployed_path" >&2
+  return 1
+}
+
+split_script=$(resolve_skill_script split-review-chunks.sh)
+runner_script=$(resolve_skill_script run-codex-review.sh)
+prepare_script=$(resolve_skill_script prepare-review-artifacts.sh)
+context_script=$(resolve_skill_script prepare-pr-context.sh)
+reviewer_b_validator=$(resolve_skill_script validate-reviewer-b-output.sh)
+reviewer_b_schema="$skill_root/assets/claude-review-result.schema.json"
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/my-pr-review-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -33,6 +56,7 @@ assert_file_not_contains() {
 test_chunking() {
   local test_repo="$tmp_dir/repo with space"
   local artifact_dir
+  local artifact_env
   local base_ref
 
   mkdir -p "$test_repo"
@@ -59,22 +83,54 @@ test_chunking() {
   git -C "$test_repo" add docs src
   git -C "$test_repo" commit -qm "test: add review fixtures"
 
-  (
+  artifact_env=$(
     cd "$test_repo"
-    eval "$(/bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/prepare-error.txt")"
-    printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/artifact-path.txt"
+    /bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/prepare-error.txt"
+  )
+  [[ "$artifact_env" == /*/artifact.env ]] ||
+    fail "prepare script did not return an absolute artifact env path: $artifact_env"
+  artifact_dir=$(dirname "$artifact_env")
+  (
+    unset MY_PR_ARTIFACT_DIR MY_PR_ARTIFACT_ENV MY_PR_REVIEW_BYTES
+    # shellcheck source=/dev/null
+    source "$artifact_env"
     printf '%s\n' "$MY_PR_REVIEW_BYTES" >"$tmp_dir/review-bytes.txt"
   )
-  artifact_dir="$test_repo/$(cat "$tmp_dir/artifact-path.txt")"
   [[ "$(cat "$tmp_dir/review-bytes.txt")" =~ ^[1-9][0-9]*$ ]] || fail "review byte count was not exported"
   assert_file_contains "$artifact_dir/changed-files.txt" "src/日本語.txt"
 
+  mkdir -p "$tmp_dir/fake-bin"
+  cat >"$tmp_dir/fake-bin/gh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-} ${2:-}" == "pr view" ]]; then
+  echo "no pull requests found for branch" >&2
+  exit 1
+fi
+echo "unexpected gh invocation: $*" >&2
+exit 2
+EOF
+  chmod +x "$tmp_dir/fake-bin/gh"
   (
     cd "$test_repo"
-    MY_PR_ARTIFACT_DIR="$artifact_dir" \
-      MY_PR_REVIEW_CHUNK_MAX_BYTES=20000 \
-      /bin/bash "$split_script" "$base_ref" >"$tmp_dir/chunk-output.txt"
+    env -u MY_PR_ARTIFACT_DIR -u MY_PR_ARTIFACT_ENV \
+      PATH="$tmp_dir/fake-bin:$PATH" \
+      /bin/bash "$context_script" "$artifact_env" >"$tmp_dir/context-output.txt"
   )
+  [[ "$(cat "$tmp_dir/context-output.txt")" == "$artifact_env" ]] ||
+    fail "context script did not return the artifact env path"
+  assert_file_contains "$artifact_env" "export MY_PR_CONTEXT="
+  assert_file_contains "$artifact_dir/pr-context.md" "State: no existing PR"
+
+  (
+    cd "$test_repo"
+    env -u MY_PR_ARTIFACT_DIR -u MY_PR_BASE_REF \
+      MY_PR_REVIEW_CHUNK_MAX_BYTES=20000 \
+      /bin/bash "$split_script" "$artifact_env" >"$tmp_dir/chunk-output.txt"
+  )
+  [[ "$(cat "$tmp_dir/chunk-output.txt")" == "$artifact_env" ]] ||
+    fail "chunk script did not return the artifact env path"
+  assert_file_contains "$artifact_env" "export MY_PR_CHUNK_MANIFEST="
 
   local manifest="$artifact_dir/chunks/manifest.txt"
   [[ -s "$manifest" ]] || fail "chunk manifest is empty"
@@ -95,9 +151,9 @@ test_chunking() {
 
   if (
     cd "$test_repo"
-    MY_PR_ARTIFACT_DIR="$artifact_dir" \
+    env -u MY_PR_ARTIFACT_DIR -u MY_PR_BASE_REF \
       MY_PR_REVIEW_CHUNK_MAX_BYTES=196609 \
-      /bin/bash "$split_script" "$base_ref" \
+      /bin/bash "$split_script" "$artifact_env" \
       >"$tmp_dir/raised-chunk-cap-output.txt" 2>"$tmp_dir/raised-chunk-cap-error.txt"
   ); then
     fail "raised chunk cap unexpectedly succeeded"
@@ -108,16 +164,16 @@ test_chunking() {
   git -C "$test_repo" add docs/oversized.md
   git -C "$test_repo" commit -qm "test: add oversized review fixture"
   local oversized_artifact
-  (
+  local oversized_env
+  oversized_env=$(
     cd "$test_repo"
-    eval "$(/bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/oversized-prepare-error.txt")"
-    printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/oversized-artifact-path.txt"
+    /bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/oversized-prepare-error.txt"
   )
-  oversized_artifact="$test_repo/$(cat "$tmp_dir/oversized-artifact-path.txt")"
+  oversized_artifact=$(dirname "$oversized_env")
   (
     cd "$test_repo"
-    MY_PR_ARTIFACT_DIR="$oversized_artifact" \
-      /bin/bash "$split_script" "$base_ref" \
+    env -u MY_PR_ARTIFACT_DIR -u MY_PR_BASE_REF \
+      /bin/bash "$split_script" "$oversized_env" \
       >"$tmp_dir/oversized-file-output.txt" 2>"$tmp_dir/oversized-file-error.txt"
   )
   assert_file_contains "$oversized_artifact/chunks/all-covered.txt" "docs/oversized.md"
@@ -128,16 +184,16 @@ test_chunking() {
   git -C "$test_repo" add docs/too-large.json
   git -C "$test_repo" commit -qm "test: add skipped review fixture"
   local skipped_artifact
-  (
+  local skipped_env
+  skipped_env=$(
     cd "$test_repo"
-    eval "$(/bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/skipped-prepare-error.txt")"
-    printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/skipped-artifact-path.txt"
+    /bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/skipped-prepare-error.txt"
   )
-  skipped_artifact="$test_repo/$(cat "$tmp_dir/skipped-artifact-path.txt")"
+  skipped_artifact=$(dirname "$skipped_env")
   (
     cd "$test_repo"
-    MY_PR_ARTIFACT_DIR="$skipped_artifact" \
-      /bin/bash "$split_script" "$base_ref" \
+    env -u MY_PR_ARTIFACT_DIR -u MY_PR_BASE_REF \
+      /bin/bash "$split_script" "$skipped_env" \
       >"$tmp_dir/skipped-file-output.txt" 2>"$tmp_dir/skipped-file-error.txt"
   )
   assert_file_contains "$skipped_artifact/chunks/skipped-files.txt" "docs/too-large.json"
@@ -149,6 +205,7 @@ test_chunking() {
   local skipped_only_repo="$tmp_dir/skipped only repo"
   local skipped_only_base
   local skipped_only_artifact
+  local skipped_only_env
   mkdir -p "$skipped_only_repo"
   git -C "$skipped_only_repo" init -q
   git -C "$skipped_only_repo" config user.name "Test User"
@@ -160,16 +217,15 @@ test_chunking() {
   awk 'BEGIN { for (i = 1; i <= 22000; i++) print "+0123456789" }' >"$skipped_only_repo/only-large.json"
   git -C "$skipped_only_repo" add only-large.json
   git -C "$skipped_only_repo" commit -qm "test: add only skipped fixture"
-  (
+  skipped_only_env=$(
     cd "$skipped_only_repo"
-    eval "$(/bin/bash "$prepare_script" "$skipped_only_base" 2>"$tmp_dir/skipped-only-prepare-error.txt")"
-    printf '%s\n' "$MY_PR_ARTIFACT_DIR" >"$tmp_dir/skipped-only-artifact-path.txt"
+    /bin/bash "$prepare_script" "$skipped_only_base" 2>"$tmp_dir/skipped-only-prepare-error.txt"
   )
-  skipped_only_artifact="$skipped_only_repo/$(cat "$tmp_dir/skipped-only-artifact-path.txt")"
+  skipped_only_artifact=$(dirname "$skipped_only_env")
   (
     cd "$skipped_only_repo"
-    MY_PR_ARTIFACT_DIR="$skipped_only_artifact" \
-      /bin/bash "$split_script" "$skipped_only_base" \
+    env -u MY_PR_ARTIFACT_DIR -u MY_PR_BASE_REF \
+      /bin/bash "$split_script" "$skipped_only_env" \
       >"$tmp_dir/skipped-only-output.txt" 2>"$tmp_dir/skipped-only-error.txt"
   )
   [[ ! -s "$skipped_only_artifact/chunks/manifest.txt" ]] ||
@@ -307,15 +363,17 @@ test_runner() {
   local context_file="$artifact_dir/pr-context.md"
   local diff_file="$artifact_dir/review.diff"
   local fake_codex
+  local canonical_artifact_dir
 
   mkdir -p "$artifact_dir"
+  canonical_artifact_dir=$(cd "$artifact_dir" && pwd -P)
+  unset MY_PR_ARTIFACT_DIR
   printf 'Review the supplied input and report findings.\n' >"$prompt_file"
   awk 'BEGIN { for (i = 1; i <= 300; i++) print "context line " i " 日本語" }' >"$context_file"
   awk 'BEGIN { for (i = 1; i <= 500; i++) print "+diff line " i " abcdefghijklmnopqrstuvwxyz" }' >"$diff_file"
   fake_codex=$(write_fake_codex)
 
-  MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_ARGS="$tmp_dir/reviewer-a-args.txt" \
     FAKE_CAPTURE="$tmp_dir/reviewer-a-input.md" \
     /bin/bash "$runner_script" reviewer-a full 1 "$prompt_file" "$context_file" "$diff_file" \
@@ -330,11 +388,12 @@ test_runner() {
   assert_file_contains "$tmp_dir/reviewer-a-input.md" "context line 300 日本語"
   assert_file_contains "$tmp_dir/reviewer-a-input.md" "+diff line 500 abcdefghijklmnopqrstuvwxyz"
   assert_file_contains "$artifact_dir/reviewer-results/reviewer-a/full/review.md" "# Simplify Review"
-  eval "$(cat "$tmp_dir/reviewer-a-output.txt")"
-  [[ -f "$MY_PR_CODEX_REVIEW_MARKDOWN" ]] || fail "escaped runner output is not sourceable"
+  local reviewer_a_output
+  reviewer_a_output=$(cat "$tmp_dir/reviewer-a-output.txt")
+  [[ "$reviewer_a_output" == "$canonical_artifact_dir/reviewer-results/reviewer-a/full/review.md" ]] ||
+    fail "runner output mismatch: expected=$canonical_artifact_dir/reviewer-results/reviewer-a/full/review.md actual=$reviewer_a_output"
 
-  MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_ARGS="$tmp_dir/reviewer-c-args.txt" \
     FAKE_CAPTURE="$tmp_dir/reviewer-c-input.md" \
     /bin/bash "$runner_script" reviewer-c full 1 "$prompt_file" "$context_file" "$diff_file" \
@@ -343,8 +402,7 @@ test_runner() {
     fail "Reviewer C must preserve the global reasoning effort"
   fi
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     MY_PR_CODEX_PROMPT_MAX_BYTES=100 \
     FAKE_ARGS="$tmp_dir/oversized-args.txt" \
     FAKE_CAPTURE="$tmp_dir/oversized-input.md" \
@@ -354,8 +412,7 @@ test_runner() {
   fi
   assert_file_contains "$tmp_dir/oversized-error.txt" "prompt exceeds byte limit"
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     MY_PR_CODEX_PROMPT_MAX_BYTES=393217 \
     FAKE_ARGS="$tmp_dir/raised-cap-args.txt" \
     FAKE_CAPTURE="$tmp_dir/raised-cap-input.md" \
@@ -365,8 +422,7 @@ test_runner() {
   fi
   assert_file_contains "$tmp_dir/raised-cap-error.txt" "1 through 393216"
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_BAD_RECEIPT=1 \
     FAKE_ARGS="$tmp_dir/bad-receipt-args.txt" \
     FAKE_CAPTURE="$tmp_dir/bad-receipt-input.md" \
@@ -379,8 +435,7 @@ test_runner() {
   mkdir -p "$artifact_dir/reviewer-results/reviewer-c/stale"
   cp "$artifact_dir/reviewer-results/reviewer-c/full/result.json" \
     "$artifact_dir/reviewer-results/reviewer-c/stale/result.json"
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_NO_RESULT=1 \
     FAKE_ARGS="$tmp_dir/stale-args.txt" \
     FAKE_CAPTURE="$tmp_dir/stale-input.md" \
@@ -390,8 +445,7 @@ test_runner() {
   fi
   assert_file_contains "$tmp_dir/stale-error.txt" "result is missing or empty"
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_EXIT_CODE=7 \
     FAKE_ARGS="$tmp_dir/nonzero-args.txt" \
     FAKE_CAPTURE="$tmp_dir/nonzero-input.md" \
@@ -401,8 +455,7 @@ test_runner() {
   fi
   assert_file_contains "$tmp_dir/nonzero-error.txt" "Codex reviewer failed"
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_STATUS=REVIEW_INCOMPLETE \
     FAKE_ARGS="$tmp_dir/incomplete-args.txt" \
     FAKE_CAPTURE="$tmp_dir/incomplete-input.md" \
@@ -412,8 +465,7 @@ test_runner() {
   fi
   assert_file_contains "$tmp_dir/incomplete-error.txt" "receipt or status is invalid"
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_ARGS="$tmp_dir/missing-args.txt" \
     FAKE_CAPTURE="$tmp_dir/missing-input.md" \
     /bin/bash "$runner_script" reviewer-c missing 1 "$prompt_file" "$context_file.missing" "$diff_file" \
@@ -423,8 +475,7 @@ test_runner() {
   assert_file_contains "$tmp_dir/missing-error.txt" "review input not found"
 
   : >"$artifact_dir/empty.md"
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_ARGS="$tmp_dir/empty-args.txt" \
     FAKE_CAPTURE="$tmp_dir/empty-input.md" \
     /bin/bash "$runner_script" reviewer-c empty 1 "$prompt_file" "$artifact_dir/empty.md" "$diff_file" \
@@ -433,8 +484,7 @@ test_runner() {
   fi
   assert_file_contains "$tmp_dir/empty-error.txt" "not found or empty"
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_IGNORE_TAIL=1 \
     FAKE_ARGS="$tmp_dir/no-tail-args.txt" \
     FAKE_CAPTURE="$tmp_dir/no-tail-input.md" \
@@ -443,8 +493,7 @@ test_runner() {
     fail "reviewer without end receipt unexpectedly succeeded"
   fi
 
-  if MY_PR_ARTIFACT_DIR="$artifact_dir" \
-    MY_PR_CODEX_BIN="$fake_codex" \
+  if MY_PR_CODEX_BIN="$fake_codex" \
     FAKE_SHORT_MARKDOWN=1 \
     FAKE_ARGS="$tmp_dir/short-markdown-args.txt" \
     FAKE_CAPTURE="$tmp_dir/short-markdown-input.md" \
@@ -503,8 +552,20 @@ test_reviewer_b_schema() {
     fail "Reviewer B schema does not require review_markdown"
 }
 
+test_documented_state_contract() {
+  if grep -R -n -- 'MY_PR_SKILL_DIR' "$skill_root" >"$tmp_dir/legacy-skill-dir.txt"; then
+    cat "$tmp_dir/legacy-skill-dir.txt" >&2
+    fail "my-pr still depends on MY_PR_SKILL_DIR"
+  fi
+  if grep -R -n -- 'eval "$(bash' "$skill_root" >"$tmp_dir/legacy-eval.txt"; then
+    cat "$tmp_dir/legacy-eval.txt" >&2
+    fail "my-pr still documents cross-shell eval state"
+  fi
+}
+
 test_chunking
 test_runner
 test_reviewer_b_validator
 test_reviewer_b_schema
+test_documented_state_contract
 echo "PASS: my-pr review input tests"

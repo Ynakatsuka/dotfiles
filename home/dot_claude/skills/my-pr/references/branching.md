@@ -38,37 +38,37 @@ git diff --cached --stat
 If currently on a protected branch, move the target tracked changes to a worktree before committing.
 
 ```bash
-ORIG_REPO=$(pwd)
-BRANCH="feat/example"
-bash "${MY_PR_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+bash "$HOME/.claude/skills/my-pr/scripts/move-changes-to-worktree.sh" "feat/example"
 ```
+
+Preserve the exact `ORIG_REPO`, `WORKTREE_DIR`, and `BRANCH` values printed by the script. Do not expect shell variables from this invocation to exist during cleanup.
 
 For task-created untracked files, pass only an explicit list. Do not include unrelated untracked files.
 
 ```bash
 TASK_CREATED_UNTRACKED_FILES="path/created-by-this-task.txt" \
-  bash "${MY_PR_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "$HOME/.claude/skills/my-pr/scripts/move-changes-to-worktree.sh" "feat/example"
 ```
 
 If paths contain spaces or many files are involved, write a newline-delimited list and pass it with `MY_PR_UNTRACKED_FILE_LIST`.
 
 ```bash
 MY_PR_UNTRACKED_FILE_LIST=/path/to/task-created-untracked-files.txt \
-  bash "${MY_PR_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "$HOME/.claude/skills/my-pr/scripts/move-changes-to-worktree.sh" "feat/example"
 ```
 
 If unrelated tracked changes exist, restrict the transfer with `MY_PR_PATHSPEC_FILE`.
 
 ```bash
 MY_PR_PATHSPEC_FILE=/path/to/task-pathspecs.txt \
-  bash "${MY_PR_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "$HOME/.claude/skills/my-pr/scripts/move-changes-to-worktree.sh" "feat/example"
 ```
 
 For a short pathspec list whose paths contain no whitespace, pass a whitespace-separated list with `MY_PR_PATHS` instead. The value is split on whitespace, so it cannot express paths containing spaces; use `MY_PR_PATHSPEC_FILE` for those. When both are set, `MY_PR_PATHSPEC_FILE` takes precedence and `MY_PR_PATHS` is ignored.
 
 ```bash
 MY_PR_PATHS="src/feature.py tests/test_feature.py" \
-  bash "${MY_PR_SKILL_DIR:?}/scripts/move-changes-to-worktree.sh" "$BRANCH"
+  bash "$HOME/.claude/skills/my-pr/scripts/move-changes-to-worktree.sh" "feat/example"
 ```
 
 The script transfers changes by binary patches, verifies the worktree diff matches the original staged/unstaged patches, and intentionally does not clean the original repository by itself.
@@ -79,11 +79,16 @@ After a successful transfer, the orchestrator must clean the task-owned changes 
 Set `STAGED_FILES`, `CHANGED_FILES`, and `TASK_CREATED_UNTRACKED_FILES` to exact task-owned paths only. Do not run cleanup commands with empty, unverified, or unrelated path lists. If ownership is unclear, stop and report before deleting or restoring anything.
 
 ```bash
-git -C "$ORIG_REPO" reset HEAD -- $STAGED_FILES
-git -C "$ORIG_REPO" checkout -- $CHANGED_FILES $STAGED_FILES
+ORIG_REPO="/absolute/original/repository/path"
+STAGED_FILES=("path/to/staged-file")
+CHANGED_FILES=("path/to/changed-file")
+TASK_CREATED_UNTRACKED_FILES=("path/to/task-created-file")
+
+git -C "$ORIG_REPO" reset HEAD -- "${STAGED_FILES[@]}"
+git -C "$ORIG_REPO" checkout -- "${CHANGED_FILES[@]}" "${STAGED_FILES[@]}"
 
 # Delete only untracked files that were created during the current task and copied to the worktree.
-for f in $TASK_CREATED_UNTRACKED_FILES; do
+for f in "${TASK_CREATED_UNTRACKED_FILES[@]}"; do
   rm -f "$ORIG_REPO/$f"
 done
 
@@ -137,7 +142,7 @@ Do not run `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"`. That can advance a ch
 Before every push, verify the destination branch.
 
 ```bash
-bash "${MY_PR_SKILL_DIR:?}/scripts/check-push-destination.sh"
+bash "$HOME/.claude/skills/my-pr/scripts/check-push-destination.sh"
 ```
 
 If the script reports a protected branch mismatch, stop and ask the user before pushing.

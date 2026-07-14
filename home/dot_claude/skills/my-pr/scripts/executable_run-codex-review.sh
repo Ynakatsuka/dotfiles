@@ -14,8 +14,6 @@ prompt_file=$4
 context_file=$5
 diff_file=$6
 
-: "${MY_PR_ARTIFACT_DIR:?Run prepare-review-artifacts.sh first and export MY_PR_ARTIFACT_DIR}"
-
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
@@ -45,6 +43,11 @@ for input_file in "$prompt_file" "$context_file" "$diff_file"; do
     exit 1
   fi
 done
+
+# The context artifact always lives at the review artifact root. Derive the
+# result location from that explicit input instead of relying on shell state
+# inherited from the orchestrator.
+artifact_dir=$(cd "$(dirname "$context_file")" && pwd -P)
 
 max_prompt_bytes=${MY_PR_CODEX_PROMPT_MAX_BYTES:-393216}
 if [[ ! "$max_prompt_bytes" =~ ^[1-9][0-9]*$ ]] || ((max_prompt_bytes > 393216)); then
@@ -96,11 +99,7 @@ for input_file in "$prompt_file" "$context_file" "$diff_file"; do
   fi
 done
 
-result_dir="$MY_PR_ARTIFACT_DIR/reviewer-results/$reviewer_mode/$chunk_id"
-case "$result_dir" in
-  /*) ;;
-  *) result_dir="$repo_root/$result_dir" ;;
-esac
+result_dir="$artifact_dir/reviewer-results/$reviewer_mode/$chunk_id"
 mkdir -p "$result_dir"
 input_prompt="$result_dir/input.md"
 result_json="$result_dir/result.json"
@@ -227,7 +226,4 @@ else
   require_markdown_marker '**Ready to merge?**'
 fi
 
-printf 'MY_PR_CODEX_REVIEW_JSON=%q\n' "$result_json"
-printf 'MY_PR_CODEX_REVIEW_MARKDOWN=%q\n' "$review_markdown"
-printf 'MY_PR_CODEX_REVIEW_STDOUT=%q\n' "$stdout_log"
-printf 'MY_PR_CODEX_REVIEW_STDERR=%q\n' "$stderr_log"
+printf '%s\n' "$review_markdown"

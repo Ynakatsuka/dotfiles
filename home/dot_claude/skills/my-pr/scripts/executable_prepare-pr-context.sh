@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (($# > 0)); then
-  echo "ERROR: unexpected argument: $1" >&2
+usage='Usage: prepare-pr-context.sh <artifact-env-file>'
+if (($# != 1)); then
+  echo "ERROR: $usage" >&2
   exit 1
 fi
 
-: "${MY_PR_ARTIFACT_DIR:?Run prepare-review-artifacts.sh first and source MY_PR_ARTIFACT_ENV when resuming}"
+artifact_env=$1
+if [[ ! -f "$artifact_env" ]]; then
+  echo "ERROR: artifact state file not found: $artifact_env" >&2
+  exit 1
+fi
+artifact_env=$(cd "$(dirname "$artifact_env")" && pwd -P)/$(basename "$artifact_env")
+# shellcheck source=/dev/null
+source "$artifact_env"
+: "${MY_PR_ARTIFACT_DIR:?Invalid artifact state: MY_PR_ARTIFACT_DIR is missing}"
+: "${MY_PR_ARTIFACT_ENV:?Invalid artifact state: MY_PR_ARTIFACT_ENV is missing}"
+if [[ "$MY_PR_ARTIFACT_ENV" != "$artifact_env" ]]; then
+  echo "ERROR: artifact state path mismatch: expected=$artifact_env actual=$MY_PR_ARTIFACT_ENV" >&2
+  exit 1
+fi
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
@@ -141,7 +155,6 @@ else
   context_state="found"
 fi
 
-artifact_env="${MY_PR_ARTIFACT_ENV:-$MY_PR_ARTIFACT_DIR/artifact.env}"
 context_env="$MY_PR_ARTIFACT_DIR/pr-context.env"
 context_bytes=$(wc -c <"$context_md" | tr -d ' ')
 {
@@ -160,6 +173,6 @@ if [[ -f "$latest_env" ]]; then
   cp "$artifact_env" "$latest_env"
 fi
 
-cat "$context_env"
 rm -f "$context_env"
+printf '%s\n' "$artifact_env"
 printf 'PR context artifact: %s\n' "$context_md" >&2

@@ -26,9 +26,9 @@ All commands except `verify` must complete these gates before review, simplify, 
 
 1. Resolve the base branch. Do not guess `main`.
 2. Fetch the base branch only into `refs/remotes/origin/$BASE_BRANCH`; never use `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` because it mutates the local protected branch ref without updating a checked-out worktree/index.
-3. Set `BASE_REF="origin/$BASE_BRANCH"` and run `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"`.
-4. Run `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/prepare-pr-context.sh")"` to capture the current PR body and GitHub conversation when an existing PR is attached to the branch.
-5. Read `MY_PR_SCOPE_SUMMARY` and `MY_PR_CONTEXT`. Source `MY_PR_ARTIFACT_ENV` if resuming in a new shell.
+3. In the same shell call, set `BASE_REF="origin/$BASE_BRANCH"` and run `bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF"`.
+4. Preserve the single absolute `artifact.env` path printed by the script. Pass that exact path to `prepare-pr-context.sh`; do not rely on exported variables from a previous shell call or discover `latest-env.sh`.
+5. Run `bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "/absolute/path/to/artifact.env"`, then source that exact file in any shell call that reads `MY_PR_SCOPE_SUMMARY` or `MY_PR_CONTEXT`.
 6. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
    - `large`: continue only when the user already clearly confirmed the whole current branch/diff is the target PR scope.
    - `untracked`: classify the untracked files. Stage or `git add -N` task-created files that belong in the PR, or confirm they are out of scope, then regenerate artifacts.

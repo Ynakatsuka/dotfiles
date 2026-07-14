@@ -142,6 +142,7 @@ cmp "$staged_patch" "$tmp_dir/worktree-staged.patch" >/dev/null
 cmp "$unstaged_patch" "$tmp_dir/worktree-unstaged.patch" >/dev/null
 transfer_complete=true
 
+printf 'ORIG_REPO=%s\n' "$orig_repo"
 printf 'WORKTREE_DIR=%s\n' "$worktree_dir"
 printf 'BRANCH=%s\n' "$branch"
 if ((${#pathspecs[@]} > 0)); then

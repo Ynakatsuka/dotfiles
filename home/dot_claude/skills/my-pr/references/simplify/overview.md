@@ -12,7 +12,7 @@ codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
 
 Use the global Codex default effort only when the user explicitly asks for a full-effort simplify run. Use Claude/local execution only when the user explicitly asks for it.
 
-For `my-pr` review mode, do not invoke Codex directly. Write this reference's review prompt under `MY_PR_ARTIFACT_DIR` and use `scripts/run-codex-review.sh reviewer-a`; the runner embeds context and diff through stdin, applies medium effort, disables nested delegation, and verifies complete-input receipts.
+For `my-pr` review mode, do not invoke Codex directly. Use the exact artifact paths persisted in the current run's explicit `artifact.env`; do not depend on inherited `MY_PR_*` variables. Write this reference's review prompt under that artifact directory and use `scripts/run-codex-review.sh reviewer-a`; the runner embeds context and diff through stdin, applies medium effort, disables nested delegation, and verifies complete-input receipts.
 
 Do not silently switch from Codex to Claude if Codex fails or rejects the config override. Report the failure and stop.
 

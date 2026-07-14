@@ -12,6 +12,10 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 artifact_parent=${MY_PR_ARTIFACT_PARENT:-.tmp/my-pr}
+case "$artifact_parent" in
+  /*) ;;
+  *) artifact_parent="$repo_root/$artifact_parent" ;;
+esac
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 artifact_dir="$artifact_parent/$timestamp-$$"
 mkdir -p "$artifact_dir"
@@ -122,6 +126,6 @@ latest_env="$artifact_parent/latest-env.sh"
 } >"$artifact_env"
 cp "$artifact_env" "$latest_env"
 
-cat "$artifact_env"
+printf '%s\n' "$artifact_env"
 printf 'Review artifacts are local-only. Do not stage or commit .tmp/my-pr/.\n' >&2
-printf 'To reuse paths later, source %s.\n' "$artifact_env" >&2
+printf 'Artifact state: %s\n' "$artifact_env" >&2

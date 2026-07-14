@@ -48,7 +48,12 @@ test_without_pathspecs() {
   (
     cd "$test_repo"
     /bin/bash "$move_script" test/no-pathspec "$worktree_dir"
-  )
+  ) >"$tmp_dir/no-pathspec-output.txt"
+
+  grep -q '^ORIG_REPO=/' "$tmp_dir/no-pathspec-output.txt" || {
+    echo "FAIL: move script did not report the original repository path" >&2
+    exit 1
+  }
 
   assert_file_content "$worktree_dir/one.txt" "staged one"
   assert_file_content "$worktree_dir/two.txt" "unstaged two"

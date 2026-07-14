@@ -22,8 +22,14 @@ This reference is read-only for repository behavior. It collects and integrates 
 Use repo-local artifacts. Do not pass `/tmp` diff files to reviewers.
 
 ```bash
-eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/prepare-review-artifacts.sh" "$BASE_REF")"
+BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+BASE_REF="origin/$BASE_BRANCH"
+git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+git rev-parse --verify "$BASE_REF^{commit}" >/dev/null
+bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF"
 ```
+
+The script prints one absolute `artifact.env` path. Preserve that exact path as orchestration state. Replace `/absolute/path/to/artifact.env` below with it; never infer the current artifact from `latest-env.sh` or a previous shell environment.
 
 Read `MY_PR_SCOPE_SUMMARY` before launching reviewers. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
 
@@ -31,7 +37,7 @@ Read `MY_PR_SCOPE_SUMMARY` before launching reviewers. If `MY_PR_SCOPE_GATE` is 
 - `untracked`: classify the untracked files. Stage or `git add -N` task-created files that belong in the PR, or confirm they are out of scope, then regenerate artifacts.
 - `large+untracked`: resolve both conditions before continuing.
 
-Use these generated paths:
+The state file persists these generated paths. They are not user-configured environment prerequisites; source the explicit file only within a shell call that needs to inspect them:
 
 ```text
 MY_PR_ARTIFACT_DIR=<repo-local artifact dir>
@@ -49,7 +55,9 @@ Never stage or commit `.tmp/my-pr/`.
 After preparing review artifacts, capture PR context:
 
 ```bash
-eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/prepare-pr-context.sh")"
+bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "/absolute/path/to/artifact.env"
+source "/absolute/path/to/artifact.env"
+cat "$MY_PR_CONTEXT"
 ```
 
 Use these generated paths:
@@ -87,7 +95,7 @@ Chunk rules:
 
 1. Group files by subsystem or top-level directory.
 2. Keep each chunk at or below 196,608 bytes. Line count is not a safety bound because Markdown and generated content can contain long lines.
-3. Generate chunk artifacts with `eval "$(bash "${MY_PR_SKILL_DIR:?}/scripts/split-review-chunks.sh" "$BASE_REF")"`. The script packs complete file diffs, verifies reviewable-file coverage, records oversized files under `MY_PR_SKIPPED_FILES`, and is compatible with macOS Bash 3.2.
+3. Generate chunk artifacts with `bash "$HOME/.claude/skills/my-pr/scripts/split-review-chunks.sh" "/absolute/path/to/artifact.env"`. The script loads the base ref from that state file, packs complete file diffs, verifies reviewable-file coverage, persists chunk paths back to the state file, and is compatible with macOS Bash 3.2.
 4. Each chunk prompt must include `Chunk id`, `Files covered`, and `Files not covered`.
 5. Integration must list all chunks for Reviewer A/C and stop if any is missing, failed, or inaccessible. If any Reviewer B chunk remains structurally invalid after format correction, skip the entire Reviewer B family instead of integrating partial B coverage. Also list every skipped file with its byte count and state that those files were not reviewed.
 
@@ -111,21 +119,30 @@ The runner:
 - caps the generated prompt at 393,216 bytes before launch
 - runs from an isolated artifact-local Git repository instead of the review target repository
 - disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox
-- stores stdout/stderr under `MY_PR_ARTIFACT_DIR` instead of streaming token-heavy output to the parent tool
+- derives the artifact root from the required context-file argument, so reviewer processes do not need to inherit `MY_PR_ARTIFACT_DIR`
+- stores stdout/stderr under that artifact root instead of streaming token-heavy output to the parent tool
 - requires JSON Schema output with matching SHA-256 receipts and an unpredictable nonce disclosed only after the final diff boundary
 - exits non-zero on missing input, oversized prompt, Codex failure, incomplete status, or receipt mismatch
 
-Write the role-specific prompt under `MY_PR_ARTIFACT_DIR`, then invoke one runner process per assigned chunk:
+Write each role-specific prompt under the exact artifact directory recorded in `artifact.env`. Invoke one runner process per assigned chunk with literal values from that state file or chunk manifest; do not rely on shell variables inherited from orchestration:
 
 ```bash
-bash "${MY_PR_SKILL_DIR:?}/scripts/run-codex-review.sh" \
-  reviewer-a "$CHUNK_ID" "$CHUNK_COUNT" "$REVIEWER_A_PROMPT" "$MY_PR_CONTEXT" "$CHUNK_DIFF"
+bash "$HOME/.claude/skills/my-pr/scripts/run-codex-review.sh" \
+  reviewer-a "full" "1" \
+  "/absolute/artifact/path/reviewer-a-prompt.md" \
+  "/absolute/artifact/path/pr-context.md" \
+  "/absolute/artifact/path/review.diff"
 
-bash "${MY_PR_SKILL_DIR:?}/scripts/run-codex-review.sh" \
-  reviewer-c "$CHUNK_ID" "$CHUNK_COUNT" "$REVIEWER_C_PROMPT" "$MY_PR_CONTEXT" "$CHUNK_DIFF"
+bash "$HOME/.claude/skills/my-pr/scripts/run-codex-review.sh" \
+  reviewer-c "full" "1" \
+  "/absolute/artifact/path/reviewer-c-prompt.md" \
+  "/absolute/artifact/path/pr-context.md" \
+  "/absolute/artifact/path/review.diff"
 ```
 
-Use the emitted `MY_PR_CODEX_REVIEW_MARKDOWN` file as reviewer output. Never use a partial stdout/stderr log as review output. Do not retry a failed chunk or switch executors unless the user explicitly approves it.
+Each successful runner prints the absolute review Markdown path. Use that file as reviewer output. Never use a partial stdout/stderr log as review output. Do not retry a failed chunk or switch executors unless the user explicitly approves it.
+
+Do not set or forward `MY_PR_ARTIFACT_DIR` solely for the runner. Its context-file argument is the source of truth for the result directory, including when Reviewer A/C runs in another process or shell.
 
 ## Review focus checklist
 
@@ -166,17 +183,17 @@ Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers 
 Reviewer B is host-aware:
 
 - In a Claude Code session with the Agent tool available, use the Agent tool.
-- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`. Pass `assets/claude-review-result.schema.json` through `--json-schema` so the final event contains `structured_output.review_markdown` with the complete review body: `claude --permission-mode plan --tools Read --output-format=stream-json --verbose --json-schema "$(jq -c . "${MY_PR_SKILL_DIR:?}/assets/claude-review-result.schema.json")" -p "<PROMPT>"`. Keep this schema dialect-neutral: Claude CLI validates the supported schema subset itself and rejects the Draft 2020-12 `$schema` URI before starting the review.
-- For Agent output, save the final response verbatim under `MY_PR_ARTIFACT_DIR/reviewer-results/reviewer-b/<chunk-id>/review.md`. For CLI output, extract only `structured_output.review_markdown` from the final `stream-json` result event into the same path. Do not use an interim message, handoff summary, or shortened recap as the reviewer body.
-- Validate every Reviewer B Markdown file with `bash "${MY_PR_SKILL_DIR:?}/scripts/validate-reviewer-b-output.sh" "$REVIEWER_B_REVIEW"` before integration.
+- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`: `claude --permission-mode plan --tools Read --output-format=stream-json --verbose --json-schema "$(jq -c . "$HOME/.claude/skills/my-pr/assets/claude-review-result.schema.json")" -p "<PROMPT>"`. The final event must contain `structured_output.review_markdown` with the complete review body. Keep this schema dialect-neutral: Claude CLI validates the supported schema subset itself and rejects the Draft 2020-12 `$schema` URI before starting the review.
+- For Agent output, have the main orchestrator save the final response verbatim to the exact `<artifact-dir>/reviewer-results/reviewer-b/<chunk-id>/review.md` path. For CLI output, extract only `structured_output.review_markdown` from the final `stream-json` result event into the same path. Do not make Reviewer B inherit `MY_PR_ARTIFACT_DIR`, and do not use an interim message, handoff summary, or shortened recap as the reviewer body.
+- Validate every Reviewer B Markdown file with `bash "$HOME/.claude/skills/my-pr/scripts/validate-reviewer-b-output.sh" "/absolute/path/to/reviewer-b-review.md"` before integration.
 - If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or Reviewer B reports that the diff/context was inaccessible, return `REVIEW_INCOMPLETE` and stop before integration.
 - Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
 - Do not pass `--model` unless the user explicitly requested a model. Use the Claude Code configured default model and effort.
-- If a prompt file is needed for quoting, write it under `MY_PR_ARTIFACT_DIR` as an orchestration artifact. Do not use `/tmp`, and never stage or commit it.
+- If a prompt file is needed for quoting, write it under the exact artifact directory from the current state file. Do not use `/tmp`, and never stage or commit it.
 
 ## Reviewer A: integrated simplify review
 
-Read `references/simplify/overview.md`. Write its review-mode prompt to `MY_PR_ARTIFACT_DIR`, then run `scripts/run-codex-review.sh reviewer-a` against `MY_PR_REVIEW_DIFF` or each assigned chunk. The runner applies `model_reasoning_effort="medium"`, embeds the complete inputs, disables nested delegation, and validates the receipt. Do not invoke Codex directly for Reviewer A.
+Read `references/simplify/overview.md`. Write its review-mode prompt under the exact artifact directory from the current state file, then run `scripts/run-codex-review.sh reviewer-a` with the absolute full-diff path or assigned chunk path. The runner applies `model_reasoning_effort="medium"`, embeds the complete inputs, disables nested delegation, and validates the receipt. Do not invoke Codex directly for Reviewer A.
 
 If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
 
@@ -291,7 +308,7 @@ If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times 
 
 Use the repo-local `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Do not create `/tmp` diff files.
 
-Write the following prompt under `MY_PR_ARTIFACT_DIR`, then run it with `scripts/run-codex-review.sh reviewer-c`. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
+Write the following prompt under the exact artifact directory from the current state file, then run it with `scripts/run-codex-review.sh reviewer-c`. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
 
 ```text
 Review the supplied diff as a senior software engineer.
@@ -363,7 +380,7 @@ If the runner exits non-zero, Codex lacks quota, the generated prompt is oversiz
 
 If reviewers run in the background, do not send a final answer while any reviewer is still running.
 
-When a long-running review must continue after the current response, persist a state note under `MY_PR_ARTIFACT_DIR/state.md` with:
+When a long-running review must continue after the current response, persist a state note at the exact `<artifact-dir>/state.md` path with:
 
 - reviewer names and output paths
 - current status
