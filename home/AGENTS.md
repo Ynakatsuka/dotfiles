@@ -9,23 +9,27 @@
 ## Response Contract
 
 - Treat user-facing response style as a persistent requirement, not a preference.
-- Before sending any user-facing message, check the `Output Style` section and revise violations.
+- Before sending any user-facing message, check the `出力の書き方` section and revise violations.
 - Preserve exact user-requested output formats, schemas, machine-readable responses, patch-only output, and verbatim structures.
 - After long sessions, resumes, or compaction, re-anchor to the latest user request and this response contract before answering.
 - Keep progress updates, status reports, and final answers in the same Japanese style.
 - Omit progress commentary when it would break a requested machine-readable or patch-only format.
 
-## Output Style
+## 出力の書き方
 
-- Write natural, concise Japanese. Drop fillers and preambles.
-- Avoid translation-like Japanese. Prefer natural headings such as `確認結果`, `対応方針`, `管理範囲`, and `補足` over stiff phrases such as `確認した事実` or `今回の整理`.
-- Put the conclusion first, but avoid chatty or directive wording. Prefer `結論は以下の通りです。` over `結論はこうです。`
-- Use short sentences. Keep one idea per sentence.
-- Use bullet lists for conditions, steps, comparisons, and ownership boundaries.
-- Do not turn bullet lists into long sentences. Prefer sentence fragments, nominal endings, or `項目: 内容` form when it improves readability.
-- Keep bullets in the same section at the same level of detail and grammatical shape.
-- Reduce vague filler such as `適切に`, `さまざまな`, `十分に`, and repeated connectors such as `つまり` or `そのため`.
-- Do not mix uncommon or unnatural English words or English abbreviations into Japanese prose when a widely understood Japanese expression is available. Keep technical identifiers, commands, API names, and established project terminology unchanged.
+- 自然で簡潔な日本語で書く。前置きや内容のない文は省く。
+- 翻訳調を避ける。見出しは、硬い表現の `確認した事実` や `今回の整理` より、自然な `確認結果`、`対応方針`、`管理範囲`、`補足` などを使う。
+- 結論や結果を最初に書く。`結論から言うと` や `以下の通りです` などの定型的な前置きは付けず、内容を直接述べる。
+- 文を短くし、一文には一つの内容だけを書く。
+- 見出しと箇条書きは、読みやすくなる場合だけ使う。短い回答を見出しで細かく分けない。
+- 条件、手順、比較、管理範囲に複数の項目がある場合は、箇条書きを使う。
+- 箇条書きの各項目を長い文章にしない。読みやすくなる場合は、短い句、体言止め、`項目: 内容` の形を使う。
+- 同じ節の箇条書きは、詳しさと文の形を揃える。
+- `適切に`、`さまざまな`、`十分に` などの曖昧な語、`つまり` や `そのため` などの接続語の繰り返し、`順に見ていきます` などの本文案内を省く。
+- AIにありがちな定型表現を避ける。結論の繰り返し、劇的な演出、大げさで抽象的な主張、無理に三項目へ揃えた列挙、定型化した但し書きを使わない。内容上必要な三項目や但し書きは残す。
+- 日本語の文章では、英単語、英字の略語、不要なカタカナ語より、なじみのある日本語を使う。短さや雰囲気のためだけに英語を混ぜない。
+- 日本語にすると正確さが損なわれる場合は、コード上の識別子、コマンド、API名、製品名、プロジェクトで定着した用語を原文のまま使う。専門家の間で一般的というだけで、読み手にも通じるとはみなさない。
+- 一般的でない用語が必要な場合は、初出時に平易な日本語で説明する。一度しか使わない略語は書かない。繰り返し使う略語は、`検索拡張生成（RAG）` のように説明の後へ添える。
 
 ## No Implicit Fallbacks
 
