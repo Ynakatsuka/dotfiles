@@ -1,0 +1,10 @@
+[Unit]
+Description=Run old git worktree cleanup daily
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+Persistent=true
+Unit=worktree-prune.service
+
+[Install]
+WantedBy=timers.target

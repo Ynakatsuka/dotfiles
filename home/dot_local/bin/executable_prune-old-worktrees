@@ -1,0 +1,503 @@
+#!/usr/bin/env python3
+"""Remove old convention-based git worktrees without deleting session logs."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+from urllib.parse import quote
+from urllib.request import urlopen
+
+
+SECONDS_PER_DAY = 24 * 60 * 60
+
+
+@dataclass(frozen=True)
+class ProjectRef:
+    main_repo_path: Path
+    project_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CleanupConfig:
+    enabled: bool
+    retention_days: int
+    delete_branch_mode: str
+
+
+@dataclass(frozen=True)
+class Activity:
+    worktree_path: Path
+    main_repo_path: Path
+    project_ids: tuple[str, ...]
+    latest_file_epoch: float
+    latest_session_epoch: float | None
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Remove worktrees whose latest file and latest session are both "
+            "older than the retention period. The command never deletes session logs."
+        )
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="remove matching worktrees; otherwise only print the candidates",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        help="override the configured retention period for diagnostics",
+    )
+    parser.add_argument(
+        "--ghq-root",
+        type=Path,
+        default=Path(
+            os.environ.get("WORKTREE_PRUNE_GHQ_ROOT", str(Path.home() / "ghq"))
+        ),
+        help="only inspect worktrees below this directory",
+    )
+    parser.add_argument(
+        "--ccv-origin",
+        default=os.environ.get("WORKTREE_PRUNE_CCV_ORIGIN", "http://localhost:3434"),
+        help="Claude Code Viewer origin (default: http://localhost:3434)",
+    )
+    parser.add_argument(
+        "--now-epoch",
+        type=float,
+        help="override the current epoch for deterministic checks",
+    )
+    return parser.parse_args()
+
+
+def fail(message: str) -> None:
+    raise RuntimeError(message)
+
+
+def fetch_json(url: str) -> Any:
+    try:
+        with urlopen(url, timeout=30) as response:
+            return json.load(response)
+    except Exception as error:
+        fail(f"failed to fetch {url}: {error}")
+
+
+def is_within(target: Path, parent: Path) -> bool:
+    try:
+        return os.path.commonpath((target, parent)) == str(parent)
+    except ValueError:
+        return False
+
+
+def read_cleanup_config(origin: str) -> CleanupConfig:
+    payload = fetch_json(f"{origin.rstrip('/')}/api/worktree-cleanup/config")
+    if not isinstance(payload, dict):
+        fail("CCV worktree cleanup config response must be an object")
+
+    config = payload.get("config")
+    if not isinstance(config, dict):
+        fail("CCV worktree cleanup response must contain a config object")
+    enabled = config.get("enabled")
+    retention_days = config.get("retentionDays")
+    delete_branch_mode = config.get("deleteBranchMode")
+    if not isinstance(enabled, bool):
+        fail("CCV worktree cleanup config enabled must be a boolean")
+    if (
+        not isinstance(retention_days, int)
+        or isinstance(retention_days, bool)
+        or not 1 <= retention_days <= 365
+    ):
+        fail("CCV worktree cleanup config retentionDays must be an integer from 1 to 365")
+    if delete_branch_mode not in ("keep", "merged"):
+        fail("CCV worktree cleanup config deleteBranchMode must be keep or merged")
+    return CleanupConfig(enabled, retention_days, delete_branch_mode)
+
+
+def read_project_refs(origin: str, ghq_root: Path) -> dict[Path, ProjectRef]:
+    payload = fetch_json(f"{origin.rstrip('/')}/api/projects")
+    if not isinstance(payload, dict) or not isinstance(payload.get("projects"), list):
+        fail("CCV /api/projects response must contain a projects array")
+
+    mutable_refs: dict[Path, tuple[Path, list[str]]] = {}
+    for raw_project in payload["projects"]:
+        if not isinstance(raw_project, dict):
+            fail("CCV project entry must be an object")
+        meta = raw_project.get("meta")
+        if not isinstance(meta, dict) or meta.get("isWorktree") is not True:
+            continue
+
+        raw_id = raw_project.get("id")
+        raw_worktree = meta.get("projectPath")
+        raw_main = meta.get("mainRepoPath")
+        if not all(isinstance(value, str) and value for value in (raw_id, raw_worktree, raw_main)):
+            fail("CCV worktree project is missing id, projectPath, or mainRepoPath")
+
+        worktree_path = Path(raw_worktree).resolve()
+        main_repo_path = Path(raw_main).resolve()
+        if not is_within(worktree_path, ghq_root):
+            continue
+
+        expected_parent = Path(f"{main_repo_path}-worktree")
+        if worktree_path.parent != expected_parent:
+            print(f"SKIP convention-mismatch {worktree_path}")
+            continue
+
+        existing = mutable_refs.get(worktree_path)
+        if existing is None:
+            mutable_refs[worktree_path] = (main_repo_path, [raw_id])
+            continue
+        if existing[0] != main_repo_path:
+            fail(f"CCV returned conflicting main repositories for {worktree_path}")
+        existing[1].append(raw_id)
+
+    return {
+        worktree_path: ProjectRef(main_repo_path, tuple(project_ids))
+        for worktree_path, (main_repo_path, project_ids) in mutable_refs.items()
+    }
+
+
+def parse_timestamp(value: Any, label: str) -> float:
+    if not isinstance(value, str) or not value:
+        fail(f"{label} must be a non-empty ISO 8601 string")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        fail(f"invalid {label}: {value}: {error}")
+    if parsed.tzinfo is None:
+        fail(f"{label} must include a timezone: {value}")
+    return parsed.timestamp()
+
+
+def latest_session_epoch(origin: str, project_ids: tuple[str, ...]) -> float | None:
+    latest: float | None = None
+    for project_id in project_ids:
+        encoded_id = quote(project_id, safe="")
+        payload = fetch_json(
+            f"{origin.rstrip('/')}/api/projects/{encoded_id}/latest-session"
+        )
+        if not isinstance(payload, dict):
+            fail(f"latest-session response for {project_id} must be an object")
+        session = payload.get("latestSession")
+        if session is None:
+            continue
+        if not isinstance(session, dict):
+            fail(f"latestSession for {project_id} must be an object or null")
+        timestamp = parse_timestamp(
+            session.get("lastModifiedAt"),
+            f"latest session timestamp for {project_id}",
+        )
+        latest = timestamp if latest is None else max(latest, timestamp)
+
+    return latest
+
+
+def latest_file_epoch(worktree_path: Path) -> float | None:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(worktree_path),
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "-z",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    relative_paths = {
+        os.fsdecode(value) for value in result.stdout.split(b"\0") if value
+    }
+    for local_config in (".env", ".envrc"):
+        if (worktree_path / local_config).is_file():
+            relative_paths.add(local_config)
+
+    latest: float | None = None
+    for relative_path in relative_paths:
+        file_path = worktree_path / relative_path
+        if not file_path.exists() and not file_path.is_symlink():
+            continue
+        timestamp = file_path.stat(follow_symlinks=False).st_mtime
+        latest = timestamp if latest is None else max(latest, timestamp)
+    return latest
+
+
+def registered_worktrees(main_repo_path: Path) -> set[Path]:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(main_repo_path),
+            "-c",
+            "core.quotePath=false",
+            "worktree",
+            "list",
+            "--porcelain",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        Path(field.removeprefix("worktree ")).resolve()
+        for field in result.stdout.splitlines()
+        if field.startswith("worktree ")
+    }
+
+
+def collect_activity(origin: str, refs: dict[Path, ProjectRef]) -> list[Activity]:
+    registered_by_main: dict[Path, set[Path]] = {}
+    activities: list[Activity] = []
+    for worktree_path, project_ref in sorted(refs.items()):
+        if not worktree_path.is_dir():
+            print(f"SKIP missing-worktree {worktree_path}")
+            continue
+        if not project_ref.main_repo_path.is_dir():
+            fail(f"main repository does not exist: {project_ref.main_repo_path}")
+
+        registered = registered_by_main.get(project_ref.main_repo_path)
+        if registered is None:
+            registered = registered_worktrees(project_ref.main_repo_path)
+            registered_by_main[project_ref.main_repo_path] = registered
+        if worktree_path not in registered:
+            fail(f"path is not a registered worktree: {worktree_path}")
+
+        file_epoch = latest_file_epoch(worktree_path)
+        if file_epoch is None:
+            print(f"SKIP no-files {worktree_path}")
+            continue
+        session_epoch = latest_session_epoch(origin, project_ref.project_ids)
+        activities.append(
+            Activity(
+                worktree_path=worktree_path,
+                main_repo_path=project_ref.main_repo_path,
+                project_ids=project_ref.project_ids,
+                latest_file_epoch=file_epoch,
+                latest_session_epoch=session_epoch,
+            )
+        )
+    return activities
+
+
+def format_epoch(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch).astimezone().isoformat(timespec="seconds")
+
+
+def format_optional_epoch(epoch: float | None) -> str:
+    return "none" if epoch is None else format_epoch(epoch)
+
+
+def git_output(repo_path: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo_path), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def branch_and_oid(worktree_path: Path) -> tuple[str | None, str]:
+    oid = git_output(worktree_path, "rev-parse", "HEAD")
+    result = subprocess.run(
+        ["git", "-C", str(worktree_path), "symbolic-ref", "--quiet", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 1:
+        return None, oid
+    if result.returncode != 0:
+        fail(f"failed to identify branch for {worktree_path}: {result.stderr.strip()}")
+    branch = result.stdout.strip()
+    if not branch:
+        fail(f"git returned an empty branch for {worktree_path}")
+    return branch, oid
+
+
+def is_protected_branch(branch: str) -> bool:
+    return branch in {
+        "staging",
+        "main",
+        "master",
+        "develop",
+        "production",
+    } or branch.startswith("release/")
+
+
+def branch_merge_targets(main_repo_path: Path, branch: str) -> tuple[str, ...]:
+    targets: list[str] = []
+    upstream = git_output(
+        main_repo_path,
+        "for-each-ref",
+        "--format=%(upstream)",
+        f"refs/heads/{branch}",
+    )
+    if upstream:
+        targets.append(upstream)
+
+    for remote_branch in ("origin/staging", "origin/main", "origin/master"):
+        ref = f"refs/remotes/{remote_branch}"
+        result = subprocess.run(
+            ["git", "-C", str(main_repo_path), "show-ref", "--verify", "--quiet", ref]
+        )
+        if result.returncode == 0:
+            if ref not in targets:
+                targets.append(ref)
+            break
+        if result.returncode != 1:
+            fail(f"failed to inspect merge target {ref} in {main_repo_path}")
+    return tuple(targets)
+
+
+def is_ancestor(main_repo_path: Path, oid: str, target: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(main_repo_path), "merge-base", "--is-ancestor", oid, target]
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    fail(f"failed to compare {oid} with {target} in {main_repo_path}")
+
+
+def main() -> int:
+    args = parse_args()
+    config = read_cleanup_config(args.ccv_origin)
+    if args.days is not None and not 1 <= args.days <= 365:
+        fail("--days must be an integer from 1 to 365")
+    if not config.enabled:
+        print("DISABLED worktree cleanup is disabled in CCV")
+        return 0
+
+    ghq_root = args.ghq_root.resolve()
+    if not ghq_root.is_dir():
+        fail(f"ghq root does not exist: {ghq_root}")
+
+    now_epoch = args.now_epoch if args.now_epoch is not None else datetime.now().timestamp()
+    retention_days = args.days if args.days is not None else config.retention_days
+    cutoff = now_epoch - retention_days * SECONDS_PER_DAY
+    refs = read_project_refs(args.ccv_origin, ghq_root)
+    activities = collect_activity(args.ccv_origin, refs)
+    candidates: list[Activity] = []
+
+    for activity in activities:
+        old_file = activity.latest_file_epoch <= cutoff
+        old_session = (
+            activity.latest_session_epoch is None
+            or activity.latest_session_epoch <= cutoff
+        )
+        state = "CANDIDATE" if old_file and old_session else "KEEP"
+        print(
+            f"{state} {activity.worktree_path} "
+            f"file={format_epoch(activity.latest_file_epoch)} "
+            f"session={format_optional_epoch(activity.latest_session_epoch)}"
+        )
+        if old_file and old_session:
+            candidates.append(activity)
+
+    if not args.apply:
+        print(f"DRY-RUN candidates={len(candidates)} inspected={len(activities)}")
+        return 0
+
+    removed_count = 0
+    for activity in candidates:
+        current_file_epoch = latest_file_epoch(activity.worktree_path)
+        if current_file_epoch is None:
+            print(f"KEEP-UPDATED no-files {activity.worktree_path}")
+            continue
+        current_session_epoch = latest_session_epoch(
+            args.ccv_origin, activity.project_ids
+        )
+        if (
+            activity.latest_session_epoch is not None
+            and current_session_epoch is None
+        ):
+            fail(f"latest session disappeared for {activity.worktree_path}")
+        session_updated = current_session_epoch is not None and (
+            activity.latest_session_epoch is None
+            or current_session_epoch > activity.latest_session_epoch
+        )
+        session_recent = (
+            current_session_epoch is not None and current_session_epoch > cutoff
+        )
+        if (
+            current_file_epoch > activity.latest_file_epoch
+            or session_updated
+            or current_file_epoch > cutoff
+            or session_recent
+        ):
+            print(
+                f"KEEP-UPDATED {activity.worktree_path} "
+                f"file={format_epoch(current_file_epoch)} "
+                f"session={format_optional_epoch(current_session_epoch)}"
+            )
+            continue
+
+        branch, oid = branch_and_oid(activity.worktree_path)
+        merge_target = None
+        delete_branch = False
+        if config.delete_branch_mode == "merged" and branch is not None:
+            if is_protected_branch(branch):
+                print(f"KEEP-BRANCH protected {branch}")
+            else:
+                for target in branch_merge_targets(
+                    activity.main_repo_path, branch
+                ):
+                    if is_ancestor(activity.main_repo_path, oid, target):
+                        merge_target = target
+                        delete_branch = True
+                        break
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(activity.main_repo_path),
+                "worktree",
+                "remove",
+                str(activity.worktree_path),
+                "--force",
+            ],
+            check=True,
+        )
+        removed_count += 1
+        print(f"REMOVED {activity.worktree_path}")
+        if delete_branch and branch is not None:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(activity.main_repo_path),
+                    "update-ref",
+                    "-d",
+                    f"refs/heads/{branch}",
+                    oid,
+                ],
+                check=True,
+            )
+            print(f"DELETED-BRANCH {branch} merged-into={merge_target}")
+        elif branch is None:
+            print("KEEP-BRANCH detached")
+        elif not is_protected_branch(branch):
+            reason = "configured-keep" if config.delete_branch_mode == "keep" else "unmerged"
+            print(f"KEEP-BRANCH {reason} {branch}")
+
+    print(f"APPLIED removed={removed_count} inspected={len(activities)}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        sys.exit(1)

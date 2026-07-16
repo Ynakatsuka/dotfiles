@@ -5,6 +5,11 @@
 Library
 {{- end }}
 
+{{- if ne .chezmoi.os "linux" }}
+# Linux-only user services
+.config/systemd
+{{- end }}
+
 # Python bytecode cache — never deploy
 **/__pycache__
 

@@ -152,6 +152,18 @@ The rewrite hook deliberately bypasses compound `find` syntax that RTK 0.43.0 re
 | `gwtl` | `git worktree list` |
 | `gwtr` | `git worktree remove` |
 
+On Linux, `worktree-prune.timer` checks `~/ghq` every day. CCV's web UI controls
+whether cleanup is enabled, the 1–365 day retention period, and whether merged
+local branches are also deleted. A `{repo}-worktree/*` worktree is removed only
+when both its latest project-file timestamp and latest CCV session timestamp
+exceed the configured retention period. A worktree with no session history is
+evaluated using its project-file timestamp alone. In merged-branch mode, a local
+branch is deleted only when its captured commit is an ancestor of its upstream
+or the highest-priority existing `origin/staging`, `origin/main`, or
+`origin/master`.
+Protected, detached, and unmerged branches remain. Agent session logs are never
+deleted. Run `prune-old-worktrees` without `--apply` to preview candidates.
+
 ### Docker
 
 | Alias | Action |

@@ -1,0 +1,10 @@
+[Unit]
+Description=Remove old git worktrees while preserving agent session logs
+After=claude-code-viewer.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/prune-old-worktrees --apply --ghq-root %h/ghq
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
