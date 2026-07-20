@@ -2,34 +2,64 @@
 name: my-update-models
 description: >-
   Check the latest Claude (Anthropic), OpenAI Codex, and Google Gemini model
-  releases from official primary sources, then update model selections in this
-  dotfiles repo (home/dot_claude/settings.json, home/dot_codex/private_config.toml.tmpl,
-  home/dot_gemini/settings.json). Also scans the invoking repository for hardcoded
-  model IDs in GitHub Actions workflows, Python code, and shell scripts, and
-  offers to bump them. Use when the user asks to "モデル更新", "モデルを最新に",
-  "最新モデル確認", "model bump", "update models", or
-  "claude/codex/gemini のモデル更新". Do NOT use for one-off model selection in
-  a single conversation, general model questions, or non-config code changes.
-argument-hint: "[claude|codex|gemini|all]"
+  releases from official primary sources, update model selections in this
+  dotfiles repo, and update the Codex and Claude Code CLIs through their existing
+  managers. The model track also scans the invoking repository for hardcoded
+  model IDs and offers to bump them. Use when the user asks to "モデル更新", "モデルを最新に",
+  "最新モデル確認", "Codex/Claude Code本体の更新", "model bump", "update models",
+  or "update agent CLIs". Subcommands: harness, model, both (default). Do NOT
+  use for one-off model selection in a single conversation, general model
+  questions, or unrelated package updates.
+argument-hint: "[harness|model|both] [claude|codex|gemini|all]"
+arguments:
+  - mode
+  - provider
 ---
 
-# Update Models
+# Update Models and Agent CLIs
 
 Refresh the default model selections in this dotfiles repo using the latest
-official release information from Anthropic, OpenAI, and Google, then sweep
-the invoking repository for any hardcoded model IDs that should be bumped too.
+official release information from Anthropic, OpenAI, and Google. Update the
+Codex and Claude Code CLIs through their current managers, then sweep the
+invoking repository for any hardcoded model IDs that should be bumped too.
 
-## Scope (argument)
+## Subcommands and Targets
 
-Default: `all`.
+Invocation: `$my-update-models [$mode] [$provider]`.
 
-- `claude` — only Anthropic settings (`home/dot_claude/settings.json`)
-- `codex`  — only OpenAI Codex settings (`home/dot_codex/private_config.toml.tmpl`)
-- `gemini` — only Google Gemini settings (`home/dot_gemini/settings.json`)
-- `all`    — all three providers
+Treat an omitted `$mode` as `both` and an omitted `$provider` as `all`.
+Therefore, invoking the skill without arguments updates both tracks for every
+supported provider.
 
-Regardless of argument, always run the repo-scan step (see below) so stale
-model IDs in CI or app code do not silently drift out of sync.
+### Mode
+
+- `harness` — check and update the Codex and/or Claude Code CLI. Do not edit
+  model settings or run the model-ID repo scan.
+- `model` — check and update model settings, then run the model-ID repo scan.
+  Do not update a CLI.
+- `both` — run both `harness` and `model` for the selected provider. This is
+  the default.
+
+### Provider
+
+- `claude` — Anthropic model settings and, when selected, native Claude Code
+- `codex` — OpenAI model settings and, when selected, mise-managed Codex CLI
+- `gemini` — Google Gemini model settings only
+- `all` — all model providers plus the Codex and Claude Code CLIs
+
+Reject unknown modes or providers before making network calls. Also reject
+`harness gemini` and `both gemini`; this skill does not manage the Gemini CLI.
+Tell the user to use `model gemini` for Gemini model settings.
+
+Examples:
+
+```text
+$my-update-models                 # both all
+$my-update-models harness         # harness all
+$my-update-models harness codex   # Codex CLI only
+$my-update-models model gemini    # Gemini model settings only
+$my-update-models both claude     # Claude model settings and Claude Code CLI
+```
 
 ## Dotfiles Config Files
 
@@ -40,6 +70,7 @@ Always edit in the ghq repo, never in `~/`.
 |---|---|---|---|
 | `home/dot_claude/settings.json` | top-level `model` | `"opus"` | Default Claude Code model alias. Effort is managed separately via `env.CLAUDE_CODE_EFFORT_LEVEL`. |
 | `home/dot_claude/settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
+| `home/dot_claude/settings.json` | `autoUpdatesChannel` | `"latest"` | Native Claude Code update channel. Read it when checking or updating the CLI; do not change it unless requested. |
 | `home/dot_codex/private_config.toml.tmpl` | `model` | `"gpt-5.5"` | Codex CLI default model (full ID, not an alias). |
 | `home/dot_codex/private_config.toml.tmpl` | `[tui.model_availability_nux]` key | `"gpt-5.5" = 4` | NUX banner suppression — must be bumped together with `model` to keep the key in sync. |
 | `home/dot_gemini/settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
@@ -47,16 +78,38 @@ Always edit in the ghq repo, never in `~/`.
 Do NOT modify model IDs that appear inside skill examples
 (e.g., `home/dot_claude/skills/my-agent/SKILL.md`). Those are illustrative only.
 
+## CLI Management
+
+Keep the existing split ownership. Do not migrate either CLI to another
+manager as part of this skill.
+
+| CLI | Expected manager | Current version | Latest/update command |
+|---|---|---|---|
+| Codex | mise entry `npm:@openai/codex = "latest"` | `codex --version` | `mise latest npm:@openai/codex`; update with `mise upgrade npm:@openai/codex --yes` |
+| Claude Code | Anthropic native installer under `~/.local/share/claude/versions/` | `claude --version` | Check the configured channel and official releases; update with `claude update` |
+
+Before proposing an update, resolve each selected executable with `command -v`
+and inspect symlinks with `realpath`. For Codex, also run:
+
+```bash
+mise ls --json npm:@openai/codex
+```
+
+Stop and report an ownership mismatch instead of updating through a guessed
+manager. Do not fall back to `npm install -g`, `curl | sh`, or another installer.
+For Claude Code, also stop if `DISABLE_UPDATES=1` prevents manual updates.
+
 ## Primary Sources
 
-Always prefer primary sources over blog posts or third-party summaries.
-If a primary page is unavailable, corroborate any secondary source against
-another primary source before acting.
+Use primary sources only. If a required primary source is unavailable, report
+the failure and stop before proposing or applying an update.
 
 ### Anthropic (Claude / Claude Code)
 - Models overview: https://docs.anthropic.com/en/docs/about-claude/models/overview
 - News: https://www.anthropic.com/news
+- Claude Code setup and updates: https://docs.anthropic.com/en/docs/claude-code/setup
 - Claude Code release notes: https://docs.claude.com/en/release-notes/claude-code
+- Claude Code releases: https://github.com/anthropics/claude-code/releases
 
 ### OpenAI (Codex)
 - Models reference: https://platform.openai.com/docs/models
@@ -70,22 +123,52 @@ another primary source before acting.
 
 ## Workflow
 
-1. **Read current settings.** Open the managed files for the selected
-   provider(s) and capture the current model values. Report them up front.
-2. **Fetch latest info.** Use WebFetch (or WebSearch when WebFetch is blocked)
-   on the primary sources. Look for:
+1. **Parse scope.** Resolve `$mode` and `$provider` using the defaults and
+   validation rules above. Report the resolved scope before continuing.
+2. **Read current state.** For the `model` track, open the managed files for the
+   selected provider(s) and capture the current model values. For the `harness`
+   track, verify selected CLI ownership and capture installed versions. Report
+   the current state up front.
+3. **Fetch latest info.** Use WebFetch on the primary sources. If a required
+   source cannot be read, report the failure and stop before proposing an
+   update. Fetch only information required by the selected track(s):
    - Newest available model IDs (new Claude family generation, new
      `gpt-*-codex` release, new `gemini-*` generation)
    - Release date and any deprecation notice on the currently configured model
    - Whether a new alias has been introduced (e.g., a new Claude family, or a
      new Gemini alias)
-3. **Compare.** Build a short table: `file | field | current | proposed | reason`.
-   Note trade-offs (capability, latency, cost) when relevant.
-4. **Confirm with the user before editing.** If the user picks a different
-   choice, follow it.
-5. **Apply edits in the ghq repo** with the Edit tool. One field per edit.
-6. **Scan the invoking repository** for hardcoded model IDs (see next section).
-7. **Deploy.** Tell the user the deploy steps; only run them if asked.
+   - Latest selected CLI versions. Use `mise latest npm:@openai/codex` for
+     Codex. For Claude Code on the `latest` channel, use the official GitHub
+     release and cross-check it against the changelog. For another channel,
+     report the channel explicitly and use only a target documented for it.
+4. **Compare models when selected.** Build a short table:
+   `file | field | current | proposed | reason`. Note trade-offs (capability,
+   latency, cost) when relevant. Omit this step for `harness`.
+5. **Compare CLIs when selected.** Build a short table:
+   `CLI | manager | installed | latest | action`. Omit this step for `model`.
+6. **Confirm before mutating anything.** Let the user independently approve
+   model config edits, each CLI update, and repo-scan edits. If the user picks a
+   different choice, follow it.
+7. **Update selected CLIs.** For `harness` or `both`, run only the approved
+   commands:
+   ```bash
+   mise upgrade npm:@openai/codex --yes
+   mise reshim --force
+   claude update
+   ```
+   Run the Codex pair only for `codex` or `all`, and `claude update` only for
+   `claude` or `all`. If a command fails, surface the error and stop that update;
+   do not switch installers or claim partial success as complete.
+8. **Verify CLI updates.** Re-resolve each updated executable, run its
+   `--version` command, and compare the result with the proposed version. Report
+   an error if the executable moved to an unexpected manager or the installed
+   version did not change as expected.
+9. **Apply approved model edits.** For `model` or `both`, edit the ghq repo with
+   the Edit tool. Change one field per edit.
+10. **Scan the invoking repository.** For `model` or `both`, scan for hardcoded
+   model IDs as described below. Skip the scan for `harness`.
+11. **Deploy model config changes.** Tell the user the deploy steps; only run
+   them if asked.
    The chezmoi source dir is the ghq clone, so the canonical sequence is:
    ```bash
    chezmoi git pull -- --ff-only
@@ -93,7 +176,7 @@ another primary source before acting.
    chezmoi apply -v
    ```
    Per repo policy, do not commit automatically — wait for explicit approval.
-8. **Verify.** After `chezmoi apply`, read `~/.codex/config.toml`,
+12. **Verify model config changes.** After `chezmoi apply`, read `~/.codex/config.toml`,
    `~/.claude/settings.json`, and `~/.gemini/settings.json` to confirm the
    change landed.
 
