@@ -6,6 +6,14 @@
 - Write comments and docstrings in the language used by the surrounding file or project. Prefer the language that best serves maintainers; use English only when required by the repository, public API, or intended audience.
 - Follow repository conventions for commit messages and README text.
 
+## Effort and Quality Trade-offs
+
+- Optimize for useful, validated results rather than theoretical completeness.
+- When comparing approaches, weigh expected user-visible benefit and risk reduction against the added time and complexity.
+- Prefer a much faster approach when additional effort would only produce a small improvement in confidence, polish, or coverage.
+- Spend additional effort when it materially affects explicit acceptance criteria, the primary workflow, safety, data integrity, a public contract, or an irreversible action.
+- Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work that the request does not require and report any meaningful residual risk.
+
 ## Response Contract
 
 - Treat user-facing response style as a persistent requirement, not a preference.
