@@ -47,8 +47,8 @@ git -C "$worktree_base/old-upstream" commit -qm upstream
 printf 'base fallback\n' >"$worktree_base/old-base-fallback/base-fallback.txt"
 git -C "$worktree_base/old-base-fallback" add base-fallback.txt
 git -C "$worktree_base/old-base-fallback" commit -qm base-fallback
-upstream_unmerged_oid=$(printf 'upstream unmerged\n' | \
-  git -C "$main_repo" commit-tree refs/heads/main^{tree} -p refs/heads/main)
+upstream_unmerged_oid=$(printf 'upstream unmerged\n' |
+  git -C "$main_repo" commit-tree "refs/heads/main^{tree}" -p refs/heads/main)
 git -C "$main_repo" update-ref refs/heads/upstream-unmerged "$upstream_unmerged_oid"
 git -C "$main_repo" update-ref \
   refs/remotes/origin/staging refs/heads/old-base-fallback
