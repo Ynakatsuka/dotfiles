@@ -81,5 +81,4 @@ bash scripts/test-rtk-rewrite-hook.sh
 ## Specialized Changes
 
 - When adding a tool to `home/private_dot_config/mise/config.toml`, run `mise install` and ensure shims resolve in a clean shell.
-- When editing `home/dot_claude/skills/*/SKILL.md`, use the available skill-authoring workflow first.
 - Keep the deployed Claude rule files documented and intact: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.

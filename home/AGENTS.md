@@ -4,7 +4,7 @@
 
 - Respond in Japanese using です・ます form. Avoid casual form unless the user requests another language or style.
 - Write comments and docstrings in the language used by the surrounding file or project. Prefer the language that best serves maintainers; use English only when required by the repository, public API, or intended audience.
-- Follow repository conventions for commit messages and README text.
+- Follow repository conventions for README and other prose.
 
 ## Effort and Quality Trade-offs
 
@@ -21,6 +21,7 @@
 - Preserve exact user-requested output formats, schemas, machine-readable responses, patch-only output, and verbatim structures.
 - After long sessions, resumes, or compaction, re-anchor to the latest user request and this response contract before answering.
 - Keep progress updates, status reports, and final answers in the same Japanese style.
+- Keep mid-task messages to roughly one line. Briefly saying what you are about to do is welcome, since the user may not read tool calls closely; cut the padding rather than the message. Final answers, approval requests, and stop-and-report messages keep their full detail.
 - Omit progress commentary when it would break a requested machine-readable or patch-only format.
 
 ## 出力の書き方
@@ -44,6 +45,7 @@
 - Default to surfacing failures as errors.
 - Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, workaround paths, or silent retries unless the user explicitly approves that fallback in the current task.
 - If a fallback seems necessary, stop before editing and propose it: name the failure mode, the exact fallback behavior, the trade-off, and what erroring out would look like.
+- Do not preserve or broaden existing fallback logic when modifying nearby code unless it is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask first.
 
 Avoid these patterns unless explicitly approved:
 
@@ -54,14 +56,12 @@ Avoid these patterns unless explicitly approved:
 - Guessing alternate config paths, branches, models, endpoints, parsers, or commands.
 - Treating partial results as complete success without surfacing the missing or failed part.
 
-- Do not preserve or broaden existing fallback logic when modifying nearby code unless it is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask first.
-
 ## Safety and Approvals
 
 - Ask before adding or changing production dependencies, performing destructive or irreversible actions, or sending, publishing, deploying, or mutating external state.
 - Complete local, reversible validation before external side effects. Do not chain a push, deployment, publication, or send operation with checks that can still fail afterward.
 - Never commit or push unless the user explicitly requests it. A request to fix or update an existing pull request authorizes committing the requested fixes and pushing the validated commits to that pull request's existing source branch without separate approval. Confirm the current branch and pull request head branch before committing or pushing.
-- Never commit secrets, credentials, or environment files.
+- Never commit secrets, credentials, or environment files. Read the staged diff before committing and check it for them.
 - Do not revert user changes. Ignore unrelated dirty-worktree changes.
 
 ## Investigation and Scope
@@ -78,7 +78,6 @@ Avoid these patterns unless explicitly approved:
 
 ## Tools and Evidence
 
-- Set a shell tool's `workdir` when supported. Otherwise use the session working directory or an absolute path; use `cd` only when the command must run elsewhere.
 - In zsh, never use `path` as a variable name because it is tied to `PATH`. Use `route`, `file_path`, or `target_path` instead.
 - Verify uncertain paths with `fd` or `rg --files` before reading them. Confirm file type before using a file-reading tool.
 - Bound file reads, searches, logs, and command output. Narrow the query after truncation instead of repeating an unbounded command.
@@ -86,7 +85,7 @@ Avoid these patterns unless explicitly approved:
 - Use `ast-grep` for syntax-aware searches or rewrites when it is available and safer than text matching.
 - Use `jq` and `yq` for structured data when they are available. Do not introduce an unconfigured runtime only to parse structured data.
 - Before running a remote or container batch, verify every required executable in that environment. Do not assume host tools or the host `PATH` exist there; stop and report missing requirements.
-- Call only tools exposed in the current session. Use the supported tool-discovery mechanism when capability availability is unclear.
+- Use the supported tool-discovery mechanism when capability availability is unclear.
 
 ## Verification
 
@@ -97,7 +96,7 @@ Avoid these patterns unless explicitly approved:
 
 ## Git
 
-- Use Conventional Commits when the repository does not define another commit convention.
+- Follow the repository's commit message convention. Use Conventional Commits in English when it does not define one.
 - Before a push without an explicit refspec, resolve `@{push}`. Stop if a topic branch would push to `main`, `master`, `staging`, `develop`, `production`, or `release/*`, unless the user explicitly requested that protected-branch push.
 
 ## Project Toolchains
