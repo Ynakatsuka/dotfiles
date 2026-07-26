@@ -29,7 +29,7 @@ case "$reviewer_mode" in
     exit 1
     ;;
 esac
-if [[ ! "$chunk_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+if [[ ! "$chunk_id" =~ ^[A-Za-z0-9._-]+$ ]] || [[ "$chunk_id" == "." ]] || [[ "$chunk_id" == ".." ]]; then
   echo "ERROR: invalid chunk id: $chunk_id" >&2
   exit 1
 fi
@@ -166,8 +166,12 @@ codex_args=(
   --output-schema "$schema_file"
   -o "$result_json"
 )
+# Pin each reviewer's model and effort instead of inheriting the global Codex
+# config, so a change to ~/.codex/config.toml cannot silently alter review depth.
 if [[ "$reviewer_mode" == "reviewer-a" ]]; then
   codex_args+=(-c 'model_reasoning_effort="medium"')
+else
+  codex_args+=(-c 'model="gpt-5.6-terra"' -c 'model_reasoning_effort="xhigh"')
 fi
 codex_args+=(-)
 
@@ -212,6 +216,14 @@ require_markdown_marker() {
   fi
 }
 
+reject_markdown_marker() {
+  local marker=$1
+  if grep -Fq "$marker" "$review_markdown"; then
+    echo "ERROR: Codex reviewer output must not include a removed section: reviewer=$reviewer marker=$marker" >&2
+    exit 1
+  fi
+}
+
 if [[ "$reviewer_mode" == "reviewer-a" ]]; then
   require_markdown_marker '# Simplify Review'
   require_markdown_marker '## Required'
@@ -219,11 +231,11 @@ if [[ "$reviewer_mode" == "reviewer-a" ]]; then
   require_markdown_marker '## Not needed'
 else
   require_markdown_marker '## PR understanding'
-  require_markdown_marker '## Strengths'
   require_markdown_marker '## Findings'
-  require_markdown_marker '## Non-findings'
   require_markdown_marker '## Assessment'
   require_markdown_marker '**Ready to merge?**'
+  reject_markdown_marker '## Strengths'
+  reject_markdown_marker '## Non-findings'
 fi
 
 printf '%s\n' "$review_markdown"

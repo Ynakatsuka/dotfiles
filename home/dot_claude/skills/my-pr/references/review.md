@@ -79,7 +79,7 @@ If `MY_PR_CONTEXT_STATE=found`, reviewers must read `MY_PR_CONTEXT` before the d
 3. Cross-check the diff against that intended behavior. Report mismatches between PR intent and implementation as findings.
 4. Avoid re-raising discussion items already resolved in the PR conversation unless the diff still violates the resolved decision.
 
-If `MY_PR_CONTEXT_STATE=no_existing_pr`, state that no PR body or prior GitHub conversation exists. Do not invent missing intent; infer only from the diff and repository files, and mark intent uncertainty in findings or Non-findings.
+If `MY_PR_CONTEXT_STATE=no_existing_pr`, state that no PR body or prior GitHub conversation exists. Do not invent missing intent; infer only from the diff and repository files, and mark intent uncertainty in the affected findings.
 
 ## Large diff chunking
 
@@ -111,11 +111,12 @@ Reviewer A chunks run integrated simplify in `review` mode with the simplify per
 
 ## Codex review input integrity
 
-Reviewer A and Reviewer C must use `scripts/run-codex-review.sh`. Do not pass artifact paths to Codex and ask Codex to read them with `cat`, `sed`, `Read`, or another tool.
+Reviewer A and Reviewer C must go through `scripts/run-codex-reviews.sh`, which launches both concurrently using the underlying `scripts/run-codex-review.sh`. Do not pass artifact paths to Codex and ask Codex to read them with `cat`, `sed`, `Read`, or another tool.
 
-The runner:
+The underlying runner:
 
 - embeds the complete PR context and assigned diff directly into Codex stdin
+- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-5.6-terra` at `xhigh` effort, so Reviewer C alone is also independent of the configured `model`
 - caps the generated prompt at 393,216 bytes before launch
 - runs from an isolated artifact-local Git repository instead of the review target repository
 - disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox
@@ -124,29 +125,28 @@ The runner:
 - requires JSON Schema output with matching SHA-256 receipts and an unpredictable nonce disclosed only after the final diff boundary
 - exits non-zero on missing input, oversized prompt, Codex failure, incomplete status, or receipt mismatch
 
-Write each role-specific prompt under the exact artifact directory recorded in `artifact.env`. Invoke one runner process per assigned chunk with literal values from that state file or chunk manifest; do not rely on shell variables inherited from orchestration:
+Write each role-specific prompt under the exact artifact directory recorded in `artifact.env`. Launch both reviewers for an assigned chunk through `scripts/run-codex-reviews.sh`, which starts the two runner processes concurrently and waits for both. Use literal values from that state file or chunk manifest; do not rely on shell variables inherited from orchestration:
 
 ```bash
-bash "$HOME/.claude/skills/my-pr/scripts/run-codex-review.sh" \
-  reviewer-a "full" "1" \
+bash "$HOME/.claude/skills/my-pr/scripts/run-codex-reviews.sh" \
+  "full" "1" \
   "/absolute/artifact/path/reviewer-a-prompt.md" \
-  "/absolute/artifact/path/pr-context.md" \
-  "/absolute/artifact/path/review.diff"
-
-bash "$HOME/.claude/skills/my-pr/scripts/run-codex-review.sh" \
-  reviewer-c "full" "1" \
   "/absolute/artifact/path/reviewer-c-prompt.md" \
   "/absolute/artifact/path/pr-context.md" \
   "/absolute/artifact/path/review.diff"
 ```
 
-Each successful runner prints the absolute review Markdown path. Use that file as reviewer output. Never use a partial stdout/stderr log as review output. Do not retry a failed chunk or switch executors unless the user explicitly approves it.
+It prints one `<reviewer>\t<absolute review Markdown path>` line per reviewer. Use those files as reviewer output. Never use a partial stdout/stderr log as review output. Do not retry a failed chunk or switch executors unless the user explicitly approves it.
+
+If either reviewer fails, the wrapper reports which one, echoes that reviewer's stderr, prints no result paths, and exits non-zero. Treat that as `REVIEW_INCOMPLETE`; do not integrate the reviewer that happened to succeed.
+
+Call `run-codex-review.sh` directly only when relaunching a single reviewer after the user explicitly approved it. The argument order differs: `<reviewer-a|reviewer-c> <chunk-id> <chunk-count> <prompt> <context> <diff>`.
 
 Do not set or forward `MY_PR_ARTIFACT_DIR` solely for the runner. Its context-file argument is the source of truth for the result directory, including when Reviewer A/C runs in another process or shell.
 
 ## Review focus checklist
 
-Use this checklist for Claude/Codex correctness review. Exclude style or preference-only findings, but keep plausible low-severity or uncertain risks for integration. Put inspected-but-safe areas in Non-findings when useful.
+Use this checklist for Claude/Codex correctness review. Exclude style or preference-only findings, but keep plausible low-severity or uncertain risks for integration. Do not report inspected-but-safe areas or diff strengths; they do not affect the fix decision.
 
 - Fallbacks: unintended fallback behavior, default substitution, broad catch, silent retry, mock/stub continuation, cached-data continuation, or swallowed dependency/config failures.
 - Approach fit: whether the implementation directly solves the PR's stated problem under its constraints, whether it bypasses the intended architecture or extension point, and whether a simpler or safer existing implementation should have been reused or extended.
@@ -180,6 +180,25 @@ MY_PR_CONTEXT_BYTES=<PR context bytes>
 
 Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all launched reviewer and chunk results before integration.
 
+### Launch mechanics
+
+Concurrency across A and C is enforced by `scripts/run-codex-reviews.sh`, which backgrounds both runners and waits for both. Concurrency with Reviewer B is not enforced, so order the launch deliberately. The exact mechanism is host-dependent because Reviewer B's executor differs by host (see below).
+
+In a Claude Code session with the Agent tool:
+
+- Launch Reviewer B first. The Agent tool runs subagents in the background, so it returns immediately and overlaps whatever follows.
+- Then call `run-codex-reviews.sh` once per chunk. Issue every chunk call in the same response; never await one chunk before issuing the next.
+- Give each `run-codex-reviews.sh` call an explicit `timeout` of `600000` ms. The default Bash timeout is 120,000 ms, and Reviewer C runs at `xhigh` effort, so the default kills a healthy review mid-run. Because the wrapper runs A and C concurrently, its wall clock is the slower reviewer, not their sum.
+- A timeout kill is an execution failure, not a format failure. It produces `REVIEW_INCOMPLETE` and cannot be retried without explicit user approval, so set the timeout before launching rather than recovering afterward.
+- If a chunked run needs more than the 600,000 ms ceiling, launch the wrapper with `run_in_background` and wait for its completion notification. Do not poll on a short interval.
+
+In a Codex or other non-Claude host, Reviewer B runs through the blocking Claude CLI command below, so there is no equivalent to Agent-tool backgrounding or a `run_in_background` flag:
+
+- Start `run-codex-reviews.sh` in the background first (for example with `&`, capturing its PID and redirecting stdout/stderr to files under the artifact directory), since it is the call this host can actually parallelize.
+- Then run the Reviewer B Claude CLI command, which blocks until it returns.
+- After the CLI command returns, wait on the backgrounded wrapper's PID and read its captured output before integration.
+- If this host cannot execute concurrent tasks at all, report that limitation before starting review instead of silently serializing.
+
 Reviewer B is host-aware:
 
 - In a Claude Code session with the Agent tool available, use the Agent tool.
@@ -193,7 +212,7 @@ Reviewer B is host-aware:
 
 ## Reviewer A: integrated simplify review
 
-Read `references/simplify/overview.md`. Write its review-mode prompt under the exact artifact directory from the current state file, then run `scripts/run-codex-review.sh reviewer-a` with the absolute full-diff path or assigned chunk path. The runner applies `model_reasoning_effort="medium"`, embeds the complete inputs, disables nested delegation, and validates the receipt. Do not invoke Codex directly for Reviewer A.
+Read `references/simplify/overview.md`. Write its review-mode prompt under the exact artifact directory from the current state file, then pass that prompt to `scripts/run-codex-reviews.sh` together with the Reviewer C prompt and the absolute full-diff path or assigned chunk path. The runner applies `model_reasoning_effort="medium"`, embeds the complete inputs, disables nested delegation, and validates the receipt. Do not invoke Codex directly for Reviewer A.
 
 If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
 
@@ -255,7 +274,7 @@ Do not use Bash or any shell command.
 Use only the Read tool and the supplied diff artifact.
 Use the supplied PR context artifact as the source of truth for PR body and prior GitHub conversation. If it cannot be read, return REVIEW_INCOMPLETE.
 Do not run formatters, tests, generators, migrations, reproductions, grep, rg, git, or commands of any kind.
-If additional evidence would require a shell command or another unavailable tool, report the uncertainty in the finding or Non-findings instead of trying to execute it.
+If additional evidence would require a shell command or another unavailable tool, report the uncertainty inside the affected finding instead of trying to execute it.
 </read_only_rules>
 
 <finding_policy>
@@ -263,7 +282,8 @@ Report every plausible issue you find, including low-severity or uncertain findi
 </finding_policy>
 
 <output_format>
-Your final response must contain the complete Markdown structure below and nothing else. Do not return a progress report, handoff summary, shortened recap, or a statement that the review was completed. Use `- none` in `Strengths`, `Findings`, or `Non-findings` when that section has no entries.
+Your final response must contain the complete Markdown structure below and nothing else. Do not return a progress report, handoff summary, shortened recap, or a statement that the review was completed. Use `- none` in `Findings` when there are no entries.
+Do not add sections that are not listed below. In particular, do not report diff strengths or inspected-but-safe areas; they do not change the fix decision.
 When the executor supplies a JSON Schema, put this complete Markdown verbatim in `review_markdown`. Do not put a summary in that field.
 
 ## PR understanding
@@ -272,9 +292,6 @@ When the executor supplies a JSON Schema, put this complete Markdown verbatim in
 - Problem: one sentence based on the PR context, or "Unavailable: no existing PR context".
 - Intended behavior: one sentence.
 - Prior discussion constraints: bullets, or "- none found".
-
-## Strengths
-- Specific strengths in the diff, if any. Keep this short.
 
 ## Findings
 
@@ -286,9 +303,6 @@ When the executor supplies a JSON Schema, put this complete Markdown verbatim in
    - Evidence: why this follows from the diff/code
    - Suggested fix: concrete fix direction
    - Verification: test or command that should catch this
-
-## Non-findings
-- Notable risks inspected but not reported, with reason. Use `- none` when there are none.
 
 ## Assessment
 
@@ -308,7 +322,7 @@ If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times 
 
 Use the repo-local `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Do not create `/tmp` diff files.
 
-Write the following prompt under the exact artifact directory from the current state file, then run it with `scripts/run-codex-review.sh reviewer-c`. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
+Write the following prompt under the exact artifact directory from the current state file, then pass it to `scripts/run-codex-reviews.sh` as the Reviewer C prompt. The runner pins `gpt-5.6-terra` at `xhigh` effort for this reviewer, so it is the deepest and slowest of the three; the wrapper starts it alongside Reviewer A, and the call needs the 600,000 ms timeout. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
 
 ```text
 Review the supplied diff as a senior software engineer.
@@ -341,7 +355,7 @@ Finding policy:
 - Do not filter for importance at this stage. Integration will rank and filter.
 - Include severity and confidence for each finding.
 
-Output exactly this structure:
+Output exactly this structure. Do not add sections that are not listed. In particular, do not report diff strengths or inspected-but-safe areas; they do not change the fix decision.
 
 ## PR understanding
 - Description: one sentence describing what the PR changes.
@@ -349,9 +363,6 @@ Output exactly this structure:
 - Problem: one sentence based on the PR context, or "Unavailable: no existing PR context".
 - Intended behavior: one sentence.
 - Prior discussion constraints: bullets, or "- none found".
-
-## Strengths
-- Specific strengths in the diff, if any. Keep this short.
 
 ## Findings
 
@@ -363,9 +374,6 @@ Output exactly this structure:
    - Evidence: why this follows from the diff/code
    - Suggested fix: concrete fix direction
    - Verification: test or command that should catch this
-
-## Non-findings
-- Optional: notable risks inspected but not reported, with reason.
 
 ## Assessment
 

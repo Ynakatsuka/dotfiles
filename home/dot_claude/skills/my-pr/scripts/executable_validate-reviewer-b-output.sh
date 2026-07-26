@@ -11,11 +11,20 @@ if [[ ! -s "$review_file" ]]; then
   exit 1
 fi
 
+forbidden_markers=(
+  '## Strengths'
+  '## Non-findings'
+)
+for forbidden in "${forbidden_markers[@]}"; do
+  if grep -n -m 1 -Fx -- "$forbidden" "$review_file" >/dev/null; then
+    echo "ERROR: Reviewer B output must not include a removed section: $forbidden" >&2
+    exit 1
+  fi
+done
+
 markers=(
   '## PR understanding'
-  '## Strengths'
   '## Findings'
-  '## Non-findings'
   '## Assessment'
 )
 previous_line=0

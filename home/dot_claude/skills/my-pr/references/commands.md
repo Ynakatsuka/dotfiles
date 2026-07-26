@@ -47,7 +47,9 @@ Run the full workflow:
 4. Start all three quality reviewers concurrently
    - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
-   - stdin-embedded Codex review via `scripts/run-codex-review.sh`
+   - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-terra` at `xhigh`)
+
+   Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
 5. Wait for all reviewers; do not final-answer while background reviewers are running
 6. Integrate findings
 7. Fix Required findings
@@ -81,7 +83,9 @@ Run local quality review in read-only mode.
 4. Start all three quality reviewers concurrently
    - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
-   - stdin-embedded Codex review via `scripts/run-codex-review.sh`
+   - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-terra` at `xhigh`)
+
+   Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
 5. Wait for all reviewers
 6. Integrate findings
 7. Stop
@@ -98,7 +102,9 @@ Fix only Required findings, verify, and commit without pushing.
 4. Start all three quality reviewers concurrently in read-only mode
    - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
    - Claude correctness review (host-aware Agent or Claude CLI)
-   - stdin-embedded Codex review via `scripts/run-codex-review.sh`
+   - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-terra` at `xhigh`)
+
+   Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
 5. Wait for all reviewers
 6. Integrate findings
 7. Fix Required findings only
