@@ -103,11 +103,12 @@ If `$ARGUMENTS` is not referenced in the body, arguments are auto-appended as `A
 
 #### Dynamic context injection
 
-`` !`command` `` runs a shell command BEFORE the skill content reaches Claude; the output replaces the placeholder, so the prompt arrives grounded in live state (git status, current tags, open PRs). For multi-line commands, use a fenced block opened with ` ```! `.
+A `!` immediately followed by a backtick-quoted command runs that shell command BEFORE the skill content reaches Claude; the output replaces the placeholder, so the prompt arrives grounded in live state (git status, current tags, open PRs). For multi-line commands, open a fence with three backticks immediately followed by `!`, as in `my-pr/SKILL.md`.
 
 Rules:
 
 - Recognized only at line start or after whitespace (`` KEY=!`cmd` `` stays literal).
+- Never write a bare three-backtick-plus-`!` sequence in prose or an inline code span. The scanner is not a Markdown parser, so it treats the rest of the file as a command and the skill fails to load. Describe the fence in words instead.
 - Commands run on EVERY invocation, including auto-invocation: keep them fast, read-only, and side-effect free.
 - Command failure output is injected as-is — that is desirable (surfaces errors instead of hiding them). Do not wrap commands in `|| echo` fallbacks.
 - Output is not re-scanned for further placeholders.
