@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json",
   "schemaVersion": 1,
   "customSidebars": {
-    "renderer": "inProcess"
+    "renderer": "remote"
   },
   "shortcuts": {
     "bindings": {

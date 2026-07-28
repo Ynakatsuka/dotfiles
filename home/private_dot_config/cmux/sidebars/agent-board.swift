@@ -1,8 +1,7 @@
-// Agent Board — compact workspace and agent activity sidebar for cmux.
+// Agent Board — lightweight workspace and agent activity sidebar for cmux.
 //
-// The interpreted sidebar API does not expose process metadata or arbitrary
-// status entries. Agent activity is therefore derived from cmux's live signals:
-// progress labels and activity-prefixed surface titles.
+// cmux re-evaluates interpreted sidebars about once a second. Keep the data
+// classification and rendered view tree deliberately small.
 
 func hasSpinner(_ title: String) -> Bool {
     return title.hasPrefix("⠁")
@@ -25,6 +24,13 @@ func hasSpinner(_ title: String) -> Bool {
         || title.hasPrefix("⠏")
 }
 
+func isStopped(_ workspace) -> Bool {
+    let customTitleSuffix = "⁣⁤⁢⁣⁤⁢⁣⁤"
+    let autoTitleSuffix = "⁣⁢⁤⁣⁢⁤⁣⁢"
+    return workspace.title.hasSuffix(customTitleSuffix)
+        || workspace.title.hasSuffix(autoTitleSuffix)
+}
+
 func progressLabel(_ workspace) -> String {
     if workspace.progress != nil && workspace.progress.label != nil {
         return workspace.progress.label.lowercased()
@@ -32,146 +38,59 @@ func progressLabel(_ workspace) -> String {
     return ""
 }
 
-func hasWorkingSurface(_ workspace) -> Bool {
-    return workspace.tabs.contains { hasSpinner($0.title) }
-}
+func agentState(_ workspace) -> String {
+    if isStopped(workspace) { return "stopped" }
 
-func hasInputSurface(_ workspace) -> Bool {
-    return workspace.tabs.contains {
+    let label = progressLabel(workspace)
+    let needsInput = workspace.tabs.contains {
         $0.title.lowercased().contains("action required")
     }
-}
-
-func isStopped(_ workspace) -> Bool {
-    let customTitleSuffix = "⁣⁤⁢⁣⁤⁢⁣⁤" // U+2063,U+2064,U+2062,U+2063,U+2064,U+2062,U+2063,U+2064
-    let autoTitleSuffix = "⁣⁢⁤⁣⁢⁤⁣⁢" // U+2063,U+2062,U+2064,U+2063,U+2062,U+2064,U+2063,U+2062
-    return workspace.title.hasSuffix(customTitleSuffix)
-        || workspace.title.hasSuffix(autoTitleSuffix)
-}
-
-func needsInput(_ workspace) -> Bool {
-    if isStopped(workspace) { return false }
-    let label = progressLabel(workspace)
-    return hasInputSurface(workspace)
+    if needsInput
         || label.contains("waiting")
         || label.contains("input")
         || label.contains("approval")
         || label.contains("question")
-        || label.contains("blocked")
-}
+        || label.contains("blocked") {
+        return "input"
+    }
 
-func isWorking(_ workspace) -> Bool {
-    if isStopped(workspace) || needsInput(workspace) { return false }
-    let label = progressLabel(workspace)
-    return hasWorkingSurface(workspace)
+    let hasWorkingTab = workspace.tabs.contains {
+        hasSpinner($0.title)
+    }
+    if hasWorkingTab
         || label.contains("working")
         || label.contains("running")
-        || label.contains("progress")
-}
+        || label.contains("progress") {
+        return "working"
+    }
 
-func isDone(_ workspace) -> Bool {
-    if isStopped(workspace) || needsInput(workspace) || isWorking(workspace) { return false }
-    let label = progressLabel(workspace)
-    return label.contains("done")
+    if label.contains("done")
         || label.contains("complete")
         || label.contains("finished")
-        || label.contains("success")
+        || label.contains("success") {
+        return "done"
+    }
+
+    return "idle"
 }
 
-func hasActivity(_ workspace) -> Bool {
-    return needsInput(workspace)
-        || isWorking(workspace)
-        || isDone(workspace)
-        || isStopped(workspace)
-}
-
-func activityTint(_ workspace) -> String {
-    if needsInput(workspace) { return "#FF9F0A" }
-    if isWorking(workspace) { return "#30D158" }
-    if isDone(workspace) { return "#54A8FF" }
-    if isStopped(workspace) { return "#FFD60A" }
-    return "#8E8E93"
-}
-
-func activityIcon(_ workspace) -> String {
-    if needsInput(workspace) { return "exclamationmark.circle.fill" }
-    if isDone(workspace) { return "checkmark.circle.fill" }
-    if isStopped(workspace) { return "stop.circle.fill" }
-    return "circle"
-}
-
-func activityLabel(_ workspace) -> String {
-    if needsInput(workspace) { return "Needs input" }
-    if isWorking(workspace) { return "Working" }
-    if isDone(workspace) { return "Done" }
-    if isStopped(workspace) { return "Stopped" }
+func stateLabel(_ state: String) -> String {
+    if state == "input" { return "Input" }
+    if state == "working" { return "Working" }
+    if state == "done" { return "Done" }
+    if state == "stopped" { return "Stopped" }
     return ""
 }
 
-func hasTabActivity(_ tab) -> Bool {
-    return hasSpinner(tab.title)
-        || tab.title.lowercased().contains("action required")
+func stateTint(_ state: String) -> String {
+    if state == "input" { return "#FF9F0A" }
+    if state == "working" { return "#30D158" }
+    if state == "done" { return "#54A8FF" }
+    if state == "stopped" { return "#FFD60A" }
+    return "#636366"
 }
 
-func activeAgentCount(_ workspace) -> Int {
-    if isStopped(workspace) { return 0 }
-    return workspace.tabs.count { hasTabActivity($0) }
-}
-
-func surfaceKind(_ tab) -> String {
-    if hasTabActivity(tab) { return "Agent" }
-    return ""
-}
-
-func tabStatusSummary(_ workspace) -> String {
-    return workspace.tabs.indices.filter { $0 < 8 }.reduce("") { summary, index in
-        let tab = workspace.tabs[index]
-        let symbol = !isStopped(workspace) && hasSpinner(tab.title)
-            ? "◉"
-            : (tab.focused ? "●" : "○")
-        let separator = summary == "" ? "" : "  "
-        return "\(summary)\(separator)\(symbol) \(index + 1)"
-    }
-}
-
-func tabActivityLabel(_ tab) -> String {
-    if hasSpinner(tab.title) { return "Working" }
-    if tab.title.lowercased().contains("action required") { return "Needs input" }
-    return ""
-}
-
-func workspaceBranchText(_ workspace) -> String {
-    if workspace.branch != nil && workspace.branch != "" {
-        return "\(workspace.branch)\(workspace.dirty == true ? " •" : "")"
-    }
-
-    let focusedTabs = workspace.tabs.filter { $0.focused }
-    if focusedTabs.count > 0 {
-        let branch = tabBranchText(focusedTabs[0])
-        if branch != "" { return branch }
-    }
-
-    let matchingTabs = workspace.tabs.filter { $0.directory == workspace.directory }
-    if matchingTabs.count > 0 {
-        let branch = tabBranchText(matchingTabs[0])
-        if branch != "" { return branch }
-    }
-
-    let currentWorktree = worktreeName(workspace)
-    if currentWorktree != "" {
-        let worktreeTabs = workspace.tabs.filter {
-            tabWorktreeName($0) == currentWorktree
-        }
-        if worktreeTabs.count > 0 {
-            let branch = tabBranchText(worktreeTabs[0])
-            if branch != "" { return branch }
-        }
-    }
-
-    return ""
-}
-
-func repositoryNameFromDirectory(_ directory: String) -> String {
+func repositoryName(_ directory: String) -> String {
     let components = directory.split(separator: "/")
     if components.count == 0 { return directory }
     if components.count > 1 {
@@ -183,7 +102,7 @@ func repositoryNameFromDirectory(_ directory: String) -> String {
     return components[components.count - 1]
 }
 
-func worktreeNameFromDirectory(_ directory: String) -> String {
+func worktreeName(_ directory: String) -> String {
     let components = directory.split(separator: "/")
     if components.count < 2 { return "" }
     let parent = components[components.count - 2]
@@ -191,174 +110,80 @@ func worktreeNameFromDirectory(_ directory: String) -> String {
     return components[components.count - 1]
 }
 
-func repositoryName(_ workspace) -> String {
-    return repositoryNameFromDirectory(workspace.directory)
+func workspaceSubtitle(_ workspace) -> String {
+    let repository = repositoryName(workspace.directory)
+    let worktree = worktreeName(workspace.directory)
+    let branch = workspace.branch != nil ? workspace.branch : ""
+    let location = worktree != "" ? "\(repository)/\(worktree)" : repository
+    return branch != "" ? "\(location)  \(branch)\(workspace.dirty == true ? " •" : "")" : location
 }
 
-func worktreeName(_ workspace) -> String {
-    return worktreeNameFromDirectory(workspace.directory)
-}
-
-func tabRepositoryName(_ tab) -> String {
-    if tab.directory == nil || tab.directory == "" { return "" }
-    return repositoryNameFromDirectory(tab.directory)
-}
-
-func tabWorktreeName(_ tab) -> String {
-    if tab.directory == nil || tab.directory == "" { return "" }
-    return worktreeNameFromDirectory(tab.directory)
-}
-
-func hasPullRequest(_ workspace) -> Bool {
-    return workspace.pr != nil && workspace.pr.label != nil && workspace.pr.label != ""
-}
-
-func tabBranchText(_ tab) -> String {
-    if tab.branch == nil || tab.branch == "" { return "" }
-    return "\(tab.branch)\(tab.dirty == true ? " •" : "")"
-}
-
-func prTint(_ workspace) -> String {
-    if !hasPullRequest(workspace) { return "#8E8E93" }
-    if workspace.pr.stale == true { return "#8E8E93" }
-    if workspace.pr.status == "open" { return "#3FB950" }
-    if workspace.pr.status == "merged" { return "#A371F7" }
-    if workspace.pr.status == "closed" { return "#F85149" }
-    return "#8E8E93"
-}
-
-func activityDetail(_ workspace) -> String {
-    if needsInput(workspace) && workspace.latestMessage != nil {
-        return workspace.latestMessage
+func tabSubtitle(_ tab) -> String {
+    if tab.directory == nil || tab.directory == "" {
+        return tab.branch != nil ? tab.branch : ""
     }
-    if isWorking(workspace) && workspace.latestPrompt != nil {
-        return workspace.latestPrompt
-    }
-    if isDone(workspace) && workspace.latestMessage != nil {
-        return workspace.latestMessage
-    }
-    if isStopped(workspace) && workspace.latestMessage != nil {
-        return workspace.latestMessage
-    }
-    return ""
+    let repository = repositoryName(tab.directory)
+    let branch = tab.branch != nil ? tab.branch : ""
+    return branch != "" ? "\(repository)  \(branch)\(tab.dirty == true ? " •" : "")" : repository
+}
+
+func tabState(_ tab, _ workspaceStopped: Bool) -> String {
+    if workspaceStopped { return "idle" }
+    if tab.title.lowercased().contains("action required") { return "input" }
+    if hasSpinner(tab.title) { return "working" }
+    return "idle"
 }
 
 func workspaceRow(_ workspace) -> some View {
-    let tint = activityTint(workspace)
-    let detail = activityDetail(workspace)
-    let worktree = worktreeName(workspace)
-    let branch = workspaceBranchText(workspace)
-    let agents = activeAgentCount(workspace)
+    let state = agentState(workspace)
+    let tint = stateTint(state)
 
-    HStack(alignment: .top, spacing: 7) {
+    HStack(spacing: 7) {
         Capsule()
             .foregroundColor(workspace.selected ? "#7A4FD8" : tint)
-            .opacity(workspace.selected ? 1.0 : 0.7)
-            .frame(width: 3, height: 34)
+            .frame(width: 3, height: 30)
 
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 6) {
-                Text("\(workspace.index + 1)")
-                    .font(.system(size: 8, design: .monospaced))
-                    .fontWeight(.semibold)
-                    .foregroundColor(workspace.selected ? "#FFFFFF" : "#8E8E93")
-                    .frame(width: 14, height: 14)
-                    .background(workspace.selected ? "#7A4FD8" : "#8E8E9326")
-                    .cornerRadius(4)
+        Text("\(workspace.index + 1)")
+            .font(.system(size: 9, design: .monospaced))
+            .foregroundColor("#8E8E93")
+            .frame(width: 14)
 
-                Text(workspace.title)
-                    .font(.system(size: 13))
-                    .fontWeight(workspace.selected ? .semibold : .regular)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-
-                Spacer()
-
-                if agents > 0 {
-                    Label("\(agents)", systemImage: "cpu")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor("#636366")
-                }
-
-                if hasActivity(workspace) {
-                    Image(systemName: activityIcon(workspace))
-                        .font(.system(size: 10))
-                        .foregroundColor(tint)
-                }
-            }
-
-            HStack(spacing: 5) {
-                Text(repositoryName(workspace))
-                    .font(.system(size: 10))
-                    .foregroundColor("#8E8E93")
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                Spacer()
-            }
-
-            if worktree != "" {
-                Label(worktree, systemImage: "square.stack.3d.down.right")
-                    .font(.system(size: 10))
-                    .foregroundColor("#636366")
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            if branch != "" {
-                Label(branch, systemImage: "arrow.triangle.branch")
-                    .font(.system(size: 10))
-                    .foregroundColor("#8E8E93")
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            if hasActivity(workspace) || hasPullRequest(workspace) {
-                HStack(spacing: 5) {
-                    if hasActivity(workspace) {
-                        Text(activityLabel(workspace))
-                            .font(.system(size: 10))
-                            .foregroundColor(tint)
-                    }
-
-                    if hasPullRequest(workspace) {
-                        Text(workspace.pr.label)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(prTint(workspace))
-                    }
-                }
-            }
-
-            Text("\(tabStatusSummary(workspace))\(workspace.tabCount > 8 ? "  +\(workspace.tabCount - 8)" : "")")
-                .font(.system(size: 7, design: .monospaced))
-                .foregroundColor("#8E8E93")
+        VStack(alignment: .leading, spacing: 2) {
+            Text(workspace.title)
+                .font(.system(size: 12))
+                .fontWeight(workspace.selected ? .semibold : .regular)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            if detail != "" {
-                Text(detail)
-                    .font(.system(size: 10))
-                    .foregroundColor("#636366")
-                    .lineLimit(2)
-                    .truncationMode(.tail)
-            }
+            Text(workspaceSubtitle(workspace))
+                .font(.system(size: 9))
+                .foregroundColor("#8E8E93")
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+
+        Spacer()
+
+        if state != "idle" {
+            Text(stateLabel(state))
+                .font(.system(size: 9))
+                .foregroundColor(tint)
         }
     }
     .padding(6)
     .background(workspace.selected ? "#7A4FD826" : "#00000000")
-    .cornerRadius(8)
+    .cornerRadius(7)
     .onTapGesture { cmux("workspace.select", workspace_id: workspace.id) }
 }
 
-func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
-    let repository = tabRepositoryName(tab)
-    let worktree = tabWorktreeName(tab)
-    let branch = tabBranchText(tab)
-    let activity = workspaceStopped ? "" : tabActivityLabel(tab)
+func tabRow(_ tab, _ workspaceStopped: Bool) -> some View {
+    let state = tabState(tab, workspaceStopped)
+    let tint = stateTint(state)
 
     HStack(spacing: 7) {
-        Image(systemName: !workspaceStopped && hasTabActivity(tab) ? "cpu" : "terminal")
-            .font(.system(size: 10))
-            .foregroundColor(tab.focused ? "#7A4FD8" : "#8E8E93")
+        Image(systemName: state == "idle" ? "terminal" : "circle.fill")
+            .font(.system(size: 9))
+            .foregroundColor(state == "idle" ? "#8E8E93" : tint)
             .frame(width: 14)
 
         VStack(alignment: .leading, spacing: 2) {
@@ -368,24 +193,9 @@ func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            if repository != "" {
-                Text(repository)
-                    .font(.system(size: 9))
-                    .foregroundColor("#8E8E93")
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            if worktree != "" {
-                Label(worktree, systemImage: "square.stack.3d.down.right")
-                    .font(.system(size: 9))
-                    .foregroundColor("#636366")
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            if branch != "" {
-                Label(branch, systemImage: "arrow.triangle.branch")
+            let subtitle = tabSubtitle(tab)
+            if subtitle != "" {
+                Text(subtitle)
                     .font(.system(size: 9))
                     .foregroundColor("#636366")
                     .lineLimit(1)
@@ -394,17 +204,6 @@ func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
         }
 
         Spacer()
-
-        if activity != "" {
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(activity)
-                    .font(.system(size: 9))
-                    .foregroundColor("#8E8E93")
-                Text(surfaceKind(tab))
-                    .font(.system(size: 8))
-                    .foregroundColor("#636366")
-            }
-        }
     }
     .padding(5)
     .background(tab.focused ? "#7A4FD81F" : "#00000000")
@@ -413,13 +212,12 @@ func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
 }
 
 VStack(alignment: .leading, spacing: 6) {
-    let visibleWorkspaces = workspaces.filter { $0.index < 30 }
-    let inputCount = visibleWorkspaces.count { needsInput($0) }
-    let workingCount = visibleWorkspaces.count { isWorking($0) }
-    let doneCount = visibleWorkspaces.count { isDone($0) }
-    let stoppedCount = visibleWorkspaces.count { isStopped($0) }
+    let visibleWorkspaces = workspaces.prefix(20)
+    let inputCount = visibleWorkspaces.count { agentState($0) == "input" }
+    let workingCount = visibleWorkspaces.count { agentState($0) == "working" }
+    let stoppedCount = visibleWorkspaces.count { agentState($0) == "stopped" }
 
-    HStack(spacing: 6) {
+    HStack {
         Image(systemName: "rectangle.3.group")
             .font(.system(size: 12))
             .foregroundColor("#7A4FD8")
@@ -430,50 +228,12 @@ VStack(alignment: .leading, spacing: 6) {
     }
     .padding(4)
 
-    HStack(spacing: 8) {
-        if inputCount > 0 {
-            Label("\(inputCount) needs input", systemImage: "exclamationmark.circle.fill")
-                .font(.system(size: 9))
-                .foregroundColor("#FF9F0A")
-        }
-        if workingCount > 0 {
-            Label("\(workingCount) working", systemImage: "circle.fill")
-                .font(.system(size: 9))
-                .foregroundColor("#30D158")
-        }
-        if doneCount > 0 {
-            Label("\(doneCount) done", systemImage: "checkmark.circle.fill")
-                .font(.system(size: 9))
-                .foregroundColor("#54A8FF")
-        }
-        if stoppedCount > 0 {
-            Label("\(stoppedCount) stopped", systemImage: "stop.circle.fill")
-                .font(.system(size: 9))
-                .foregroundColor("#FFD60A")
-        }
-        if inputCount == 0 && workingCount == 0 && doneCount == 0 && stoppedCount == 0 {
-            Text("No active agents")
-                .font(.system(size: 9))
-                .foregroundColor("#636366")
-        }
-        Spacer()
-    }
-    .padding(4)
+    Text("\(workingCount) working   \(inputCount) input   \(stoppedCount) stopped")
+        .font(.system(size: 9, design: .monospaced))
+        .foregroundColor("#8E8E93")
+        .padding(4)
 
     Divider()
-
-    HStack {
-        Text("Workspaces")
-            .font(.system(size: 10))
-            .fontWeight(.semibold)
-            .textCase(.uppercase)
-            .foregroundColor("#636366")
-        Spacer()
-        Text("\(visibleWorkspaces.count)")
-            .font(.system(size: 9, design: .monospaced))
-            .foregroundColor("#636366")
-    }
-    .padding(4)
 
     ForEach(visibleWorkspaces) { workspace in
         workspaceRow(workspace)
@@ -485,7 +245,6 @@ VStack(alignment: .leading, spacing: 6) {
         Text("Tabs")
             .font(.system(size: 10))
             .fontWeight(.semibold)
-            .textCase(.uppercase)
             .foregroundColor("#636366")
         Spacer()
         Text(selectedTitle)
@@ -496,15 +255,8 @@ VStack(alignment: .leading, spacing: 6) {
     .padding(4)
 
     ForEach(workspaces.filter { $0.selected }.prefix(1)) { selected in
-        if selected.tabs.isEmpty {
-            Text("No tabs")
-                .font(.system(size: 10))
-                .foregroundColor("#636366")
-                .padding(6)
-        } else {
-            ForEach(selected.tabs.prefix(12)) { tab in
-                surfaceRow(tab, isStopped(selected))
-            }
+        ForEach(selected.tabs.prefix(10)) { tab in
+            tabRow(tab, isStopped(selected))
         }
     }
 

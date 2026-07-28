@@ -1,15 +1,13 @@
--- Keep Agent Board's stopped state aligned with cmux's live agent metadata.
+-- Keep Agent Board's stopped state aligned with cmux metadata changes.
 
 local module = {}
 
 local cmuxPath = "/opt/homebrew/bin/cmux"
 local syncPath = os.getenv("HOME") .. "/.local/bin/cmux-agent-status-sync"
-local reconcileInterval = 30
-local debounceDelay = 0.25
+local debounceDelay = 1
 
 local eventTask = nil
 local syncTask = nil
-local reconcileTimer = nil
 local debounceTimer = nil
 local terminal = false
 local pendingSync = false
@@ -26,11 +24,6 @@ local function stopMonitoring()
     if debounceTimer then
         debounceTimer:stop()
         debounceTimer = nil
-    end
-
-    if reconcileTimer then
-        reconcileTimer:stop()
-        reconcileTimer = nil
     end
 
     if syncTask then
@@ -120,7 +113,7 @@ local function scheduleSync()
 end
 
 function module.start()
-    if eventTask or reconcileTimer or syncTask then
+    if eventTask or syncTask then
         return true
     end
 
@@ -172,14 +165,13 @@ function module.start()
         return false
     end
 
-    reconcileTimer = hs.timer.doEvery(reconcileInterval, runSync)
     runSync()
     return true
 end
 
 function module.status()
     return {
-        running = not terminal and eventTask ~= nil and reconcileTimer ~= nil,
+        running = not terminal and eventTask ~= nil,
         syncInFlight = syncTask ~= nil,
         pendingSync = pendingSync,
         lastSyncAt = lastSyncAt,
