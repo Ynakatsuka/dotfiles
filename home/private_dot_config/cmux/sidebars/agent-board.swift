@@ -24,7 +24,7 @@ func hasSpinner(_ title: String) -> Bool {
         || title.hasPrefix("⠏")
 }
 
-func isStopped(_ workspace) -> Bool {
+func hasIdleMarker(_ workspace) -> Bool {
     let customTitleSuffix = "⁣⁤⁢⁣⁤⁢⁣⁤"
     let autoTitleSuffix = "⁣⁢⁤⁣⁢⁤⁣⁢"
     return workspace.title.hasSuffix(customTitleSuffix)
@@ -39,8 +39,6 @@ func progressLabel(_ workspace) -> String {
 }
 
 func agentState(_ workspace) -> String {
-    if isStopped(workspace) { return "stopped" }
-
     let label = progressLabel(workspace)
     let needsInput = workspace.tabs.contains {
         $0.title.lowercased().contains("action required")
@@ -71,14 +69,16 @@ func agentState(_ workspace) -> String {
         return "done"
     }
 
-    return "idle"
+    if hasIdleMarker(workspace) { return "idle" }
+
+    return "unknown"
 }
 
 func stateLabel(_ state: String) -> String {
-    if state == "input" { return "Input" }
+    if state == "input" { return "Needs input" }
     if state == "working" { return "Working" }
     if state == "done" { return "Done" }
-    if state == "stopped" { return "Stopped" }
+    if state == "idle" { return "Idle" }
     return ""
 }
 
@@ -86,7 +86,7 @@ func stateTint(_ state: String) -> String {
     if state == "input" { return "#FF9F0A" }
     if state == "working" { return "#30D158" }
     if state == "done" { return "#54A8FF" }
-    if state == "stopped" { return "#FFD60A" }
+    if state == "idle" { return "#8E8E93" }
     return "#636366"
 }
 
@@ -127,8 +127,8 @@ func tabSubtitle(_ tab) -> String {
     return branch != "" ? "\(repository)  \(branch)\(tab.dirty == true ? " •" : "")" : repository
 }
 
-func tabState(_ tab, _ workspaceStopped: Bool) -> String {
-    if workspaceStopped { return "idle" }
+func tabState(_ tab, _ workspaceIdle: Bool) -> String {
+    if workspaceIdle { return "idle" }
     if tab.title.lowercased().contains("action required") { return "input" }
     if hasSpinner(tab.title) { return "working" }
     return "idle"
@@ -164,7 +164,7 @@ func workspaceRow(_ workspace) -> some View {
 
         Spacer()
 
-        if state != "idle" {
+        if state != "unknown" {
             Text(stateLabel(state))
                 .font(.system(size: 9))
                 .foregroundColor(tint)
@@ -176,8 +176,8 @@ func workspaceRow(_ workspace) -> some View {
     .onTapGesture { cmux("workspace.select", workspace_id: workspace.id) }
 }
 
-func tabRow(_ tab, _ workspaceStopped: Bool) -> some View {
-    let state = tabState(tab, workspaceStopped)
+func tabRow(_ tab, _ workspaceIdle: Bool) -> some View {
+    let state = tabState(tab, workspaceIdle)
     let tint = stateTint(state)
 
     HStack(spacing: 7) {
@@ -215,7 +215,7 @@ VStack(alignment: .leading, spacing: 6) {
     let visibleWorkspaces = workspaces.prefix(20)
     let inputCount = visibleWorkspaces.count { agentState($0) == "input" }
     let workingCount = visibleWorkspaces.count { agentState($0) == "working" }
-    let stoppedCount = visibleWorkspaces.count { agentState($0) == "stopped" }
+    let idleCount = visibleWorkspaces.count { agentState($0) == "idle" }
 
     HStack {
         Image(systemName: "rectangle.3.group")
@@ -228,7 +228,7 @@ VStack(alignment: .leading, spacing: 6) {
     }
     .padding(4)
 
-    Text("\(workingCount) working   \(inputCount) input   \(stoppedCount) stopped")
+    Text("\(workingCount) working   \(inputCount) needs input   \(idleCount) idle")
         .font(.system(size: 9, design: .monospaced))
         .foregroundColor("#8E8E93")
         .padding(4)
@@ -256,7 +256,7 @@ VStack(alignment: .leading, spacing: 6) {
 
     ForEach(workspaces.filter { $0.selected }.prefix(1)) { selected in
         ForEach(selected.tabs.prefix(10)) { tab in
-            tabRow(tab, isStopped(selected))
+            tabRow(tab, agentState(selected) == "idle")
         }
     }
 

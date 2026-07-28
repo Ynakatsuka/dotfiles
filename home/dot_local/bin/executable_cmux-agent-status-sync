@@ -1,13 +1,13 @@
 #!/bin/zsh
 
-# Reconcile cmux's live agent status with invisible Agent Board title markers.
+# Reconcile cmux's live agent status with invisible Agent Board idle markers.
 
 set -euo pipefail
 
 readonly CMUX_BIN="/opt/homebrew/bin/cmux"
 readonly JQ_BIN="/opt/homebrew/bin/jq"
-readonly CUSTOM_STOPPED_SUFFIX=$'\u2063\u2064\u2062\u2063\u2064\u2062\u2063\u2064'
-readonly AUTO_STOPPED_SUFFIX=$'\u2063\u2062\u2064\u2063\u2062\u2064\u2063\u2062'
+readonly CUSTOM_IDLE_SUFFIX=$'\u2063\u2064\u2062\u2063\u2064\u2062\u2063\u2064'
+readonly AUTO_IDLE_SUFFIX=$'\u2063\u2062\u2064\u2063\u2062\u2064\u2063\u2062'
 
 dry_run=false
 
@@ -79,7 +79,7 @@ typeset base_title
 typeset marked_title
 typeset marker_kind
 typeset has_custom_title
-typeset should_show_stopped
+typeset should_show_idle
 typeset -i relevant_count
 typeset -i idle_count
 
@@ -114,54 +114,54 @@ for workspace_ref in "${workspace_refs[@]}"; do
         esac
     done <<< "$status_output"
 
-    should_show_stopped=false
+    should_show_idle=false
     if (( relevant_count > 0 && relevant_count == idle_count )); then
-        should_show_stopped=true
+        should_show_idle=true
     fi
 
-    if [[ "$should_show_stopped" == true ]]; then
-        if [[ "$current_title" == *"$CUSTOM_STOPPED_SUFFIX" ]]; then
-            print -- "$workspace_ref: custom-title stopped marker is current"
-        elif [[ "$current_title" == *"$AUTO_STOPPED_SUFFIX" ]]; then
-            print -- "$workspace_ref: auto-title stopped marker is current"
+    if [[ "$should_show_idle" == true ]]; then
+        if [[ "$current_title" == *"$CUSTOM_IDLE_SUFFIX" ]]; then
+            print -- "$workspace_ref: custom-title idle marker is current"
+        elif [[ "$current_title" == *"$AUTO_IDLE_SUFFIX" ]]; then
+            print -- "$workspace_ref: auto-title idle marker is current"
         else
             if [[ "$has_custom_title" == "true" ]]; then
-                marked_title="${current_title}${CUSTOM_STOPPED_SUFFIX}"
+                marked_title="${current_title}${CUSTOM_IDLE_SUFFIX}"
                 marker_kind="custom-title"
             else
-                marked_title="${current_title}${AUTO_STOPPED_SUFFIX}"
+                marked_title="${current_title}${AUTO_IDLE_SUFFIX}"
                 marker_kind="auto-title"
             fi
 
             if [[ "$dry_run" == true ]]; then
-                print -- "$workspace_ref: would add $marker_kind stopped marker"
+                print -- "$workspace_ref: would add $marker_kind idle marker"
             else
                 CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
                     --action rename \
                     --title "$marked_title" \
                     --workspace "$workspace_ref" >/dev/null
-                print -- "$workspace_ref: added $marker_kind stopped marker"
+                print -- "$workspace_ref: added $marker_kind idle marker"
             fi
         fi
-    elif [[ "$current_title" == *"$CUSTOM_STOPPED_SUFFIX" ]]; then
-        base_title="${current_title%$CUSTOM_STOPPED_SUFFIX}"
+    elif [[ "$current_title" == *"$CUSTOM_IDLE_SUFFIX" ]]; then
+        base_title="${current_title%$CUSTOM_IDLE_SUFFIX}"
         if [[ "$dry_run" == true ]]; then
-            print -- "$workspace_ref: would remove custom-title stopped marker"
+            print -- "$workspace_ref: would remove custom-title idle marker"
         else
             CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
                 --action rename \
                 --title "$base_title" \
                 --workspace "$workspace_ref" >/dev/null
-            print -- "$workspace_ref: removed custom-title stopped marker"
+            print -- "$workspace_ref: removed custom-title idle marker"
         fi
-    elif [[ "$current_title" == *"$AUTO_STOPPED_SUFFIX" ]]; then
+    elif [[ "$current_title" == *"$AUTO_IDLE_SUFFIX" ]]; then
         if [[ "$dry_run" == true ]]; then
-            print -- "$workspace_ref: would clear auto-title stopped marker"
+            print -- "$workspace_ref: would clear auto-title idle marker"
         else
             CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
                 --action clear-name \
                 --workspace "$workspace_ref" >/dev/null
-            print -- "$workspace_ref: cleared auto-title stopped marker"
+            print -- "$workspace_ref: cleared auto-title idle marker"
         fi
     else
         print -- "$workspace_ref: no Agent Board title change"

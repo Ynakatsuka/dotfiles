@@ -1,4 +1,4 @@
--- Keep Agent Board's stopped state aligned with cmux metadata changes.
+-- Keep Agent Board's idle state aligned with cmux metadata changes.
 
 local module = {}
 
