@@ -82,11 +82,15 @@ func isDone(_ workspace) -> Bool {
         || label.contains("success")
 }
 
+func hasActivity(_ workspace) -> Bool {
+    return needsInput(workspace) || isWorking(workspace) || isDone(workspace)
+}
+
 func activityTint(_ workspace) -> String {
     if needsInput(workspace) { return "#FF9F0A" }
     if isWorking(workspace) { return "#30D158" }
     if isDone(workspace) { return "#54A8FF" }
-    return "#FFD60A"
+    return "#8E8E93"
 }
 
 func activityIcon(_ workspace) -> String {
@@ -99,31 +103,21 @@ func activityLabel(_ workspace) -> String {
     if needsInput(workspace) { return "Needs input" }
     if isWorking(workspace) { return "Working" }
     if isDone(workspace) { return "Done" }
-    return "Stopped"
+    return ""
 }
 
-func isKnownAgent(_ tab) -> Bool {
-    let title = tab.title.lowercased()
+func hasTabActivity(_ tab) -> Bool {
     return hasSpinner(tab.title)
-        || title.contains("claude")
-        || title.contains("codex")
-        || title.contains("opencode")
-        || title.contains("gemini")
-        || title.contains("agent")
+        || tab.title.lowercased().contains("action required")
 }
 
-func agentCount(_ workspace) -> Int {
-    return workspace.tabs.count { isKnownAgent($0) }
+func activeAgentCount(_ workspace) -> Int {
+    return workspace.tabs.count { hasTabActivity($0) }
 }
 
 func surfaceKind(_ tab) -> String {
-    let title = tab.title.lowercased()
-    if title.contains("claude") { return "Claude" }
-    if title.contains("codex") { return "Codex" }
-    if title.contains("opencode") { return "OpenCode" }
-    if title.contains("gemini") { return "Gemini" }
-    if hasSpinner(tab.title) { return "Agent" }
-    return "Terminal"
+    if hasTabActivity(tab) { return "Agent" }
+    return ""
 }
 
 func tabStatusSummary(_ workspace, _ second: Int) -> String {
@@ -137,7 +131,8 @@ func tabStatusSummary(_ workspace, _ second: Int) -> String {
 
 func tabActivityLabel(_ tab) -> String {
     if hasSpinner(tab.title) { return "Working" }
-    return "Stopped"
+    if tab.title.lowercased().contains("action required") { return "Needs input" }
+    return ""
 }
 
 func workspaceBranchText(_ workspace) -> String {
@@ -234,11 +229,8 @@ func activityDetail(_ workspace) -> String {
     if isWorking(workspace) && workspace.latestPrompt != nil {
         return workspace.latestPrompt
     }
-    if workspace.latestMessage != nil {
+    if isDone(workspace) && workspace.latestMessage != nil {
         return workspace.latestMessage
-    }
-    if workspace.latestPrompt != nil {
-        return workspace.latestPrompt
     }
     return ""
 }
@@ -248,7 +240,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
     let detail = activityDetail(workspace)
     let worktree = worktreeName(workspace)
     let branch = workspaceBranchText(workspace)
-    let agents = agentCount(workspace)
+    let agents = activeAgentCount(workspace)
 
     Button(action: { cmux("workspace.select", workspace_id: workspace.id) }) {
         HStack(alignment: .top, spacing: 7) {
@@ -285,7 +277,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                         Text(spinnerFrame(second))
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundColor(tint)
-                    } else {
+                    } else if hasActivity(workspace) {
                         Image(systemName: activityIcon(workspace))
                             .font(.system(size: 10))
                             .foregroundColor(tint)
@@ -317,15 +309,19 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                         .truncationMode(.middle)
                 }
 
-                HStack(spacing: 5) {
-                    Text(activityLabel(workspace))
-                        .font(.system(size: 10))
-                        .foregroundColor(tint)
+                if hasActivity(workspace) || hasPullRequest(workspace) {
+                    HStack(spacing: 5) {
+                        if hasActivity(workspace) {
+                            Text(activityLabel(workspace))
+                                .font(.system(size: 10))
+                                .foregroundColor(tint)
+                        }
 
-                    if hasPullRequest(workspace) {
-                        Text(workspace.pr.label)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(prTint(workspace))
+                        if hasPullRequest(workspace) {
+                            Text(workspace.pr.label)
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundColor(prTint(workspace))
+                        }
                     }
                 }
 
@@ -354,10 +350,11 @@ func surfaceRow(_ tab) -> some View {
     let repository = tabRepositoryName(tab)
     let worktree = tabWorktreeName(tab)
     let branch = tabBranchText(tab)
+    let activity = tabActivityLabel(tab)
 
     Button(action: { cmux("surface.focus", surface_id: tab.id) }) {
         HStack(spacing: 7) {
-            Image(systemName: isKnownAgent(tab) ? "cpu" : "terminal")
+            Image(systemName: hasTabActivity(tab) ? "cpu" : "terminal")
                 .font(.system(size: 10))
                 .foregroundColor(tab.focused ? "#7A4FD8" : .secondary)
                 .frame(width: 14)
@@ -396,13 +393,15 @@ func surfaceRow(_ tab) -> some View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(tabActivityLabel(tab))
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
-                Text(surfaceKind(tab))
-                    .font(.system(size: 8))
-                    .foregroundColor(.tertiary)
+            if activity != "" {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(activity)
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                    Text(surfaceKind(tab))
+                        .font(.system(size: 8))
+                        .foregroundColor(.tertiary)
+                }
             }
         }
         .padding(5)
@@ -448,9 +447,9 @@ VStack(alignment: .leading, spacing: 6) {
                 .foregroundColor("#54A8FF")
         }
         if inputCount == 0 && workingCount == 0 && doneCount == 0 {
-            Text("Agents stopped")
+            Text("No active agents")
                 .font(.system(size: 9))
-                .foregroundColor("#FFD60A")
+                .foregroundColor(.tertiary)
         }
         Spacer()
     }
@@ -471,7 +470,7 @@ VStack(alignment: .leading, spacing: 6) {
     }
     .padding(4)
 
-    Reorderable(visibleWorkspaces, move: "workspace.reorder") { workspace in
+    ForEach(visibleWorkspaces) { workspace in
         workspaceRow(workspace, clock.second)
     }
 
