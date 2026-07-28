@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Enable cmux custom sidebars and select the managed Agent Board sidebar.
+#
+# cmux stores these values in macOS preferences rather than settings.json.
+# Running this after chezmoi applies the sidebar file makes a fresh dotfiles
+# installation activate Agent Board without requiring UI setup.
+
+set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  exit 0
+fi
+
+readonly CMUX_BUNDLE_ID="com.cmuxterm.app"
+readonly SIDEBAR_PROVIDER_ID="cmux.sidebar.custom.agent-board"
+
+defaults write "${CMUX_BUNDLE_ID}" customSidebars.beta.enabled -bool true
+defaults write "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId \
+  -string "${SIDEBAR_PROVIDER_ID}"
+
+[[ "$(defaults read "${CMUX_BUNDLE_ID}" customSidebars.beta.enabled)" == "1" ]]
+[[ "$(defaults read "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId)" == \
+  "${SIDEBAR_PROVIDER_ID}" ]]
+
+echo "Enabled cmux custom sidebars and selected agent-board."
