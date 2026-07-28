@@ -54,7 +54,15 @@ func hasInputSurface(_ workspace) -> Bool {
     }
 }
 
+func isStopped(_ workspace) -> Bool {
+    let customTitleSuffix = "⁣⁤⁢⁣⁤⁢⁣⁤" // U+2063,U+2064,U+2062,U+2063,U+2064,U+2062,U+2063,U+2064
+    let autoTitleSuffix = "⁣⁢⁤⁣⁢⁤⁣⁢" // U+2063,U+2062,U+2064,U+2063,U+2062,U+2064,U+2063,U+2062
+    return workspace.title.hasSuffix(customTitleSuffix)
+        || workspace.title.hasSuffix(autoTitleSuffix)
+}
+
 func needsInput(_ workspace) -> Bool {
+    if isStopped(workspace) { return false }
     let label = progressLabel(workspace)
     return hasInputSurface(workspace)
         || label.contains("waiting")
@@ -65,7 +73,7 @@ func needsInput(_ workspace) -> Bool {
 }
 
 func isWorking(_ workspace) -> Bool {
-    if needsInput(workspace) { return false }
+    if isStopped(workspace) || needsInput(workspace) { return false }
     let label = progressLabel(workspace)
     return hasWorkingSurface(workspace)
         || label.contains("working")
@@ -74,7 +82,7 @@ func isWorking(_ workspace) -> Bool {
 }
 
 func isDone(_ workspace) -> Bool {
-    if needsInput(workspace) || isWorking(workspace) { return false }
+    if isStopped(workspace) || needsInput(workspace) || isWorking(workspace) { return false }
     let label = progressLabel(workspace)
     return label.contains("done")
         || label.contains("complete")
@@ -83,19 +91,24 @@ func isDone(_ workspace) -> Bool {
 }
 
 func hasActivity(_ workspace) -> Bool {
-    return needsInput(workspace) || isWorking(workspace) || isDone(workspace)
+    return needsInput(workspace)
+        || isWorking(workspace)
+        || isDone(workspace)
+        || isStopped(workspace)
 }
 
 func activityTint(_ workspace) -> String {
     if needsInput(workspace) { return "#FF9F0A" }
     if isWorking(workspace) { return "#30D158" }
     if isDone(workspace) { return "#54A8FF" }
+    if isStopped(workspace) { return "#FFD60A" }
     return "#8E8E93"
 }
 
 func activityIcon(_ workspace) -> String {
     if needsInput(workspace) { return "exclamationmark.circle.fill" }
     if isDone(workspace) { return "checkmark.circle.fill" }
+    if isStopped(workspace) { return "stop.circle.fill" }
     return "circle"
 }
 
@@ -103,6 +116,7 @@ func activityLabel(_ workspace) -> String {
     if needsInput(workspace) { return "Needs input" }
     if isWorking(workspace) { return "Working" }
     if isDone(workspace) { return "Done" }
+    if isStopped(workspace) { return "Stopped" }
     return ""
 }
 
@@ -112,6 +126,7 @@ func hasTabActivity(_ tab) -> Bool {
 }
 
 func activeAgentCount(_ workspace) -> Int {
+    if isStopped(workspace) { return 0 }
     return workspace.tabs.count { hasTabActivity($0) }
 }
 
@@ -123,7 +138,9 @@ func surfaceKind(_ tab) -> String {
 func tabStatusSummary(_ workspace, _ second: Int) -> String {
     return workspace.tabs.indices.filter { $0 < 8 }.reduce("") { summary, index in
         let tab = workspace.tabs[index]
-        let symbol = hasSpinner(tab.title) ? spinnerFrame(second) : (tab.focused ? "●" : "○")
+        let symbol = !isStopped(workspace) && hasSpinner(tab.title)
+            ? spinnerFrame(second)
+            : (tab.focused ? "●" : "○")
         let separator = summary == "" ? "" : "  "
         return "\(summary)\(separator)\(symbol) \(index + 1)"
     }
@@ -232,6 +249,9 @@ func activityDetail(_ workspace) -> String {
     if isDone(workspace) && workspace.latestMessage != nil {
         return workspace.latestMessage
     }
+    if isStopped(workspace) && workspace.latestMessage != nil {
+        return workspace.latestMessage
+    }
     return ""
 }
 
@@ -254,7 +274,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                     Text("\(workspace.index + 1)")
                         .font(.system(size: 8, design: .monospaced))
                         .fontWeight(.semibold)
-                        .foregroundColor(workspace.selected ? "#FFFFFF" : .secondary)
+                        .foregroundColor(workspace.selected ? "#FFFFFF" : "#8E8E93")
                         .frame(width: 14, height: 14)
                         .background(workspace.selected ? "#7A4FD8" : "#8E8E9326")
                         .cornerRadius(4)
@@ -270,7 +290,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                     if agents > 0 {
                         Label("\(agents)", systemImage: "cpu")
                             .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor(.tertiary)
+                            .foregroundColor("#636366")
                     }
 
                     if isWorking(workspace) {
@@ -287,7 +307,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                 HStack(spacing: 5) {
                     Text(repositoryName(workspace))
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundColor("#8E8E93")
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer()
@@ -296,7 +316,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                 if worktree != "" {
                     Label(worktree, systemImage: "square.stack.3d.down.right")
                         .font(.system(size: 10))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor("#636366")
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -304,7 +324,7 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
                 if branch != "" {
                     Label(branch, systemImage: "arrow.triangle.branch")
                         .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .foregroundColor("#8E8E93")
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -327,14 +347,14 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
 
                 Text("\(tabStatusSummary(workspace, second))\(workspace.tabCount > 8 ? "  +\(workspace.tabCount - 8)" : "")")
                     .font(.system(size: 7, design: .monospaced))
-                    .foregroundColor(.secondary)
+                    .foregroundColor("#8E8E93")
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 if detail != "" {
                     Text(detail)
                         .font(.system(size: 10))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor("#636366")
                         .lineLimit(2)
                         .truncationMode(.tail)
                 }
@@ -346,17 +366,17 @@ func workspaceRow(_ workspace, _ second: Int) -> some View {
     }
 }
 
-func surfaceRow(_ tab) -> some View {
+func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
     let repository = tabRepositoryName(tab)
     let worktree = tabWorktreeName(tab)
     let branch = tabBranchText(tab)
-    let activity = tabActivityLabel(tab)
+    let activity = workspaceStopped ? "" : tabActivityLabel(tab)
 
     Button(action: { cmux("surface.focus", surface_id: tab.id) }) {
         HStack(spacing: 7) {
-            Image(systemName: hasTabActivity(tab) ? "cpu" : "terminal")
+            Image(systemName: !workspaceStopped && hasTabActivity(tab) ? "cpu" : "terminal")
                 .font(.system(size: 10))
-                .foregroundColor(tab.focused ? "#7A4FD8" : .secondary)
+                .foregroundColor(tab.focused ? "#7A4FD8" : "#8E8E93")
                 .frame(width: 14)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -369,7 +389,7 @@ func surfaceRow(_ tab) -> some View {
                 if repository != "" {
                     Text(repository)
                         .font(.system(size: 9))
-                        .foregroundColor(.secondary)
+                        .foregroundColor("#8E8E93")
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -377,7 +397,7 @@ func surfaceRow(_ tab) -> some View {
                 if worktree != "" {
                     Label(worktree, systemImage: "square.stack.3d.down.right")
                         .font(.system(size: 9))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor("#636366")
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -385,7 +405,7 @@ func surfaceRow(_ tab) -> some View {
                 if branch != "" {
                     Label(branch, systemImage: "arrow.triangle.branch")
                         .font(.system(size: 9))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor("#636366")
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
@@ -397,10 +417,10 @@ func surfaceRow(_ tab) -> some View {
                 VStack(alignment: .trailing, spacing: 1) {
                     Text(activity)
                         .font(.system(size: 9))
-                        .foregroundColor(.secondary)
+                        .foregroundColor("#8E8E93")
                     Text(surfaceKind(tab))
                         .font(.system(size: 8))
-                        .foregroundColor(.tertiary)
+                        .foregroundColor("#636366")
                 }
             }
         }
@@ -415,6 +435,7 @@ VStack(alignment: .leading, spacing: 6) {
     let inputCount = visibleWorkspaces.count { needsInput($0) }
     let workingCount = visibleWorkspaces.count { isWorking($0) }
     let doneCount = visibleWorkspaces.count { isDone($0) }
+    let stoppedCount = visibleWorkspaces.count { isStopped($0) }
 
     HStack(spacing: 6) {
         Image(systemName: "rectangle.3.group")
@@ -426,7 +447,7 @@ VStack(alignment: .leading, spacing: 6) {
         Spacer()
         Text(clock.time)
             .font(.system(size: 9, design: .monospaced))
-            .foregroundColor(.tertiary)
+            .foregroundColor("#636366")
     }
     .padding(4)
 
@@ -446,10 +467,15 @@ VStack(alignment: .leading, spacing: 6) {
                 .font(.system(size: 9))
                 .foregroundColor("#54A8FF")
         }
-        if inputCount == 0 && workingCount == 0 && doneCount == 0 {
+        if stoppedCount > 0 {
+            Label("\(stoppedCount) stopped", systemImage: "stop.circle.fill")
+                .font(.system(size: 9))
+                .foregroundColor("#FFD60A")
+        }
+        if inputCount == 0 && workingCount == 0 && doneCount == 0 && stoppedCount == 0 {
             Text("No active agents")
                 .font(.system(size: 9))
-                .foregroundColor(.tertiary)
+                .foregroundColor("#636366")
         }
         Spacer()
     }
@@ -462,11 +488,11 @@ VStack(alignment: .leading, spacing: 6) {
             .font(.system(size: 10))
             .fontWeight(.semibold)
             .textCase(.uppercase)
-            .foregroundColor(.tertiary)
+            .foregroundColor("#636366")
         Spacer()
         Text("\(visibleWorkspaces.count)")
             .font(.system(size: 9, design: .monospaced))
-            .foregroundColor(.tertiary)
+            .foregroundColor("#636366")
     }
     .padding(4)
 
@@ -481,11 +507,11 @@ VStack(alignment: .leading, spacing: 6) {
             .font(.system(size: 10))
             .fontWeight(.semibold)
             .textCase(.uppercase)
-            .foregroundColor(.tertiary)
+            .foregroundColor("#636366")
         Spacer()
         Text(selectedTitle)
             .font(.system(size: 10))
-            .foregroundColor(.tertiary)
+            .foregroundColor("#636366")
             .lineLimit(1)
     }
     .padding(4)
@@ -494,15 +520,16 @@ VStack(alignment: .leading, spacing: 6) {
         if selected.tabs.isEmpty {
             Text("No tabs")
                 .font(.system(size: 10))
-                .foregroundColor(.tertiary)
+                .foregroundColor("#636366")
                 .padding(6)
         } else {
             ForEach(selected.tabs.prefix(12)) { tab in
-                surfaceRow(tab)
+                surfaceRow(tab, isStopped(selected))
             }
         }
     }
 
     Spacer()
 }
+.foregroundColor("#F2F2F7")
 .padding(4)

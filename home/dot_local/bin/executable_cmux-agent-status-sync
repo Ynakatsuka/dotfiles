@@ -1,0 +1,169 @@
+#!/bin/zsh
+
+# Reconcile cmux's live agent status with invisible Agent Board title markers.
+
+set -euo pipefail
+
+readonly CMUX_BIN="/opt/homebrew/bin/cmux"
+readonly JQ_BIN="/opt/homebrew/bin/jq"
+readonly CUSTOM_STOPPED_SUFFIX=$'\u2063\u2064\u2062\u2063\u2064\u2062\u2063\u2064'
+readonly AUTO_STOPPED_SUFFIX=$'\u2063\u2062\u2064\u2063\u2062\u2064\u2063\u2062'
+
+dry_run=false
+
+usage() {
+    print -u2 "Usage: cmux-agent-status-sync [--dry-run]"
+}
+
+if (( $# > 1 )); then
+    usage
+    exit 2
+fi
+
+if (( $# == 1 )); then
+    if [[ "$1" != "--dry-run" ]]; then
+        usage
+        exit 2
+    fi
+    dry_run=true
+fi
+
+if [[ ! -x "$CMUX_BIN" ]]; then
+    print -u2 "Error: cmux is not executable at $CMUX_BIN"
+    exit 1
+fi
+
+if [[ ! -x "$JQ_BIN" ]]; then
+    print -u2 "Error: jq is not executable at $JQ_BIN"
+    exit 1
+fi
+
+typeset workspace_json
+if ! workspace_json=$(CMUX_QUIET=1 "$CMUX_BIN" list-workspaces --json); then
+    print -u2 "Error: failed to list cmux workspaces"
+    exit 1
+fi
+
+if ! print -r -- "$workspace_json" |
+    "$JQ_BIN" -e '
+        .workspaces
+        | type == "array"
+            and all(.[];
+                (.ref | type) == "string"
+                and (.title | type) == "string"
+                and (.has_custom_title | type) == "boolean"
+            )
+    ' \
+        >/dev/null; then
+    print -u2 "Error: cmux returned an invalid workspace list"
+    exit 1
+fi
+
+typeset workspace_refs_text
+workspace_refs_text=$(print -r -- "$workspace_json" | "$JQ_BIN" -r '.workspaces[].ref')
+typeset -a workspace_refs
+if [[ -n "$workspace_refs_text" ]]; then
+    workspace_refs=("${(@f)workspace_refs_text}")
+else
+    workspace_refs=()
+fi
+
+typeset workspace_ref
+typeset status_output
+typeset status_line
+typeset status_value
+typeset status_state
+typeset workspace_record
+typeset current_title
+typeset base_title
+typeset marked_title
+typeset marker_kind
+typeset has_custom_title
+typeset should_show_stopped
+typeset -i relevant_count
+typeset -i idle_count
+
+for workspace_ref in "${workspace_refs[@]}"; do
+    if ! workspace_record=$(print -r -- "$workspace_json" |
+        "$JQ_BIN" -ce --arg ref "$workspace_ref" '
+            first(.workspaces[] | select(.ref == $ref))
+        '); then
+        print -u2 "Error: failed to resolve workspace metadata for $workspace_ref"
+        exit 1
+    fi
+    current_title=$(print -r -- "$workspace_record" | "$JQ_BIN" -r '.title')
+    has_custom_title=$(print -r -- "$workspace_record" | "$JQ_BIN" -r '.has_custom_title')
+
+    if ! status_output=$(CMUX_QUIET=1 "$CMUX_BIN" list-status --workspace "$workspace_ref"); then
+        print -u2 "Error: failed to list status for $workspace_ref"
+        exit 1
+    fi
+
+    relevant_count=0
+    idle_count=0
+    while IFS= read -r status_line; do
+        case "$status_line" in
+            codex=*|claude_code=*)
+                (( relevant_count += 1 ))
+                status_value="${status_line#*=}"
+                status_state="${status_value%% *}"
+                if [[ "$status_state" == "Idle" ]]; then
+                    (( idle_count += 1 ))
+                fi
+                ;;
+        esac
+    done <<< "$status_output"
+
+    should_show_stopped=false
+    if (( relevant_count > 0 && relevant_count == idle_count )); then
+        should_show_stopped=true
+    fi
+
+    if [[ "$should_show_stopped" == true ]]; then
+        if [[ "$current_title" == *"$CUSTOM_STOPPED_SUFFIX" ]]; then
+            print -- "$workspace_ref: custom-title stopped marker is current"
+        elif [[ "$current_title" == *"$AUTO_STOPPED_SUFFIX" ]]; then
+            print -- "$workspace_ref: auto-title stopped marker is current"
+        else
+            if [[ "$has_custom_title" == "true" ]]; then
+                marked_title="${current_title}${CUSTOM_STOPPED_SUFFIX}"
+                marker_kind="custom-title"
+            else
+                marked_title="${current_title}${AUTO_STOPPED_SUFFIX}"
+                marker_kind="auto-title"
+            fi
+
+            if [[ "$dry_run" == true ]]; then
+                print -- "$workspace_ref: would add $marker_kind stopped marker"
+            else
+                CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+                    --action rename \
+                    --title "$marked_title" \
+                    --workspace "$workspace_ref" >/dev/null
+                print -- "$workspace_ref: added $marker_kind stopped marker"
+            fi
+        fi
+    elif [[ "$current_title" == *"$CUSTOM_STOPPED_SUFFIX" ]]; then
+        base_title="${current_title%$CUSTOM_STOPPED_SUFFIX}"
+        if [[ "$dry_run" == true ]]; then
+            print -- "$workspace_ref: would remove custom-title stopped marker"
+        else
+            CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+                --action rename \
+                --title "$base_title" \
+                --workspace "$workspace_ref" >/dev/null
+            print -- "$workspace_ref: removed custom-title stopped marker"
+        fi
+    elif [[ "$current_title" == *"$AUTO_STOPPED_SUFFIX" ]]; then
+        if [[ "$dry_run" == true ]]; then
+            print -- "$workspace_ref: would clear auto-title stopped marker"
+        else
+            CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+                --action clear-name \
+                --workspace "$workspace_ref" >/dev/null
+            print -- "$workspace_ref: cleared auto-title stopped marker"
+        fi
+    else
+        print -- "$workspace_ref: no Agent Board title change"
+    fi
+done
