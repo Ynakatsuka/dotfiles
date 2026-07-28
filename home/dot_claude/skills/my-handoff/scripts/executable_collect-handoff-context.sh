@@ -6,17 +6,59 @@ fail() {
   exit 1
 }
 
+if (($# > 1)); then
+  fail "usage: collect-handoff-context.sh [remote|local]"
+fi
+
+mode=${1:-remote}
+case "$mode" in
+  remote | local) ;;
+  *) fail "unsupported handoff mode '$mode'; expected 'remote' or 'local'" ;;
+esac
+
 if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
   fail "run this command inside a Git working tree"
 fi
 cd "$repo_root"
 
-if ! branch=$(git symbolic-ref --quiet --short HEAD); then
-  fail "detached HEAD cannot identify a branch for handoff"
+if branch=$(git symbolic-ref --quiet --short HEAD); then
+  head_state="branch"
+else
+  branch=""
+  head_state="detached"
 fi
 
 working_tree=$(git status --porcelain=v1 --untracked-files=all)
 if [[ -n "$working_tree" ]]; then
+  working_tree_state="dirty"
+else
+  working_tree_state="clean"
+fi
+
+if head_sha=$(git rev-parse --verify HEAD 2>/dev/null); then
+  :
+elif [[ "$head_state" == "branch" ]]; then
+  head_state="unborn"
+  head_sha=""
+else
+  fail "could not resolve HEAD"
+fi
+
+if [[ "$mode" == "local" ]]; then
+  printf 'handoff_mode=%q\n' "$mode"
+  printf 'repo_root=%q\n' "$repo_root"
+  printf 'head_state=%q\n' "$head_state"
+  printf 'branch=%q\n' "$branch"
+  printf 'commit=%q\n' "$head_sha"
+  printf 'working_tree=%q\n' "$working_tree_state"
+  exit 0
+fi
+
+if [[ "$head_state" != "branch" ]]; then
+  fail "$head_state HEAD cannot identify a branch for remote handoff"
+fi
+
+if [[ "$working_tree_state" == "dirty" ]]; then
   echo "ERROR: working tree contains local-only changes" >&2
   printf '%s\n' "$working_tree" >&2
   exit 1
@@ -82,7 +124,6 @@ if [[ -n "$submodule_entries" ]]; then
   exit 1
 fi
 
-head_sha=$(git rev-parse HEAD)
 if ! remote_output=$(git ls-remote --exit-code "$remote_name" "$merge_ref"); then
   fail "could not read remote branch '$remote_name/$remote_branch'"
 fi
@@ -126,6 +167,8 @@ if [[ -n "$github_repo" ]]; then
     *) fail "could not parse GitHub repository from remote URL: $remote_url" ;;
   esac
 
+  github_repo_lower=$(printf '%s' "$github_repo" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+
   if command -v gh >/dev/null 2>&1; then
     pr_lookup="checked"
     if ! pr_output=$(gh pr list \
@@ -144,7 +187,8 @@ if [[ -n "$github_repo" ]]; then
     pr_head_sha=""
     while IFS=$'\t' read -r candidate_url candidate_head_sha candidate_head_branch candidate_repo candidate_base_branch; do
       [[ -z "$candidate_url" ]] && continue
-      if [[ "${candidate_repo,,}" != "${github_repo,,}" ]]; then
+      candidate_repo_lower=$(printf '%s' "$candidate_repo" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+      if [[ "$candidate_repo_lower" != "$github_repo_lower" ]]; then
         continue
       fi
       if [[ "$candidate_head_branch" != "$remote_branch" ]]; then
@@ -170,6 +214,7 @@ if [[ -n "$github_repo" ]]; then
   fi
 fi
 
+printf 'handoff_mode=%q\n' "$mode"
 printf 'share_kind=%q\n' "$share_kind"
 printf 'pr_lookup=%q\n' "$pr_lookup"
 printf 'remote_name=%q\n' "$remote_name"
