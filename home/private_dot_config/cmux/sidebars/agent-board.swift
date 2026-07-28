@@ -25,18 +25,6 @@ func hasSpinner(_ title: String) -> Bool {
         || title.hasPrefix("⠏")
 }
 
-func spinnerFrame(_ second: Int) -> String {
-    let frame = second % 8
-    if frame == 0 { return "⠋" }
-    if frame == 1 { return "⠙" }
-    if frame == 2 { return "⠹" }
-    if frame == 3 { return "⠸" }
-    if frame == 4 { return "⠼" }
-    if frame == 5 { return "⠴" }
-    if frame == 6 { return "⠦" }
-    return "⠧"
-}
-
 func progressLabel(_ workspace) -> String {
     if workspace.progress != nil && workspace.progress.label != nil {
         return workspace.progress.label.lowercased()
@@ -135,11 +123,11 @@ func surfaceKind(_ tab) -> String {
     return ""
 }
 
-func tabStatusSummary(_ workspace, _ second: Int) -> String {
+func tabStatusSummary(_ workspace) -> String {
     return workspace.tabs.indices.filter { $0 < 8 }.reduce("") { summary, index in
         let tab = workspace.tabs[index]
         let symbol = !isStopped(workspace) && hasSpinner(tab.title)
-            ? spinnerFrame(second)
+            ? "◉"
             : (tab.focused ? "●" : "○")
         let separator = summary == "" ? "" : "  "
         return "\(summary)\(separator)\(symbol) \(index + 1)"
@@ -255,115 +243,110 @@ func activityDetail(_ workspace) -> String {
     return ""
 }
 
-func workspaceRow(_ workspace, _ second: Int) -> some View {
+func workspaceRow(_ workspace) -> some View {
     let tint = activityTint(workspace)
     let detail = activityDetail(workspace)
     let worktree = worktreeName(workspace)
     let branch = workspaceBranchText(workspace)
     let agents = activeAgentCount(workspace)
 
-    Button(action: { cmux("workspace.select", workspace_id: workspace.id) }) {
-        HStack(alignment: .top, spacing: 7) {
-            Capsule()
-                .foregroundColor(workspace.selected ? "#7A4FD8" : tint)
-                .opacity(workspace.selected ? 1.0 : 0.7)
-                .frame(width: 3, height: 34)
+    HStack(alignment: .top, spacing: 7) {
+        Capsule()
+            .foregroundColor(workspace.selected ? "#7A4FD8" : tint)
+            .opacity(workspace.selected ? 1.0 : 0.7)
+            .frame(width: 3, height: 34)
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text("\(workspace.index + 1)")
-                        .font(.system(size: 8, design: .monospaced))
-                        .fontWeight(.semibold)
-                        .foregroundColor(workspace.selected ? "#FFFFFF" : "#8E8E93")
-                        .frame(width: 14, height: 14)
-                        .background(workspace.selected ? "#7A4FD8" : "#8E8E9326")
-                        .cornerRadius(4)
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text("\(workspace.index + 1)")
+                    .font(.system(size: 8, design: .monospaced))
+                    .fontWeight(.semibold)
+                    .foregroundColor(workspace.selected ? "#FFFFFF" : "#8E8E93")
+                    .frame(width: 14, height: 14)
+                    .background(workspace.selected ? "#7A4FD8" : "#8E8E9326")
+                    .cornerRadius(4)
 
-                    Text(workspace.title)
-                        .font(.system(size: 13))
-                        .fontWeight(workspace.selected ? .semibold : .regular)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-
-                    Spacer()
-
-                    if agents > 0 {
-                        Label("\(agents)", systemImage: "cpu")
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundColor("#636366")
-                    }
-
-                    if isWorking(workspace) {
-                        Text(spinnerFrame(second))
-                            .font(.system(size: 10, design: .monospaced))
-                            .foregroundColor(tint)
-                    } else if hasActivity(workspace) {
-                        Image(systemName: activityIcon(workspace))
-                            .font(.system(size: 10))
-                            .foregroundColor(tint)
-                    }
-                }
-
-                HStack(spacing: 5) {
-                    Text(repositoryName(workspace))
-                        .font(.system(size: 10))
-                        .foregroundColor("#8E8E93")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                }
-
-                if worktree != "" {
-                    Label(worktree, systemImage: "square.stack.3d.down.right")
-                        .font(.system(size: 10))
-                        .foregroundColor("#636366")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                if branch != "" {
-                    Label(branch, systemImage: "arrow.triangle.branch")
-                        .font(.system(size: 10))
-                        .foregroundColor("#8E8E93")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                if hasActivity(workspace) || hasPullRequest(workspace) {
-                    HStack(spacing: 5) {
-                        if hasActivity(workspace) {
-                            Text(activityLabel(workspace))
-                                .font(.system(size: 10))
-                                .foregroundColor(tint)
-                        }
-
-                        if hasPullRequest(workspace) {
-                            Text(workspace.pr.label)
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(prTint(workspace))
-                        }
-                    }
-                }
-
-                Text("\(tabStatusSummary(workspace, second))\(workspace.tabCount > 8 ? "  +\(workspace.tabCount - 8)" : "")")
-                    .font(.system(size: 7, design: .monospaced))
-                    .foregroundColor("#8E8E93")
+                Text(workspace.title)
+                    .font(.system(size: 13))
+                    .fontWeight(workspace.selected ? .semibold : .regular)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
-                if detail != "" {
-                    Text(detail)
-                        .font(.system(size: 10))
+                Spacer()
+
+                if agents > 0 {
+                    Label("\(agents)", systemImage: "cpu")
+                        .font(.system(size: 9, design: .monospaced))
                         .foregroundColor("#636366")
-                        .lineLimit(2)
-                        .truncationMode(.tail)
+                }
+
+                if hasActivity(workspace) {
+                    Image(systemName: activityIcon(workspace))
+                        .font(.system(size: 10))
+                        .foregroundColor(tint)
                 }
             }
+
+            HStack(spacing: 5) {
+                Text(repositoryName(workspace))
+                    .font(.system(size: 10))
+                    .foregroundColor("#8E8E93")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+
+            if worktree != "" {
+                Label(worktree, systemImage: "square.stack.3d.down.right")
+                    .font(.system(size: 10))
+                    .foregroundColor("#636366")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            if branch != "" {
+                Label(branch, systemImage: "arrow.triangle.branch")
+                    .font(.system(size: 10))
+                    .foregroundColor("#8E8E93")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            if hasActivity(workspace) || hasPullRequest(workspace) {
+                HStack(spacing: 5) {
+                    if hasActivity(workspace) {
+                        Text(activityLabel(workspace))
+                            .font(.system(size: 10))
+                            .foregroundColor(tint)
+                    }
+
+                    if hasPullRequest(workspace) {
+                        Text(workspace.pr.label)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(prTint(workspace))
+                    }
+                }
+            }
+
+            Text("\(tabStatusSummary(workspace))\(workspace.tabCount > 8 ? "  +\(workspace.tabCount - 8)" : "")")
+                .font(.system(size: 7, design: .monospaced))
+                .foregroundColor("#8E8E93")
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            if detail != "" {
+                Text(detail)
+                    .font(.system(size: 10))
+                    .foregroundColor("#636366")
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+            }
         }
-        .padding(6)
-        .background(workspace.selected ? "#7A4FD826" : "#00000000")
-        .cornerRadius(8)
     }
+    .padding(6)
+    .background(workspace.selected ? "#7A4FD826" : "#00000000")
+    .cornerRadius(8)
+    .onTapGesture { cmux("workspace.select", workspace_id: workspace.id) }
 }
 
 func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
@@ -372,62 +355,61 @@ func surfaceRow(_ tab, _ workspaceStopped: Bool) -> some View {
     let branch = tabBranchText(tab)
     let activity = workspaceStopped ? "" : tabActivityLabel(tab)
 
-    Button(action: { cmux("surface.focus", surface_id: tab.id) }) {
-        HStack(spacing: 7) {
-            Image(systemName: !workspaceStopped && hasTabActivity(tab) ? "cpu" : "terminal")
-                .font(.system(size: 10))
-                .foregroundColor(tab.focused ? "#7A4FD8" : "#8E8E93")
-                .frame(width: 14)
+    HStack(spacing: 7) {
+        Image(systemName: !workspaceStopped && hasTabActivity(tab) ? "cpu" : "terminal")
+            .font(.system(size: 10))
+            .foregroundColor(tab.focused ? "#7A4FD8" : "#8E8E93")
+            .frame(width: 14)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(tab.title)
-                    .font(.system(size: 11))
-                    .fontWeight(tab.focused ? .semibold : .regular)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(tab.title)
+                .font(.system(size: 11))
+                .fontWeight(tab.focused ? .semibold : .regular)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            if repository != "" {
+                Text(repository)
+                    .font(.system(size: 9))
+                    .foregroundColor("#8E8E93")
                     .lineLimit(1)
-                    .truncationMode(.tail)
-
-                if repository != "" {
-                    Text(repository)
-                        .font(.system(size: 9))
-                        .foregroundColor("#8E8E93")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                if worktree != "" {
-                    Label(worktree, systemImage: "square.stack.3d.down.right")
-                        .font(.system(size: 9))
-                        .foregroundColor("#636366")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
-                if branch != "" {
-                    Label(branch, systemImage: "arrow.triangle.branch")
-                        .font(.system(size: 9))
-                        .foregroundColor("#636366")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
+                    .truncationMode(.middle)
             }
 
-            Spacer()
+            if worktree != "" {
+                Label(worktree, systemImage: "square.stack.3d.down.right")
+                    .font(.system(size: 9))
+                    .foregroundColor("#636366")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
 
-            if activity != "" {
-                VStack(alignment: .trailing, spacing: 1) {
-                    Text(activity)
-                        .font(.system(size: 9))
-                        .foregroundColor("#8E8E93")
-                    Text(surfaceKind(tab))
-                        .font(.system(size: 8))
-                        .foregroundColor("#636366")
-                }
+            if branch != "" {
+                Label(branch, systemImage: "arrow.triangle.branch")
+                    .font(.system(size: 9))
+                    .foregroundColor("#636366")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
             }
         }
-        .padding(5)
-        .background(tab.focused ? "#7A4FD81F" : "#00000000")
-        .cornerRadius(7)
+
+        Spacer()
+
+        if activity != "" {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(activity)
+                    .font(.system(size: 9))
+                    .foregroundColor("#8E8E93")
+                Text(surfaceKind(tab))
+                    .font(.system(size: 8))
+                    .foregroundColor("#636366")
+            }
+        }
     }
+    .padding(5)
+    .background(tab.focused ? "#7A4FD81F" : "#00000000")
+    .cornerRadius(7)
+    .onTapGesture { cmux("surface.focus", surface_id: tab.id) }
 }
 
 VStack(alignment: .leading, spacing: 6) {
@@ -445,9 +427,6 @@ VStack(alignment: .leading, spacing: 6) {
             .font(.system(size: 13))
             .fontWeight(.semibold)
         Spacer()
-        Text(clock.time)
-            .font(.system(size: 9, design: .monospaced))
-            .foregroundColor("#636366")
     }
     .padding(4)
 
@@ -458,8 +437,8 @@ VStack(alignment: .leading, spacing: 6) {
                 .foregroundColor("#FF9F0A")
         }
         if workingCount > 0 {
-            Text("\(spinnerFrame(clock.second)) \(workingCount) working")
-                .font(.system(size: 9, design: .monospaced))
+            Label("\(workingCount) working", systemImage: "circle.fill")
+                .font(.system(size: 9))
                 .foregroundColor("#30D158")
         }
         if doneCount > 0 {
@@ -497,7 +476,7 @@ VStack(alignment: .leading, spacing: 6) {
     .padding(4)
 
     ForEach(visibleWorkspaces) { workspace in
-        workspaceRow(workspace, clock.second)
+        workspaceRow(workspace)
     }
 
     Divider()
