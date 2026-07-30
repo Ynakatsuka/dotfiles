@@ -86,7 +86,7 @@ func stateTint(_ state: String) -> String {
     if state == "input" { return "#FF9F0A" }
     if state == "working" { return "#30D158" }
     if state == "done" { return "#54A8FF" }
-    if state == "idle" { return "#8E8E93" }
+    if state == "idle" { return "#FFD60A" }
     return "#636366"
 }
 
@@ -118,20 +118,34 @@ func workspaceSubtitle(_ workspace) -> String {
     return branch != "" ? "\(location)  \(branch)\(workspace.dirty == true ? " •" : "")" : location
 }
 
-func tabSubtitle(_ tab) -> String {
-    if tab.directory == nil || tab.directory == "" {
-        return tab.branch != nil ? tab.branch : ""
+func tabLocation(_ tab, _ workspaceDirectory: String) -> String {
+    let workspaceRepository = repositoryName(workspaceDirectory)
+    let workspaceWorktree = worktreeName(workspaceDirectory)
+    let workspaceLocation = workspaceWorktree != "" ? "\(workspaceRepository)/\(workspaceWorktree)" : workspaceRepository
+
+    if tab.directory == nil || tab.directory == "" { return workspaceLocation }
+    if tab.directory == workspaceDirectory || tab.directory.hasPrefix("\(workspaceDirectory)/") {
+        return workspaceLocation
     }
-    let repository = repositoryName(tab.directory)
-    let branch = tab.branch != nil ? tab.branch : ""
-    return branch != "" ? "\(repository)  \(branch)\(tab.dirty == true ? " •" : "")" : repository
+
+    let tabWorktree = worktreeName(tab.directory)
+    if tabWorktree != "" {
+        return "\(repositoryName(tab.directory))/\(tabWorktree)"
+    }
+    return repositoryName(tab.directory)
 }
 
-func tabState(_ tab, _ workspaceIdle: Bool) -> String {
-    if workspaceIdle { return "idle" }
+func tabSubtitle(_ tab, _ workspaceDirectory: String) -> String {
+    let location = tabLocation(tab, workspaceDirectory)
+    let branch = tab.branch != nil ? tab.branch : ""
+    return branch != "" ? "\(location)  \(branch)\(tab.dirty == true ? " •" : "")" : location
+}
+
+func tabState(_ tab, _ workspaceState: String) -> String {
     if tab.title.lowercased().contains("action required") { return "input" }
     if hasSpinner(tab.title) { return "working" }
-    return "idle"
+    if workspaceState == "idle" { return "idle" }
+    return "unknown"
 }
 
 func workspaceRow(_ workspace) -> some View {
@@ -160,6 +174,24 @@ func workspaceRow(_ workspace) -> some View {
                 .foregroundColor("#8E8E93")
                 .lineLimit(1)
                 .truncationMode(.middle)
+
+            HStack(spacing: 4) {
+                Text("\(workspace.tabCount) tabs")
+                    .font(.system(size: 8, design: .monospaced))
+                    .foregroundColor("#636366")
+
+                ForEach(workspace.tabs.prefix(6)) { tab in
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 7))
+                        .foregroundColor(stateTint(tabState(tab, state)))
+                }
+
+                if workspace.tabCount > 6 {
+                    Text("+\(workspace.tabCount - 6)")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundColor("#636366")
+                }
+            }
         }
 
         Spacer()
@@ -176,14 +208,14 @@ func workspaceRow(_ workspace) -> some View {
     .onTapGesture { cmux("workspace.select", workspace_id: workspace.id) }
 }
 
-func tabRow(_ tab, _ workspaceIdle: Bool) -> some View {
-    let state = tabState(tab, workspaceIdle)
+func tabRow(_ tab, _ workspaceState: String, _ workspaceDirectory: String) -> some View {
+    let state = tabState(tab, workspaceState)
     let tint = stateTint(state)
 
     HStack(spacing: 7) {
-        Image(systemName: state == "idle" ? "terminal" : "circle.fill")
+        Image(systemName: state == "unknown" ? "terminal" : "circle.fill")
             .font(.system(size: 9))
-            .foregroundColor(state == "idle" ? "#8E8E93" : tint)
+            .foregroundColor(state == "unknown" ? "#8E8E93" : tint)
             .frame(width: 14)
 
         VStack(alignment: .leading, spacing: 2) {
@@ -193,7 +225,7 @@ func tabRow(_ tab, _ workspaceIdle: Bool) -> some View {
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            let subtitle = tabSubtitle(tab)
+            let subtitle = tabSubtitle(tab, workspaceDirectory)
             if subtitle != "" {
                 Text(subtitle)
                     .font(.system(size: 9))
@@ -256,7 +288,7 @@ VStack(alignment: .leading, spacing: 6) {
 
     ForEach(workspaces.filter { $0.selected }.prefix(1)) { selected in
         ForEach(selected.tabs.prefix(10)) { tab in
-            tabRow(tab, agentState(selected) == "idle")
+            tabRow(tab, agentState(selected), selected.directory)
         }
     }
 
