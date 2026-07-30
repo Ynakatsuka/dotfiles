@@ -176,20 +176,10 @@ func workspaceRow(_ workspace) -> some View {
                 .truncationMode(.middle)
 
             HStack(spacing: 4) {
-                Text("\(workspace.tabCount) tabs")
-                    .font(.system(size: 8, design: .monospaced))
-                    .foregroundColor("#636366")
-
-                ForEach(workspace.tabs.prefix(6)) { tab in
+                ForEach(workspace.tabs) { tab in
                     Image(systemName: "circle.fill")
                         .font(.system(size: 7))
                         .foregroundColor(stateTint(tabState(tab, state)))
-                }
-
-                if workspace.tabCount > 6 {
-                    Text("+\(workspace.tabCount - 6)")
-                        .font(.system(size: 8, design: .monospaced))
-                        .foregroundColor("#636366")
                 }
             }
         }
@@ -267,7 +257,7 @@ VStack(alignment: .leading, spacing: 6) {
 
     Divider()
 
-    ForEach(visibleWorkspaces) { workspace in
+    Reorderable(visibleWorkspaces, move: "workspace.reorder") { workspace in
         workspaceRow(workspace)
     }
 
