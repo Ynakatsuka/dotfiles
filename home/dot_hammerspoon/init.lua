@@ -8,6 +8,9 @@ hs.application.enableSpotlightForNameSearches(true)
 require("hs.ipc")
 hs.allowAppleScript(true)
 
+local cmuxAgentStatusSync = require("cmux_agent_status_sync")
+cmuxAgentStatusSync.start()
+
 -- Hotkey modifier
 local hyper = {"alt", "ctrl"}
 

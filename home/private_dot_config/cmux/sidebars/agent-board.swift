@@ -110,12 +110,53 @@ func worktreeName(_ directory: String) -> String {
     return components[components.count - 1]
 }
 
-func workspaceSubtitle(_ workspace) -> String {
+func managedDescriptionBranch(_ workspace) -> String {
+    if workspace.description == nil || workspace.description == "" { return "" }
+    let prefix = "agent-board-branch:"
+    let matchingLines = workspace.description.split(separator: "\n").filter {
+        $0.hasPrefix(prefix)
+    }
+    if matchingLines.count == 0 { return "" }
+    return matchingLines[0].replacingOccurrences(of: prefix, with: "")
+}
+
+func workspaceBranchText(_ workspace) -> String {
+    if workspace.branch != nil && workspace.branch != "" {
+        return "\(workspace.branch)\(workspace.dirty == true ? " •" : "")"
+    }
+
+    let managedBranch = managedDescriptionBranch(workspace)
+    if managedBranch != "" {
+        return "\(managedBranch)\(workspace.dirty == true ? " •" : "")"
+    }
+
+    let focusedTabs = workspace.tabs.filter { $0.focused }
+    if focusedTabs.count > 0 && focusedTabs[0].branch != nil && focusedTabs[0].branch != "" {
+        return "\(focusedTabs[0].branch)\(focusedTabs[0].dirty == true ? " •" : "")"
+    }
+
+    let matchingTabs = workspace.tabs.filter { $0.directory == workspace.directory }
+    if matchingTabs.count > 0 && matchingTabs[0].branch != nil && matchingTabs[0].branch != "" {
+        return "\(matchingTabs[0].branch)\(matchingTabs[0].dirty == true ? " •" : "")"
+    }
+
+    let currentWorktree = worktreeName(workspace.directory)
+    if currentWorktree != "" {
+        let worktreeTabs = workspace.tabs.filter {
+            $0.directory != nil && worktreeName($0.directory) == currentWorktree
+        }
+        if worktreeTabs.count > 0 && worktreeTabs[0].branch != nil && worktreeTabs[0].branch != "" {
+            return "\(worktreeTabs[0].branch)\(worktreeTabs[0].dirty == true ? " •" : "")"
+        }
+    }
+
+    return ""
+}
+
+func workspaceWorktreeText(_ workspace) -> String {
     let repository = repositoryName(workspace.directory)
     let worktree = worktreeName(workspace.directory)
-    let branch = workspace.branch != nil ? workspace.branch : ""
-    let location = worktree != "" ? "\(repository)/\(worktree)" : repository
-    return branch != "" ? "\(location)  \(branch)\(workspace.dirty == true ? " •" : "")" : location
+    return worktree != "" ? "\(repository)/\(worktree)" : repository
 }
 
 func tabLocation(_ tab, _ workspaceDirectory: String) -> String {
@@ -151,11 +192,13 @@ func tabState(_ tab, _ workspaceState: String) -> String {
 func workspaceRow(_ workspace) -> some View {
     let state = agentState(workspace)
     let tint = stateTint(state)
+    let branch = workspaceBranchText(workspace)
+    let branchLabel = branch != "" ? branch : "—"
 
     HStack(spacing: 7) {
         Capsule()
             .foregroundColor(workspace.selected ? "#7A4FD8" : tint)
-            .frame(width: 3, height: 30)
+            .frame(width: 3, height: 42)
 
         Text("\(workspace.index + 1)")
             .font(.system(size: 9, design: .monospaced))
@@ -169,7 +212,13 @@ func workspaceRow(_ workspace) -> some View {
                 .lineLimit(1)
                 .truncationMode(.tail)
 
-            Text(workspaceSubtitle(workspace))
+            Label(workspaceWorktreeText(workspace), systemImage: "square.stack.3d.down.right")
+                .font(.system(size: 9))
+                .foregroundColor("#8E8E93")
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Label(branchLabel, systemImage: "arrow.triangle.branch")
                 .font(.system(size: 9))
                 .foregroundColor("#8E8E93")
                 .lineLimit(1)

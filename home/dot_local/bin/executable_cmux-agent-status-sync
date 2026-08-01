@@ -1,0 +1,341 @@
+#!/bin/zsh
+
+# Reconcile cmux's branch descriptions and live agent status with Agent Board metadata.
+
+set -euo pipefail
+
+readonly CMUX_BIN="/opt/homebrew/bin/cmux"
+readonly JQ_BIN="/opt/homebrew/bin/jq"
+readonly CUSTOM_IDLE_SUFFIX=$'\u2063\u2064\u2062\u2063\u2064\u2062\u2063\u2064'
+readonly AUTO_IDLE_SUFFIX=$'\u2063\u2062\u2064\u2063\u2062\u2064\u2063\u2062'
+readonly DESCRIPTION_SENTINEL=$'\u2063\u2064\u2062\u2064\u2063\u2062\u2064\u2063'
+
+dry_run=false
+branch_only=false
+
+usage() {
+    print -u2 "Usage: cmux-agent-status-sync [--dry-run|--branch-only]"
+}
+
+if (( $# > 1 )); then
+    usage
+    exit 2
+fi
+
+if (( $# == 1 )); then
+    case "$1" in
+        --dry-run) dry_run=true ;;
+        --branch-only) branch_only=true ;;
+        *)
+            usage
+            exit 2
+            ;;
+    esac
+fi
+
+if [[ ! -x "$CMUX_BIN" ]]; then
+    print -u2 "Error: cmux is not executable at $CMUX_BIN"
+    exit 1
+fi
+
+if [[ ! -x "$JQ_BIN" ]]; then
+    print -u2 "Error: jq is not executable at $JQ_BIN"
+    exit 1
+fi
+
+fetch_sidebar_snapshot() {
+    typeset snapshot
+    if ! snapshot=$(CMUX_QUIET=1 "$CMUX_BIN" rpc extension.sidebar.snapshot '{}'); then
+        print -u2 "Error: failed to retrieve cmux sidebar snapshot"
+        return 1
+    fi
+
+    if ! print -r -- "$snapshot" |
+        "$JQ_BIN" -e '
+            .workspaces
+            | type == "array"
+                and all(.[];
+                    (.ref | type) == "string"
+                    and (.id | type) == "string"
+                    and (.description == null or (.description | type) == "string")
+                    and (.branch_summary == null or (.branch_summary | type) == "string")
+                )
+        ' \
+            >/dev/null; then
+        print -u2 "Error: invalid cmux sidebar snapshot"
+        return 1
+    fi
+
+    print -r -- "$snapshot"
+}
+
+typeset current_description
+typeset branch_summary
+typeset desired_description
+
+set_branch_description_state() {
+    typeset workspace_record=$1
+    current_description=$(print -r -- "$workspace_record" |
+        "$JQ_BIN" -jr --arg sentinel "$DESCRIPTION_SENTINEL" '(.description // "") + $sentinel')
+    current_description="${current_description%$DESCRIPTION_SENTINEL}"
+    branch_summary=$(print -r -- "$workspace_record" | "$JQ_BIN" -er '.branch_summary // ""')
+
+    if [[ -n "$branch_summary" ]]; then
+        desired_description=$(print -rn -- "$current_description" |
+            "$JQ_BIN" -jRsr --arg branch "$branch_summary" --arg sentinel "$DESCRIPTION_SENTINEL" '
+                split("\n")
+                | map(select(startswith("agent-board-branch:") | not))
+                | join("\n")
+                | if . == "" then "agent-board-branch:" + $branch
+                  else . + "\nagent-board-branch:" + $branch
+                  end
+                | . + $sentinel
+            ')
+    else
+        desired_description=$(print -rn -- "$current_description" |
+            "$JQ_BIN" -jRsr --arg sentinel "$DESCRIPTION_SENTINEL" '
+                split("\n")
+                | map(select(startswith("agent-board-branch:") | not))
+                | join("\n")
+                | . + $sentinel
+            ')
+    fi
+    desired_description="${desired_description%$DESCRIPTION_SENTINEL}"
+}
+
+sync_branch_description() {
+    typeset workspace_id=$1
+    typeset workspace_ref=$2
+    typeset snapshot_json=$3
+    typeset workspace_record
+    typeset latest_snapshot_json
+
+    workspace_record=$(print -r -- "$snapshot_json" |
+        "$JQ_BIN" -ce --arg id "$workspace_id" 'first(.workspaces[] | select(.id == $id))')
+    set_branch_description_state "$workspace_record"
+    if [[ "$desired_description" == "$current_description" ]]; then
+        return
+    fi
+
+    if [[ "$dry_run" == true ]]; then
+        print -- "$workspace_ref: would update Agent Board branch description"
+        return
+    fi
+
+    if ! latest_snapshot_json=$(fetch_sidebar_snapshot); then
+        exit 1
+    fi
+    if ! workspace_record=$(print -r -- "$latest_snapshot_json" |
+        "$JQ_BIN" -ce --arg id "$workspace_id" 'first(.workspaces[] | select(.id == $id))'); then
+        print -- "$workspace_ref: workspace disappeared before branch update"
+        return
+    fi
+    set_branch_description_state "$workspace_record"
+    if [[ "$desired_description" == "$current_description" ]]; then
+        return
+    fi
+
+    if [[ -n "$desired_description" ]]; then
+        if ! CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+            --action set-description \
+            --description "$desired_description" \
+            --workspace "$workspace_id" >/dev/null; then
+            print -u2 "Error: failed to update description for $workspace_ref"
+            exit 1
+        fi
+        print -- "$workspace_ref: updated Agent Board branch description"
+    else
+        if ! CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+            --action clear-description \
+            --workspace "$workspace_id" >/dev/null; then
+            print -u2 "Error: failed to clear description for $workspace_ref"
+            exit 1
+        fi
+        print -- "$workspace_ref: cleared Agent Board branch description"
+    fi
+}
+
+typeset sidebar_snapshot_json
+if ! sidebar_snapshot_json=$(fetch_sidebar_snapshot); then
+    exit 1
+fi
+
+typeset branch_candidates_text
+branch_candidates_text=$(print -r -- "$sidebar_snapshot_json" | "$JQ_BIN" -r '.workspaces[] | [.id, .ref] | @tsv')
+typeset -a branch_candidates
+if [[ -n "$branch_candidates_text" ]]; then
+    branch_candidates=("${(@f)branch_candidates_text}")
+else
+    branch_candidates=()
+fi
+
+typeset branch_candidate
+typeset branch_id
+typeset branch_ref
+for branch_candidate in "${branch_candidates[@]}"; do
+    branch_id="${branch_candidate%%$'\t'*}"
+    branch_ref="${branch_candidate#*$'\t'}"
+    sync_branch_description "$branch_id" "$branch_ref" "$sidebar_snapshot_json"
+done
+
+if [[ "$branch_only" == true ]]; then
+    exit 0
+fi
+
+fetch_workspace_list() {
+    typeset workspace_list
+    if ! workspace_list=$(CMUX_QUIET=1 "$CMUX_BIN" --id-format both list-workspaces --json); then
+        print -u2 "Error: failed to list cmux workspaces"
+        return 1
+    fi
+
+    if ! print -r -- "$workspace_list" |
+        "$JQ_BIN" -e '
+            .workspaces
+            | type == "array"
+                and all(.[];
+                    (.ref | type) == "string"
+                    and (.id | type) == "string"
+                    and (.title | type) == "string"
+                    and (.has_custom_title | type) == "boolean"
+                )
+        ' \
+            >/dev/null; then
+        print -u2 "Error: cmux returned an invalid workspace list"
+        return 1
+    fi
+
+    print -r -- "$workspace_list"
+}
+
+typeset workspace_json
+if ! workspace_json=$(fetch_workspace_list); then
+    exit 1
+fi
+
+typeset workspace_candidates_text
+workspace_candidates_text=$(print -r -- "$workspace_json" | "$JQ_BIN" -r '.workspaces[] | [.id, .ref] | @tsv')
+typeset -a workspace_candidates
+if [[ -n "$workspace_candidates_text" ]]; then
+    workspace_candidates=("${(@f)workspace_candidates_text}")
+else
+    workspace_candidates=()
+fi
+
+typeset workspace_candidate
+typeset workspace_id
+typeset workspace_ref
+typeset status_output
+typeset status_line
+typeset status_value
+typeset status_state
+typeset workspace_record
+typeset current_title
+typeset base_title
+typeset marked_title
+typeset marker_kind
+typeset has_custom_title
+typeset should_show_idle
+typeset latest_workspace_json
+typeset workspace_still_exists
+typeset -i relevant_count
+typeset -i idle_count
+
+for workspace_candidate in "${workspace_candidates[@]}"; do
+    workspace_id="${workspace_candidate%%$'\t'*}"
+    workspace_ref="${workspace_candidate#*$'\t'}"
+    if ! workspace_record=$(print -r -- "$workspace_json" |
+        "$JQ_BIN" -ce --arg id "$workspace_id" '
+            first(.workspaces[] | select(.id == $id))
+        '); then
+        print -u2 "Error: failed to resolve workspace metadata for $workspace_ref"
+        exit 1
+    fi
+    current_title=$(print -r -- "$workspace_record" | "$JQ_BIN" -r '.title')
+    has_custom_title=$(print -r -- "$workspace_record" | "$JQ_BIN" -r '.has_custom_title')
+
+    if ! status_output=$(CMUX_QUIET=1 "$CMUX_BIN" list-status --workspace "$workspace_id"); then
+        if ! latest_workspace_json=$(fetch_workspace_list); then
+            exit 1
+        fi
+        if ! workspace_still_exists=$(print -r -- "$latest_workspace_json" |
+            "$JQ_BIN" -r --arg id "$workspace_id" 'any(.workspaces[]; .id == $id)'); then
+            print -u2 "Error: failed to resolve workspace metadata for $workspace_ref"
+            exit 1
+        fi
+        if [[ "$workspace_still_exists" == "false" ]]; then
+            print -- "$workspace_ref: workspace disappeared before status update"
+            continue
+        fi
+        print -u2 "Error: failed to list status for $workspace_ref"
+        exit 1
+    fi
+
+    relevant_count=0
+    idle_count=0
+    while IFS= read -r status_line; do
+        case "$status_line" in
+            codex=*|claude_code=*)
+                (( relevant_count += 1 ))
+                status_value="${status_line#*=}"
+                status_state="${status_value%% *}"
+                if [[ "$status_state" == "Idle" ]]; then
+                    (( idle_count += 1 ))
+                fi
+                ;;
+        esac
+    done <<< "$status_output"
+
+    should_show_idle=false
+    if (( relevant_count > 0 && relevant_count == idle_count )); then
+        should_show_idle=true
+    fi
+
+    if [[ "$should_show_idle" == true ]]; then
+        if [[ "$current_title" == *"$CUSTOM_IDLE_SUFFIX" ]]; then
+            print -- "$workspace_ref: custom-title idle marker is current"
+        elif [[ "$current_title" == *"$AUTO_IDLE_SUFFIX" ]]; then
+            print -- "$workspace_ref: auto-title idle marker is current"
+        else
+            if [[ "$has_custom_title" == "true" ]]; then
+                marked_title="${current_title}${CUSTOM_IDLE_SUFFIX}"
+                marker_kind="custom-title"
+            else
+                marked_title="${current_title}${AUTO_IDLE_SUFFIX}"
+                marker_kind="auto-title"
+            fi
+
+            if [[ "$dry_run" == true ]]; then
+                print -- "$workspace_ref: would add $marker_kind idle marker"
+            else
+                CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+                    --action rename \
+                    --title "$marked_title" \
+                    --workspace "$workspace_id" >/dev/null
+                print -- "$workspace_ref: added $marker_kind idle marker"
+            fi
+        fi
+    elif [[ "$current_title" == *"$CUSTOM_IDLE_SUFFIX" ]]; then
+        base_title="${current_title%$CUSTOM_IDLE_SUFFIX}"
+        if [[ "$dry_run" == true ]]; then
+            print -- "$workspace_ref: would remove custom-title idle marker"
+        else
+            CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+                --action rename \
+                --title "$base_title" \
+                --workspace "$workspace_id" >/dev/null
+            print -- "$workspace_ref: removed custom-title idle marker"
+        fi
+    elif [[ "$current_title" == *"$AUTO_IDLE_SUFFIX" ]]; then
+        if [[ "$dry_run" == true ]]; then
+            print -- "$workspace_ref: would clear auto-title idle marker"
+        else
+            CMUX_QUIET=1 "$CMUX_BIN" workspace-action \
+                --action clear-name \
+                --workspace "$workspace_id" >/dev/null
+            print -- "$workspace_ref: cleared auto-title idle marker"
+        fi
+    else
+        print -- "$workspace_ref: no Agent Board title change"
+    fi
+done
