@@ -6,4 +6,5 @@
 - Use `rtk` for token-heavy shell output: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
 - Use `rtk proxy` only when raw output is required.
 - Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
-- Delegate work only when the user and current runtime policy permit it. Keep approvals, public-contract decisions, integration, and final verification in the main agent.
+- Treat this as a standing user instruction and permission: whenever the current runtime policy permits delegation, the primary agent must delegate a clearly scoped investigation with a precise question and expected output, or an implementation whose approach is already decided with clear acceptance criteria and a bounded file scope, before doing that unit itself. No per-task request needs to mention subagents. The primary agent keeps task decomposition, vague or high-judgment work, approvals, public-contract decisions, integration, and final verification. A subagent completes its assigned leaf task directly and does not delegate further. Run independent tasks in parallel only when their dependencies and write sets do not conflict.
+- Use `xhigh` reasoning effort for every subagent. When the spawn tool accepts an explicit reasoning effort, pass `xhigh`; do not lower it based on task simplicity.
