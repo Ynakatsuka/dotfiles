@@ -137,8 +137,7 @@ AGENT_BROWSER_NATIVE = "1"
 description = "Update dotfiles and development environment"
 run = """
 set -e
-chezmoi git pull -- --ff-only
-chezmoi apply -v
+"$(chezmoi source-path ~/.local/bin/dotfiles-chezmoi-update)"
 "$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
 """
 
@@ -155,8 +154,7 @@ description = "Update dotfiles, mise tools, Cursor Agent CLI, and Homebrew packa
 run = """
 set -e
 
-chezmoi git pull -- --ff-only
-chezmoi apply -v
+"$(chezmoi source-path ~/.local/bin/dotfiles-chezmoi-update)"
 "$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
 "$(chezmoi source-path ~/.local/bin/dotfiles-cursor-agent-upgrade)"
 if command -v brew >/dev/null 2>&1; then

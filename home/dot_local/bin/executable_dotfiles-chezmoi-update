@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+main() {
+  local target="$HOME/.config/cmux/sidebars/agent-board.swift"
+
+  if [ -e "$target" ] && ! chezmoi verify "$target"; then
+    echo "[ERROR] The differing deployed cmux Agent Board will not be overwritten." >&2
+    echo "[ERROR] Review it with: chezmoi diff -- $target" >&2
+    return 1
+  fi
+
+  chezmoi git pull -- --ff-only
+  chezmoi diff --no-pager
+  chezmoi apply -v
+}
+
+main "$@"
