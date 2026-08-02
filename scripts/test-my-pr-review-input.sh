@@ -25,11 +25,11 @@ resolve_skill_script() {
 }
 
 split_script=$(resolve_skill_script split-review-chunks.sh)
+runner_script=$(resolve_skill_script run-codex-review.sh)
 prepare_script=$(resolve_skill_script prepare-review-artifacts.sh)
 context_script=$(resolve_skill_script prepare-pr-context.sh)
-reviewer_agent="$repo_root/home/dot_codex/agents/reviewer.toml"
-simplifier_agent="$repo_root/home/dot_codex/agents/simplifier.toml"
-simplifier_apply_agent="$repo_root/home/dot_codex/agents/simplifier_apply.toml"
+reviewer_b_validator=$(resolve_skill_script validate-reviewer-b-output.sh)
+reviewer_b_schema="$skill_root/assets/claude-review-result.schema.json"
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/my-pr-review-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -42,38 +42,14 @@ fail() {
 assert_file_contains() {
   local file=$1
   local pattern=$2
-
   grep -Fq -- "$pattern" "$file" || fail "$file does not contain: $pattern"
 }
 
 assert_file_not_contains() {
   local file=$1
   local pattern=$2
-
   if grep -Fq -- "$pattern" "$file"; then
     fail "$file unexpectedly contains: $pattern"
-  fi
-}
-
-assert_file_line_count() {
-  local file=$1
-  local line=$2
-  local expected=$3
-  local actual
-
-  actual=$(awk -v expected_line="$line" '$0 == expected_line { count++ } END { print count + 0 }' "$file")
-  [[ "$actual" == "$expected" ]] ||
-    fail "$file contains $actual exact '$line' lines; expected $expected"
-}
-
-assert_skill_tree_not_matching() {
-  local pattern=$1
-  local description=$2
-  local matches="$tmp_dir/forbidden-skill-reference.txt"
-
-  if rg -n -i -e "$pattern" "$skill_root" >"$matches"; then
-    cat "$matches" >&2
-    fail "my-pr skill tree still contains $description"
   fi
 }
 
@@ -272,276 +248,308 @@ EOF
   assert_file_contains "$tmp_dir/newline-error.txt" "does not support file names containing newlines"
 }
 
-test_review_artifact_preparation_is_non_mutating() {
-  local protected_repo="$tmp_dir/protected main review repo"
-  local base_ref
-  local artifact_env
-  local status_before
-  local worktrees_before
-  local refs_before
-  local exclude_file
-  local exclude_before="$tmp_dir/protected-main-exclude-before"
-  local exclude_existed=false
+write_fake_codex() {
+  local fake="$tmp_dir/fake-codex"
+  cat >"$fake" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
 
-  mkdir -p "$protected_repo"
-  git -C "$protected_repo" init -q
-  git -C "$protected_repo" checkout -qb main
-  git -C "$protected_repo" config user.name "Test User"
-  git -C "$protected_repo" config user.email "test@example.com"
-  printf '.tmp/\n' >"$protected_repo/.gitignore"
-  printf 'base\n' >"$protected_repo/base.txt"
-  git -C "$protected_repo" add .gitignore base.txt
-  git -C "$protected_repo" commit -qm "chore: add protected review base"
-  base_ref=$(git -C "$protected_repo" rev-parse HEAD)
+output_file=
+printf '%s\n' "$@" >"${FAKE_ARGS:?}"
+while (($# > 0)); do
+  case "$1" in
+    -o)
+      output_file=$2
+      shift 2
+      ;;
+    --output-schema|-c|--sandbox)
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+[[ -n "$output_file" ]]
+if [[ "${FAKE_IGNORE_TAIL:-0}" == "1" ]]; then
+  head -n 25 >"${FAKE_CAPTURE:?}"
+else
+  cat >"${FAKE_CAPTURE:?}"
+fi
+if [[ -n "${FAKE_EXIT_CODE:-}" ]]; then
+  exit "$FAKE_EXIT_CODE"
+fi
+if [[ "${FAKE_NO_RESULT:-0}" == "1" ]]; then
+  exit 0
+fi
 
-  printf 'staged\n' >"$protected_repo/staged.txt"
-  git -C "$protected_repo" add staged.txt
-  printf 'unstaged\n' >>"$protected_repo/base.txt"
-  printf 'untracked\n' >"$protected_repo/untracked.txt"
+receipt=$(grep '^MY_PR_END_RECEIPT ' "$FAKE_CAPTURE" | tail -n 1 || true)
+reviewer=${receipt#* reviewer=}
+reviewer=${reviewer%% *}
+chunk_id=${receipt#* chunk_id=}
+chunk_id=${chunk_id%% *}
+chunk_count=${receipt#* chunk_count=}
+chunk_count=${chunk_count%% *}
+context_sha=${receipt#* context_sha256=}
+context_sha=${context_sha%% *}
+diff_sha=${receipt#* diff_sha256=}
+diff_sha=${diff_sha%% *}
+end_nonce=${receipt#* end_nonce=}
+end_nonce=${end_nonce%% *}
+if [[ "${FAKE_BAD_RECEIPT:-0}" == "1" ]]; then
+  diff_sha=0000000000000000000000000000000000000000000000000000000000000000
+fi
 
-  status_before=$(git -C "$protected_repo" status --porcelain=v1 --untracked-files=all)
-  worktrees_before=$(git -C "$protected_repo" worktree list --porcelain)
-  refs_before=$(git -C "$protected_repo" for-each-ref --format='%(refname) %(objectname)')
-  exclude_file=$(git -C "$protected_repo" rev-parse --git-path info/exclude)
-  if [[ -e "$exclude_file" ]]; then
-    cp "$exclude_file" "$exclude_before"
-    exclude_existed=true
-  fi
+if [[ "${FAKE_SHORT_MARKDOWN:-0}" == "1" ]]; then
+  review_markdown='# Review'
+elif [[ "$reviewer" == "A" ]]; then
+  review_markdown='# Simplify Review
 
-  artifact_env=$(
-    cd "$protected_repo"
-    /bin/bash "$prepare_script" "$base_ref" 2>"$tmp_dir/protected-main-prepare-error.txt"
-  )
-  [[ "$artifact_env" == "$protected_repo"/.tmp/my-pr/*/artifact.env ]] ||
-    fail "protected review artifacts escaped the ignored .tmp/my-pr directory: $artifact_env"
-  [[ -d "$(dirname "$artifact_env")" ]] || fail "protected review artifact directory was not created"
-  git -C "$protected_repo" check-ignore -q -- .tmp/my-pr ||
-    fail "protected review artifact directory is not ignored"
+## Required
+- none
 
-  [[ "$(git -C "$protected_repo" branch --show-current)" == "main" ]] ||
-    fail "artifact preparation changed the protected branch"
-  [[ "$(git -C "$protected_repo" status --porcelain=v1 --untracked-files=all)" == "$status_before" ]] ||
-    fail "artifact preparation changed staged, unstaged, or untracked state"
-  [[ "$(git -C "$protected_repo" worktree list --porcelain)" == "$worktrees_before" ]] ||
-    fail "artifact preparation changed the worktree list"
-  [[ "$(git -C "$protected_repo" for-each-ref --format='%(refname) %(objectname)')" == "$refs_before" ]] ||
-    fail "artifact preparation changed repository refs"
-  if [[ "$exclude_existed" == true ]]; then
-    cmp -s "$exclude_before" "$exclude_file" ||
-      fail "artifact preparation changed .git/info/exclude"
-  else
-    [[ ! -e "$exclude_file" ]] || fail "artifact preparation created .git/info/exclude"
-  fi
+## Recommended
+- none
+
+## Not needed
+- none'
+else
+  review_markdown='## PR understanding
+- complete
+
+## Strengths
+- none
+
+## Findings
+- none
+
+## Non-findings
+- none
+
+## Assessment
+
+**Ready to merge?** Yes'
+fi
+
+jq -n \
+  --arg reviewer "$reviewer" \
+  --arg chunk_id "$chunk_id" \
+  --argjson chunk_count "$chunk_count" \
+  --arg context_sha "$context_sha" \
+  --arg diff_sha "$diff_sha" \
+  --arg end_nonce "$end_nonce" \
+  --arg status "${FAKE_STATUS:-COMPLETE}" \
+  --arg review_markdown "$review_markdown" \
+  '{
+    status: $status,
+    reviewer: $reviewer,
+    chunk_id: $chunk_id,
+    chunk_count: $chunk_count,
+    context_sha256: $context_sha,
+    diff_sha256: $diff_sha,
+    end_nonce: $end_nonce,
+    saw_context_end: true,
+    saw_diff_end: true,
+    review_markdown: $review_markdown
+  }' >"$output_file"
+EOF
+  chmod +x "$fake"
+  printf '%s\n' "$fake"
 }
 
-assert_role_specific_dispatch_contract() {
-  local overview="$skill_root/references/simplify/overview.md"
-  local review_reference="$skill_root/references/review.md"
-  local skill="$skill_root/SKILL.md"
-  local native_role_launch
-  local simplifier_dispatch
-  local review_launch='- In Codex, spawn one `agent_type: reviewer` and one `agent_type: simplifier`, each with `fork_turns: "none"`. Do not set a model or reasoning-effort override.'
-  local skill_review_launch='Codex host では agent_type: reviewer と agent_type: simplifier、fork_turns: "none" を使う。model と reasoning_effort は指定しない。'
-  local apply_launch='Apply mode uses `simplifier_apply`. On Codex, `create` and `simplify` launch `agent_type: "simplifier_apply"` with `fork_turns: "none"`. Do not override `model` or `reasoning_effort` at spawn time; the role configuration supplies `gpt-5.6-terra` at `medium` effort.'
+test_runner() {
+  local artifact_dir="$tmp_dir/runner artifacts"
+  local prompt_file="$artifact_dir/reviewer-prompt.md"
+  local context_file="$artifact_dir/pr-context.md"
+  local diff_file="$artifact_dir/review.diff"
+  local fake_codex
+  local canonical_artifact_dir
 
-  native_role_launch=$(sed -n '/^## Native role launch$/,/^## Dispatch contract$/p' "$review_reference")
-  [[ "$native_role_launch" == *"$review_launch"* ]] ||
-    fail "Native role launch does not bind reviewer and simplifier to fork_turns none without overrides"
-  assert_file_contains "$skill" "$skill_review_launch"
-  assert_file_contains "$overview" "$apply_launch"
-  simplifier_dispatch=$(sed -n '/^### Simplifier dispatch$/,/^## Integration rules$/p' "$review_reference")
-  [[ "$simplifier_dispatch" == *$'Mode: review\n'* ]] ||
-    fail "read-only simplifier dispatch does not declare Mode: review"
-  [[ "$simplifier_dispatch" == *'Act as the read-only simplifier for the supplied PR artifact.'* ]] ||
-    fail "read-only simplifier dispatch is missing its role-specific task"
-}
+  mkdir -p "$artifact_dir"
+  canonical_artifact_dir=$(cd "$artifact_dir" && pwd -P)
+  unset MY_PR_ARTIFACT_DIR
+  printf 'Review the supplied input and report findings.\n' >"$prompt_file"
+  awk 'BEGIN { for (i = 1; i <= 300; i++) print "context line " i " 日本語" }' >"$context_file"
+  awk 'BEGIN { for (i = 1; i <= 500; i++) print "+diff line " i " abcdefghijklmnopqrstuvwxyz" }' >"$diff_file"
+  fake_codex=$(write_fake_codex)
 
-assert_review_scope_gate_contract() {
-  local review_reference="$skill_root/references/review.md"
-  local review_base_gate
-  local review_untracked_gate
-  local default_fix_base_gate
-  local default_fix_untracked_gate
+  MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_ARGS="$tmp_dir/reviewer-a-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/reviewer-a-input.md" \
+    /bin/bash "$runner_script" reviewer-a full 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/reviewer-a-output.txt"
 
-  review_base_gate=$(sed -n '/^### `my-pr review`$/,/^### `default` and `fix`$/p' "$review_reference")
-  review_untracked_gate=$(sed -n '/^For `my-pr review`:$/,/^For the default and `fix` workflows:$/p' "$review_reference")
-  default_fix_base_gate=$(sed -n '/^### `default` and `fix`$/,/^The script prints one absolute `artifact.env` path\./p' "$review_reference")
-  default_fix_untracked_gate=$(sed -n '/^For the default and `fix` workflows:$/,/^The state file persists these generated paths\./p' "$review_reference")
-  [[ "$review_base_gate" == *'For `my-pr review`, resolve and verify an existing remote-tracking base ref without `git fetch`. Never mutate refs.'* ]] ||
-    fail "my-pr review scope gate does not prohibit ref fetches"
-  [[ "$review_base_gate" != *'git fetch origin '* ]] ||
-    fail "my-pr review scope gate unexpectedly fetches the base ref"
-  [[ "$review_untracked_gate" == *'`untracked` or `large+untracked`: stop and report the files without staging, `git add -N`, ignore or exclude changes, or file removal.'* ]] ||
-    fail "my-pr review scope gate does not prohibit untracked-file mutations"
-  [[ "$review_untracked_gate" != *'Stage or `git add -N` task-created files'* ]] ||
-    fail "my-pr review scope gate unexpectedly permits staging untracked files"
-  [[ "$default_fix_base_gate" == *'git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"'* ]] ||
-    fail "default and fix scope gate is missing the safe remote-tracking fetch"
-  [[ "$default_fix_untracked_gate" == *'Stage or `git add -N` task-created files that belong in the PR'* ]] ||
-    fail "default and fix scope gate is missing permitted untracked-file resolution"
-}
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" "multi_agent"
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" "hooks"
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" "plugins"
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" "remote_plugin"
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" "mcp_servers={}"
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" 'model_reasoning_effort="medium"'
+  assert_file_contains "$tmp_dir/reviewer-a-input.md" "context line 300 日本語"
+  assert_file_contains "$tmp_dir/reviewer-a-input.md" "+diff line 500 abcdefghijklmnopqrstuvwxyz"
+  assert_file_contains "$artifact_dir/reviewer-results/reviewer-a/full/review.md" "# Simplify Review"
+  local reviewer_a_output
+  reviewer_a_output=$(cat "$tmp_dir/reviewer-a-output.txt")
+  [[ "$reviewer_a_output" == "$canonical_artifact_dir/reviewer-results/reviewer-a/full/review.md" ]] ||
+    fail "runner output mismatch: expected=$canonical_artifact_dir/reviewer-results/reviewer-a/full/review.md actual=$reviewer_a_output"
 
-test_review_scope_gate_contract_rejects_regressions() {
-  local fetch_regression_root="$tmp_dir/skill-with-review-fetch"
-  local stage_regression_root="$tmp_dir/skill-with-review-staging"
-
-  cp -R "$skill_root" "$fetch_regression_root"
-  perl -0pi -e 's/without `git fetch`\. Never mutate refs\./with `git fetch`. Never mutate refs./' \
-    "$fetch_regression_root/references/review.md"
-  if (
-    skill_root="$fetch_regression_root"
-    assert_review_scope_gate_contract
-  ) \
-    >"$tmp_dir/review-fetch-contract.out" 2>&1; then
-    fail "adding a review fetch unexpectedly passed the scope-gate contract"
+  MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_ARGS="$tmp_dir/reviewer-c-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/reviewer-c-input.md" \
+    /bin/bash "$runner_script" reviewer-c full 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/reviewer-c-output.txt"
+  if grep -Fq 'model_reasoning_effort' "$tmp_dir/reviewer-c-args.txt"; then
+    fail "Reviewer C must preserve the global reasoning effort"
   fi
 
-  cp -R "$skill_root" "$stage_regression_root"
-  perl -0pi -e 's/stop and report the files without staging, `git add -N`, ignore or exclude changes, or file removal/Stage or `git add -N` task-created files and regenerate artifacts/' \
-    "$stage_regression_root/references/review.md"
-  if (
-    skill_root="$stage_regression_root"
-    assert_review_scope_gate_contract
-  ) \
-    >"$tmp_dir/review-staging-contract.out" 2>&1; then
-    fail "permitting review staging unexpectedly passed the scope-gate contract"
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    MY_PR_CODEX_PROMPT_MAX_BYTES=100 \
+    FAKE_ARGS="$tmp_dir/oversized-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/oversized-input.md" \
+    /bin/bash "$runner_script" reviewer-c oversized 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/oversized-output.txt" 2>"$tmp_dir/oversized-error.txt"; then
+    fail "oversized prompt unexpectedly succeeded"
   fi
+  assert_file_contains "$tmp_dir/oversized-error.txt" "prompt exceeds byte limit"
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    MY_PR_CODEX_PROMPT_MAX_BYTES=393217 \
+    FAKE_ARGS="$tmp_dir/raised-cap-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/raised-cap-input.md" \
+    /bin/bash "$runner_script" reviewer-c raised-cap 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/raised-cap-output.txt" 2>"$tmp_dir/raised-cap-error.txt"; then
+    fail "raised prompt cap unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/raised-cap-error.txt" "1 through 393216"
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_BAD_RECEIPT=1 \
+    FAKE_ARGS="$tmp_dir/bad-receipt-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/bad-receipt-input.md" \
+    /bin/bash "$runner_script" reviewer-c bad-receipt 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/bad-receipt-output.txt" 2>"$tmp_dir/bad-receipt-error.txt"; then
+    fail "bad receipt unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/bad-receipt-error.txt" "receipt or status is invalid"
+
+  mkdir -p "$artifact_dir/reviewer-results/reviewer-c/stale"
+  cp "$artifact_dir/reviewer-results/reviewer-c/full/result.json" \
+    "$artifact_dir/reviewer-results/reviewer-c/stale/result.json"
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_NO_RESULT=1 \
+    FAKE_ARGS="$tmp_dir/stale-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/stale-input.md" \
+    /bin/bash "$runner_script" reviewer-c stale 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/stale-output.txt" 2>"$tmp_dir/stale-error.txt"; then
+    fail "stale result unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/stale-error.txt" "result is missing or empty"
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_EXIT_CODE=7 \
+    FAKE_ARGS="$tmp_dir/nonzero-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/nonzero-input.md" \
+    /bin/bash "$runner_script" reviewer-c nonzero 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/nonzero-output.txt" 2>"$tmp_dir/nonzero-error.txt"; then
+    fail "non-zero Codex exit unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/nonzero-error.txt" "Codex reviewer failed"
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_STATUS=REVIEW_INCOMPLETE \
+    FAKE_ARGS="$tmp_dir/incomplete-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/incomplete-input.md" \
+    /bin/bash "$runner_script" reviewer-c incomplete 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/incomplete-output.txt" 2>"$tmp_dir/incomplete-error.txt"; then
+    fail "incomplete reviewer status unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/incomplete-error.txt" "receipt or status is invalid"
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_ARGS="$tmp_dir/missing-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/missing-input.md" \
+    /bin/bash "$runner_script" reviewer-c missing 1 "$prompt_file" "$context_file.missing" "$diff_file" \
+    >"$tmp_dir/missing-output.txt" 2>"$tmp_dir/missing-error.txt"; then
+    fail "missing review input unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/missing-error.txt" "review input not found"
+
+  : >"$artifact_dir/empty.md"
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_ARGS="$tmp_dir/empty-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/empty-input.md" \
+    /bin/bash "$runner_script" reviewer-c empty 1 "$prompt_file" "$artifact_dir/empty.md" "$diff_file" \
+    >"$tmp_dir/empty-output.txt" 2>"$tmp_dir/empty-error.txt"; then
+    fail "empty review input unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/empty-error.txt" "not found or empty"
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_IGNORE_TAIL=1 \
+    FAKE_ARGS="$tmp_dir/no-tail-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/no-tail-input.md" \
+    /bin/bash "$runner_script" reviewer-c no-tail 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/no-tail-output.txt" 2>"$tmp_dir/no-tail-error.txt"; then
+    fail "reviewer without end receipt unexpectedly succeeded"
+  fi
+
+  if MY_PR_CODEX_BIN="$fake_codex" \
+    FAKE_SHORT_MARKDOWN=1 \
+    FAKE_ARGS="$tmp_dir/short-markdown-args.txt" \
+    FAKE_CAPTURE="$tmp_dir/short-markdown-input.md" \
+    /bin/bash "$runner_script" reviewer-c short-markdown 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/short-markdown-output.txt" 2>"$tmp_dir/short-markdown-error.txt"; then
+    fail "incomplete review Markdown unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/short-markdown-error.txt" "missing required section"
 }
 
-test_role_specific_dispatch_contract_rejects_regressions() {
-  local missing_review_mode_root="$tmp_dir/skill-without-review-mode"
-  local review_fork_all_root="$tmp_dir/skill-with-review-fork-all"
+test_reviewer_b_validator() {
+  local valid="$tmp_dir/reviewer-b-valid.md"
+  local summary="$tmp_dir/reviewer-b-summary.md"
 
-  cp -R "$skill_root" "$missing_review_mode_root"
-  perl -0pi -e 's/^Mode: review$/Mode: inspect/m' \
-    "$missing_review_mode_root/references/review.md"
-  if (
-    skill_root="$missing_review_mode_root"
-    assert_role_specific_dispatch_contract
-  ) \
-    >"$tmp_dir/missing-review-mode-contract.out" 2>&1; then
-    fail "removing the read-only simplifier Mode: review dispatch unexpectedly passed"
-  fi
+  cat >"$valid" <<'EOF'
+## PR understanding
+- Description: test
 
-  cp -R "$skill_root" "$review_fork_all_root"
-  perl -0pi -e 's/each with `fork_turns: "none"`\. Do not set a model or reasoning-effort override\./each with `fork_turns: "all"`. Do not set a model or reasoning-effort override./' \
-    "$review_fork_all_root/references/review.md"
-  if (
-    skill_root="$review_fork_all_root"
-    assert_role_specific_dispatch_contract
-  ) \
-    >"$tmp_dir/review-fork-all-contract.out" 2>&1; then
-    fail "changing only the Native role launch review fork unexpectedly passed"
+## Strengths
+- none
+
+## Findings
+- none
+
+## Non-findings
+- none
+
+## Assessment
+
+**Ready to merge?** Yes
+
+**Reasoning:** No findings.
+EOF
+  printf '%s\n' 'Reviewer B completed the review and found no blocking issues.' >"$summary"
+
+  /bin/bash "$reviewer_b_validator" "$valid"
+  if /bin/bash "$reviewer_b_validator" "$summary" \
+    >"$tmp_dir/reviewer-b-summary-output.txt" 2>"$tmp_dir/reviewer-b-summary-error.txt"; then
+    fail "Reviewer B summary unexpectedly passed validation"
   fi
+  assert_file_contains "$tmp_dir/reviewer-b-summary-error.txt" "missing required section"
 }
 
-test_native_agent_contract() {
-  local removed_source
+test_reviewer_b_schema() {
+  jq -e '
+    has("$schema") | not
+  ' "$reviewer_b_schema" >/dev/null ||
+    fail "Reviewer B schema must not declare a dialect unsupported by Claude CLI"
 
-  [[ -f "$reviewer_agent" ]] || fail "native reviewer agent is missing: $reviewer_agent"
-  [[ -f "$simplifier_agent" ]] || fail "native simplifier agent is missing: $simplifier_agent"
-  [[ -f "$simplifier_apply_agent" ]] || fail "native simplifier apply agent is missing: $simplifier_apply_agent"
-  assert_file_contains "$reviewer_agent" 'name = "reviewer"'
-  assert_file_contains "$reviewer_agent" 'model = "gpt-5.6-sol"'
-  assert_file_contains "$reviewer_agent" 'model_reasoning_effort = "high"'
-  assert_file_contains "$reviewer_agent" 'sandbox_mode = "read-only"'
-  assert_file_contains "$reviewer_agent" 'Do not delegate, spawn subagents'
-  assert_file_contains "$reviewer_agent" 'Never modify files, create patches, commit, push, deploy, apply configuration, or mutate external systems.'
-  assert_file_line_count "$reviewer_agent" 'STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED' 1
-  assert_file_line_count "$reviewer_agent" 'SUMMARY:' 1
-  assert_file_line_count "$reviewer_agent" 'EVIDENCE:' 1
-  assert_file_line_count "$reviewer_agent" 'CHECKS:' 1
-  assert_file_line_count "$reviewer_agent" 'CONCERNS:' 1
-  assert_file_contains "$simplifier_agent" 'name = "simplifier"'
-  assert_file_contains "$simplifier_agent" 'model = "gpt-5.6-terra"'
-  assert_file_contains "$simplifier_agent" 'model_reasoning_effort = "medium"'
-  assert_file_contains "$simplifier_agent" 'sandbox_mode = "read-only"'
-  assert_file_not_contains "$simplifier_agent" 'sandbox_mode = "workspace-write"'
-  assert_file_contains "$simplifier_agent" 'Do not delegate, spawn subagents'
-  assert_file_contains "$simplifier_agent" 'The prompt must state `Mode: review`.'
-  assert_file_contains "$simplifier_agent" 'Never modify files, create patches, commit, push, deploy, apply configuration, or mutate external systems.'
-  assert_file_contains "$simplifier_agent" 'inspect repository state beyond the exact supplied artifact and reference paths'
-  assert_file_line_count "$simplifier_agent" 'STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED' 1
-  assert_file_line_count "$simplifier_agent" 'SUMMARY:' 1
-  assert_file_line_count "$simplifier_agent" 'EVIDENCE:' 1
-  assert_file_line_count "$simplifier_agent" 'CHANGES:' 0
-  assert_file_line_count "$simplifier_agent" 'CHECKS:' 1
-  assert_file_line_count "$simplifier_agent" 'CONCERNS:' 1
-
-  assert_file_contains "$simplifier_apply_agent" 'name = "simplifier_apply"'
-  assert_file_contains "$simplifier_apply_agent" 'model = "gpt-5.6-terra"'
-  assert_file_contains "$simplifier_apply_agent" 'model_reasoning_effort = "medium"'
-  assert_file_contains "$simplifier_apply_agent" 'sandbox_mode = "workspace-write"'
-  assert_file_contains "$simplifier_apply_agent" 'Do not delegate, spawn subagents'
-  assert_file_contains "$simplifier_apply_agent" 'The prompt must state `Mode: apply` and provide explicit `Authorized write targets` and `Allowed read-only inputs`.'
-  assert_file_contains "$simplifier_apply_agent" 'verify that `Authorized write targets` and `Allowed read-only inputs` are explicit and disjoint.'
-  assert_file_contains "$simplifier_apply_agent" 'You may read both sets, but may edit only authorized write targets and allowed areas.'
-  assert_file_contains "$simplifier_apply_agent" 'Never edit an allowed read-only input.'
-  assert_file_contains "$simplifier_apply_agent" 'If a path appears in both sets, return BLOCKED and name the overlap.'
-  assert_file_contains "$simplifier_apply_agent" 'Identify Required behavior-preserving simplifications within the authorized write targets and apply only those changes.'
-  assert_file_contains "$simplifier_apply_agent" 'Do not commit, push, deploy, apply configuration, or mutate external systems.'
-  assert_file_line_count "$simplifier_apply_agent" 'STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED' 1
-  assert_file_line_count "$simplifier_apply_agent" 'SUMMARY:' 1
-  assert_file_line_count "$simplifier_apply_agent" 'EVIDENCE:' 0
-  assert_file_line_count "$simplifier_apply_agent" 'CHANGES:' 1
-  assert_file_line_count "$simplifier_apply_agent" 'CHECKS:' 1
-  assert_file_line_count "$simplifier_apply_agent" 'CONCERNS:' 1
-
-  assert_file_contains "$skill_root/SKILL.md" '全 role・全 chunk の完了まで統合しない'
-  assert_file_contains "$skill_root/SKILL.md" 'Review-only Safety gate'
-  assert_file_contains "$skill_root/SKILL.md" 'worktree の移動・cleanup、reset、checkout、rm、stage / git add -N、commit、push、PR の変更を実行しない。'
-  assert_file_contains "$skill_root/SKILL.md" '`review` で `untracked` または `large+untracked` なら、stage / git add -N や対象外化のための状態変更をせず停止して報告する。'
-  assert_file_contains "$skill_root/references/commands.md" '`review` uses the Review-only Safety gate.'
-  assert_file_contains "$skill_root/references/commands.md" 'must not invoke worktree transfer/cleanup, reset, checkout, rm, stage / git add -N, commit, push, PR mutation, or ref fetch.'
-  assert_file_contains "$skill_root/references/commands.md" 'For default, `create`, `fix`, and `simplify`, the normal protected-branch worktree flow remains mandatory'
-  assert_file_contains "$skill_root/references/branching.md" '## Review-only Safety gate'
-  assert_file_contains "$skill_root/references/branching.md" 'do not transfer changes to a worktree or clean up the original worktree.'
-  assert_file_contains "$skill_root/references/branching.md" 'Do not run reset, checkout, rm, stage / git add -N, commit, push, PR mutation, or ref fetch.'
-  assert_file_contains "$skill_root/references/branching.md" 'Do not stage them, use `git add -N`, alter ignore or exclude metadata, or remove files to continue review.'
-  assert_file_not_contains "$prepare_script" 'info/exclude'
-  assert_file_contains "$skill_root/references/review.md" 'launch `reviewer` and `simplifier` concurrently'
-  assert_file_contains "$skill_root/references/review.md" 'Do not integrate until all role results for all chunks have arrived.'
-  assert_file_contains "$skill_root/references/review.md" 'stop without partial integration and return `REVIEW_INCOMPLETE`'
-  assert_review_scope_gate_contract
-  assert_file_contains "$skill_root/references/review.md" 'the `reviewer` may use read-only tools or bounded shell commands to inspect relevant unchanged callers'
-  assert_file_contains "$skill_root/references/review.md" 'Mode: `review`, for the `simplifier` role only.'
-  assert_file_contains "$skill_root/references/review.md" 'Mode: review'
-  assert_file_contains "$skill_root/references/review.md" 'select matching rules from `Files covered`, or changed targets for a full diff'
-  assert_file_contains "$skill_root/references/review.md" 'Provide the selected absolute paths in the documented order: TypeScript / JavaScript, Python, then Shell / Bash / Zsh.'
-  assert_file_contains "$skill_root/references/review.md" 'none (no matching language-specific reference)'
-  assert_file_contains "$skill_root/references/review.md" 'the `simplifier` may read only the exact supplied simplifier overview, PR-context, diff or chunk, and language-reference paths.'
-  assert_file_contains "$skill_root/references/review.md" 'overview, PR context, diff or chunk, then each supplied language reference in the documented order.'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'apply only Required, behavior-preserving simplifications'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'The main workflow owns final diff review, project verification, and any commit.'
-  assert_role_specific_dispatch_contract
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'On Claude Code, use native Agents for review and apply'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'The absolute `references/simplify/overview.md` path.'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'Select language-specific rules from `Files covered`, or from changed targets for a full diff'
-  assert_file_contains "$skill_root/references/simplify/overview.md" '`references/simplify/shell.md`'
-  assert_file_contains "$skill_root/references/simplify/overview.md" '`Authorized write targets`: only requested product files and allowed areas that the subagent may edit.'
-  assert_file_contains "$skill_root/references/simplify/overview.md" '`Allowed read-only inputs`: the common overview, task context, and applicable language rules'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'Rules can be read without becoming writable.'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'If either set is missing or ambiguous, return `NEEDS_CONTEXT`. If the sets overlap, or the request requires editing an allowed read-only input, return `BLOCKED`.'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'Authorized write targets: <apply mode: explicit product paths and allowed areas; review mode: none>'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'Allowed read-only inputs: <absolute common overview, task context, applicable language-rule paths, and review artifacts; none only when no input exists>'
-  assert_file_contains "$skill_root/references/simplify/overview.md" '<MATCHING_ABSOLUTE_LANGUAGE_REFERENCES_IN_DOCUMENTED_ORDER_OR_NONE>'
-  assert_file_contains "$skill_root/references/simplify/overview.md" 'Read the supplied `references/simplify/overview.md` path, then the PR context, then the diff or chunk, then each supplied language-reference path in the documented order.'
-
-  for removed_source in \
-    "$skill_root/scripts/executable_run-codex-review.sh" \
-    "$skill_root/scripts/executable_run-codex-reviews.sh" \
-    "$skill_root/scripts/executable_validate-reviewer-b-output.sh" \
-    "$skill_root/assets/codex-review-result.schema.json" \
-    "$skill_root/assets/claude-review-result.schema.json"; do
-    [[ ! -e "$removed_source" ]] || fail "removed my-pr source still exists: $removed_source"
-  done
-
-  assert_skill_tree_not_matching 'claude[[:space:]]+(-p|--[[:alnum:]-]+)' "a Claude CLI command"
-  assert_skill_tree_not_matching 'codex[[:space:]]+exec' "a Codex executor command"
-  assert_skill_tree_not_matching 'run-codex-review' "a removed Codex runner"
-  assert_skill_tree_not_matching 'codex-review-result\.schema\.json' "a removed Codex schema"
-  assert_skill_tree_not_matching 'claude-review-result\.schema\.json' "a removed Claude schema"
-  assert_skill_tree_not_matching 'Reviewer[[:space:]]+[ABC]' "a legacy Reviewer A/B/C reference"
+  jq -e '
+    .type == "object" and
+    .additionalProperties == false and
+    .required == ["review_markdown"] and
+    .properties.review_markdown.type == "string"
+  ' "$reviewer_b_schema" >/dev/null ||
+    fail "Reviewer B schema does not require review_markdown"
 }
 
 test_documented_state_contract() {
@@ -556,9 +564,8 @@ test_documented_state_contract() {
 }
 
 test_chunking
-test_review_artifact_preparation_is_non_mutating
-test_native_agent_contract
-test_role_specific_dispatch_contract_rejects_regressions
-test_review_scope_gate_contract_rejects_regressions
+test_runner
+test_reviewer_b_validator
+test_reviewer_b_schema
 test_documented_state_contract
 echo "PASS: my-pr review input tests"

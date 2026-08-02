@@ -4,61 +4,57 @@ Use this reference from `my-pr` when running the `simplify` subcommand, `create`
 
 ## Executor
 
-Use one host-native simplifier role per mode and one self-contained dispatch prompt.
+Default apply-mode executor is Codex CLI with the simplify performance profile. Do not override the model; only lower reasoning effort for simplify:
 
-- Review mode uses the read-only `simplifier` role. On Codex, the default, `review`, and `fix` quality stage launches `reviewer` and `simplifier` with `fork_turns: "none"`. Do not override `model` or `reasoning_effort` at spawn time.
-- Apply mode uses `simplifier_apply`. On Codex, `create` and `simplify` launch `agent_type: "simplifier_apply"` with `fork_turns: "none"`. Do not override `model` or `reasoning_effort` at spawn time; the role configuration supplies `gpt-5.6-terra` at `medium` effort.
-- On Claude Code, use native Agents for review and apply with the same self-contained dispatch prompt. Do not start an external process for simplify.
-- If a native role is unavailable or its execution fails, report the failure and stop. Do not substitute another executor or continue with partial simplify evidence.
+```bash
+codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
+```
 
-The dispatch must include the mode, explicit write scope, allowed read-only inputs, applicable language rules, acceptance criteria, and the output contract below. The role must not delegate.
+Use the global Codex default effort only when the user explicitly asks for a full-effort simplify run. Use Claude/local execution only when the user explicitly asks for it.
+
+For `my-pr` review mode, do not invoke Codex directly. Use the exact artifact paths persisted in the current run's explicit `artifact.env`; do not depend on inherited `MY_PR_*` variables. Write this reference's review prompt under that artifact directory and pass it to `scripts/run-codex-reviews.sh` as the Reviewer A prompt; the runner embeds context and diff through stdin, applies medium effort, disables nested delegation, and verifies complete-input receipts.
+
+Do not silently switch from Codex to Claude if Codex fails or rejects the config override. Report the failure and stop.
 
 ## Modes
 
 | Mode | Behavior |
 |---|---|
-| `review` | Use the read-only `simplifier` role for analysis of the supplied PR context and full diff or assigned diff chunk. Use read-only tools or bounded shell commands only to read those exact artifact and reference paths. Do not inspect other repository state, write files, or run checks. |
-| `apply` | Use `simplifier_apply` to inspect and edit only the explicitly authorized write targets. Identify and apply only Required, behavior-preserving simplifications. Do not apply Recommended items. |
+| `review` | Analyze current PR changes and report findings only. Do not edit or write files. |
+| `apply` | Apply only Required behavior-preserving simplifications, then verify. |
 
 ## Performance profile
 
-- The native role configuration controls the model and effort. Do not override either in a dispatch.
-- For every full-diff run or chunk, return at most 5 Required and 5 Recommended findings.
-- Prioritize high-confidence, behavior-preserving changes with clear maintenance value.
-- Apply the line and byte chunking conditions in `references/review.md`. Dispatch each file-boundary chunk with its PR context and assigned diff.
-- Avoid repository exploration. In `apply` mode, examine only the dispatch's explicit targets and supplied context.
+- Use `model_reasoning_effort="medium"` for simplify runs.
+- Keep the configured Codex model. Do not pass `--model` unless the user explicitly requests one.
+- For each run or chunk, report at most 5 Required and at most 5 Recommended findings.
+- Prioritize high-confidence, behavior-preserving simplifications with clear maintenance value.
+- For diffs that meet the line or byte chunking conditions in `references/review.md`, run simplify per file-boundary chunk. Otherwise prefer one full-diff simplify run.
+- Avoid broad repository exploration. Read nearby docs, ADRs, specs, or tests only when design intent is unclear.
 
-## Scope and inputs
+## Scope
 
-The orchestrator determines the scope before dispatching. A native subagent must not infer scope from all repository changes or touch unrelated staged, unstaged, or untracked files.
+Target only files changed in the current conversation or current PR diff. Do not touch unrelated staged, unstaged, or untracked files.
 
-### Review mode
+When invoked from `my-pr`, use the repo-local `MY_PR_REVIEW_DIFF` artifact from `prepare-review-artifacts.sh`. Do not use `/tmp` diff files. In review mode, the runner embeds that artifact directly; do not ask Codex to read it with tools. If the artifact cannot be embedded and receipt-validated, stop instead of reviewing current file state as a substitute.
 
-Give the read-only `simplifier` role, in this exact order:
+When invoked from `my-pr` in review mode, read the PR context embedded by the runner before the diff. In apply mode, read `MY_PR_CONTEXT` when provided. Use the context to understand the PR's stated problem, intended behavior, explicit constraints, and resolved discussion. Do not propose simplifications that conflict with that intent.
 
-1. The absolute `references/simplify/overview.md` path.
-2. The PR context artifact, or an explicit statement that no context exists.
-3. The complete review diff artifact or the assigned chunk artifact.
-4. The matching language-specific rules from this reference, supplied as absolute paths in the documented order.
+In apply mode, before analysis, inspect:
 
-Select language-specific rules from `Files covered`, or from changed targets for a full diff, using the mapping below. If no target matches, state `none (no matching language-specific reference)` explicitly. Do not use a current worktree file as a substitute for a supplied artifact or reference.
+```bash
+git status --short
+git diff --stat
+git diff --name-only
+git diff --cached --stat
+git diff --cached --name-only
+```
 
-Use no other repository data. If a required context, diff, or chunk cannot be supplied completely, stop the workflow and report incomplete review evidence; do not inspect the checkout as a substitute.
-
-### Apply mode
-
-Give the subagent two explicit, disjoint path sets:
-
-- `Authorized write targets`: only requested product files and allowed areas that the subagent may edit.
-- `Allowed read-only inputs`: the common overview, task context, and applicable language rules, plus any other supplied evidence the subagent may read but must never edit.
-
-The subagent may read both sets. Rules can be read without becoming writable. It may inspect and edit only authorized write targets to decide which Required simplifications exist. It must not change files merely because they appear in the broader PR diff. If either set is missing or ambiguous, return `NEEDS_CONTEXT`. If the sets overlap, or the request requires editing an allowed read-only input, return `BLOCKED`.
-
-The main workflow owns final diff review, project verification, and any commit. The subagent must not commit, push, deploy, apply configuration, or mutate external systems.
+In apply mode, if design intent is unclear, read the nearest README, AGENTS.md, CLAUDE.md, ADR, spec, and tests before proposing or applying a simplification. In review mode, use only the embedded PR context and diff; report missing intent instead of calling tools.
 
 ## Language-specific references
 
-Supply only the references that match the explicit targets or diff chunk. For review mode, select them from `Files covered`, or from changed targets for a full diff. Pass their absolute paths in this documented order: TypeScript / JavaScript, Python, then Shell / Bash / Zsh.
+Read only the references that match changed files.
 
 | Target | Reference |
 |---|---|
@@ -66,11 +62,14 @@ Supply only the references that match the explicit targets or diff chunk. For re
 | Python | `references/simplify/python.md` |
 | Shell / Bash / Zsh | `references/simplify/shell.md` |
 
-If no language-specific reference exists, state `none (no matching language-specific reference)` in the dispatch and use this file's common rules only.
+If no language-specific reference exists, use this file's common rules only.
+
 
 ## Classification
 
-Place each candidate in exactly one category. Keep at most 5 Required and 5 Recommended candidates per run or chunk. If more candidates exist, keep the safest, highest-value items and omit style-only or preference-only items.
+Each finding must be placed in exactly one category.
+
+Each run or chunk must return at most 5 Required and at most 5 Recommended findings. If more candidates exist, keep the safest and highest-value findings and omit style or preference-only items.
 
 ### Required
 
@@ -78,7 +77,7 @@ Safe, behavior-preserving changes with clear maintenance value.
 
 - duplicated logic that can reuse an existing helper
 - unnecessary wrappers, adapters, arguments, state, or configuration
-- unreachable code, unused imports, unused variables, or dead branches
+- unreachable code, unused imports, unused variables, dead branches
 - excessive nesting or hard-to-read boolean expressions
 - naming that obscures contracts or responsibilities
 - comments that duplicate or contradict implementation
@@ -105,54 +104,52 @@ Do not apply.
 
 ## Apply rules
 
-The subagent identifies Required candidates within its authorized files, then applies only candidates that satisfy every condition:
+Apply only Required findings that satisfy all conditions:
 
 1. External behavior is unchanged.
-2. Public contracts, schemas, CLI/config contracts, persistence formats, and error semantics are unchanged.
-3. Dependencies and module boundaries are unchanged.
-4. No fallback, default substitution, broad catch, mock/stub continuation, or silent retry is added.
-5. Any new helper or abstraction removes duplication or clarifies responsibility.
-6. The before/after change is easy to explain.
+2. Public contracts are unchanged.
+3. No fallback, default substitution, broad catch, mock/stub continuation, or silent retry is added.
+4. Any new helper or abstraction removes duplication or clarifies responsibility.
+5. The before/after diff is easy to explain.
 
-Do not make a prohibited change. Mark it Recommended or return `BLOCKED` when the requested result requires a decision outside this scope.
+Stop and request approval before changing APIs, schemas, CLI/config contracts, persistence formats, error semantics, module boundaries, dependencies, or large file structure.
 
-## Dispatch prompt
+## Codex prompt template
 
-Use this prompt unchanged apart from the bracketed inputs. Do not add an output format that replaces the role's status contract.
+Use this prompt with the simplify performance profile:
+
+```bash
+codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
+```
 
 ```text
-Run the integrated my-pr simplify workflow.
+Run the integrated my-pr simplify workflow in <review|apply> mode for the current repository changes.
 
-Mode: <review|apply>
-Authorized write targets: <apply mode: explicit product paths and allowed areas; review mode: none>
-Allowed read-only inputs: <absolute common overview, task context, applicable language-rule paths, and review artifacts; none only when no input exists>
-Task and PR context:
-<PR_CONTEXT_OR_NO_CONTEXT>
-
-Review input (review mode only; source of truth):
-<FULL_DIFF_ARTIFACT_OR_ASSIGNED_CHUNK_ARTIFACT>
-
-Applicable language rules:
-<MATCHING_ABSOLUTE_LANGUAGE_REFERENCES_IN_DOCUMENTED_ORDER_OR_NONE>
-
-Acceptance criteria:
-- Preserve behavior. Do not change public contracts, schemas, CLI/config contracts, persistence formats, error semantics, dependencies, or module boundaries.
+Follow these constraints:
+- Preserve behavior. Do not change public APIs, schemas, CLI/config contracts, persistence formats, or error semantics without approval.
+- Target only the current conversation changes or current PR diff. Do not touch unrelated files.
+- Classify every finding as Required, Recommended, or Not needed. Put each finding in exactly one category.
+- Return at most 5 Required and at most 5 Recommended findings per run or chunk. Prioritize high-confidence, behavior-preserving simplifications.
+- For each Required and Recommended finding, include Severity (`critical`, `high`, `medium`, or `low`) and Confidence (`high`, `medium`, or `low`), then use 3-5 concise lines that state the problem, why it matters or needs approval, the ideal state, and the concrete change direction.
+- In review mode, do not edit or write files anywhere, including .plans, .tmp, or /tmp.
+- In review mode, do not call tools, read repository files, delegate, or spawn subagents. Use only the context and diff embedded by the runner.
+- In apply mode, apply only Required behavior-preserving simplifications. Do not apply Recommended changes.
 - Do not add fallbacks, default substitutions, broad catches, silent retries, mocks, or stub continuations.
-- Do not delegate, commit, push, deploy, apply configuration, or mutate external systems.
-- In review mode, remain read-only. Read the supplied `references/simplify/overview.md` path, then the PR context, then the diff or chunk, then each supplied language-reference path in the documented order. Use read-only tools or bounded shell commands only for those exact paths. Do not inspect other repository files or run verification commands.
-- In apply mode, treat Authorized write targets and Allowed read-only inputs as explicit, disjoint sets. Read-only inputs, including the common overview, task context, and language rules, may be read without becoming writable. Edit only Authorized write targets. If either set is missing or ambiguous, return NEEDS_CONTEXT. If the sets overlap, or an edit is requested for a read-only input, return BLOCKED. Identify Required candidates yourself, apply only Required behavior-preserving changes, and do not apply Recommended candidates.
-- Return at most 5 Required and 5 Recommended findings per full-diff run or chunk.
-- Classify each candidate exactly once as Required, Recommended, or Not needed.
-- The main workflow will review the diff and run verification. Do not run repository verification commands; state this in CHECKS.
-
-Use the role's exact status envelope. Include the requested details inside EVIDENCE or CHANGES; do not replace STATUS, SUMMARY, CHECKS, or CONCERNS.
+- Respect AGENTS.md, CLAUDE.md, ADRs, specs, nearby tests, and project conventions.
+- In apply mode, run targeted verification from documented project commands. If no documented command exists, report it as unverified instead of inventing one.
+- In review mode, do not run verification commands; report a verification plan or unverified item instead.
+- Report changed files, skipped recommendations, and verification results.
+- If MY_PR_REVIEW_DIFF is provided and unreadable, return REVIEW_INCOMPLETE and stop.
+- In review mode, read the embedded PR context before the embedded diff. In apply mode, read MY_PR_CONTEXT when provided. Preserve the PR's stated intent and discussion constraints.
 ```
 
 ## Verification
 
-After an apply dispatch completes, the main workflow reviews the produced diff and runs the closest documented verification command. Prefer project docs, package manager scripts, `AGENTS.md`, or CI workflow commands.
+After applying changes, run the closest documented verification command. Prefer project docs, package manager scripts, AGENTS.md, or CI workflow commands.
 
-If no documented command exists, report the item as unverified. Always run:
+If no documented command exists, do not invent one. Report it as unverified.
+
+Always run:
 
 ```bash
 git diff --check
@@ -161,15 +158,11 @@ git diff --stat
 
 ## Output
 
-The role must always use its exact five-section status envelope. `EVIDENCE` is used in review mode and `CHANGES` in apply mode. Detailed headings below are nested content, not substitute top-level sections.
-
 ### Review mode
 
 ```markdown
-STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
-SUMMARY:
-- concise review result
-EVIDENCE:
+# Simplify Review
+
 ## Required
 1. **file:line** — short title
    - Severity: critical | high | medium | low
@@ -191,26 +184,20 @@ EVIDENCE:
 
 ## Not needed
 - finding and reason
-CHECKS:
-- not run: review mode is read-only; main workflow owns verification
-CONCERNS:
-- remaining risk or none
 ```
 
 ### Apply mode
 
 ```markdown
-STATUS: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
-SUMMARY:
-- concise apply result
-CHANGES:
+# Simplify Result
+
 ## Applied
-- **file:line** — Required change and behavior-preservation evidence
+- **file:line** — change and reason
 
 ## Not applied
-- **file:line** — Recommended or out-of-scope item and reason
-CHECKS:
-- not run: main workflow owns diff review and verification
-CONCERNS:
-- remaining risk or none
+- **file:line** — reason
+
+## Verification
+- command and result
+- unverified items
 ```

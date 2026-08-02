@@ -20,6 +20,16 @@ timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 artifact_dir="$artifact_parent/$timestamp-$$"
 mkdir -p "$artifact_dir"
 
+# Keep review artifacts out of commits without changing the working tree.
+exclude_file=$(git rev-parse --git-path info/exclude)
+if [[ -f "$exclude_file" ]] && ! grep -qxF ".tmp/my-pr/" "$exclude_file"; then
+  {
+    printf '\n'
+    printf '# my-pr review artifacts\n'
+    printf '.tmp/my-pr/\n'
+  } >>"$exclude_file"
+fi
+
 git status --short >"$artifact_dir/status.txt"
 
 git diff --stat "$diff_range" >"$artifact_dir/branch.diffstat"

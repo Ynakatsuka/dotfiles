@@ -12,11 +12,7 @@ mcp.json
 .claude/rules/writing.md
 .claude/skills/my-guided-tour
 .claude/skills/my-sdd
-.claude/skills/my-pr/scripts/run-codex-review.sh
-.claude/skills/my-pr/scripts/run-codex-reviews.sh
-.claude/skills/my-pr/scripts/validate-reviewer-b-output.sh
-.claude/skills/my-pr/assets/codex-review-result.schema.json
-.claude/skills/my-pr/assets/claude-review-result.schema.json
+.codex/agents/simplifier_apply.toml
 .codex/skills/my-subagent
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy

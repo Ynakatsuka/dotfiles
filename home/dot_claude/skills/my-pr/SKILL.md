@@ -4,7 +4,9 @@ description: >-
   Unified pull request workflow: prepare a safe branch, run read-only review,
   fix Required findings, create/update a GitHub draft PR, and verify CI plus
   automated review comments.
-  Subcommands: `create`, `review`, `fix`, `simplify`, and `verify`.
+  Subcommands: `create` (simplify + PR, skip code review), `review`
+  (read-only findings only), `fix` (Required fixes + commit, no push),
+  `simplify` (simplification only), `verify` (existing PR checks/reviews only).
   Use when creating or reviewing PRs, self-reviewing changes, simplifying PR
   changes, or requesting "PR作成", "レビュー", "簡素化". Do NOT use for responding
   to review comments or a lightweight review of the current working diff
@@ -22,16 +24,16 @@ PR 作成を安全に進めるため、ブランチ準備、簡素化、レビ�
 git status --short --branch
 ```
 
-このスナップショットは初期判断にのみ使う。以後は規定のコマンド・スクリプトで取得する最新状態を正とする。
+このスナップショットはモード判定と Safety gate の初期判断にのみ使う。以後の各ステップでは、規定のコマンド・スクリプトで取得する最新状態を正とする。
 
 ## 0. モード判定
 
-$ARGUMENTS の先頭を確認し、references/commands.md を読んで実行パスを決める。
+`$ARGUMENTS` の先頭を確認し、`references/commands.md` を読んで実行パスを決める。
 
 | 引数 | 動作 |
 |---|---|
 | 空（デフォルト） | full PR workflow |
-| `create` | simplify + PR, skip local correctness review |
+| `create` | simplify + PR, skip local code review |
 | `review` | read-only quality review and finding integration |
 | `fix` | Required fixes + verification + commit, no push |
 | `simplify` | simplification-only apply, no PR/push |
@@ -39,48 +41,46 @@ $ARGUMENTS の先頭を確認し、references/commands.md を読んで実行パ�
 
 不明な引数の場合は停止してユーザーに確認する。
 
-bundled scripts は chezmoi により $HOME/.claude/skills/my-pr/ へ配置される。最初のスクリプト実行前に配置を検証する。
+bundled scripts は chezmoi により `$HOME/.claude/skills/my-pr/` へ配置される。最初のスクリプト実行前に配置を検証する。
 
 ```bash
 test -f "$HOME/.claude/skills/my-pr/SKILL.md"
 test -x "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh"
-test -x "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh"
 ```
+
+以後、bundled scripts は各 shell call から `$HOME/.claude/skills/my-pr/scripts/...` で直接参照する。前の shell call で設定した変数が残ると仮定しない。
+
+---
 
 ## 1. Safety gate
 
-`review` では references/branching.md の Review-only Safety gate を使う。protected branch 上でもその場でレビューし、worktree の移動・cleanup、reset、checkout、rm、stage / git add -N、commit、push、PR の変更を実行しない。main が作る .tmp/my-pr/ artifact だけが許可されるローカル書き込みである。
+`verify` 以外では、`references/branching.md` を読み、変更対象の分離、protected branch / worktree 処理、worktree 移動後の元ブランチ cleanup、upstream safety を確認する。
 
-デフォルト、`create`、`fix`、`simplify` では references/branching.md の通常の protected branch / worktree 処理、worktree 移動後の元ブランチ cleanup、upstream safety を確認する。対象変更と作業ブランチを確定し、protected branch に対象差分が残っていないことを確認するまで、simplify、fix、PR作成へ進まない。
+ここで対象変更と作業ブランチを確定し、protected branch に対象差分が残っていないことを確認するまで、simplify、review、fix、PR作成へ進まない。
+
+---
 
 ## 2. Base and PR state
 
-`review` では既存の remote-tracking base ref だけを使う。base branch の取得に失敗した場合は推測で main にしない。fetch して ref を更新しない。既存の base ref を検証できない場合は停止する。
+`verify` 以外では base branch と既存 PR を確認する。base branch の取得に失敗した場合は推測で `main` にしない。
+
+base 取得では、ローカル `main` / `master` などの protected branch ref を直接進めない。`git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` は禁止する。別 worktree の checked-out branch ref だけが進み、worktree/index に古い内容が逆差分として残ることがある。
 
 ```bash
 BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
 BASE_REF="origin/$BASE_BRANCH"
+git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
 git rev-parse --verify "$BASE_REF^{commit}" >/dev/null
 git diff "$BASE_REF"...HEAD --stat
 git log "$BASE_REF"..HEAD --oneline
 bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF"
 ```
 
-デフォルト、`create`、`fix`、`simplify` では base branch と既存 PR を確認する。base branch の取得に失敗した場合は推測で main にしない。
+PR scope を確認する。未コミット差分だけでなく、base branch との差分量を必ず報告する。
 
-```bash
-BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
-BASE_REF="origin/$BASE_BRANCH"
-git fetch origin "+refs/heads/$BASE_BRANCH:refs/remotes/origin/$BASE_BRANCH"
-git rev-parse --verify "$BASE_REF^{commit}" >/dev/null
-git diff "$BASE_REF"...HEAD --stat
-git log "$BASE_REF"..HEAD --oneline
-bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF"
-```
+最後に出力された絶対パスを、この run の artifact state file として保持する。以後の例にある `/absolute/path/to/artifact.env` は必ずその実パスへ置き換える。`latest-env.sh` の推測や、前の shell call の環境変数へ依存しない。
 
-ローカル protected branch ref を直接進める `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` は禁止する。
-
-最後に出力された絶対パスを、この run の artifact state file として保持する。/absolute/path/to/artifact.env は必ずその実パスへ置き換える。latest-env.sh の推測や、前の shell call の環境変数へ依存しない。
+既存 PR の有無を確認する。
 
 ```bash
 bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "/absolute/path/to/artifact.env"
@@ -89,57 +89,105 @@ cat "$MY_PR_SCOPE_SUMMARY"
 cat "$MY_PR_CONTEXT"
 ```
 
-MY_PR_SCOPE_GATE が `ok` 以外の場合は停止する。`large` はユーザーがそのブランチ全体を PR 対象として明示済みの場合だけ続行できる。`review` で `untracked` または `large+untracked` なら、stage / git add -N や対象外化のための状態変更をせず停止して報告する。デフォルト、`create`、`fix`、`simplify` では、`untracked` の対象ファイルを明示して stage / git add -N するか、対象外と確認して artifact を作り直す。
+`MY_PR_SCOPE_GATE` が `ok` 以外の場合は停止する。`large` はユーザーがそのブランチ全体を PR 対象として明示済みの場合だけ続行できる。`untracked` は対象ファイルを明示して stage / `git add -N` するか、対象外と確認してから artifact を作り直す。
 
-MY_PR_CONTEXT_STATE=found の場合は、PR 本文、top-level comments、reviews、inline review comments を review 入力として扱う。no_existing_pr の場合は、PR 本文と過去のやり取りが存在しないことを明示し、推測で補わない。
+`MY_PR_CONTEXT_STATE=found` の場合は、PR 本文、top-level comments、reviews、inline review comments を review 入力として扱う。`no_existing_pr` の場合は、PR 本文と過去のやり取りが存在しないことを明示し、推測で補わない。
+
+---
 
 ## 3. Quality workflow
 
-### `create` / `simplify`
+### 3-1. `create` / `simplify`
 
-references/simplify/overview.md を読み、native simplifier_apply に apply mode を委譲する。
+コードレビューをスキップするモードでは、`references/simplify/overview.md` を読み、integrated simplify を `apply` mode で実行する。特に指定がない場合は Codex CLI の simplify profile（`model_reasoning_effort="medium"`）で行う。
 
 - `create`: local correctness review なしで simplify apply → 修正があれば commit → PR 作成/更新へ進む。
-- `simplify`: simplify apply → main による差分確認・検証・必要な commit を行い、PR作成・push せず終了する。
+- `simplify`: 簡素化専用。simplify apply → 修正・検証・必要な commit まで行い、PR作成・push せず終了する。
 
-Codex host では agent_type: simplifier_apply と fork_turns: "none" を使う。model と reasoning_effort は指定しない。Claude Code host では native Agent に同じ自己完結 prompt を渡す。native subagent を起動できない場合は停止し、別の実行器へ切り替えない。simplifier_apply は commit、push、PR 操作をしない。main が差分確認、検証、commit を担当する。
+### 3-2. デフォルト / `review` / `fix`: read-only quality review
 
-### デフォルト / `review` / `fix`
+`references/review.md` を読み、そこに定義された Reviewer A/B/C と統合ルールに従う。
 
-references/review.md を読み、native reviewer と native simplifier を同時に起動して全結果を統合する。最初に simplify apply を実行しない。
+最初に simplify apply を実行しない。先に apply すると、Claude/Codex が古い diff をレビューするため。
 
-main は prepare-review-artifacts.sh と prepare-pr-context.sh を実行し、repo-local artifact をレビュー範囲と変更内容の正とする。`reviewer` は下流影響を確認するため、関連する呼び出し元・契約・テストをread-onlyで追加調査できる。`simplifier` はartifactだけを使う。/tmp の diff や現在のファイル状態レビューへ暗黙に切り替えない。
+`prepare-review-artifacts.sh` が作成した repo-local artifact を使う。`/tmp` の diff や「現在のファイル状態」レビューへ暗黙に切り替えない。
 
-Codex host では agent_type: reviewer と agent_type: simplifier、fork_turns: "none" を使う。model と reasoning_effort は指定しない。Claude Code host では同じ自己完結 prompt を native Agent に渡す。native subagent を起動できない場合は REVIEW_INCOMPLETE で停止する。別の実行器へ切り替えない。
+以下 3 つを同時に起動し、起動した reviewer が完了するまで統合しない。
 
-小さい diff では2役を各1本、10,000行超または196,608 bytes超では split-review-chunks.sh で chunk 化し、各 chunk に2役を割り当てる。可能な限り並列に起動し、全 role・全 chunk の完了まで統合しない。失敗、欠損、入力不読は REVIEW_INCOMPLETE として停止する。単一ファイル上限による skip は COMPLETE_WITH_SKIPS とする。
+- Reviewer A: integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
+- Reviewer B: Claude correctness review (Claude Code Agent when available; Claude CLI otherwise)
+- Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-terra` / `xhigh` 固定）
 
-references/review.md の統合規則と出力形式に従う。2役の結果を重複排除し、各指摘を Required / Recommended / Not needed のどれか1つに分類する。Signal は reviewer、simplify、multiple だけを使う。
+起動順は、まず Reviewer B（Agent は背景実行なので即座に返る）、続けて `scripts/run-codex-reviews.sh` を chunk ごとに呼ぶ。このラッパーが A と C を同時に起動して両方を待つため、A/C の並列は保証される。chunk が複数ある場合も呼び出しは1つの応答にまとめ、1本の結果を待ってから次を呼ばない。
+
+`run-codex-reviews.sh` の呼び出しには `timeout` を `600000` で明示する。既定の 120 秒では Reviewer C の `xhigh` が正常動作中に強制終了され、`REVIEW_INCOMPLETE` になる。
+
+Reviewer A/C の失敗、quota、permission、diff access 不可、timeout は review incomplete として停止する。Reviewer B の実行・入力エラーも同様に停止する。Reviewer B が読み取りを完了したが所定の本文構造を返さない場合だけ、同じ session で形式修正を1回要求する。再度不正なら Reviewer B 全体を skip し、A/C の結果を `COMPLETE_WITH_SKIPS` として統合する。
+
+### 3-3. 統合
+
+`references/review.md` の Integration rules と Integration output に従う。3つの結果を重複排除し、各指摘を Required / Recommended / Not needed のどれか1つに分類する。
+
+background 実行した reviewer が残っている間は最終回答しない。やむを得ず待機に入る場合は、再開に必要な artifact path、reviewer output path、次の手順を保存し、CCV の background monitor が利用可能なら監視登録する。
 
 `review` は read-only なのでここで終了する。ファイル編集、検証、commit、push、PR作成をしない。
 
-デフォルト / `fix` では Required だけ修正する。Recommended は修正しない。振る舞い変更、API/schema/CLI/config 変更は修正せず停止して報告する。修正後は関連検証を実行し、修正を commit する。`fix` は push、PR作成、verify を行わずここで終了する。
+### 3-4. Required fix
+
+デフォルト / `fix` では、🔴 Required だけ修正する。🟡 Recommended は修正しない。
+
+| 変更の性質 | 対応 |
+|---|---|
+| タイポ、未使用 import、dead code、重複削除 | 修正する |
+| 振る舞いが変わらない簡素化 | 修正する |
+| バグ・セキュリティ修正 | root cause を確認して修正する |
+| 振る舞い変更、API/schema/CLI/config 変更 | 修正せず停止して報告する |
+| 好み、style、clever one-liner 化 | 修正しない |
+
+修正後は関連検証を実行し、修正を commit する。`fix` は push、PR作成、verify を行わずここで終了する。
+
+---
 
 ## 4. PR create / update
 
 `review` / `fix` / `simplify` の場合はスキップする。
 
-references/pr-body.md を読み、PR title/body を作る。push 前には references/branching.md の Push destination safety を実行する。既存 PR がなければ draft PR を作成し、既存 PR があれば本文を更新する。
+`references/pr-body.md` を読み、PR title/body を作る。push 前には `references/branching.md` の Push destination safety を実行する。
+
+既存 PR がなければ draft PR を作成し、既存 PR があれば本文を更新する。
+
+---
 
 ## 5. Verify
 
 デフォルト、`create`、`verify` で実行する。`review` / `fix` / `simplify` ではスキップする。
 
-references/verify.md を読み、既存 PR の checks polling、automated review 確認、必要な修正を行う。ready 化は行わない。
+`references/verify.md` を読み、既存 PR の checks polling、automated review 確認、必要な修正を行う。ready 化は行わない。
+
+---
 
 ## 注意事項
 
 - PR 本文は日本語で書く。
-- draft PR を作成し、--assignee @me を付ける。
+- draft PR を作成する。ready 化は行わない。
+- `--assignee @me` を付ける。
 - commit message は Conventional Commits 形式の英語。
-- review stage 中、main と subagent は product files を変更しない。main が作る .tmp/my-pr/ artifact だけは例外とする。
+- `create` でも integrated simplify apply は必ず実行する。
+- `review` は read-only。指摘の収集と統合だけを行う。
+- read-only reviewer は repo 内外を問わずファイルを書かない。`.plans`、`/tmp`、`.tmp/my-pr` への追加メモも禁止する。main orchestrator が作る `.tmp/my-pr/` artifact だけは例外。
+- `fix` は Required だけ修正・検証・commit し、push しない。
+- デフォルトでは read-only review → Required fix → PR作成/更新 → verify の順に実行する。
+- Simplify は Codex CLI の `model_reasoning_effort="medium"` を使う。model は上書きしない。
+- Simplify は full diff を優先する。`references/review.md` の line/byte chunking 条件を満たす場合だけ file-boundary chunking し、各 run/chunk の Required と Recommended をそれぞれ最大 5 件に制限する。
+- chunk の単一ファイル上限を超える差分はそのファイルだけレビューから除外し、ファイル名と byte 数を最終結果に明示する。レビュー済みとして扱わない。
+- Reviewer A/C は `scripts/run-codex-reviews.sh` でまとめて起動する。単体の `run-codex-review.sh` 直接呼び出しは、ユーザーが明示的に承認した再実行のときだけ使う。runner は context-file 引数から artifact root を決定するため、別 process へ `MY_PR_ARTIFACT_DIR` を引き継ぐ必要はない。artifact path を Codex の shell tool に読ませず、stdin 埋め込み、末尾 nonce、SHA-256 receipt で完全性を検証する。Codex は対象 repo ではなく隔離済み artifact-local repo から起動する。
+- 片方の reviewer だけ失敗した場合、ラッパーは result path を出さずに非ゼロ終了する。成功した側だけを統合しない。
+- runner は reviewer ごとに effort を固定する。Reviewer A は設定中の model の medium、Reviewer C は `-c 'model="gpt-5.6-terra"'` で model 自体も `xhigh` に固定する。Reviewer A の model は設定中のものを継承するため、`~/.codex/config.toml` の `model` を変えると Reviewer A の深さは変わる。orchestrator 側は独自の `--model` を渡さない。
+- correctness reviewer の出力は PR understanding / Findings / Assessment のみ。Strengths と Non-findings は修正判断に使わないので出力させない。
+- Claude correctness review は host-aware に実行する。Claude Code Agent が使えるセッションでは Agent を使い、それ以外では Claude CLI の `--json-schema` で完全な review Markdown を受け取る。統合前に `scripts/validate-reviewer-b-output.sh` で必須見出しを検証する。
+- Codex、Claude reviewer、diff artifact 取得のいずれかに失敗したら停止する。Reviewer B の実行成功後に本文構造検証だけが失敗する場合は、1回の形式修正後に Reviewer B を skip する。暗黙に他 reviewer や local review へ切り替えない。
 - fallback、default substitution、broad catch を追加しない。
 - 好みの問題や style 指摘は修正対象にしない。
 - テストが壊れる修正はしない。
 - worktree 使用時は、PR 作成後も自動削除しない。
-- .tmp/my-pr/ は local artifact 置き場。stage / commit しない。
+- `.tmp/my-pr/` は local artifact 置き場。stage / commit しない。

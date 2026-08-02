@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "reviewer",
+    "chunk_id",
+    "chunk_count",
+    "context_sha256",
+    "diff_sha256",
+    "end_nonce",
+    "saw_context_end",
+    "saw_diff_end",
+    "review_markdown"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["COMPLETE", "REVIEW_INCOMPLETE"]
+    },
+    "reviewer": {
+      "type": "string",
+      "enum": ["A", "C"]
+    },
+    "chunk_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "chunk_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "context_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "diff_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "end_nonce": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "saw_context_end": {
+      "type": "boolean"
+    },
+    "saw_diff_end": {
+      "type": "boolean"
+    },
+    "review_markdown": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -33,17 +33,9 @@ git diff --cached --stat
 - Use English Conventional Commits messages.
 - Inspect `git diff --cached` before every commit.
 
-## Review-only Safety gate
-
-For `my-pr review`, inspect the current repository in place. On a protected branch, do not transfer changes to a worktree or clean up the original worktree. Do not run reset, checkout, rm, stage / git add -N, commit, push, PR mutation, or ref fetch. The only permitted local write is the explicit ignored `.tmp/my-pr/` orchestration artifact directory.
-
-If the review scope gate reports `untracked` or `large+untracked`, stop and report the files. Do not stage them, use `git add -N`, alter ignore or exclude metadata, or remove files to continue review.
-
-For the default, `create`, `fix`, and `simplify` commands, use the normal protected-branch worktree flow below before work that may later be committed.
-
 ## Worktree flow for protected branches
 
-For the default, `create`, `fix`, and `simplify` commands, if currently on a protected branch, move the target tracked changes to a worktree before committing. Do not use this flow for `review`.
+If currently on a protected branch, move the target tracked changes to a worktree before committing.
 
 ```bash
 bash "$HOME/.claude/skills/my-pr/scripts/move-changes-to-worktree.sh" "feat/example"
