@@ -3,13 +3,11 @@ name: my-subagent
 description: >-
   Delegate subagent-suitable work to subagents and keep the main agent focused
   on orchestration, decisions, integration, and final verification. Use
-  automatically before non-trivial work when any part can be isolated as
-  independent research, implementation, testing, review, or multi-step worker
-  work; also use when the user says "subagent", "委譲", "並列実行", or asks to
-  use lighter models for worker tasks. Do NOT use for simple one-shot answers,
-  tiny one-file edits, irreversible actions, or decisions that require user
-  approval.
-argument-hint: "[task-or-plan]"
+  automatically whenever a clear, bounded investigation or implementation with
+  settled policy can be isolated, including small or one-file work; also use
+  when the user says "subagent", "委譲", or "並列実行". Do NOT use for simple
+  one-shot answers without research or implementation, unresolved decisions or
+  work requiring user approval, or final integration and verification.
 ---
 
 # Subagent Delegation
@@ -28,30 +26,28 @@ argument-hint: "[task-or-plan]"
 
 使う:
 
-- 独立した調査・実装・テスト・レビューがある
-- タスクが明確な入力、出力、対象ファイル、受入基準を持つ
+- 目的と対象が明確な、bounded な調査（ファイル数や規模を問わない）
+- 方針が確定し、対象と受入基準が明確な実装（1 ファイルの簡単な変更を含む）
+- 独立したテスト・レビューがある
 - 複数の候補調査やファイル群調査を並列化できる
 - main の文脈を汚さずに局所作業を進めたい
 
 使わない:
 
-- 1 ファイルの小さな編集で、委譲コストの方が高い
-- public contract 変更の可否が未決
-- ユーザー承認が必要な判断が中心
+- 調査も実装もない simple one-shot answer
+- ユーザー承認、public contract、実装方針などの判断が未確定
+- subagent の結果を統合する作業、最終検証、完了判断
 - subagent が使えない環境
 
-## モデル選択
+委譲条件を満たさない作業まで機械的に委譲せず、main が直接処理する。
 
-subagent には、作業に足りる範囲で最も軽量なモデルを使う。
+## モデル方針
 
-| 作業 | モデル方針 |
-|---|---|
-| grep・ファイル列挙・単純調査 | 軽量・高速モデル |
-| 明確な単一ファイル実装 | 軽量・高速モデル |
-| 複数ファイル実装・テスト修正 | 標準モデル |
-| 設計判断・仕様一致レビュー・セキュリティレビュー | 高性能モデル |
+subagent は設定済みの defaults を使う。ユーザーが明示しない限り、spawn 時に `model` と `reasoning_effort` を指定して上書きしない。
 
-subagent 起動ツールが model 指定をサポートする場合だけ指定する。サポート有無が不明な場合は、存在しない引数を推測して付けない。
+Codex の `spawn_agent` では、full-history fork (`fork_turns: "all"` またはその既定値) が親の model / reasoning effort を継承する。設定済みの subagent defaults を使う場合は `fork_turns: "none"` または必要最小限の positive turn count を明示し、必要な文脈は prompt に含める。
+
+ユーザーが model を明示した場合だけ、その指定を spawn 時に渡してよい。reasoning effort は設定済みの default を下げない。起動ツールが指定をサポートしない場合は、存在しない引数を推測して付けない。
 
 ## 手順
 
@@ -64,7 +60,6 @@ subagent 起動ツールが model 指定をサポートする場合だけ指定�
    - 受入基準
    - 必要な既存コード・規約
    - 検証コマンド
-   - 推奨モデル方針
 3. TodoWrite が使える環境では、作業単位を登録する。
 
 ### 2. 委譲可否を判定する
@@ -86,7 +81,6 @@ main が行う:
 - 複数 subagent の結果統合
 - 最終テスト実行
 - `tasks.md` / TodoWrite の完了更新
-- モデル選択方針の決定
 
 ### 3. 並列化を判定する
 
@@ -160,4 +154,3 @@ subagent には以下のいずれかで終了させる。
 - write set 衝突のあるタスクを並列起動する
 - subagent がユーザー承認事項を勝手に決める
 - main が検証せずに完了扱いする
-- 重要な設計判断を軽量モデルに任せる

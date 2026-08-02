@@ -105,6 +105,22 @@ codex exec --ephemeral --sandbox read-only -c 'approval_policy="never"' \
 
 For interactive clients, use `/memory` in Claude Code and `/memory show` in Gemini CLI to inspect the loaded instruction context. Restart an active session after changing persistent instructions.
 
+### Codex Subagent Policy
+
+`home/dot_codex/private_config.toml.tmpl` is the sole managed source for
+Codex subagent defaults. Its standard `[agents]` section is deployed to
+`~/.codex/config.toml` by:
+
+```bash
+chezmoi apply
+```
+
+The personal `my-subagent` skill is managed at
+`~/.agents/skills/my-subagent`; `~/.claude/skills/my-subagent` is a
+compatibility symlink to it. No duplicate is generated under
+`~/.codex/skills/`. This design has no CCV, systemd, environment-variable, or
+separate apply-script dependency.
+
 ### RTK Command Rewriting
 
 RTK reduces token-heavy shell output. Codex is instructed to invoke it directly, while Claude Code uses the ordered Bash `PreToolUse` hooks in `home/dot_claude/settings.json`:
