@@ -65,14 +65,6 @@ func agentState(_ workspace) -> String {
     return "stopped"
 }
 
-func stateLabel(_ state: String) -> String {
-    if state == "input" { return "Needs input" }
-    if state == "working" { return "Working" }
-    if state == "done" { return "Done" }
-    if state == "stopped" { return "Stopped" }
-    return ""
-}
-
 func stateTint(_ state: String) -> String {
     if state == "input" { return "#FF9F0A" }
     if state == "working" { return "#30D158" }
@@ -188,7 +180,7 @@ func workspaceRow(_ workspace) -> some View {
 
     HStack(spacing: 7) {
         Capsule()
-            .foregroundColor(workspace.selected ? "#7A4FD8" : tint)
+            .foregroundColor(tint)
             .frame(width: 3, height: 42)
 
         Text("\(workspace.index + 1)")
@@ -225,12 +217,6 @@ func workspaceRow(_ workspace) -> some View {
         }
 
         Spacer()
-
-        if state != "unknown" {
-            Text(stateLabel(state))
-                .font(.system(size: 9))
-                .foregroundColor(tint)
-        }
     }
     .padding(6)
     .background(workspace.selected ? "#7A4FD826" : "#00000000")
