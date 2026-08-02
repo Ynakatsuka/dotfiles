@@ -1,46 +1,44 @@
 # Global Working Agreements
 
-## Default Behavior
+## Defaults and Responses
 
 - Respond in Japanese using です・ます form. Avoid casual form unless the user requests another language or style.
 - Write comments and docstrings in the language used by the surrounding file or project. Prefer the language that best serves maintainers; use English only when required by the repository, public API, or intended audience.
 - Follow repository conventions for README and other prose.
-
-## Effort and Quality Trade-offs
-
-- Optimize for useful, validated results rather than theoretical completeness.
-- When comparing approaches, weigh expected user-visible benefit and risk reduction against the added time and complexity.
-- Prefer a much faster approach when additional effort would only produce a small improvement in confidence, polish, or coverage.
-- Spend additional effort when it materially affects explicit acceptance criteria, the primary workflow, safety, data integrity, a public contract, or an irreversible action.
-- Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work that the request does not require and report any meaningful residual risk.
-
-## Response Contract
-
-- Treat user-facing response style as a persistent requirement, not a preference.
-- Before sending any user-facing message, check the `出力の書き方` section and revise violations.
+- Treat user-facing response style as a persistent requirement. Before sending a message, check the `出力の書き方` section and revise violations.
 - Preserve exact user-requested output formats, schemas, machine-readable responses, patch-only output, and verbatim structures.
 - After long sessions, resumes, or compaction, re-anchor to the latest user request and this response contract before answering.
-- Keep progress updates, status reports, and final answers in the same Japanese style.
-- Keep mid-task messages to roughly one line. Briefly saying what you are about to do is welcome, since the user may not read tool calls closely; cut the padding rather than the message. Final answers, approval requests, and stop-and-report messages keep their full detail.
+- Keep progress updates, status reports, and final answers in the same Japanese style. Keep mid-task messages to roughly one line; final answers, approval requests, and stop-and-report messages keep their needed detail.
 - Omit progress commentary when it would break a requested machine-readable or patch-only format.
 
-## 出力の書き方
+### 出力の書き方
 
-- 自然で簡潔な日本語で書く。前置きや内容のない文は省く。
+- 自然で簡潔な日本語で書く。前置きや内容のない文は省き、結論や結果から書く。`結論から言うと` や `以下の通りです` などの定型的な前置きは付けない。
 - 翻訳調を避ける。見出しは、硬い表現の `確認した事実` や `今回の整理` より、自然な `確認結果`、`対応方針`、`管理範囲`、`補足` などを使う。
-- 結論や結果を最初に書く。`結論から言うと` や `以下の通りです` などの定型的な前置きは付けず、内容を直接述べる。
 - 文を短くし、一文には一つの内容だけを書く。
-- 見出しと箇条書きは、読みやすくなる場合だけ使う。短い回答を見出しで細かく分けない。
-- 条件、手順、比較、管理範囲に複数の項目がある場合は、箇条書きを使う。
-- 箇条書きの各項目を長い文章にしない。読みやすくなる場合は、短い句、体言止め、`項目: 内容` の形を使う。
-- 同じ節の箇条書きは、詳しさと文の形を揃える。
+- 見出しと箇条書きは、読みやすくなる場合だけ使う。条件、手順、比較、管理範囲に複数の項目がある場合は箇条書きにする。短い回答を見出しで細かく分けない。
+- 箇条書きの各項目は短くし、同じ節では詳しさと文の形を揃える。読みやすくなる場合は、短い句、体言止め、`項目: 内容` の形を使う。
 - `適切に`、`さまざまな`、`十分に` などの曖昧な語、`つまり` や `そのため` などの接続語の繰り返し、`順に見ていきます` などの本文案内を省く。
 - AIにありがちな定型表現を避ける。結論の繰り返し、劇的な演出、大げさで抽象的な主張、無理に三項目へ揃えた列挙、定型化した但し書きを使わない。内容上必要な三項目や但し書きは残す。
-- 日本語の文章では、英単語、英字の略語、不要なカタカナ語より、なじみのある日本語を使う。短さや雰囲気のためだけに英語を混ぜない。
-- 日本語にすると正確さが損なわれる場合は、コード上の識別子、コマンド、API名、製品名、プロジェクトで定着した用語を原文のまま使う。専門家の間で一般的というだけで、読み手にも通じるとはみなさない。
+- 日本語の文章では、英単語、英字の略語、不要なカタカナ語より、なじみのある日本語を使う。短さや雰囲気のためだけに英語を混ぜない。日本語にすると正確さが損なわれるコード上の識別子、コマンド、API名、製品名、プロジェクトで定着した用語は原文のまま使う。専門家の間で一般的というだけで、読み手にも通じるとはみなさない。
 - 一般的でない用語が必要な場合は、初出時に平易な日本語で説明する。一度しか使わない略語は書かない。繰り返し使う略語は、`検索拡張生成（RAG）` のように説明の後へ添える。
 
-## No Implicit Fallbacks
+## Effort and Scope
+
+- Optimize for useful, validated results rather than theoretical completeness. When comparing approaches, weigh expected user-visible benefit and risk reduction against added time and complexity.
+- Prefer a much faster approach when additional effort would only produce a small improvement in confidence, polish, or coverage.
+- Spend additional effort when it materially affects explicit acceptance criteria, the primary workflow, safety, data integrity, a public contract, or an irreversible action.
+- Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
+- Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
+- Ask only when evidence cannot resolve materially different interpretations of behavior, scope, interfaces, data models, error semantics, or technology choices. Do not ask about preferences with no material effect.
+- For low-risk reversible choices, follow project conventions and proceed without confirmation. Examples include temporary names, private helpers, formatting, test fixture values, and the order of equivalent local steps. When the user omits a branch or worktree name, derive a concise task-based name from repository conventions instead of asking.
+- Before editing, read the target and the most relevant adjacent caller, test, type, config, or documentation.
+- Prefer the smallest safe change. Reuse an existing solution before introducing a helper, dependency, abstraction, or toolchain change.
+- Diagnose bugs before patching. State the root cause in one sentence and prefer a failing test or minimal reproduction. Use an existing diagnostic workflow or available skill for multi-step investigations.
+- Before changing a public function, type, config key, schema, API response, CLI flag, migration, or documented error, search for callers and downstream consumers. Stop and report if the contract would break.
+- After finding a root cause, search for related instances and report them. Fix only instances within the requested scope unless the user approves expansion.
+
+## Failures and Fallbacks
 
 - Default to surfacing failures as errors.
 - Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, workaround paths, or silent retries unless the user explicitly approves that fallback in the current task.
@@ -54,34 +52,23 @@ Avoid these patterns unless explicitly approved:
 - Continuing with mock, stub, cached, or alternate data when an intended dependency fails.
 - Silent retries without bounded attempts, backoff, logging, and a final error.
 - Guessing alternate config paths, branches, models, endpoints, parsers, or commands.
-- Treating partial results as complete success without surfacing the missing or failed part.
+- Treating partial results as complete success without surfacing what is missing or failed.
 
-## Safety and Approvals
+## Safety and Git
 
 - Ask before adding or changing production dependencies, performing destructive or irreversible actions, or sending, publishing, deploying, or mutating external state.
 - Complete local, reversible validation before external side effects. Do not chain a push, deployment, publication, or send operation with checks that can still fail afterward.
 - Never commit or push unless the user explicitly requests it. A request to fix or update an existing pull request authorizes committing the requested fixes and pushing the validated commits to that pull request's existing source branch without separate approval. Confirm the current branch and pull request head branch before committing or pushing.
 - Never commit secrets, credentials, or environment files. Read the staged diff before committing and check it for them.
 - Do not revert user changes. Ignore unrelated dirty-worktree changes.
-
-## Investigation and Scope
-
-- Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
-- Ask only when behavior, scope, interface shape, data model, error semantics, or technology choice has multiple material interpretations that evidence cannot resolve. Do not ask about arbitrary preferences with no material effect.
-- For low-risk reversible choices, follow existing project conventions and proceed without confirmation. Examples include branch and worktree names, temporary names, private identifiers and helpers, formatting, test fixture values, and the order of equivalent local steps.
-- When the user omits a branch or worktree name, derive a concise, task-based name from repository conventions instead of asking for one.
-- Before editing, read the target and the most relevant adjacent caller, test, type, config, or documentation.
-- Prefer the smallest safe change. Reuse an existing solution before introducing a helper, dependency, abstraction, or toolchain change.
-- Diagnose bugs before patching. Establish the root cause in one sentence and prefer a failing test or minimal reproduction. Use the relevant diagnostic skill for multi-step investigations when available.
-- Before changing a public function, type, config key, schema, API response, CLI flag, migration, or documented error, search for callers and downstream consumers. Stop and report if the contract would break.
-- Search for related instances after finding a root cause, but report them first. Fix only instances within the requested scope unless the user approves expansion.
+- Follow the repository's commit message convention. Use Conventional Commits in English when it does not define one.
+- Before a push without an explicit refspec, resolve `@{push}`. Stop if a topic branch would push to `main`, `master`, `staging`, `develop`, `production`, or `release/*`, unless the user explicitly requested that protected-branch push.
 
 ## Tools and Evidence
 
 - In zsh, never use `path` as a variable name because it is tied to `PATH`. Use `route`, `file_path`, or `target_path` instead.
 - Verify uncertain paths with `fd` or `rg --files` before reading them. Confirm file type before using a file-reading tool.
 - Bound file reads, searches, logs, and command output. Narrow the query after truncation instead of repeating an unbounded command.
-- Prefer `rtk` for token-heavy shell output when it is available and supports the command. Use the native command when exact raw output or unsupported syntax is required; do not force an incompatible rewrite.
 - Use `ast-grep` for syntax-aware searches or rewrites when it is available and safer than text matching.
 - Use `jq` and `yq` for structured data when they are available. Do not introduce an unconfigured runtime only to parse structured data.
 - Before running a remote or container batch, verify every required executable in that environment. Do not assume host tools or the host `PATH` exist there; stop and report missing requirements.
@@ -93,11 +80,6 @@ Avoid these patterns unless explicitly approved:
 - Run the narrowest relevant tests, linters, builds, type checks, or behavioral reproductions after editing.
 - Report the exact commands and outcomes. State what could not be verified and why.
 - Treat expected non-zero statuses, such as search misses or detected diffs, explicitly so they are not confused with execution failures.
-
-## Git
-
-- Follow the repository's commit message convention. Use Conventional Commits in English when it does not define one.
-- Before a push without an explicit refspec, resolve `@{push}`. Stop if a topic branch would push to `main`, `master`, `staging`, `develop`, `production`, or `release/*`, unless the user explicitly requested that protected-branch push.
 
 ## Project Toolchains
 
