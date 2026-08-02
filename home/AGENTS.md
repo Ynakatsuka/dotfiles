@@ -25,9 +25,9 @@
 
 ## Effort and Scope
 
-- Optimize for useful, validated results rather than theoretical completeness. When comparing approaches, weigh expected user-visible benefit and risk reduction against added time and complexity.
-- Prefer a much faster approach when additional effort would only produce a small improvement in confidence, polish, or coverage.
-- Spend additional effort when it materially affects explicit acceptance criteria, the primary workflow, safety, data integrity, a public contract, or an irreversible action.
+- Solve the underlying cause within the requested scope. Do not stop at a symptom-level workaround, and do not broaden the task into adjacent cleanup or redesign.
+- Take the shortest safe path to the requested outcome. Perform only steps that materially affect correctness, verification, safety, or explicit acceptance criteria.
+- Do not add abstractions, generalization, extensibility, polish, or coverage for hypothetical future needs. Add them only when the current task or repository conventions require them.
 - Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
 - Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
 - Ask only when evidence cannot resolve materially different interpretations of behavior, scope, interfaces, data models, error semantics, or technology choices. Do not ask about preferences with no material effect.
