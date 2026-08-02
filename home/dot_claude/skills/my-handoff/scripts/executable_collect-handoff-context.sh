@@ -125,6 +125,7 @@ if [[ -n "$github_repo" ]]; then
     */*) ;;
     *) fail "could not parse GitHub repository from remote URL: $remote_url" ;;
   esac
+  github_repo_lower=$(printf '%s' "$github_repo" | LC_ALL=C tr '[:upper:]' '[:lower:]')
 
   if command -v gh >/dev/null 2>&1; then
     pr_lookup="checked"
@@ -144,7 +145,8 @@ if [[ -n "$github_repo" ]]; then
     pr_head_sha=""
     while IFS=$'\t' read -r candidate_url candidate_head_sha candidate_head_branch candidate_repo candidate_base_branch; do
       [[ -z "$candidate_url" ]] && continue
-      if [[ "${candidate_repo,,}" != "${github_repo,,}" ]]; then
+      candidate_repo_lower=$(printf '%s' "$candidate_repo" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+      if [[ "$candidate_repo_lower" != "$github_repo_lower" ]]; then
         continue
       fi
       if [[ "$candidate_head_branch" != "$remote_branch" ]]; then
