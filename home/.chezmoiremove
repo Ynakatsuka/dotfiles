@@ -12,6 +12,7 @@ mcp.json
 .claude/rules/writing.md
 .claude/skills/my-guided-tour
 .claude/skills/my-sdd
+.codex/agents/simplifier_apply.toml
 .codex/skills/my-subagent
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy
