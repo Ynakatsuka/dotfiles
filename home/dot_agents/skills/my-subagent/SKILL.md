@@ -45,6 +45,8 @@ description: >-
 
 subagent は設定済みの defaults を使う。ユーザーが明示しない限り、spawn 時に `model` と `reasoning_effort` を指定して上書きしない。
 
+Codex の `spawn_agent` では、full-history fork (`fork_turns: "all"` またはその既定値) が親の model / reasoning effort を継承する。設定済みの subagent defaults を使う場合は `fork_turns: "none"` または必要最小限の positive turn count を明示し、必要な文脈は prompt に含める。
+
 ユーザーが model を明示した場合だけ、その指定を spawn 時に渡してよい。reasoning effort は設定済みの default を下げない。起動ツールが指定をサポートしない場合は、存在しない引数を推測して付けない。
 
 ## 手順
