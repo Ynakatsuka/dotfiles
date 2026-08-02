@@ -3,33 +3,17 @@
 ## Codex Tool Usage
 
 - Pass an explicit `workdir` to shell command tools.
-- Use `rtk` for token-heavy shell output: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
+- Use `rtk` for token-heavy shell output when it is available and supports the command: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
 - Use `rtk proxy` only when raw output is required.
+- For unsupported syntax, use the native command; do not force an incompatible rewrite.
 - Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
-- Delegate work only when the user and current runtime policy permit it. Keep approvals, public-contract decisions, integration, and final verification in the main agent.
+- Delegate only when the user and current runtime policy permit it. Keep approvals, public-contract or dependency decisions, integration, and final verification in the main thread.
 
 ## Codex Subagent Routing
 
-### Choose the Execution Target
-
-- Keep work in the main thread when it takes only a few minutes or requires task decomposition, unresolved design choices, user approval, public-contract or dependency decisions, integration, or final verification.
-- Use `luna_worker` only for a substantial leaf task that is independent, clearly bounded, supplied with explicit acceptance criteria, and does not require judgment reserved for the main thread. A task is substantial when delegation is expected to save meaningful main-thread time after dispatch and review overhead; otherwise keep it in the main thread.
-- Use a standard subagent for delegable work that needs broader context or more judgment than a `luna_worker` task. A standard subagent uses the configured `[agents]` defaults: choose `explorer` for read-only codebase investigation, `worker` for implementation or fixes, and `default` when neither specialized role fits.
-- Do not assign high-risk or judgment-heavy implementation to `luna_worker`. Keep it in the main thread or use a standard subagent with a settled scope.
+- Keep work in the main thread when it takes only a few minutes or needs unresolved decisions, user approval, public-contract or dependency decisions, integration, or final verification.
+- Use `luna_worker` only for substantial, independent leaf tasks with a settled approach. Use standard `explorer`, `worker`, or `default` subagents otherwise; never assign high-risk or judgment-heavy implementation to `luna_worker`.
 - When configured standard-subagent defaults are required, use `fork_turns: "none"` or the minimum necessary positive turn count and supply the remaining context in the dispatch prompt. A full-history fork inherits the parent model and reasoning effort.
-
-### Dispatch and Parallelism
-
-- Make every dispatch self-contained because workers run in separate threads. Include the task, relevant context, files to inspect, exact write scope and supplied worktree, boundaries, acceptance criteria, expected report, and focused verification command.
-- Run independent read-only workers in parallel. Run writing workers in parallel only when each has an isolated worktree and a non-overlapping write set; otherwise run them sequentially, and do not edit their files concurrently in the main thread.
-- When using parallel execution, issue every `spawn_agent` call in the same tool-call batch. Start all workers before inspecting any result or calling `wait`.
-- If parallel workers do not start concurrently, inspect `agents.max_concurrent_threads_per_session` before changing the dispatch plan.
-
-### Quality Gate
-
-- The main thread reviews every subagent result and owns integration, final verification, and the completion decision. A worker's `DONE` status is a handoff for review, not acceptance.
-- Inspect the worker's status, evidence, checks, concerns, and actual diff against the dispatch acceptance criteria. For research tasks, verify cited evidence, search scope, and unverified areas.
-- Run the final relevant checks in the main thread after integration. Do not accept a worker's verification as a substitute for checks against the integrated state.
-- Do not spawn a separate reviewer by default. Use an independent standard subagent reviewer only when the main thread identifies material uncertainty or elevated risk that remains appropriate to delegate.
-- These Codex-specific quality rules take precedence over generic reviewer stages in a shared delegation skill.
-- Re-dispatch failed work only with the specific missing or incorrect requirement; never silently retry the same prompt.
+- Make every dispatch self-contained. Run independent read-only workers in parallel. Run writing workers in parallel only with isolated worktrees and non-overlapping write sets; otherwise run them sequentially. Issue parallel `spawn_agent` calls in the same tool-call batch, and if they do not start concurrently, inspect `agents.max_concurrent_threads_per_session` before changing the plan.
+- The main thread reviews every result and diff, then owns integration and final verification. Do not start an independent reviewer by default; use one only for material uncertainty or elevated risk. These Codex-specific routing and quality rules take precedence over conflicting generic guidance in shared delegation skills.
+- Re-dispatch only with the specific missing or incorrect requirement; never silently retry the same prompt.
