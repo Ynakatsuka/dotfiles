@@ -19,11 +19,10 @@ Context:
 <ACCEPTANCE_CRITERIA>
 - Verification command:
 <VERIFY_COMMAND>
-- Model choice:
-<MODEL_CHOICE_AND_REASON>
 
 Rules:
 - Follow the existing project conventions.
+- Use the configured subagent defaults. Do not lower reasoning effort.
 - Write or update tests before implementation when the task changes behavior.
 - Do not change public APIs, schemas, config keys, CLI flags, or documented error semantics unless the task explicitly requires it.
 - Do not add fallback behavior or swallow errors.
@@ -43,7 +42,7 @@ CONCERNS:
 ## Researcher
 
 ```text
-You are a research subagent. Use a lightweight model if model selection is available.
+You are a research subagent.
 
 Research task:
 <TASK_TEXT>
@@ -55,6 +54,7 @@ Scope:
 <QUESTIONS>
 
 Rules:
+- Use the configured subagent defaults. Do not lower reasoning effort.
 - Cite exact file paths and line numbers where possible.
 - Separate confirmed evidence from inference.
 - Do not edit files.
