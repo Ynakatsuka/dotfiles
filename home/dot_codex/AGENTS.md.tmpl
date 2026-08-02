@@ -14,9 +14,9 @@
 
 - Keep work in the main thread when it takes only a few minutes or requires task decomposition, unresolved design choices, user approval, public-contract or dependency decisions, integration, or final verification.
 - Use `luna_worker` only for a substantial leaf task that is independent, clearly bounded, supplied with explicit acceptance criteria, and does not require judgment reserved for the main thread. A task is substantial when delegation is expected to save meaningful main-thread time after dispatch and review overhead; otherwise keep it in the main thread.
-- Use a standard subagent for delegable work that needs broader context or more judgment than a `luna_worker` task. A standard subagent uses the configured `[agents]` defaults: choose `explorer` for read-only codebase investigation, `worker` for implementation or fixes, and `default` when neither specialized role fits.
+- Use a standard subagent for delegable work that needs broader context or more judgment than a `luna_worker` task. A standard subagent uses the configured `[agents]` defaults: choose `explorer` for read-only codebase investigation, `worker` for implementation or fixes, and `default` when neither specialized role fits. When the user or an explicit workflow such as `my-pr` requests review, use the native `reviewer` or read-only `simplifier` role as applicable. For behavior-preserving simplification apply work, use `simplifier_apply`.
 - Do not assign high-risk or judgment-heavy implementation to `luna_worker`. Keep it in the main thread or use a standard subagent with a settled scope.
-- When configured standard-subagent defaults are required, use `fork_turns: "none"` or the minimum necessary positive turn count and supply the remaining context in the dispatch prompt. A full-history fork inherits the parent model and reasoning effort.
+- When configured standard-subagent defaults or a native custom role are required, use `fork_turns: "none"` or the minimum necessary positive turn count and supply the remaining context in the dispatch prompt. This lets the selected role's model and instructions apply. A full-history fork inherits the parent model and reasoning effort.
 
 ### Dispatch and Parallelism
 
@@ -30,6 +30,6 @@
 - The main thread reviews every subagent result and owns integration, final verification, and the completion decision. A worker's `DONE` status is a handoff for review, not acceptance.
 - Inspect the worker's status, evidence, checks, concerns, and actual diff against the dispatch acceptance criteria. For research tasks, verify cited evidence, search scope, and unverified areas.
 - Run the final relevant checks in the main thread after integration. Do not accept a worker's verification as a substitute for checks against the integrated state.
-- Do not spawn a separate reviewer by default. Use an independent standard subagent reviewer only when the main thread identifies material uncertainty or elevated risk that remains appropriate to delegate.
+- Do not spawn a separate reviewer by default. When the user or an explicit workflow such as `my-pr` requests review, use the native `reviewer` or read-only `simplifier` role with a self-contained dispatch. Use `simplifier_apply` only for explicitly authorized behavior-preserving simplification apply work; otherwise, use an independent standard subagent reviewer only when the main thread identifies material uncertainty or elevated risk that remains appropriate to delegate.
 - These Codex-specific quality rules take precedence over generic reviewer stages in a shared delegation skill.
 - Re-dispatch failed work only with the specific missing or incorrect requirement; never silently retry the same prompt.
