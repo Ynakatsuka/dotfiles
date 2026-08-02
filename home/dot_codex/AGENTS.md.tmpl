@@ -3,7 +3,17 @@
 ## Codex Tool Usage
 
 - Pass an explicit `workdir` to shell command tools.
-- Use `rtk` for token-heavy shell output: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
+- Use `rtk` for token-heavy shell output when it is available and supports the command: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
 - Use `rtk proxy` only when raw output is required.
+- For unsupported syntax, use the native command; do not force an incompatible rewrite.
 - Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
-- For delegation, use the surfaced `my-subagent` skill when the current runtime policy permits it.
+- Delegate only when the user and current runtime policy permit it. Keep approvals, public-contract or dependency decisions, integration, and final verification in the main thread.
+
+## Codex Subagent Routing
+
+- Keep work in the main thread when it takes only a few minutes or needs unresolved decisions, user approval, public-contract or dependency decisions, integration, or final verification.
+- Use `luna_worker` only for substantial, independent leaf tasks with a settled approach. Use standard `explorer`, `worker`, or `default` subagents otherwise; never assign high-risk or judgment-heavy implementation to `luna_worker`.
+- When configured standard-subagent defaults are required, use `fork_turns: "none"` or the minimum necessary positive turn count and supply the remaining context in the dispatch prompt. A full-history fork inherits the parent model and reasoning effort.
+- Make every dispatch self-contained. Run independent read-only workers in parallel. Run writing workers in parallel only with isolated worktrees and non-overlapping write sets; otherwise run them sequentially. Issue parallel `spawn_agent` calls in the same tool-call batch, and if they do not start concurrently, inspect `agents.max_concurrent_threads_per_session` before changing the plan.
+- The main thread reviews every result and diff, then owns integration and final verification. Do not start an independent reviewer by default; use one only for material uncertainty or elevated risk. These Codex-specific routing and quality rules take precedence over conflicting generic guidance in shared delegation skills.
+- Re-dispatch only with the specific missing or incorrect requirement; never silently retry the same prompt.
