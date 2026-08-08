@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Restart every cmux terminal surface that has a saved Codex resume binding.
+
+set -euo pipefail
+
+readonly CMUX_BIN="${CMUX_BIN:-/Applications/cmux.app/Contents/Resources/bin/cmux}"
+
+die() {
+  printf 'cmux-resume-all-codex-sessions: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ -x "$CMUX_BIN" ]] || die "cmux not found at $CMUX_BIN"
+command -v jq >/dev/null 2>&1 || die "jq is required"
+
+tree_json=$(
+  "$CMUX_BIN" --json tree --all
+) || die "failed to list cmux surfaces"
+
+surface_targets=$(
+  jq -r '
+    .windows[]? as $window
+    | $window.workspaces[]? as $workspace
+    | $workspace.panes[]?.surfaces[]?
+    | select(.type == "terminal") as $surface
+    | [$window.ref, $workspace.ref, $surface.ref]
+    | @tsv
+  ' <<<"$tree_json"
+) || die "failed to parse cmux surfaces"
+
+codex_windows=()
+codex_workspaces=()
+codex_surfaces=()
+codex_commands=()
+while IFS=$'\t' read -r window_ref workspace_ref surface_ref; do
+  [[ -n "$surface_ref" ]] || continue
+
+  resume_json=$(
+    "$CMUX_BIN" --json surface resume show \
+      --window "$window_ref" \
+      --workspace "$workspace_ref" \
+      --surface "$surface_ref"
+  ) || die "failed to inspect resume data for $surface_ref"
+
+  resume_kind=$(
+    jq -r '.resume_binding.kind // ""' <<<"$resume_json"
+  ) || die "failed to parse resume data for $surface_ref"
+
+  if [[ "$resume_kind" == "codex" ]]; then
+    resume_command=$(
+      jq -r '.resume_binding.command // ""' <<<"$resume_json"
+    ) || die "failed to parse resume command for $surface_ref"
+    [[ -n "$resume_command" ]] || die "resume command is empty for $surface_ref"
+
+    codex_windows+=("$window_ref")
+    codex_workspaces+=("$workspace_ref")
+    codex_surfaces+=("$surface_ref")
+    codex_commands+=("$resume_command")
+  fi
+done <<<"$surface_targets"
+
+if ((${#codex_surfaces[@]} == 0)); then
+  printf 'No resumable Codex sessions found.\n'
+  exit 0
+fi
+
+for index in "${!codex_surfaces[@]}"; do
+  window_ref="${codex_windows[$index]}"
+  workspace_ref="${codex_workspaces[$index]}"
+  surface_ref="${codex_surfaces[$index]}"
+  resume_command="${codex_commands[$index]}"
+  "$CMUX_BIN" respawn-pane \
+    --window "$window_ref" \
+    --workspace "$workspace_ref" \
+    --surface "$surface_ref" \
+    --command "$resume_command" >/dev/null ||
+    die "failed to resume Codex session in $surface_ref"
+done
+
+printf 'Resumed %d Codex session(s).\n' "${#codex_surfaces[@]}"

@@ -304,33 +304,6 @@ hs.hotkey.bind(hyper, "I", function()
     layoutBuiltInDisplay()
 end)
 
--- Launch difit-cmux (only meaningful while cmux is frontmost)
-hs.hotkey.bind({"cmd", "shift"}, "I", function()
-    local log = "/tmp/difit-cmux.log"
-    local home = os.getenv("HOME")
-    local cmd = "exec >" .. log .. " 2>&1; "
-        .. "export PATH=\"" .. home .. "/.local/share/mise/shims:"
-        .. home .. "/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"; "
-        .. home .. "/.local/bin/difit-cmux"
-    hs.task.new("/bin/zsh", function(exitCode, _, _)
-        if exitCode ~= 0 then
-            local title = "difit-cmux failed (exit " .. tostring(exitCode) .. ")"
-            local detail = ""
-            local f = io.open(log, "r")
-            if f then
-                local content = f:read("*a")
-                f:close()
-                content = content:match("^%s*(.-)%s*$") or ""
-                if #content > 500 then
-                    content = content:sub(1, 500) .. "\n…(truncated, see " .. log .. ")"
-                end
-                detail = content
-            end
-            hs.dialog.alert(-1, -1, function() end, title, detail, "OK", nil, "critical")
-        end
-    end, {"-lc", cmd}):start()
-end)
-
 -- Toggle active window between external and built-in display (maximized)
 hs.hotkey.bind(hyper, "J", function()
     local window = hs.window.focusedWindow()
