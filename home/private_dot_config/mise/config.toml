@@ -133,6 +133,56 @@ minimum_release_age_excludes = [
 [env]
 AGENT_BROWSER_NATIVE = "1"
 
+[bootstrap.macos.defaults.NSGlobalDomain]
+NSDocumentSaveNewDocumentsToCloud = false
+AppleKeyboardUIMode = 3
+AppleShowAllExtensions = true
+"com.apple.mouse.scaling" = 3.0
+"com.apple.mouse.doubleClickThreshold" = 0.5
+"com.apple.trackpad.scaling" = 3.0
+
+[bootstrap.macos.defaults."com.apple.SoftwareUpdate"]
+ScheduleFrequency = 1
+
+[bootstrap.macos.defaults."com.apple.finder"]
+FXEnableExtensionChangeWarning = false
+
+[bootstrap.macos.defaults."com.apple.desktopservices"]
+DSDontWriteNetworkStores = true
+
+[bootstrap.macos.defaults."com.apple.TimeMachine"]
+DoNotOfferNewDisksForBackup = true
+
+[bootstrap.macos.defaults."com.apple.screencapture"]
+type = "png"
+
+[bootstrap.macos.defaults."com.apple.systemsound"]
+"com.apple.sound.beep.volume" = 0.0
+
+[bootstrap.macos.defaults."com.apple.AppleMultitouchTrackpad"]
+TrackpadThreeFingerDrag = true
+Dragging = false
+
+[bootstrap.macos.defaults."com.apple.driver.AppleBluetoothMultitouch.trackpad"]
+TrackpadThreeFingerDrag = true
+Dragging = false
+
+[bootstrap.macos.defaults."com.apple.dock"]
+wvous-br-corner = 5
+wvous-br-modifier = 0
+
+[bootstrap.hooks.post-defaults]
+# Raw bootstrap defaults do not expand $HOME, so apply the dynamic path here.
+run = """
+if [ "$(uname -s)" = "Darwin" ]; then
+  defaults write com.apple.screencapture location -string "$HOME/Downloads"
+  killall Finder 2>/dev/null || true
+  killall SystemUIServer 2>/dev/null || true
+  killall cfprefsd 2>/dev/null || true
+  killall Dock 2>/dev/null || true
+fi
+"""
+
 [tasks.update-dotfiles]
 description = "Update dotfiles and development environment"
 run = """

@@ -97,15 +97,19 @@ activate_brew() {
   eval "$("$brew_cmd" shellenv)"
 }
 
-run_mise_install() {
-  local mise_cmd=""
+resolve_mise() {
   if command -v mise >/dev/null 2>&1; then
-    mise_cmd="mise"
+    command -v mise
   elif [ -x "$HOME/.local/bin/mise" ]; then
-    mise_cmd="$HOME/.local/bin/mise"
+    printf '%s\n' "$HOME/.local/bin/mise"
+  else
+    return 1
   fi
+}
 
-  if [ -n "$mise_cmd" ]; then
+run_mise_install() {
+  local mise_cmd
+  if mise_cmd="$(resolve_mise)"; then
     log "Running mise install"
     run "$mise_cmd" install
   else

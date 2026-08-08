@@ -31,6 +31,7 @@ OS (macOS / Linux) is auto-detected. Choose a plan:
 make -C bootstrap full      # Everything: system packages, apps, CLIs, dotfiles, mise tools
 make -C bootstrap standard  # CLIs + dotfiles + mise tools (no sudo on Linux)
 make -C bootstrap minimal   # Dotfiles only (chezmoi apply)
+make -C bootstrap verify    # Verify chezmoi and mise bootstrap convergence
 ```
 
 ### One-Liner Install
@@ -55,6 +56,7 @@ Detailed bootstrap behavior lives in [bootstrap/README.md](bootstrap/README.md).
 | `make -C bootstrap full` | Full bootstrap (system packages + apps + CLIs + dotfiles + age + mise) |
 | `make -C bootstrap standard` | CLIs + dotfiles + mise (no sudo on Linux, no age encryption) |
 | `make -C bootstrap minimal` | Dotfiles only (chezmoi apply) |
+| `make -C bootstrap verify` | Verify the full declared chezmoi and mise bootstrap state |
 
 ### Chezmoi
 

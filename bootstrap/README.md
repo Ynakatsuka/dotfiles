@@ -25,7 +25,12 @@ make -C bootstrap standard
 
 # Minimal: dotfiles only (chezmoi apply)
 make -C bootstrap minimal
+
+# Verify managed dotfiles, mise tools, and declared bootstrap state
+make -C bootstrap verify
 ```
+
+On macOS, `verify` checks the full declared state. Run it after the `full` plan; the `standard` plan intentionally leaves system defaults unapplied.
 
 ### Quick Setup (No Git Clone Required)
 
@@ -62,8 +67,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 
 - macOS
   - Installs Homebrew apps from `macos/Brewfile` (VS Code, Docker, Claude, ChatGPT, Discord, Zoom, etc.)
-  - Applies system defaults (`20_defaults.sh`)
-  - Applies pointer/trackpad settings from `macos/pointer/prefs/pointer_values.sh`
+  - Applies system, pointer, trackpad, and Hot Corner settings declared in `home/private_dot_config/mise/config.toml`
   - Sets Git identity, SSH, dotfiles (prezto/tpm/chezmoi/mise), then cleanup
 
 - Ubuntu 22.04 (full)
@@ -79,7 +83,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 ### Customize
 
 - Apps: edit `bootstrap/macos/Brewfile`
-- Pointer: edit `bootstrap/macos/pointer/prefs/pointer_values.sh`
+- macOS defaults: edit `home/private_dot_config/mise/config.toml`
 
 ### Manual Steps
 

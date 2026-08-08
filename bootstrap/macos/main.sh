@@ -62,6 +62,20 @@ run_dotfiles() {
   run bash "${SCRIPT_DIR}/45_dotfiles.sh"
 }
 
+apply_macos_defaults() {
+  local mise_cmd mise_config
+
+  if ! mise_cmd="$(resolve_mise)"; then
+    warn "mise not found after Homebrew setup. Aborting."
+    exit 1
+  fi
+
+  mise_config="${ROOT_DIR}/home/private_dot_config/mise/config.toml"
+  log "Applying macOS defaults from mise config"
+  run env MISE_GLOBAL_CONFIG_FILE="$mise_config" \
+    "$mise_cmd" bootstrap macos defaults apply -C / --yes
+}
+
 case "$PLAN" in
   full)
     log "Plan: full"
@@ -73,9 +87,7 @@ case "$PLAN" in
     fi
     run "$BREW" bundle --file "${SCRIPT_DIR}/Brewfile"
 
-    run bash "${SCRIPT_DIR}/20_defaults.sh"
-    run bash "${SCRIPT_DIR}/22_pointer.sh"
-    run bash "${SCRIPT_DIR}/25_hotcorners.sh"
+    apply_macos_defaults
     run bash "${SCRIPT_DIR}/31_cmux.sh"
     run bash "${SCRIPT_DIR}/10_git.sh"
     run bash "${SCRIPT_DIR}/40_ssh.sh"

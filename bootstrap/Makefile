@@ -1,8 +1,10 @@
 SHELL := /bin/bash
 
 OS := $(shell uname -s)
+REPO_ROOT := $(abspath $(CURDIR)/..)
+MISE_CONFIG := $(REPO_ROOT)/home/private_dot_config/mise/config.toml
 
-.PHONY: full standard minimal
+.PHONY: full standard minimal verify
 
 full:
 ifeq ($(OS),Darwin)
@@ -30,3 +32,7 @@ else ifeq ($(OS),Linux)
 else
 	@echo "[ERROR] Unsupported OS: $(OS)" && exit 1
 endif
+
+verify:
+	chezmoi verify || { chezmoi status; exit 1; }
+	MISE_GLOBAL_CONFIG_FILE="$(MISE_CONFIG)" mise bootstrap status -C / --missing
