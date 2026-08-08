@@ -27,6 +27,7 @@
 
 - Solve the underlying cause within the requested scope. Do not stop at a symptom-level workaround, and do not broaden the task into adjacent cleanup or redesign.
 - Take the shortest safe path to the requested outcome. Perform only steps that materially affect correctness, verification, safety, or explicit acceptance criteria.
+- Before admitting non-trivial work, apply a deletion test: if omitting it would not make the requested outcome, an acceptance criterion, a safety requirement, or an existing contract unprovable, exclude it.
 - Do not add abstractions, generalization, extensibility, polish, or coverage for hypothetical future needs. Add them only when the current task or repository conventions require them.
 - Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
 - Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
