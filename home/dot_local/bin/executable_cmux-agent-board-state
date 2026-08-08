@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+state="${1:-}"
+workspace_id="${CMUX_WORKSPACE_ID:-}"
+
+if [[ -z "$workspace_id" ]]; then
+  echo "CMUX_WORKSPACE_ID is required" >&2
+  exit 1
+fi
+
+working_marker=$'\342\201\240\342\200\213\342\201\240'
+idle_marker=$'\342\201\240\342\200\214\342\201\240'
+input_marker=$'\342\201\240\342\200\215\342\201\240'
+
+case "$state" in
+  working) marker="$working_marker" ;;
+  idle) marker="$idle_marker" ;;
+  input) marker="$input_marker" ;;
+  clear) marker="" ;;
+  *)
+    echo "usage: cmux-agent-board-state {working|idle|input|clear}" >&2
+    exit 2
+    ;;
+esac
+
+current_title="$({
+  CMUX_QUIET=1 cmux workspace list --json
+} | jq -er --arg workspace_id "$workspace_id" '
+  .workspaces[]
+  | select(.id == $workspace_id or .ref == $workspace_id)
+  | .title
+  | gsub("\\\\u2060\\\\u200[bcd]\\\\u2060"; "")
+')"
+
+if [[ -n "$marker" && "$current_title" == *"$marker" ]]; then
+  echo '{}'
+  exit 0
+fi
+
+if [[ -z "$marker"
+  && "$current_title" != *"$working_marker"
+  && "$current_title" != *"$idle_marker"
+  && "$current_title" != *"$input_marker" ]]; then
+  echo '{}'
+  exit 0
+fi
+
+clean_title="${current_title//$working_marker/}"
+clean_title="${clean_title//$idle_marker/}"
+clean_title="${clean_title//$input_marker/}"
+
+cmux workspace-action \
+  --workspace "$workspace_id" \
+  --action rename \
+  --title "${clean_title}${marker}" \
+  >/dev/null
+
+echo '{}'

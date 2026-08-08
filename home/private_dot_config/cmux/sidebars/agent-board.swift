@@ -31,7 +31,26 @@ func progressLabel(_ workspace) -> String {
     return ""
 }
 
+func managedTitleState(_ title: String) -> String {
+    // Keep these zero-width markers literal. cmux 0.64.22 does not expand
+    // Unicode escape sequences in interpreted sidebar string literals.
+    if title.hasSuffix("⁠​⁠") { return "working" }
+    if title.hasSuffix("⁠‌⁠") { return "idle" }
+    if title.hasSuffix("⁠‍⁠") { return "input" }
+    return ""
+}
+
+func displayTitle(_ title: String) -> String {
+    return title
+        .replacingOccurrences(of: "⁠​⁠", with: "")
+        .replacingOccurrences(of: "⁠‌⁠", with: "")
+        .replacingOccurrences(of: "⁠‍⁠", with: "")
+}
+
 func agentState(_ workspace) -> String {
+    let titleState = managedTitleState(workspace.title)
+    if titleState != "" { return titleState }
+
     let label = progressLabel(workspace)
     let needsInput = workspace.tabs.contains {
         $0.title.lowercased().contains("action required")
@@ -62,6 +81,10 @@ func agentState(_ workspace) -> String {
         return "done"
     }
 
+    if label.contains("idle") {
+        return "idle"
+    }
+
     return "stopped"
 }
 
@@ -69,6 +92,7 @@ func stateTint(_ state: String) -> String {
     if state == "input" { return "#FF9F0A" }
     if state == "working" { return "#30D158" }
     if state == "done" { return "#54A8FF" }
+    if state == "idle" { return "#8E8E93" }
     if state == "stopped" { return "#FFD60A" }
     return "#636366"
 }
@@ -168,6 +192,7 @@ func tabSubtitle(_ tab, _ workspaceDirectory: String) -> String {
 func tabState(_ tab, _ workspaceState: String) -> String {
     if tab.title.lowercased().contains("action required") { return "input" }
     if hasSpinner(tab.title) { return "working" }
+    if workspaceState == "idle" { return "idle" }
     if workspaceState == "stopped" { return "stopped" }
     return "unknown"
 }
@@ -189,7 +214,7 @@ func workspaceRow(_ workspace) -> some View {
             .frame(width: 14)
 
         VStack(alignment: .leading, spacing: 2) {
-            Text(workspace.title)
+            Text(displayTitle(workspace.title))
                 .font(.system(size: 12))
                 .fontWeight(workspace.selected ? .semibold : .regular)
                 .lineLimit(1)
@@ -263,7 +288,7 @@ VStack(alignment: .leading, spacing: 6) {
     let visibleWorkspaces = workspaces.prefix(20)
     let inputCount = visibleWorkspaces.count { agentState($0) == "input" }
     let workingCount = visibleWorkspaces.count { agentState($0) == "working" }
-    let stoppedCount = visibleWorkspaces.count { agentState($0) == "stopped" }
+    let idleCount = visibleWorkspaces.count { agentState($0) == "idle" }
 
     HStack {
         Image(systemName: "rectangle.3.group")
@@ -276,7 +301,7 @@ VStack(alignment: .leading, spacing: 6) {
     }
     .padding(4)
 
-    Text("\(workingCount) working   \(inputCount) needs input   \(stoppedCount) stopped")
+    Text("\(workingCount) working   \(inputCount) needs input   \(idleCount) idle")
         .font(.system(size: 9, design: .monospaced))
         .foregroundColor("#8E8E93")
         .padding(4)
@@ -295,7 +320,7 @@ VStack(alignment: .leading, spacing: 6) {
             .fontWeight(.semibold)
             .foregroundColor("#636366")
         Spacer()
-        Text(selectedTitle)
+        Text(displayTitle(selectedTitle))
             .font(.system(size: 10))
             .foregroundColor("#636366")
             .lineLimit(1)

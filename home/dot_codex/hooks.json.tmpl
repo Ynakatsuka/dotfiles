@@ -1,0 +1,48 @@
+{{- $hooksPath := joinPath .chezmoi.homeDir ".codex/hooks.json" -}}
+{{- $base := dict "hooks" (dict) -}}
+{{- if stat $hooksPath -}}
+{{- $base = include $hooksPath | fromJson -}}
+{{- end -}}
+{{- $working := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" working; fi" -}}
+{{- $idle := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" idle; fi" -}}
+{{- $input := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" input; fi" -}}
+{{- $clear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" clear; fi" -}}
+{{- $oldWorking := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 0 --label working >/dev/null && echo '{}'; fi" -}}
+{{- $oldIdle := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 1 --label idle >/dev/null && echo '{}'; fi" -}}
+{{- $oldClear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux clear-progress >/dev/null && echo '{}'; fi" -}}
+{{ output "jq" "-n" "--argjson" "base" ($base | toJson) "--arg" "working" $working "--arg" "idle" $idle "--arg" "input" $input "--arg" "clear" $clear "--arg" "oldWorking" $oldWorking "--arg" "oldIdle" $oldIdle "--arg" "oldClear" $oldClear `
+  def without_agent_board:
+    map(select(
+      ((.hooks // []) | any(
+        .command == $working or .command == $idle or .command == $input or .command == $clear
+        or .command == $oldWorking or .command == $oldIdle or .command == $oldClear
+      )) | not
+    ));
+
+  $base
+  | .hooks = (.hooks // {})
+  | .hooks.SessionStart = (
+      ((.hooks.SessionStart // []) | without_agent_board)
+      + [{"hooks": [{"command": $idle, "timeout": 5, "type": "command"}]}]
+    )
+  | .hooks.PermissionRequest = (
+      ((.hooks.PermissionRequest // []) | without_agent_board)
+      + [{"hooks": [{"command": $input, "timeout": 5, "type": "command"}]}]
+    )
+  | .hooks.PreToolUse = (
+      ((.hooks.PreToolUse // []) | without_agent_board)
+      + [{"hooks": [{"command": $working, "timeout": 5, "type": "command"}]}]
+    )
+  | .hooks.UserPromptSubmit = (
+      ((.hooks.UserPromptSubmit // []) | without_agent_board)
+      + [{"hooks": [{"command": $working, "timeout": 5, "type": "command"}]}]
+    )
+  | .hooks.Stop = (
+      ((.hooks.Stop // []) | without_agent_board)
+      + [{"hooks": [{"command": $idle, "timeout": 5, "type": "command"}]}]
+    )
+  | .hooks.SessionEnd = (
+      ((.hooks.SessionEnd // []) | without_agent_board)
+      + [{"hooks": [{"command": $clear, "timeout": 3, "type": "command"}]}]
+    )
+` -}}
