@@ -4,57 +4,99 @@ set -euo pipefail
 
 state="${1:-}"
 workspace_id="${CMUX_WORKSPACE_ID:-}"
+surface_id="${CMUX_SURFACE_ID:-}"
 
 if [[ -z "$workspace_id" ]]; then
   echo "CMUX_WORKSPACE_ID is required" >&2
   exit 1
 fi
 
+if [[ -z "$surface_id" ]]; then
+  echo "CMUX_SURFACE_ID is required" >&2
+  exit 1
+fi
+
 working_marker=$'\342\201\240\342\200\213\342\201\240'
-idle_marker=$'\342\201\240\342\200\214\342\201\240'
+stopped_marker=$'\342\201\240\342\200\214\342\201\240'
 input_marker=$'\342\201\240\342\200\215\342\201\240'
 
 case "$state" in
   working) marker="$working_marker" ;;
-  idle) marker="$idle_marker" ;;
+  # Existing sessions can retain the former Stop hook until they restart.
+  stopped | idle) marker="$stopped_marker" ;;
   input) marker="$input_marker" ;;
   clear) marker="" ;;
   *)
-    echo "usage: cmux-agent-board-state {working|idle|input|clear}" >&2
+    echo "usage: cmux-agent-board-state {working|stopped|input|clear}" >&2
     exit 2
     ;;
 esac
 
-current_title="$({
+current_workspace_title="$({
   CMUX_QUIET=1 cmux workspace list --json
 } | jq -er --arg workspace_id "$workspace_id" '
   .workspaces[]
   | select(.id == $workspace_id or .ref == $workspace_id)
   | .title
-  | gsub("\\\\u2060\\\\u200[bcd]\\\\u2060"; "")
 ')"
 
-if [[ -n "$marker" && "$current_title" == *"$marker" ]]; then
+surface_list_params="$(jq -cn --arg workspace_id "$workspace_id" '{workspace_id: $workspace_id}')"
+current_surface_title="$({
+  CMUX_QUIET=1 cmux rpc surface.list "$surface_list_params"
+} | jq -er --arg surface_id "$surface_id" '
+  .surfaces
+  | map(select(.id == $surface_id or .ref == $surface_id))
+  | if length != 1 then error("surface not found or not unique")
+    elif (.[0].title | type) != "string" then error("surface title was not a string")
+    else .[0].title
+    end
+')"
+
+workspace_has_marker=false
+if [[ "$current_workspace_title" == *"$working_marker"*
+  || "$current_workspace_title" == *"$stopped_marker"*
+  || "$current_workspace_title" == *"$input_marker"* ]]; then
+  workspace_has_marker=true
+fi
+
+if [[ -n "$marker"
+  && "$current_surface_title" == *"$marker"
+  && "$workspace_has_marker" == false ]]; then
   echo '{}'
   exit 0
 fi
 
 if [[ -z "$marker"
-  && "$current_title" != *"$working_marker"
-  && "$current_title" != *"$idle_marker"
-  && "$current_title" != *"$input_marker" ]]; then
+  && "$current_surface_title" != *"$working_marker"
+  && "$current_surface_title" != *"$stopped_marker"
+  && "$current_surface_title" != *"$input_marker"
+  && "$workspace_has_marker" == false ]]; then
   echo '{}'
   exit 0
 fi
 
-clean_title="${current_title//$working_marker/}"
-clean_title="${clean_title//$idle_marker/}"
-clean_title="${clean_title//$input_marker/}"
+clean_surface_title="${current_surface_title//$working_marker/}"
+clean_surface_title="${clean_surface_title//$stopped_marker/}"
+clean_surface_title="${clean_surface_title//$input_marker/}"
 
-cmux workspace-action \
-  --workspace "$workspace_id" \
-  --action rename \
-  --title "${clean_title}${marker}" \
-  >/dev/null
+next_surface_title="${clean_surface_title}${marker}"
+if [[ "$next_surface_title" != "$current_surface_title" ]]; then
+  cmux tab-action \
+    --surface "$surface_id" \
+    --action rename \
+    --title "$next_surface_title" \
+    >/dev/null
+fi
+
+if [[ "$workspace_has_marker" == true ]]; then
+  clean_workspace_title="${current_workspace_title//$working_marker/}"
+  clean_workspace_title="${clean_workspace_title//$stopped_marker/}"
+  clean_workspace_title="${clean_workspace_title//$input_marker/}"
+  cmux workspace-action \
+    --workspace "$workspace_id" \
+    --action rename \
+    --title "$clean_workspace_title" \
+    >/dev/null
+fi
 
 echo '{}'

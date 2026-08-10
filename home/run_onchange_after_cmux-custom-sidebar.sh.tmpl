@@ -4,6 +4,11 @@
 # cmux stores these values in macOS preferences rather than settings.json.
 # Running this after chezmoi applies the sidebar file makes a fresh dotfiles
 # installation activate Agent Board without requiring UI setup.
+#
+# The hashes keep this run_onchange script tied to all generated-sidebar inputs.
+# agent-board-source: {{ include "dot_local/share/cmux/agent-board.swift" | sha256sum }}
+# diff-refresher: {{ include "dot_local/bin/executable_cmux-agent-board-diff-refresh" | sha256sum }}
+# launch-agent: {{ include "private_Library/private_LaunchAgents/com.cmuxterm.agent-board-diff.plist.tmpl" | sha256sum }}
 
 set -euo pipefail
 
@@ -13,6 +18,22 @@ fi
 
 readonly CMUX_BUNDLE_ID="com.cmuxterm.app"
 readonly SIDEBAR_PROVIDER_ID="cmux.sidebar.custom.agent-board"
+readonly DIFF_JOB_LABEL="com.cmuxterm.agent-board-diff"
+readonly DIFF_JOB_PLIST="${HOME}/Library/LaunchAgents/${DIFF_JOB_LABEL}.plist"
+readonly SIDEBAR_SOURCE="${HOME}/.local/share/cmux/agent-board.swift"
+readonly SIDEBAR_RUNTIME_DIR="${HOME}/.local/state/cmux"
+readonly SIDEBAR_RUNTIME="${SIDEBAR_RUNTIME_DIR}/agent-board.swift"
+
+[[ -f "${SIDEBAR_SOURCE}" ]]
+[[ -f "${DIFF_JOB_PLIST}" ]]
+plutil -lint "${DIFF_JOB_PLIST}" >/dev/null
+
+mkdir -p "${SIDEBAR_RUNTIME_DIR}"
+runtime_tmp="$(mktemp "${SIDEBAR_RUNTIME_DIR}/.agent-board.swift.XXXXXX")"
+trap 'rm -f "${runtime_tmp}"' EXIT
+install -m 0644 "${SIDEBAR_SOURCE}" "${runtime_tmp}"
+mv "${runtime_tmp}" "${SIDEBAR_RUNTIME}"
+trap - EXIT
 
 defaults write "${CMUX_BUNDLE_ID}" customSidebars.beta.enabled -bool true
 defaults write "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId \
@@ -22,4 +43,10 @@ defaults write "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId \
 [[ "$(defaults read "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId)" == \
   "${SIDEBAR_PROVIDER_ID}" ]]
 
-echo "Enabled cmux custom sidebars and selected agent-board."
+launch_domain="gui/$(id -u)"
+if launchctl print "${launch_domain}/${DIFF_JOB_LABEL}" >/dev/null 2>&1; then
+  launchctl bootout "${launch_domain}/${DIFF_JOB_LABEL}"
+fi
+launchctl bootstrap "${launch_domain}" "${DIFF_JOB_PLIST}"
+
+echo "Enabled cmux Agent Board and its Git diff refresh job."

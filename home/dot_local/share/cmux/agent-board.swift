@@ -3,6 +3,15 @@
 // cmux re-evaluates interpreted sidebars about once a second. Keep the data
 // classification and rendered view tree deliberately small.
 
+// The diff refresher replaces only this block in the runtime copy under
+// ~/.local/state/cmux. This managed source remains static under chezmoi.
+// BEGIN CMUX_DIFF_DATA (managed by cmux-agent-board-diff-refresh)
+func diffTotalsOf(_ dir) -> String { return "" }
+func diffTreeOf(_ dir) -> String { return "" }
+func diffMoreOf(_ dir) -> String { return "" }
+func diffRootOf(_ dir) -> String { return "" }
+// END CMUX_DIFF_DATA
+
 func hasSpinner(_ title: String) -> Bool {
     return title.hasPrefix("⠁")
         || title.hasPrefix("⠂")
@@ -35,7 +44,7 @@ func managedTitleState(_ title: String) -> String {
     // Keep these zero-width markers literal. cmux 0.64.22 does not expand
     // Unicode escape sequences in interpreted sidebar string literals.
     if title.hasSuffix("⁠​⁠") { return "working" }
-    if title.hasSuffix("⁠‌⁠") { return "idle" }
+    if title.hasSuffix("⁠‌⁠") { return "stopped" }
     if title.hasSuffix("⁠‍⁠") { return "input" }
     return ""
 }
@@ -48,14 +57,14 @@ func displayTitle(_ title: String) -> String {
 }
 
 func agentState(_ workspace) -> String {
-    let titleState = managedTitleState(workspace.title)
-    if titleState != "" { return titleState }
-
+    let legacyTitleState = managedTitleState(workspace.title)
     let label = progressLabel(workspace)
     let needsInput = workspace.tabs.contains {
-        $0.title.lowercased().contains("action required")
+        managedTitleState($0.title) == "input"
+            || $0.title.lowercased().contains("action required")
     }
     if needsInput
+        || legacyTitleState == "input"
         || label.contains("waiting")
         || label.contains("input")
         || label.contains("approval")
@@ -65,9 +74,10 @@ func agentState(_ workspace) -> String {
     }
 
     let hasWorkingTab = workspace.tabs.contains {
-        hasSpinner($0.title)
+        managedTitleState($0.title) == "working" || hasSpinner($0.title)
     }
     if hasWorkingTab
+        || legacyTitleState == "working"
         || label.contains("working")
         || label.contains("running")
         || label.contains("progress") {
@@ -81,11 +91,18 @@ func agentState(_ workspace) -> String {
         return "done"
     }
 
+    let hasStoppedTab = workspace.tabs.contains {
+        managedTitleState($0.title) == "stopped"
+    }
+    if hasStoppedTab || legacyTitleState == "stopped" {
+        return "stopped"
+    }
+
     if label.contains("idle") {
         return "idle"
     }
 
-    return "stopped"
+    return "idle"
 }
 
 func stateTint(_ state: String) -> String {
@@ -117,14 +134,146 @@ func worktreeName(_ directory: String) -> String {
     return components[components.count - 1]
 }
 
-func managedDescriptionBranch(_ workspace) -> String {
-    if workspace.description == nil || workspace.description == "" { return "" }
-    let prefix = "agent-board-branch:"
-    let matchingLines = workspace.description.split(separator: "\n").filter {
+func managedDescriptionValue(_ workspace, _ prefix: String) -> String {
+    // The interpreted sidebar does not unescape newline literals. Metadata
+    // therefore uses a printable unit-separator symbol in one description.
+    let matchingFields = "\(workspace.description)".split(separator: "␟").filter {
         $0.hasPrefix(prefix)
     }
-    if matchingLines.count == 0 { return "" }
-    return matchingLines[0].replacingOccurrences(of: prefix, with: "")
+    if matchingFields.count == 0 { return "" }
+    return matchingFields[0]
+        .replacingOccurrences(of: prefix, with: "")
+        .trimmingCharacters(in: .whitespaces)
+}
+
+func managedDescriptionBranch(_ workspace) -> String {
+    return managedDescriptionValue(workspace, "agent-board-branch:")
+}
+
+func diffCount(_ workspace) -> String {
+    let parts = diffTotalsOf(workspace.directory).split(separator: "|")
+    if parts.count < 3 { return "0" }
+    return "\(parts[0])"
+}
+
+func diffBadge(_ workspace) -> some View {
+    let parts = diffTotalsOf(workspace.directory).split(separator: "|")
+    HStack(spacing: 3) {
+        if parts.count > 2 {
+            Image(systemName: "doc.on.doc")
+                .font(.system(size: 8))
+                .foregroundColor("#8E8E93")
+            Text("\(parts[0])")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor("#8E8E93")
+            Text("+\(parts[1])")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor("#30D158")
+            Text("−\(parts[2])")
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor("#FF453A")
+        }
+    }
+}
+
+func diffKindIcon(_ kind: String) -> String {
+    if kind == "N" { return "plus.circle.fill" }
+    if kind == "D" { return "minus.circle.fill" }
+    return "pencil.circle.fill"
+}
+
+func diffKindColor(_ kind: String) -> String {
+    if kind == "N" { return "#30D158" }
+    if kind == "D" { return "#FF453A" }
+    return "#54A8FF"
+}
+
+func diffTreeRow(_ workspace, _ entry) -> some View {
+    let fields = "\(entry)".split(separator: "|")
+    let rowType = fields.count > 0 ? "\(fields[0])" : ""
+    Group {
+        if rowType == "D" {
+            HStack(spacing: 5) {
+                Text(fields.count > 1 ? "\(fields[1])" : " ")
+                    .font(.system(size: 9, design: .monospaced))
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor("#636366")
+                    .frame(width: 12)
+                Text(fields.count > 2 ? "\(fields[2])" : "")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor("#8E8E93")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+            }
+            .padding(4)
+        } else {
+            let indent = fields.count > 1 ? "\(fields[1])" : " "
+            let kind = fields.count > 2 ? "\(fields[2])" : ""
+            let added = fields.count > 3 ? "\(fields[3])" : ""
+            let deleted = fields.count > 4 ? "\(fields[4])" : ""
+            let fileName = fields.count > 5 ? "\(fields[5])" : ""
+            let filePath = fields.count > 6 ? "\(fields[6])" : ""
+            let pathToken = fields.count > 7 ? "\(fields[7])" : ""
+            Button(action: {
+                cmux(
+                    "surface.create",
+                    workspace_id: workspace.id,
+                    type: "terminal",
+                    working_directory: diffRootOf(workspace.directory),
+                    initial_command: "~/.local/bin/cmux-agent-board-diff-open \(pathToken) && exit",
+                    focus: true
+                )
+            }) {
+                HStack(spacing: 5) {
+                    Text(indent)
+                        .font(.system(size: 8, design: .monospaced))
+                    Image(systemName: diffKindIcon(kind))
+                        .font(.system(size: 9))
+                        .foregroundColor(diffKindColor(kind))
+                        .frame(width: 12)
+                    Text(fileName)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor("#8E8E93")
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    if added == "-" {
+                        Text("bin")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundColor("#636366")
+                    } else {
+                        Text("+\(added)")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundColor("#30D158")
+                        Text("−\(deleted)")
+                            .font(.system(size: 8, design: .monospaced))
+                            .foregroundColor("#FF453A")
+                    }
+                }
+                .padding(4)
+            }
+            .disabled(filePath == "" || pathToken == "")
+            .help("View diff for \(filePath)")
+        }
+    }
+}
+
+func diffTreeList(_ workspace) -> some View {
+    let rows = diffTreeOf(workspace.directory).split(separator: ";")
+    let more = diffMoreOf(workspace.directory)
+    VStack(alignment: .leading, spacing: 1) {
+        ForEach(rows.indices) { index in
+            diffTreeRow(workspace, rows[index])
+        }
+        if more != "" {
+            Text("+ \(more) more")
+                .font(.system(size: 9))
+                .foregroundColor("#636366")
+                .padding(4)
+        }
+    }
 }
 
 func workspaceBranchText(_ workspace) -> String {
@@ -189,12 +338,12 @@ func tabSubtitle(_ tab, _ workspaceDirectory: String) -> String {
     return branch != "" ? "\(location)  \(branch)\(tab.dirty == true ? " •" : "")" : location
 }
 
-func tabState(_ tab, _ workspaceState: String) -> String {
+func tabState(_ tab) -> String {
+    let titleState = managedTitleState(tab.title)
+    if titleState != "" { return titleState }
     if tab.title.lowercased().contains("action required") { return "input" }
     if hasSpinner(tab.title) { return "working" }
-    if workspaceState == "idle" { return "idle" }
-    if workspaceState == "stopped" { return "stopped" }
-    return "unknown"
+    return "idle"
 }
 
 func workspaceRow(_ workspace) -> some View {
@@ -206,7 +355,7 @@ func workspaceRow(_ workspace) -> some View {
     HStack(spacing: 7) {
         Capsule()
             .foregroundColor(tint)
-            .frame(width: 3, height: 42)
+            .frame(width: 3)
 
         Text("\(workspace.index + 1)")
             .font(.system(size: 9, design: .monospaced))
@@ -214,11 +363,13 @@ func workspaceRow(_ workspace) -> some View {
             .frame(width: 14)
 
         VStack(alignment: .leading, spacing: 2) {
-            Text(displayTitle(workspace.title))
-                .font(.system(size: 12))
-                .fontWeight(workspace.selected ? .semibold : .regular)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            HStack(spacing: 5) {
+                Text(displayTitle(workspace.title))
+                    .font(.system(size: 12))
+                    .fontWeight(workspace.selected ? .semibold : .regular)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
 
             Label(workspaceWorktreeText(workspace), systemImage: "square.stack.3d.down.right")
                 .font(.system(size: 9))
@@ -233,10 +384,15 @@ func workspaceRow(_ workspace) -> some View {
                 .truncationMode(.middle)
 
             HStack(spacing: 4) {
+                Spacer()
+                diffBadge(workspace)
+            }
+
+            HStack(spacing: 4) {
                 ForEach(workspace.tabs) { tab in
                     Image(systemName: "circle.fill")
                         .font(.system(size: 7))
-                        .foregroundColor(stateTint(tabState(tab, state)))
+                        .foregroundColor(stateTint(tabState(tab)))
                 }
             }
         }
@@ -249,8 +405,8 @@ func workspaceRow(_ workspace) -> some View {
     .onTapGesture { cmux("workspace.select", workspace_id: workspace.id) }
 }
 
-func tabRow(_ tab, _ workspaceState: String, _ workspaceDirectory: String) -> some View {
-    let state = tabState(tab, workspaceState)
+func tabRow(_ tab, _ workspaceDirectory: String) -> some View {
+    let state = tabState(tab)
     let tint = stateTint(state)
 
     HStack(spacing: 7) {
@@ -260,7 +416,7 @@ func tabRow(_ tab, _ workspaceState: String, _ workspaceDirectory: String) -> so
             .frame(width: 14)
 
         VStack(alignment: .leading, spacing: 2) {
-            Text(tab.title)
+            Text(displayTitle(tab.title))
                 .font(.system(size: 11))
                 .fontWeight(tab.focused ? .semibold : .regular)
                 .lineLimit(1)
@@ -329,7 +485,30 @@ VStack(alignment: .leading, spacing: 6) {
 
     ForEach(workspaces.filter { $0.selected }.prefix(1)) { selected in
         ForEach(selected.tabs.prefix(10)) { tab in
-            tabRow(tab, agentState(selected), selected.directory)
+            tabRow(tab, selected.directory)
+        }
+
+        Divider()
+
+        HStack {
+            Text("Diff")
+                .font(.system(size: 10))
+                .fontWeight(.semibold)
+                .foregroundColor("#636366")
+            Spacer()
+            Text(diffCount(selected))
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundColor("#636366")
+        }
+        .padding(4)
+
+        if diffTotalsOf(selected.directory) == "" {
+            Text("No changes")
+                .font(.system(size: 9))
+                .foregroundColor("#636366")
+                .padding(4)
+        } else {
+            diffTreeList(selected)
         }
     }
 

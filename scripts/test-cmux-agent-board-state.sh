@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly REPO_ROOT
+readonly SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-agent-board-state"
+readonly SIDEBAR="$REPO_ROOT/home/dot_local/share/cmux/agent-board.swift"
+
+test_dir=$(mktemp -d "${TMPDIR:-/tmp}/cmux-agent-board-state-test.XXXXXX")
+trap 'rm -rf "$test_dir"' EXIT
+
+mock_cmux="$test_dir/cmux"
+calls_file="$test_dir/calls"
+
+cat >"$mock_cmux" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$*" == 'workspace list --json' ]]; then
+  jq -n --arg title "${MOCK_WORKSPACE_TITLE:-workspace}" '{workspaces: [{id: "workspace-id", title: $title}]}'
+  exit 0
+fi
+
+if [[ "${1:-}" == 'rpc' && "${2:-}" == 'surface.list' ]]; then
+  jq -n --arg title "${MOCK_SURFACE_TITLE:-surface}" \
+    '{surfaces: [{id: "surface-id", ref: "surface:1", title: $title}]}'
+  exit 0
+fi
+
+if [[ "${1:-}" == 'workspace-action' || "${1:-}" == 'tab-action' ]]; then
+  printf '%s\n' "$*" >>"$MOCK_CALLS_FILE"
+  exit 0
+fi
+
+printf 'unexpected cmux arguments: %s\n' "$*" >&2
+exit 1
+MOCK
+chmod +x "$mock_cmux"
+
+run_state() {
+  PATH="$test_dir:$PATH" \
+    MOCK_CALLS_FILE="$calls_file" \
+    CMUX_WORKSPACE_ID='workspace-id' \
+    CMUX_SURFACE_ID='surface-id' \
+    bash "$SCRIPT" "$@"
+}
+
+working_marker=$'\342\201\240\342\200\213\342\201\240'
+stopped_marker=$'\342\201\240\342\200\214\342\201\240'
+input_marker=$'\342\201\240\342\200\215\342\201\240'
+
+run_state working >/dev/null
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${working_marker}" "$calls_file"
+if grep -Fq 'workspace-action' "$calls_file"; then
+  printf 'clean workspace title was unexpectedly renamed\n' >&2
+  exit 1
+fi
+
+: >"$calls_file"
+MOCK_SURFACE_TITLE="surface${working_marker}" run_state working >/dev/null
+[[ ! -s "$calls_file" ]]
+
+MOCK_WORKSPACE_TITLE="workspace${working_marker}" \
+  MOCK_SURFACE_TITLE="surface${working_marker}" \
+  run_state input >/dev/null
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${input_marker}" "$calls_file"
+grep -Fq -- 'workspace-action --workspace workspace-id --action rename --title workspace' "$calls_file"
+
+: >"$calls_file"
+MOCK_SURFACE_TITLE="surface${stopped_marker}" run_state clear >/dev/null
+grep -Fq -- 'tab-action --surface surface-id --action rename --title surface' "$calls_file"
+
+: >"$calls_file"
+MOCK_WORKSPACE_TITLE="workspace${stopped_marker}" run_state clear >/dev/null
+grep -Fq -- 'workspace-action --workspace workspace-id --action rename --title workspace' "$calls_file"
+if grep -Fq 'tab-action' "$calls_file"; then
+  printf 'marker-free surface was unexpectedly renamed during workspace migration\n' >&2
+  exit 1
+fi
+
+: >"$calls_file"
+run_state stopped >/dev/null
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${stopped_marker}" "$calls_file"
+
+: >"$calls_file"
+run_state idle >/dev/null
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${stopped_marker}" "$calls_file"
+
+if CMUX_WORKSPACE_ID='' PATH="$test_dir:$PATH" bash "$SCRIPT" idle >/dev/null 2>&1; then
+  printf 'missing workspace ID unexpectedly succeeded\n' >&2
+  exit 1
+fi
+
+if CMUX_WORKSPACE_ID='workspace-id' CMUX_SURFACE_ID='' PATH="$test_dir:$PATH" \
+  bash "$SCRIPT" stopped >/dev/null 2>&1; then
+  printf 'missing surface ID unexpectedly succeeded\n' >&2
+  exit 1
+fi
+
+jq -e '
+  .hooks.SessionStart[0].hooks[0].command | contains("cmux-agent-board-state\" stopped")
+' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+jq -e '
+  .hooks.PermissionRequest[0].hooks[0].command | contains("cmux-agent-board-state\" input")
+' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+jq -e '
+  [.hooks.PreToolUse[]
+    | select(any(.hooks[]; .command | contains("cmux-agent-board-state\" working")))
+    | .matcher] == ["^(?!AskUserQuestion$).*"]
+  and
+  [.hooks.PreToolUse[]
+    | select(any(.hooks[]; .command | contains("cmux-agent-board-state\" input")))
+    | .matcher] == ["AskUserQuestion"]
+' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+jq -e '
+  .hooks.UserPromptSubmit[0].hooks[0].command | contains("cmux-agent-board-state\" working")
+' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+jq -e '
+  .hooks.Stop[0].hooks[0].command | contains("cmux-agent-board-state\" stopped")
+' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+jq -e '
+  .hooks.SessionEnd[0].hooks[0].command | contains("cmux-agent-board-state\" clear")
+' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+
+rendered_codex_hooks=$(chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
+jq -e '
+  any(.hooks.SessionStart[]?.hooks[]?; .command | contains("cmux-agent-board-state\" stopped"))
+  and
+  any(.hooks.Stop[]?.hooks[]?; .command | contains("cmux-agent-board-state\" stopped"))
+  and
+  any(.hooks.SessionEnd[]?.hooks[]?; .command | contains("cmux-agent-board-state\" clear"))
+' <<<"$rendered_codex_hooks" >/dev/null
+
+grep -Fq "if title.hasSuffix(\"${stopped_marker}\") { return \"stopped\" }" "$SIDEBAR"
+python3 - "$SIDEBAR" <<'PY'
+import pathlib
+import sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+agent_state = source.split("func agentState", 1)[1].split("func stateTint", 1)[0]
+tab_state = source.split("func tabState", 1)[1].split("func workspaceRow", 1)[0]
+assert agent_state.rstrip().endswith('return "idle"\n}')
+assert "workspace.tabs.contains" in agent_state
+assert "managedTitleState(tab.title)" in tab_state
+assert "workspaceStatusText" not in source
+assert "workspaceMemoText" not in source
+assert "cmux-workspace-note" not in source
+assert "noteButton" not in source
+assert "statusPill" not in source
+assert '"surface.create"' in source
+assert "cmux-agent-board-diff-open" in source
+assert 'initial_command: "~/.local/bin/cmux-agent-board-diff-open \\(pathToken) && exit"' in source
+assert 'cmux("file.open"' not in source
+assert "func diffTreeRow" in source
+assert "func diffTreeList" in source
+assert "diffTreeOf(workspace.directory)" in source
+assert 'Image(systemName: "folder.fill")' in source
+assert "func unreadIndicator()" not in source
+assert "unreadBadge" not in source
+assert "workspace.unread" not in source
+assert "unreadTotal" not in source
+assert 'Text("\\(count)")' not in source
+PY
+
+printf 'cmux Agent Board state tests passed\n'

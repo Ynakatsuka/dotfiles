@@ -15,6 +15,7 @@ mcp.json
 .codex/agents/simplifier_apply.toml
 .codex/skills/my-subagent
 .config/cmux/settings.json
+.local/bin/cmux-workspace-note
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy
 CLAUDE.md

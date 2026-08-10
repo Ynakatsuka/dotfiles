@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+"""Refresh Git diff data embedded in the cmux Agent Board runtime sidebar."""
+
+from __future__ import annotations
+
+import base64
+import fcntl
+import json
+import os
+import stat
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any
+
+
+BEGIN = "// BEGIN CMUX_DIFF_DATA (managed by cmux-agent-board-diff-refresh)"
+END = "// END CMUX_DIFF_DATA"
+MAX_FILES_LISTED = 20
+MAX_UNTRACKED_BYTES = 2_000_000
+GIT_TIMEOUT_SECONDS = 15
+
+
+def configured_path(variable: str, default: Path) -> Path:
+    return Path(os.environ.get(variable, str(default))).expanduser()
+
+
+def run_command(command: list[str], *, cwd: Path | None = None) -> str:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
+        timeout=GIT_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(message or f"command failed: {' '.join(command)}")
+    return result.stdout
+
+
+def git(directory: Path, *arguments: str) -> str:
+    return run_command(
+        ["git", "-c", "core.quotepath=false", *arguments], cwd=directory
+    )
+
+
+def workspace_directories(cmux_bin: str) -> list[Path]:
+    output = run_command([cmux_bin, "--json", "workspace", "list"])
+    document = json.loads(output)
+    if not isinstance(document, dict) or not isinstance(document.get("workspaces"), list):
+        raise RuntimeError("cmux workspace list did not contain a workspaces array")
+
+    directories: list[Path] = []
+    for workspace in document["workspaces"]:
+        if not isinstance(workspace, dict):
+            raise RuntimeError("cmux workspace list contained an invalid workspace")
+        directory = workspace.get("current_directory")
+        if directory is None:
+            continue
+        if not isinstance(directory, str):
+            raise RuntimeError("cmux workspace current_directory was not a string")
+        if directory:
+            directories.append(Path(directory).expanduser())
+    return directories
+
+
+def git_toplevel(directory: Path) -> Path | None:
+    if not directory.is_dir():
+        return None
+
+    result = subprocess.run(
+        ["git", "-c", "core.quotepath=false", "rev-parse", "--show-toplevel"],
+        cwd=directory,
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
+        timeout=GIT_TIMEOUT_SECONDS,
+    )
+    if result.returncode == 0:
+        top = result.stdout.strip()
+        if not top:
+            raise RuntimeError("git rev-parse returned an empty worktree path")
+        return Path(top)
+
+    if "not a git repository" in result.stderr.lower():
+        return None
+    message = result.stderr.strip() or result.stdout.strip()
+    raise RuntimeError(message or "git rev-parse --show-toplevel failed")
+
+
+def repository_toplevels(directories: list[Path]) -> list[Path]:
+    toplevels: dict[str, Path] = {}
+    for directory in directories:
+        top = git_toplevel(directory)
+        if top is not None:
+            toplevels.setdefault(str(top), top)
+    return [toplevels[key] for key in sorted(toplevels)]
+
+
+def sanitized_field(value: str) -> str:
+    clean = "".join(character for character in value if character.isprintable())
+    for unsupported, replacement in (
+        ('"', "?"),
+        ("\\", "/"),
+        ("|", "?"),
+        (";", "?"),
+    ):
+        clean = clean.replace(unsupported, replacement)
+    return clean[-200:]
+
+
+def path_token(value: str) -> str:
+    encoded = value.encode("utf-8", errors="surrogateescape")
+    return base64.urlsafe_b64encode(encoded).decode("ascii").rstrip("=")
+
+
+def tree_rows(entries: list[dict[str, Any]]) -> str:
+    root: dict[str, Any] = {"children": {}, "entry": None}
+    for entry in sorted(entries, key=lambda item: item["path"]):
+        components = entry["path"].split("/")
+        node = root
+        for component in components[:-1]:
+            node = node["children"].setdefault(
+                component, {"children": {}, "entry": None}
+            )
+        node["children"][components[-1]] = {"children": {}, "entry": entry}
+
+    rows: list[str] = []
+
+    def append_children(node: dict[str, Any], depth: int) -> None:
+        children = node["children"]
+        names = sorted(
+            children,
+            key=lambda name: (
+                children[name]["entry"] is not None,
+                name.casefold(),
+                name,
+            ),
+        )
+        for name in names:
+            child = children[name]
+            indent = "  " * depth + " "
+            entry = child["entry"]
+            if entry is None:
+                rows.append(f"D|{indent}|{sanitized_field(name)}")
+                append_children(child, depth + 1)
+                continue
+            rows.append(
+                "|".join(
+                    (
+                        "F",
+                        indent,
+                        str(entry["kind"]),
+                        str(entry["added"]),
+                        str(entry["deleted"]),
+                        sanitized_field(name),
+                        sanitized_field(entry["path"]),
+                        path_token(entry["path"]),
+                    )
+                )
+            )
+
+    append_children(root, 0)
+    return ";".join(rows)
+
+
+def swift_literal(value: str) -> str:
+    if '"' in value or "\\" in value:
+        raise RuntimeError("path cannot be represented in the cmux sidebar interpreter")
+    return value
+
+
+def untracked_counts(file_path: Path) -> tuple[int | str, int | str]:
+    file_stat = file_path.lstat()
+    if not stat.S_ISREG(file_stat.st_mode):
+        return "-", "-"
+    size = file_stat.st_size
+    if size > MAX_UNTRACKED_BYTES:
+        return "-", "-"
+
+    line_breaks = 0
+    last_byte = b""
+    with file_path.open("rb") as file:
+        for block in iter(lambda: file.read(65536), b""):
+            if b"\0" in block:
+                return "-", "-"
+            line_breaks += block.count(b"\n")
+            last_byte = block[-1:]
+    if size and last_byte != b"\n":
+        line_breaks += 1
+    return line_breaks, 0
+
+
+def status_kind(status: str) -> str:
+    if "D" in status:
+        return "D"
+    if "A" in status or status == "??":
+        return "N"
+    return "M"
+
+
+def diff_base(top: Path) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
+        cwd=top,
+        capture_output=True,
+        text=True,
+        errors="surrogateescape",
+        timeout=GIT_TIMEOUT_SECONDS,
+    )
+    if result.returncode == 0:
+        return "HEAD"
+    if result.returncode != 1:
+        message = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(message or "git rev-parse --verify HEAD failed")
+
+    empty_tree = git(top, "hash-object", "-t", "tree", "/dev/null").strip()
+    if not empty_tree:
+        raise RuntimeError("git hash-object returned an empty tree ID")
+    return empty_tree
+
+
+def repository_changes(top: Path) -> list[dict[str, Any]]:
+    entries: dict[str, dict[str, Any]] = {}
+    numstat = git(
+        top, "diff", "--numstat", "-z", "--no-renames", diff_base(top)
+    )
+    for record in numstat.split("\0"):
+        if not record:
+            continue
+        parts = record.split("\t", 2)
+        if len(parts) != 3:
+            raise RuntimeError("git diff returned an invalid numstat record")
+        added, deleted, file_name = parts
+        if added != "-" and not added.isdecimal():
+            raise RuntimeError("git diff returned an invalid added-line count")
+        if deleted != "-" and not deleted.isdecimal():
+            raise RuntimeError("git diff returned an invalid deleted-line count")
+        entries[file_name] = {
+            "kind": "M",
+            "added": "-" if added == "-" else int(added),
+            "deleted": "-" if deleted == "-" else int(deleted),
+            "path": file_name,
+        }
+
+    status = git(top, "status", "--porcelain=v1", "-z", "-uall", "--no-renames")
+    for record in status.split("\0"):
+        if not record:
+            continue
+        if len(record) < 4 or record[2] != " ":
+            raise RuntimeError("git status returned an invalid porcelain record")
+        code, file_name = record[:2], record[3:]
+        if code == "!!":
+            continue
+        if code == "??":
+            added, deleted = untracked_counts(top / file_name)
+            entries[file_name] = {
+                "kind": "N",
+                "added": added,
+                "deleted": deleted,
+                "path": file_name,
+            }
+        elif file_name in entries:
+            entries[file_name]["kind"] = status_kind(code)
+
+    def churn(entry: dict[str, Any]) -> int:
+        added = entry["added"] if isinstance(entry["added"], int) else 0
+        deleted = entry["deleted"] if isinstance(entry["deleted"], int) else 0
+        return added + deleted
+
+    return sorted(entries.values(), key=lambda entry: (-churn(entry), entry["path"]))
+
+
+def branches(stats: dict[str, dict[str, str]], field: str) -> str:
+    lines: list[str] = []
+    for top in sorted(stats, key=lambda item: (-len(Path(item).parts), item)):
+        value = stats[top][field]
+        if not value:
+            continue
+        top_literal = swift_literal(top)
+        lines.append(
+            f'  if d == "{top_literal}" || d.hasPrefix("{top_literal}/") {{ return "{swift_literal(value)}" }}\n'
+        )
+    return "".join(lines)
+
+
+def generated_block(stats: dict[str, dict[str, str]]) -> str:
+    functions: list[str] = []
+    for name, field in (
+        ("diffTotalsOf", "totals"),
+        ("diffTreeOf", "tree"),
+        ("diffMoreOf", "more"),
+        ("diffRootOf", "root"),
+    ):
+        functions.append(
+            f"func {name}(_ dir) -> String {{\n"
+            '  let d = "\\(dir)"\n'
+            f"{branches(stats, field)}"
+            '  return ""\n'
+            "}\n"
+        )
+    return f"{BEGIN}\n{''.join(functions)}{END}"
+
+
+def collect_stats(cmux_bin: str) -> dict[str, dict[str, str]]:
+    stats: dict[str, dict[str, str]] = {}
+    for top in repository_toplevels(workspace_directories(cmux_bin)):
+        changes = repository_changes(top)
+        if not changes:
+            continue
+        added = sum(entry["added"] for entry in changes if isinstance(entry["added"], int))
+        deleted = sum(entry["deleted"] for entry in changes if isinstance(entry["deleted"], int))
+        listed = changes[:MAX_FILES_LISTED]
+        stats[str(top)] = {
+            "totals": f"{len(changes)}|{added}|{deleted}",
+            "tree": tree_rows(listed),
+            "more": str(len(changes) - len(listed)) if len(changes) > len(listed) else "",
+            "root": str(top),
+        }
+    return stats
+
+
+def render_runtime(source: str, stats: dict[str, dict[str, str]]) -> str:
+    start = source.find(BEGIN)
+    end = source.find(END, start + len(BEGIN))
+    if start < 0 or end < 0:
+        raise RuntimeError("managed CMUX_DIFF_DATA block is missing from Agent Board source")
+    end += len(END)
+    return source[:start] + generated_block(stats) + source[end:]
+
+
+def write_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as temporary:
+            temporary.write(content)
+        os.chmod(temporary_name, 0o644)
+        os.replace(temporary_name, path)
+    except BaseException:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def refresh(cmux_bin: str, source_path: Path, target_path: Path) -> bool:
+    source = source_path.read_text(encoding="utf-8")
+    runtime = render_runtime(source, collect_stats(cmux_bin))
+    try:
+        previous_runtime = target_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        previous_runtime = None
+    if runtime == previous_runtime:
+        return False
+    write_atomic(target_path, runtime)
+    run_command([cmux_bin, "sidebar", "reload", "agent-board"])
+    return True
+
+
+def main() -> None:
+    cmux_bin = os.environ.get("CMUX_BIN", "cmux")
+    source_path = configured_path(
+        "CMUX_AGENT_BOARD_SOURCE", Path.home() / ".local/share/cmux/agent-board.swift"
+    )
+    target_path = configured_path(
+        "CMUX_AGENT_BOARD_TARGET", Path.home() / ".local/state/cmux/agent-board.swift"
+    )
+    lock_path = configured_path(
+        "CMUX_AGENT_BOARD_LOCK", Path.home() / ".local/state/cmux/agent-board-diff-refresh.lock"
+    )
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise RuntimeError("another cmux Agent Board diff refresh is already running") from error
+        refresh(cmux_bin, source_path, target_path)
+
+
+if __name__ == "__main__":
+    main()

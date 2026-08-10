@@ -1,0 +1,263 @@
+#!/usr/bin/env python3
+"""Open one Agent Board file change in cmux's built-in diff viewer."""
+
+from __future__ import annotations
+
+import argparse
+import base64
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+
+GIT_TIMEOUT_SECONDS = 15
+CMUX_TIMEOUT_SECONDS = 30
+
+
+class DiffOpenError(RuntimeError):
+    """A user-facing diff-open error."""
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Open one changed file in cmux's diff viewer."
+    )
+    parser.add_argument("path_token", help="URL-safe base64 repository-relative path")
+    return parser.parse_args()
+
+
+def decode_path(token: str) -> str:
+    try:
+        encoded = token.encode("ascii")
+        padding = b"=" * (-len(encoded) % 4)
+        decoded = base64.b64decode(encoded + padding, altchars=b"-_", validate=True)
+    except (UnicodeEncodeError, ValueError) as error:
+        raise DiffOpenError("invalid file path token") from error
+
+    canonical = base64.urlsafe_b64encode(decoded).decode("ascii").rstrip("=")
+    if not decoded or canonical != token or b"\0" in decoded:
+        raise DiffOpenError("invalid file path token")
+
+    file_path = os.fsdecode(decoded)
+    relative_path = Path(file_path)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise DiffOpenError("file path must stay inside the repository")
+    return file_path
+
+
+def executable(name: str, variable: str) -> str:
+    configured = os.environ.get(variable)
+    if configured:
+        return configured
+    discovered = shutil.which(name)
+    if not discovered:
+        raise DiffOpenError(f"{name} executable not found")
+    return discovered
+
+
+def run(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    timeout: int = GIT_TIMEOUT_SECONDS,
+    accepted_statuses: tuple[int, ...] = (0,),
+) -> subprocess.CompletedProcess[bytes]:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        capture_output=True,
+        timeout=timeout,
+    )
+    if result.returncode not in accepted_statuses:
+        message = os.fsdecode(result.stderr).strip() or os.fsdecode(result.stdout).strip()
+        raise DiffOpenError(message or f"command failed: {' '.join(command)}")
+    return result
+
+
+def git(git_bin: str, root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
+    return run(
+        [git_bin, "-c", "core.quotepath=false", *arguments],
+        cwd=root,
+    )
+
+
+def repository_root(git_bin: str) -> Path:
+    result = run(
+        [git_bin, "-c", "core.quotepath=false", "rev-parse", "--show-toplevel"]
+    )
+    root = os.fsdecode(result.stdout).strip()
+    if not root:
+        raise DiffOpenError("git rev-parse returned an empty repository path")
+    return Path(root)
+
+
+def changed_file_status(git_bin: str, root: Path, file_path: str) -> str:
+    result = git(
+        git_bin,
+        root,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "-uall",
+        "--no-renames",
+        "--",
+        file_path,
+    )
+    records = [record for record in result.stdout.split(b"\0") if record]
+    matching = [
+        record
+        for record in records
+        if len(record) >= 4 and os.fsdecode(record[3:]) == file_path
+    ]
+    if len(matching) != 1:
+        raise DiffOpenError(f"file no longer has a Git change: {file_path}")
+    return os.fsdecode(matching[0][:2])
+
+
+def diff_base(git_bin: str, root: Path) -> str:
+    head = run(
+        [git_bin, "rev-parse", "--verify", "--quiet", "HEAD"],
+        cwd=root,
+        accepted_statuses=(0, 1),
+    )
+    if head.returncode == 0:
+        return "HEAD"
+    empty_tree = git(git_bin, root, "hash-object", "-t", "tree", "/dev/null")
+    tree_id = os.fsdecode(empty_tree.stdout).strip()
+    if not tree_id:
+        raise DiffOpenError("git hash-object returned an empty tree ID")
+    return tree_id
+
+
+def file_patch(git_bin: str, root: Path, file_path: str, status: str) -> bytes:
+    common = ["diff", "--binary", "--no-ext-diff", "--no-renames"]
+    if status == "??":
+        result = run(
+            [git_bin, *common, "--no-index", "--", "/dev/null", file_path],
+            cwd=root,
+            accepted_statuses=(0, 1),
+        )
+    else:
+        result = git(git_bin, root, *common, diff_base(git_bin, root), "--", file_path)
+    if not result.stdout:
+        raise DiffOpenError(f"file has no displayable diff: {file_path}")
+    return result.stdout
+
+
+def current_pane(
+    cmux_bin: str, workspace_id: str, surface_id: str
+) -> str:
+    params = json.dumps(
+        {"workspace_id": workspace_id}, separators=(",", ":")
+    )
+    result = run(
+        [cmux_bin, "rpc", "surface.list", params], timeout=CMUX_TIMEOUT_SECONDS
+    )
+    try:
+        document = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise DiffOpenError("cmux surface.list returned invalid JSON") from error
+    surfaces = document.get("surfaces") if isinstance(document, dict) else None
+    if not isinstance(surfaces, list):
+        raise DiffOpenError("cmux surface.list did not contain a surfaces array")
+    matching = [
+        surface
+        for surface in surfaces
+        if isinstance(surface, dict)
+        and (surface.get("id") == surface_id or surface.get("ref") == surface_id)
+    ]
+    if len(matching) != 1:
+        raise DiffOpenError("current cmux surface was not found")
+    pane_id = matching[0].get("pane_id") or matching[0].get("pane_ref")
+    if not isinstance(pane_id, str) or not pane_id:
+        raise DiffOpenError("current cmux pane was not found")
+    return pane_id
+
+
+def opened_diff_surface(result: subprocess.CompletedProcess[bytes]) -> str:
+    try:
+        document = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise DiffOpenError("cmux diff returned invalid JSON") from error
+    if not isinstance(document, dict):
+        raise DiffOpenError("cmux diff did not return an object")
+    surface_id = document.get("surface_id") or document.get("surface_ref")
+    if not isinstance(surface_id, str) or not surface_id:
+        raise DiffOpenError("cmux diff did not return a surface")
+    return surface_id
+
+
+def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
+    workspace_id = os.environ.get("CMUX_WORKSPACE_ID", "")
+    surface_id = os.environ.get("CMUX_SURFACE_ID", "")
+    if not workspace_id or not surface_id:
+        raise DiffOpenError("CMUX_WORKSPACE_ID and CMUX_SURFACE_ID are required")
+    pane_id = current_pane(cmux_bin, workspace_id, surface_id)
+
+    with tempfile.TemporaryDirectory(prefix="cmux-agent-board-diff-") as temp_dir:
+        patch_file = Path(temp_dir) / "change.patch"
+        patch_file.write_bytes(patch)
+        opened = run(
+            [
+                cmux_bin,
+                "--json",
+                "--id-format",
+                "uuids",
+                "diff",
+                str(patch_file),
+                "--cwd",
+                str(root),
+                "--workspace",
+                workspace_id,
+                "--surface",
+                surface_id,
+                "--focus",
+                "false",
+                "--title",
+                file_path,
+            ],
+            timeout=CMUX_TIMEOUT_SECONDS,
+        )
+    diff_surface_id = opened_diff_surface(opened)
+    run(
+        [
+            cmux_bin,
+            "move-surface",
+            "--surface",
+            diff_surface_id,
+            "--pane",
+            pane_id,
+            "--workspace",
+            workspace_id,
+            "--focus",
+            "true",
+        ],
+        timeout=CMUX_TIMEOUT_SECONDS,
+    )
+
+
+def execute(args: argparse.Namespace) -> None:
+    file_path = decode_path(args.path_token)
+    git_bin = executable("git", "GIT_BIN")
+    cmux_bin = executable("cmux", "CMUX_BIN")
+    root = repository_root(git_bin)
+    status = changed_file_status(git_bin, root, file_path)
+    patch = file_patch(git_bin, root, file_path, status)
+    open_diff(cmux_bin, root, file_path, patch)
+
+
+def main() -> int:
+    try:
+        execute(parse_args())
+    except (DiffOpenError, subprocess.TimeoutExpired) as error:
+        print(f"cmux-agent-board-diff-open: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
