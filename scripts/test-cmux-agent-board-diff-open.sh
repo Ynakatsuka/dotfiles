@@ -31,7 +31,7 @@ set -euo pipefail
 printf '%s ' "$@" >>"$MOCK_CALLS_FILE"
 printf '\n' >>"$MOCK_CALLS_FILE"
 if [[ "$*" == 'rpc surface.list '* ]]; then
-  printf '{"surfaces":[{"id":"surface-id","ref":"surface:1","pane_id":"pane-id","pane_ref":"pane:1"}]}'
+  printf '{"surfaces":[{"id":"existing-diff-surface","type":"browser","title":"Agent Board Diff: previous.txt","pane_id":"pane-id","pane_ref":"pane:1","index_in_pane":0},{"id":"surface-id","ref":"surface:1","type":"terminal","title":"Diff helper","pane_id":"pane-id","pane_ref":"pane:1","index_in_pane":1}]}'
   exit 0
 fi
 if [[ "${1:-}" == '--json' && "${4:-}" == 'diff' ]]; then
@@ -40,6 +40,9 @@ if [[ "${1:-}" == '--json' && "${4:-}" == 'diff' ]]; then
   exit 0
 fi
 if [[ "${1:-}" == 'move-surface' ]]; then
+  exit 0
+fi
+if [[ "${1:-}" == 'close-surface' ]]; then
   exit 0
 fi
 printf 'unexpected cmux arguments: %s\n' "$*" >&2
@@ -61,8 +64,9 @@ run_open() {
   run_open 'dHJhY2tlZC50eHQ'
 )
 grep -Fq 'diff --git a/tracked.txt b/tracked.txt' "$patch_copy"
-grep -Fq -- '--focus false --title tracked.txt' "$calls_file"
-grep -Fq -- 'move-surface --surface diff-surface --pane pane-id --workspace workspace-id --focus true' "$calls_file"
+grep -Fq -- '--focus false --title Agent Board Diff: tracked.txt' "$calls_file"
+grep -Fq -- 'move-surface --surface diff-surface --pane pane-id --workspace workspace-id --before existing-diff-surface --focus true' "$calls_file"
+grep -Fq -- 'close-surface --surface existing-diff-surface --workspace workspace-id' "$calls_file"
 
 (
   cd "$git_repo"

@@ -16,6 +16,7 @@ from pathlib import Path
 
 GIT_TIMEOUT_SECONDS = 15
 CMUX_TIMEOUT_SECONDS = 30
+DIFF_TITLE_PREFIX = "Agent Board Diff: "
 
 
 class DiffOpenError(RuntimeError):
@@ -148,9 +149,9 @@ def file_patch(git_bin: str, root: Path, file_path: str, status: str) -> bytes:
     return result.stdout
 
 
-def current_pane(
+def current_pane_and_diffs(
     cmux_bin: str, workspace_id: str, surface_id: str
-) -> str:
+) -> tuple[str, list[str]]:
     params = json.dumps(
         {"workspace_id": workspace_id}, separators=(",", ":")
     )
@@ -175,7 +176,23 @@ def current_pane(
     pane_id = matching[0].get("pane_id") or matching[0].get("pane_ref")
     if not isinstance(pane_id, str) or not pane_id:
         raise DiffOpenError("current cmux pane was not found")
-    return pane_id
+
+    existing_diff_ids = []
+    for surface in surfaces:
+        if not isinstance(surface, dict):
+            continue
+        candidate_pane = surface.get("pane_id") or surface.get("pane_ref")
+        title = surface.get("title")
+        candidate_id = surface.get("id") or surface.get("ref")
+        if (
+            candidate_pane == pane_id
+            and isinstance(title, str)
+            and title.startswith(DIFF_TITLE_PREFIX)
+            and isinstance(candidate_id, str)
+            and candidate_id
+        ):
+            existing_diff_ids.append(candidate_id)
+    return pane_id, existing_diff_ids
 
 
 def opened_diff_surface(result: subprocess.CompletedProcess[bytes]) -> str:
@@ -196,7 +213,9 @@ def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
     surface_id = os.environ.get("CMUX_SURFACE_ID", "")
     if not workspace_id or not surface_id:
         raise DiffOpenError("CMUX_WORKSPACE_ID and CMUX_SURFACE_ID are required")
-    pane_id = current_pane(cmux_bin, workspace_id, surface_id)
+    pane_id, existing_diff_ids = current_pane_and_diffs(
+        cmux_bin, workspace_id, surface_id
+    )
 
     with tempfile.TemporaryDirectory(prefix="cmux-agent-board-diff-") as temp_dir:
         patch_file = Path(temp_dir) / "change.patch"
@@ -218,26 +237,40 @@ def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
                 "--focus",
                 "false",
                 "--title",
-                file_path,
+                f"{DIFF_TITLE_PREFIX}{file_path}",
             ],
             timeout=CMUX_TIMEOUT_SECONDS,
         )
     diff_surface_id = opened_diff_surface(opened)
+    move_command = [
+        cmux_bin,
+        "move-surface",
+        "--surface",
+        diff_surface_id,
+        "--pane",
+        pane_id,
+        "--workspace",
+        workspace_id,
+    ]
+    if existing_diff_ids:
+        move_command.extend(["--before", existing_diff_ids[0]])
+    move_command.extend(["--focus", "true"])
     run(
-        [
-            cmux_bin,
-            "move-surface",
-            "--surface",
-            diff_surface_id,
-            "--pane",
-            pane_id,
-            "--workspace",
-            workspace_id,
-            "--focus",
-            "true",
-        ],
+        move_command,
         timeout=CMUX_TIMEOUT_SECONDS,
     )
+    for existing_diff_id in existing_diff_ids:
+        run(
+            [
+                cmux_bin,
+                "close-surface",
+                "--surface",
+                existing_diff_id,
+                "--workspace",
+                workspace_id,
+            ],
+            timeout=CMUX_TIMEOUT_SECONDS,
+        )
 
 
 def execute(args: argparse.Namespace) -> None:
