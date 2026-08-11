@@ -19,9 +19,17 @@ mkdir -p \
   "$test_dir/bin" \
   "$test_dir/root/keep/child" \
   "$test_dir/root/delete-me" \
+  "$test_dir/root/link-a" \
+  "$test_dir/root/link-b" \
+  "$test_dir/root/large" \
+  "$test_dir/root/small" \
   "$test_dir/root/restricted"
 printf 'keep\n' >"$test_dir/root/keep/child/file.txt"
 printf 'delete\n' >"$test_dir/root/delete-me/file.txt"
+dd if=/dev/zero of="$test_dir/root/large/file.bin" bs=1024 count=32 2>/dev/null
+dd if=/dev/zero of="$test_dir/root/small/file.bin" bs=1024 count=1 2>/dev/null
+dd if=/dev/zero of="$test_dir/root/link-b/file.bin" bs=1024 count=8 2>/dev/null
+ln "$test_dir/root/link-b/file.bin" "$test_dir/root/link-a/file.bin"
 printf 'secret\n' >"$test_dir/root/restricted/file.txt"
 chmod 000 "$test_dir/root/restricted"
 
@@ -38,12 +46,17 @@ fi
 grep -Fq '容量を取得できません' "$test_dir/restricted.out" ||
   fail 'scan root permission error was not surfaced'
 
-depth_one=$($disk_tree --list --depth 1 "$test_dir/root")
+depth_one=$($disk_tree --list --depth 1 --jobs 4 "$test_dir/root")
+serial_depth_one=$($disk_tree --list --depth 1 --jobs 1 "$test_dir/root")
+[ "$depth_one" = "$serial_depth_one" ] || fail 'parallel scan changed the tree output'
 printf '%s\n' "$depth_one" | grep -Fq ' keep' || fail 'depth 1 omitted a direct child'
 printf '%s\n' "$depth_one" | grep -Fq ' delete-me' || fail 'depth 1 omitted a direct child'
 if printf '%s\n' "$depth_one" | grep -Fq ' child'; then
   fail 'depth 1 included a grandchild'
 fi
+large_line=$(printf '%s\n' "$depth_one" | grep -n ' large$' | cut -d: -f1)
+small_line=$(printf '%s\n' "$depth_one" | grep -n ' small$' | cut -d: -f1)
+[ "$large_line" -lt "$small_line" ] || fail 'directories were not sorted by size descending'
 
 depth_two=$($disk_tree --list --depth 2 "$test_dir/root")
 printf '%s\n' "$depth_two" | grep -Fq ' child' || fail 'depth 2 omitted a grandchild'

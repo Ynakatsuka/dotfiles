@@ -9,6 +9,8 @@ import shutil
 import stat
 import subprocess
 import sys
+from collections import defaultdict, deque
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +24,21 @@ class DirectoryNode:
     path: Path
     size: int
     children: list[DirectoryNode]
+
+
+@dataclass(frozen=True)
+class HardLink:
+    directory: Path
+    path: Path
+    identity: tuple[int, int]
+    size: int
+
+
+@dataclass(frozen=True)
+class DirectoryScan:
+    own_size: int
+    child_paths: tuple[Path, ...]
+    hard_links: tuple[HardLink, ...]
 
 
 @dataclass(frozen=True)
@@ -46,10 +63,8 @@ def allocated_bytes(file_stat: os.stat_result) -> int:
     return file_stat.st_blocks * 512
 
 
-def scan_directory(root: Path) -> DirectoryNode:
-    seen_files: set[tuple[int, int]] = set()
-
-    def scan(current: Path) -> DirectoryNode | None:
+def scan_directory(root: Path, jobs: int) -> DirectoryNode:
+    def scan_shallow(current: Path) -> DirectoryScan | None:
         try:
             current_stat = os.stat(current, follow_symlinks=False)
             with os.scandir(current) as scanner:
@@ -67,8 +82,9 @@ def scan_directory(root: Path) -> DirectoryNode:
                 f"容量を取得できません: {target}: {error.strerror}"
             ) from error
 
-        total = allocated_bytes(current_stat)
-        children: list[DirectoryNode] = []
+        own_size = allocated_bytes(current_stat)
+        child_paths: list[Path] = []
+        hard_links: list[HardLink] = []
 
         for entry in entries:
             entry_path = Path(entry.path)
@@ -83,27 +99,69 @@ def scan_directory(root: Path) -> DirectoryNode:
                 ) from error
 
             if stat.S_ISDIR(entry_stat.st_mode):
-                child = scan(entry_path)
-                if child is None:
-                    continue
-                children.append(child)
-                total += child.size
+                child_paths.append(entry_path)
                 continue
 
-            identity = (entry_stat.st_dev, entry_stat.st_ino)
             if entry_stat.st_nlink > 1:
-                if identity in seen_files:
-                    continue
-                seen_files.add(identity)
-            total += allocated_bytes(entry_stat)
+                hard_links.append(
+                    HardLink(
+                        directory=current,
+                        path=entry_path,
+                        identity=(entry_stat.st_dev, entry_stat.st_ino),
+                        size=allocated_bytes(entry_stat),
+                    )
+                )
+            else:
+                own_size += allocated_bytes(entry_stat)
 
+        return DirectoryScan(
+            own_size,
+            tuple(child_paths),
+            tuple(hard_links),
+        )
+
+    scans: dict[Path, DirectoryScan] = {}
+    queued = deque([root])
+    pending = {}
+
+    with ThreadPoolExecutor(max_workers=jobs) as executor:
+        while queued or pending:
+            while queued and len(pending) < jobs:
+                current = queued.popleft()
+                pending[executor.submit(scan_shallow, current)] = current
+
+            completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for future in completed:
+                current = pending.pop(future)
+                result = future.result()
+                if result is None:
+                    continue
+                scans[current] = result
+                queued.extend(result.child_paths)
+
+    own_sizes = {path: result.own_size for path, result in scans.items()}
+    hard_link_groups: dict[tuple[int, int], list[HardLink]] = defaultdict(list)
+    for result in scans.values():
+        for hard_link in result.hard_links:
+            hard_link_groups[hard_link.identity].append(hard_link)
+
+    for links in hard_link_groups.values():
+        owner = min(links, key=lambda link: os.fsencode(str(link.path)))
+        own_sizes[owner.directory] += owner.size
+    hard_link_groups.clear()
+
+    def build_tree(current: Path) -> DirectoryNode:
+        result = scans.pop(current)
+        children = [
+            build_tree(child_path)
+            for child_path in result.child_paths
+            if child_path in scans
+        ]
+        total = own_sizes[current] + sum(child.size for child in children)
         children.sort(key=lambda child: (-child.size, child.path.name.casefold()))
         return DirectoryNode(current, total, children)
 
-    result = scan(root)
-    if result is None:
-        raise AssertionError("scan root must not be skipped")
-    return result
+    return build_tree(root)
 
 
 def index_tree(root: DirectoryNode) -> tuple[dict[int, DirectoryNode], dict[Path, int]]:
@@ -355,6 +413,13 @@ def parse_args() -> argparse.Namespace:
         help="初期表示する階層数（既定値: 2）",
     )
     parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=min(8, (os.cpu_count() or 1) + 4),
+        help="容量計算の並列数（既定値: 最大8）",
+    )
+    parser.add_argument(
         "--list",
         action="store_true",
         help="fzf を起動せず初期ツリーだけを表示する",
@@ -362,6 +427,8 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.depth < 1:
         parser.error("--depth には 1 以上を指定してください")
+    if args.jobs < 1:
+        parser.error("--jobs には 1 以上を指定してください")
     return args
 
 
@@ -378,8 +445,11 @@ def run(args: argparse.Namespace) -> None:
     while True:
         if needs_scan:
             if not args.list:
-                print(f"容量を計算しています: {root_path}", file=sys.stderr)
-            root = scan_directory(root_path)
+                print(
+                    f"容量を計算しています（{args.jobs}並列）: {root_path}",
+                    file=sys.stderr,
+                )
+            root = scan_directory(root_path, args.jobs)
             by_id, by_path = index_tree(root)
             if expanded is None:
                 expanded = initially_expanded(root, args.depth)
