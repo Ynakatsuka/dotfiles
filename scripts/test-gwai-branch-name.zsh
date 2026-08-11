@@ -72,7 +72,6 @@ TEST_CODEX_OUTPUT='fix resolve-slack-task-context'
 TEST_CODEX_STATUS=0
 TEST_CLAUDE_OUTPUT='chore unused-fallback'
 TEST_CLAUDE_STATUS=0
-export TEST_CODEX_OUTPUT TEST_CODEX_STATUS TEST_CLAUDE_OUTPUT TEST_CLAUDE_STATUS
 
 actual=$(_gwai_generate_branch_name "$slack_url" 2>"$tmp_dir/slack-url.err")
 [[ "$actual" =~ '^260811-chore-[0-9a-f]{8}$' ]] ||
@@ -98,7 +97,6 @@ assert_file_contains "$tmp_dir/codex.args" "$slack_url"
 
 TEST_CODEX_STATUS=1
 TEST_CLAUDE_OUTPUT='feat use-haiku-fallback'
-export TEST_CODEX_STATUS TEST_CLAUDE_OUTPUT
 actual=$(_gwai_generate_branch_name 'fallback task')
 assert_equal '260811-feat-use-haiku-fallback' "$actual" "Claude should return a dated name after Codex failure"
 assert_file_contains "$tmp_dir/claude.args" '--model'
@@ -107,13 +105,11 @@ assert_file_contains "$tmp_dir/claude.args" 'haiku'
 TEST_CODEX_STATUS=0
 TEST_CODEX_OUTPUT='not a valid branch response'
 TEST_CLAUDE_OUTPUT='docs handle-invalid-codex-output'
-export TEST_CODEX_STATUS TEST_CODEX_OUTPUT TEST_CLAUDE_OUTPUT
 actual=$(_gwai_generate_branch_name 'invalid output task')
 assert_equal '260811-docs-handle-invalid-codex-output' "$actual" "Claude should return a dated name after invalid Codex output"
 
 TEST_CODEX_OUTPUT='still invalid output'
 TEST_CLAUDE_OUTPUT='also invalid output'
-export TEST_CODEX_OUTPUT TEST_CLAUDE_OUTPUT
 actual=$(_gwai_generate_branch_name 'double failure task' 2>"$tmp_dir/failure.err")
 [[ "$actual" =~ '^260811-chore-[0-9a-f]{8}$' ]] ||
     fail "invalid output from both providers did not produce a dated random name: $actual"

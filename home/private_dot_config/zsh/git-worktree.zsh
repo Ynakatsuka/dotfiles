@@ -349,8 +349,8 @@ _gwai_parse_branch_name() {
         | sed -E 's/^[[:space:]]+|[[:space:]]+$//g') || return 1
     [[ -n "$naming_output" ]] || return 1
 
-    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
-    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
+    branch_type=${naming_output%% *}
+    branch_slug=${naming_output#* }
 
     [[ "$naming_output" = "$branch_type $branch_slug" ]] || return 1
     [[ "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]] || return 1
