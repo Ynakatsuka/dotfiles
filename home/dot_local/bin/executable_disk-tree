@@ -1,0 +1,422 @@
+#!/usr/bin/env python3
+"""Browse directory sizes as an expandable fzf tree and move selections to Trash."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import shutil
+import stat
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+
+class DiskTreeError(RuntimeError):
+    """A user-facing disk-tree failure."""
+
+
+@dataclass
+class DirectoryNode:
+    path: Path
+    size: int
+    children: list[DirectoryNode]
+
+
+@dataclass(frozen=True)
+class DisplayRow:
+    node_id: int
+    text: str
+
+    def encode(self) -> bytes:
+        return f"{self.node_id}\t{self.text}".encode(
+            sys.getfilesystemencoding(), errors="surrogateescape"
+        )
+
+
+@dataclass(frozen=True)
+class Selection:
+    key: str
+    query: str
+    node_ids: tuple[int, ...]
+
+
+def allocated_bytes(file_stat: os.stat_result) -> int:
+    return file_stat.st_blocks * 512
+
+
+def scan_directory(root: Path) -> DirectoryNode:
+    seen_files: set[tuple[int, int]] = set()
+
+    def scan(current: Path) -> DirectoryNode:
+        try:
+            current_stat = os.stat(current, follow_symlinks=False)
+            with os.scandir(current) as scanner:
+                entries = sorted(scanner, key=lambda entry: os.fsencode(entry.name))
+        except OSError as error:
+            target = Path(error.filename) if error.filename else current
+            raise DiskTreeError(
+                f"容量を取得できません: {target}: {error.strerror}"
+            ) from error
+
+        total = allocated_bytes(current_stat)
+        children: list[DirectoryNode] = []
+
+        for entry in entries:
+            entry_path = Path(entry.path)
+            try:
+                entry_stat = entry.stat(follow_symlinks=False)
+            except OSError as error:
+                target = Path(error.filename) if error.filename else entry_path
+                raise DiskTreeError(
+                    f"容量を取得できません: {target}: {error.strerror}"
+                ) from error
+
+            if stat.S_ISDIR(entry_stat.st_mode):
+                child = scan(entry_path)
+                children.append(child)
+                total += child.size
+                continue
+
+            identity = (entry_stat.st_dev, entry_stat.st_ino)
+            if entry_stat.st_nlink > 1:
+                if identity in seen_files:
+                    continue
+                seen_files.add(identity)
+            total += allocated_bytes(entry_stat)
+
+        children.sort(key=lambda child: (-child.size, child.path.name.casefold()))
+        return DirectoryNode(current, total, children)
+
+    return scan(root)
+
+
+def index_tree(root: DirectoryNode) -> tuple[dict[int, DirectoryNode], dict[Path, int]]:
+    by_id: dict[int, DirectoryNode] = {}
+    by_path: dict[Path, int] = {}
+
+    def visit(node: DirectoryNode) -> None:
+        node_id = len(by_id)
+        by_id[node_id] = node
+        by_path[node.path] = node_id
+        for child in node.children:
+            visit(child)
+
+    visit(root)
+    return by_id, by_path
+
+
+def initially_expanded(root: DirectoryNode, depth: int) -> set[Path]:
+    expanded: set[Path] = set()
+
+    def visit(node: DirectoryNode, remaining: int) -> None:
+        if remaining <= 0 or not node.children:
+            return
+        expanded.add(node.path)
+        for child in node.children:
+            visit(child, remaining - 1)
+
+    visit(root, depth)
+    return expanded
+
+
+def human_size(size: int) -> str:
+    units = ("B", "KiB", "MiB", "GiB", "TiB", "PiB")
+    value = float(size)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            if unit == "B":
+                return f"{int(value)} {unit}"
+            return f"{value:.1f} {unit}"
+        value /= 1024
+    raise AssertionError("unreachable")
+
+
+def display_name(node: DirectoryNode, root: DirectoryNode) -> str:
+    value = str(node.path) if node is root else node.path.name
+    return value.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+
+def render_rows(
+    root: DirectoryNode,
+    expanded: set[Path],
+    by_path: dict[Path, int],
+) -> list[DisplayRow]:
+    rows: list[DisplayRow] = []
+
+    def visit(
+        node: DirectoryNode,
+        prefix: str,
+        is_last: bool,
+        is_root: bool = False,
+    ) -> None:
+        connector = "" if is_root else ("└─ " if is_last else "├─ ")
+        if node.children:
+            marker = "▾" if node.path in expanded else "▸"
+        else:
+            marker = " "
+        text = (
+            f"{human_size(node.size):>10}  "
+            f"{prefix}{connector}{marker} {display_name(node, root)}"
+        )
+        rows.append(DisplayRow(by_path[node.path], text))
+
+        if node.path not in expanded:
+            return
+        child_prefix = prefix if is_root else prefix + ("   " if is_last else "│  ")
+        for index, child in enumerate(node.children):
+            visit(child, child_prefix, index == len(node.children) - 1)
+
+    visit(root, "", True, is_root=True)
+    return rows
+
+
+def parse_fzf_output(output: bytes) -> Selection | None:
+    fields = output.rstrip(b"\0").split(b"\0")
+    if len(fields) < 2:
+        return None
+
+    encoding = sys.getfilesystemencoding()
+    query = fields[0].decode(encoding, errors="surrogateescape")
+    key = fields[1].decode(encoding, errors="surrogateescape")
+    selected_ids: list[int] = []
+    for raw_row in fields[2:]:
+        if not raw_row:
+            continue
+        raw_id = raw_row.split(b"\t", 1)[0]
+        try:
+            selected_ids.append(int(raw_id))
+        except ValueError as error:
+            raise DiskTreeError("fzf から不正な選択結果を受け取りました") from error
+
+    if not selected_ids:
+        return None
+    return Selection(key, query, tuple(selected_ids))
+
+
+def choose(
+    rows: list[DisplayRow], query: str, focus_id: int | None
+) -> Selection | None:
+    fzf = shutil.which("fzf")
+    if not fzf:
+        raise DiskTreeError("fzf が見つかりません")
+
+    command = [
+        fzf,
+        "--read0",
+        "--print0",
+        "--print-query",
+        "--expect=ctrl-d,ctrl-r,alt-left,alt-right",
+        "--multi",
+        "--no-sort",
+        "--cycle",
+        "--layout=reverse",
+        "--height=90%",
+        "--border",
+        "--delimiter=\t",
+        "--with-nth=2",
+        "--prompt=容量 > ",
+        "--header=Enter: 開閉  Alt-→: 1段展開  Alt-←: 折りたたみ  Tab: 複数選択  Ctrl-D: ゴミ箱  Ctrl-R: 再計算",
+        "--bind=tab:toggle+down,btab:toggle+up",
+    ]
+    if query:
+        command.append(f"--query={query}")
+    elif focus_id is not None:
+        position = next(
+            (
+                index
+                for index, row in enumerate(rows, start=1)
+                if row.node_id == focus_id
+            ),
+            None,
+        )
+        if position is not None:
+            command.append(f"--bind=load:pos({position})")
+
+    payload = b"\0".join(row.encode() for row in rows) + b"\0"
+    result = subprocess.run(command, input=payload, capture_output=True, check=False)
+    if result.returncode in (1, 130):
+        return None
+    if result.returncode != 0:
+        message = result.stderr.decode(
+            sys.getfilesystemencoding(), errors="replace"
+        ).strip()
+        raise DiskTreeError(f"fzf の実行に失敗しました: {message or result.returncode}")
+    return parse_fzf_output(result.stdout)
+
+
+def expand_one_level(nodes: list[DirectoryNode], expanded: set[Path]) -> None:
+    for node in nodes:
+        if not node.children:
+            continue
+        if node.path not in expanded:
+            expanded.add(node.path)
+            continue
+        expanded.update(child.path for child in node.children if child.children)
+
+
+def collapse(nodes: list[DirectoryNode], expanded: set[Path]) -> Path:
+    focus = nodes[0].path
+    for node in nodes:
+        if node.path in expanded:
+            expanded.remove(node.path)
+        elif node.path.parent in expanded:
+            expanded.remove(node.path.parent)
+            focus = node.path.parent
+    return focus
+
+
+def reject_unsafe_deletion(paths: list[Path], scan_root: Path) -> None:
+    cwd = Path.cwd().resolve()
+    protected = {Path("/"), Path.home().resolve(), scan_root}
+    for target in paths:
+        if target in protected:
+            raise DiskTreeError(f"保護対象は削除できません: {target}")
+        if target == cwd or target in cwd.parents:
+            raise DiskTreeError(f"現在位置を含むディレクトリは削除できません: {target}")
+
+
+def remove_nested_selections(paths: list[Path]) -> list[Path]:
+    selected = set(paths)
+    return [
+        target
+        for target in paths
+        if not any(parent in selected for parent in target.parents)
+    ]
+
+
+def trash_command(paths: list[Path]) -> list[str]:
+    trash = shutil.which("trash")
+    if trash:
+        return [trash, *(str(path) for path in paths)]
+    trash_put = shutil.which("trash-put")
+    if trash_put:
+        return [trash_put, "--", *(str(path) for path in paths)]
+    gio = shutil.which("gio")
+    if gio:
+        return [gio, "trash", *(str(path) for path in paths)]
+    raise DiskTreeError(
+        "ゴミ箱へ移動するコマンドが見つかりません（trash、trash-put、gio のいずれかが必要です）"
+    )
+
+
+def move_to_trash(nodes: list[DirectoryNode], scan_root: Path) -> bool:
+    paths = remove_nested_selections([node.path for node in nodes])
+    reject_unsafe_deletion(paths, scan_root)
+    command = trash_command(paths)
+
+    print("\nゴミ箱へ移動するディレクトリ:")
+    size_by_path = {node.path: node.size for node in nodes}
+    for target in paths:
+        print(f"  {human_size(size_by_path[target]):>10}  {target}")
+    try:
+        answer = input("実行しますか？ [y/N] ")
+    except EOFError:
+        answer = ""
+    if answer.casefold() not in {"y", "yes"}:
+        print("中止しました")
+        return False
+
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as error:
+        raise DiskTreeError(
+            f"ゴミ箱への移動に失敗しました（終了コード {error.returncode}）"
+        ) from error
+    print(f"{len(paths)} 個のディレクトリをゴミ箱へ移動しました")
+    return True
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="ディレクトリ容量を展開可能なツリーで表示し、選択項目をゴミ箱へ移動します。"
+    )
+    parser.add_argument("path", nargs="?", type=Path, default=Path.cwd())
+    parser.add_argument(
+        "-d",
+        "--depth",
+        type=int,
+        default=2,
+        help="初期表示する階層数（既定値: 2）",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="fzf を起動せず初期ツリーだけを表示する",
+    )
+    args = parser.parse_args()
+    if args.depth < 1:
+        parser.error("--depth には 1 以上を指定してください")
+    return args
+
+
+def run(args: argparse.Namespace) -> None:
+    root_path = args.path.expanduser().resolve()
+    if not root_path.is_dir():
+        raise DiskTreeError(f"ディレクトリではありません: {root_path}")
+
+    query = ""
+    focus_path: Path | None = None
+    expanded: set[Path] | None = None
+    needs_scan = True
+
+    while True:
+        if needs_scan:
+            if not args.list:
+                print(f"容量を計算しています: {root_path}", file=sys.stderr)
+            root = scan_directory(root_path)
+            by_id, by_path = index_tree(root)
+            if expanded is None:
+                expanded = initially_expanded(root, args.depth)
+            else:
+                expanded.intersection_update(by_path)
+            needs_scan = False
+
+            if args.list:
+                rows = render_rows(root, expanded, by_path)
+                print(*(row.text for row in rows), sep="\n")
+                return
+
+        rows = render_rows(root, expanded, by_path)
+        focus_id = by_path.get(focus_path) if focus_path is not None else None
+        selection = choose(rows, query, focus_id)
+        if selection is None:
+            return
+        query = selection.query
+        nodes = [by_id[node_id] for node_id in selection.node_ids]
+        focus_path = nodes[0].path
+
+        if selection.key == "ctrl-r":
+            needs_scan = True
+            continue
+        if selection.key == "ctrl-d":
+            needs_scan = move_to_trash(nodes, root_path)
+            if needs_scan:
+                focus_path = nodes[0].path.parent
+            continue
+        if selection.key == "alt-right":
+            expand_one_level(nodes, expanded)
+        elif selection.key == "alt-left":
+            focus_path = collapse(nodes, expanded)
+        else:
+            for node in nodes:
+                if node.path in expanded:
+                    expanded.remove(node.path)
+                elif node.children:
+                    expanded.add(node.path)
+
+
+def main() -> int:
+    try:
+        run(parse_args())
+    except DiskTreeError as error:
+        print(f"disk-tree: {error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
