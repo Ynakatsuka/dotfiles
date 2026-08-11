@@ -5,18 +5,16 @@
 {{- end -}}
 {{- $working := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" working; fi" -}}
 {{- $stopped := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" stopped; fi" -}}
-{{- $legacyIdle := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" idle; fi" -}}
 {{- $input := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" input; fi" -}}
 {{- $clear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" clear; fi" -}}
 {{- $oldWorking := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 0 --label working >/dev/null && echo '{}'; fi" -}}
 {{- $oldIdle := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 1 --label idle >/dev/null && echo '{}'; fi" -}}
 {{- $oldClear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux clear-progress >/dev/null && echo '{}'; fi" -}}
-{{ output "jq" "-n" "--argjson" "base" ($base | toJson) "--arg" "working" $working "--arg" "stopped" $stopped "--arg" "legacyIdle" $legacyIdle "--arg" "input" $input "--arg" "clear" $clear "--arg" "oldWorking" $oldWorking "--arg" "oldIdle" $oldIdle "--arg" "oldClear" $oldClear `
+{{ output "jq" "-n" "--argjson" "base" ($base | toJson) "--arg" "working" $working "--arg" "stopped" $stopped "--arg" "input" $input "--arg" "clear" $clear "--arg" "oldWorking" $oldWorking "--arg" "oldIdle" $oldIdle "--arg" "oldClear" $oldClear `
   def without_agent_board:
     map(select(
       ((.hooks // []) | any(
-        .command == $working or .command == $stopped or .command == $legacyIdle
-        or .command == $input or .command == $clear
+        ((.command // "") | contains("cmux-agent-board-state"))
         or .command == $oldWorking or .command == $oldIdle or .command == $oldClear
       )) | not
     ));
@@ -25,26 +23,26 @@
   | .hooks = (.hooks // {})
   | .hooks.SessionStart = (
       ((.hooks.SessionStart // []) | without_agent_board)
-      + [{"hooks": [{"command": $stopped, "timeout": 5, "type": "command"}]}]
+      + [{"hooks": [{"command": $stopped, "timeout": 5000, "type": "command"}]}]
     )
   | .hooks.PermissionRequest = (
       ((.hooks.PermissionRequest // []) | without_agent_board)
-      + [{"hooks": [{"command": $input, "timeout": 5, "type": "command"}]}]
+      + [{"hooks": [{"command": $input, "timeout": 5000, "type": "command"}]}]
     )
   | .hooks.PreToolUse = (
       ((.hooks.PreToolUse // []) | without_agent_board)
-      + [{"hooks": [{"command": $working, "timeout": 5, "type": "command"}]}]
+      + [{"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]}]
     )
   | .hooks.UserPromptSubmit = (
       ((.hooks.UserPromptSubmit // []) | without_agent_board)
-      + [{"hooks": [{"command": $working, "timeout": 5, "type": "command"}]}]
+      + [{"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]}]
     )
   | .hooks.Stop = (
       ((.hooks.Stop // []) | without_agent_board)
-      + [{"hooks": [{"command": $stopped, "timeout": 5, "type": "command"}]}]
+      + [{"hooks": [{"command": $stopped, "timeout": 5000, "type": "command"}]}]
     )
   | .hooks.SessionEnd = (
       ((.hooks.SessionEnd // []) | without_agent_board)
-      + [{"hooks": [{"command": $clear, "timeout": 3, "type": "command"}]}]
+      + [{"hooks": [{"command": $clear, "timeout": 3000, "type": "command"}]}]
     )
 ` -}}

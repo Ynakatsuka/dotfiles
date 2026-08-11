@@ -6,6 +6,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
 readonly SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-agent-board-state"
 readonly SIDEBAR="$REPO_ROOT/home/dot_local/share/cmux/agent-board.swift"
+readonly SHELL_HOOKS="$REPO_ROOT/home/private_dot_config/zsh/cmux-agent-board.zsh"
 
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/cmux-agent-board-state-test.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT
@@ -47,7 +48,7 @@ run_state() {
 }
 
 working_marker=$'\342\201\240\342\200\213\342\201\240'
-stopped_marker=$'\342\201\240\342\200\214\342\201\240'
+idle_marker=$'\342\201\240\342\200\214\342\201\240'
 input_marker=$'\342\201\240\342\200\215\342\201\240'
 
 run_state working >/dev/null
@@ -68,11 +69,11 @@ grep -Fq -- "tab-action --surface surface-id --action rename --title surface${in
 grep -Fq -- 'workspace-action --workspace workspace-id --action rename --title workspace' "$calls_file"
 
 : >"$calls_file"
-MOCK_SURFACE_TITLE="surface${stopped_marker}" run_state clear >/dev/null
+MOCK_SURFACE_TITLE="surface${idle_marker}" run_state clear >/dev/null
 grep -Fq -- 'tab-action --surface surface-id --action rename --title surface' "$calls_file"
 
 : >"$calls_file"
-MOCK_WORKSPACE_TITLE="workspace${stopped_marker}" run_state clear >/dev/null
+MOCK_WORKSPACE_TITLE="workspace${idle_marker}" run_state clear >/dev/null
 grep -Fq -- 'workspace-action --workspace workspace-id --action rename --title workspace' "$calls_file"
 if grep -Fq 'tab-action' "$calls_file"; then
   printf 'marker-free surface was unexpectedly renamed during workspace migration\n' >&2
@@ -81,11 +82,31 @@ fi
 
 : >"$calls_file"
 run_state stopped >/dev/null
-grep -Fq -- "tab-action --surface surface-id --action rename --title surface${stopped_marker}" "$calls_file"
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${idle_marker}" "$calls_file"
 
 : >"$calls_file"
 run_state idle >/dev/null
-grep -Fq -- "tab-action --surface surface-id --action rename --title surface${stopped_marker}" "$calls_file"
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${idle_marker}" "$calls_file"
+
+shell_home="$test_dir/home"
+shell_calls="$test_dir/shell-calls"
+mkdir -p "$shell_home/.local/bin"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'printf "%s\n" "$1" >>"$MOCK_SHELL_CALLS"' \
+  >"$shell_home/.local/bin/cmux-agent-board-state"
+chmod +x "$shell_home/.local/bin/cmux-agent-board-state"
+
+HOME="$shell_home" MOCK_SHELL_CALLS="$shell_calls" \
+  CMUX_WORKSPACE_ID='workspace-id' CMUX_SURFACE_ID='surface-id' \
+  zsh -dfc '
+    source "$1"
+    _cmux_agent_board_command_started
+    _cmux_agent_board_command_finished
+  ' _ "$SHELL_HOOKS"
+grep -Fxq 'working' "$shell_calls"
+grep -Fxq 'idle' "$shell_calls"
+grep -Fq '"$_zsh_config_dir/cmux-agent-board.zsh"' "$REPO_ROOT/home/dot_zshrc"
 
 if CMUX_WORKSPACE_ID='' PATH="$test_dir:$PATH" bash "$SCRIPT" idle >/dev/null 2>&1; then
   printf 'missing workspace ID unexpectedly succeeded\n' >&2
@@ -130,9 +151,18 @@ jq -e '
   any(.hooks.Stop[]?.hooks[]?; .command | contains("cmux-agent-board-state\" stopped"))
   and
   any(.hooks.SessionEnd[]?.hooks[]?; .command | contains("cmux-agent-board-state\" clear"))
+  and
+  ([.hooks[][]?.hooks[]?
+   | select(.command | contains("cmux-agent-board-state"))] as $state_hooks
+   | ($state_hooks | length) == 6
+   and all($state_hooks[];
+     if (.command | contains("cmux-agent-board-state\" clear"))
+     then .timeout == 3000
+     else .timeout == 5000
+     end))
 ' <<<"$rendered_codex_hooks" >/dev/null
 
-grep -Fq "if title.hasSuffix(\"${stopped_marker}\") { return \"stopped\" }" "$SIDEBAR"
+grep -Fq "if title.hasSuffix(\"${idle_marker}\") { return \"idle\" }" "$SIDEBAR"
 python3 - "$SIDEBAR" <<'PY'
 import pathlib
 import sys

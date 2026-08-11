@@ -17,13 +17,13 @@ if [[ -z "$surface_id" ]]; then
 fi
 
 working_marker=$'\342\201\240\342\200\213\342\201\240'
-stopped_marker=$'\342\201\240\342\200\214\342\201\240'
+idle_marker=$'\342\201\240\342\200\214\342\201\240'
 input_marker=$'\342\201\240\342\200\215\342\201\240'
 
 case "$state" in
   working) marker="$working_marker" ;;
   # Existing sessions can retain the former Stop hook until they restart.
-  stopped | idle) marker="$stopped_marker" ;;
+  stopped | idle) marker="$idle_marker" ;;
   input) marker="$input_marker" ;;
   clear) marker="" ;;
   *)
@@ -54,7 +54,7 @@ current_surface_title="$({
 
 workspace_has_marker=false
 if [[ "$current_workspace_title" == *"$working_marker"*
-  || "$current_workspace_title" == *"$stopped_marker"*
+  || "$current_workspace_title" == *"$idle_marker"*
   || "$current_workspace_title" == *"$input_marker"* ]]; then
   workspace_has_marker=true
 fi
@@ -68,7 +68,7 @@ fi
 
 if [[ -z "$marker"
   && "$current_surface_title" != *"$working_marker"
-  && "$current_surface_title" != *"$stopped_marker"
+  && "$current_surface_title" != *"$idle_marker"
   && "$current_surface_title" != *"$input_marker"
   && "$workspace_has_marker" == false ]]; then
   echo '{}'
@@ -76,7 +76,7 @@ if [[ -z "$marker"
 fi
 
 clean_surface_title="${current_surface_title//$working_marker/}"
-clean_surface_title="${clean_surface_title//$stopped_marker/}"
+clean_surface_title="${clean_surface_title//$idle_marker/}"
 clean_surface_title="${clean_surface_title//$input_marker/}"
 
 next_surface_title="${clean_surface_title}${marker}"
@@ -90,7 +90,7 @@ fi
 
 if [[ "$workspace_has_marker" == true ]]; then
   clean_workspace_title="${current_workspace_title//$working_marker/}"
-  clean_workspace_title="${clean_workspace_title//$stopped_marker/}"
+  clean_workspace_title="${clean_workspace_title//$idle_marker/}"
   clean_workspace_title="${clean_workspace_title//$input_marker/}"
   cmux workspace-action \
     --workspace "$workspace_id" \
