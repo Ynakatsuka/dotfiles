@@ -81,6 +81,7 @@ function cdx() {
 
     codex \
         --dangerously-bypass-approvals-and-sandbox \
+        --dangerously-bypass-hook-trust \
         "${config_args[@]}" \
         "$@"
 }
