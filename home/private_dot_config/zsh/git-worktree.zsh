@@ -338,7 +338,117 @@ function gw() {
     fi
 }
 
-# AI-assisted worktree creation: prompt -> branch name (via claude haiku) -> gw -> session
+# Generate and validate a branch name with Codex, falling back to Claude.
+_gwai_parse_branch_name() {
+    local raw_output="$1"
+    local naming_output branch_type branch_slug date_prefix
+
+    naming_output=$(printf '%s\n' "$raw_output" \
+        | tr -d '\r`"'\''' \
+        | awk 'NF{print; exit}' \
+        | sed -E 's/^[[:space:]]+|[[:space:]]+$//g') || return 1
+    [[ -n "$naming_output" ]] || return 1
+
+    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
+    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
+
+    [[ "$naming_output" = "$branch_type $branch_slug" ]] || return 1
+    [[ "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]] || return 1
+    [[ "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 1
+
+    date_prefix=$(date '+%y%m%d') || return 1
+    [[ "$date_prefix" =~ ^[0-9]{6}$ ]] || return 1
+    printf '%s-%s-%s\n' "$date_prefix" "$branch_type" "$branch_slug"
+}
+
+_gwai_generate_random_branch_name() {
+    local date_prefix random_suffix
+
+    date_prefix=$(date '+%y%m%d') || return 1
+    [[ "$date_prefix" =~ ^[0-9]{6}$ ]] || return 1
+    printf -v random_suffix '%04x%04x' "$RANDOM" "$RANDOM"
+    printf '%s-chore-%s\n' "$date_prefix" "$random_suffix"
+}
+
+_gwai_generate_with_codex() {
+    local naming_prompt="$1"
+    local output_file naming_output
+
+    command -v codex >/dev/null 2>&1 || return 1
+    output_file=$(mktemp "${TMPDIR:-/tmp}/gwai-codex-output.XXXXXX") || return 1
+
+    if ! codex exec \
+        --ephemeral \
+        --sandbox read-only \
+        --disable apps \
+        --disable plugins \
+        --disable shell_tool \
+        -c 'approval_policy="never"' \
+        -c 'network_access=false' \
+        --model gpt-5.6-luna \
+        -c 'model_reasoning_effort="low"' \
+        --output-last-message "$output_file" \
+        "$naming_prompt" >/dev/null 2>&1; then
+        rm -f "$output_file"
+        return 1
+    fi
+
+    naming_output=$(<"$output_file")
+    rm -f "$output_file"
+    printf '%s\n' "$naming_output"
+}
+
+_gwai_generate_with_claude() {
+    local naming_prompt="$1"
+
+    command -v claude >/dev/null 2>&1 || return 1
+    claude -p --model haiku "$naming_prompt" 2>/dev/null
+}
+
+_gwai_generate_branch_name() {
+    local prompt="$1"
+    local naming_prompt naming_output branch_name
+
+    if [[ "$prompt" =~ '^https://([[:alnum:]-]+\.)?slack\.com/[^[:space:]]+$' ]]; then
+        echo "Warning: Slack URL has no descriptive text; using a random branch name..." >&2
+        _gwai_generate_random_branch_name
+        return
+    fi
+
+    naming_prompt="Generate exactly one git branch type and slug for the task below.
+Context rules:
+- Use only the text supplied in Task. Do not open, fetch, or read linked content.
+- For a URL, infer the task only from human-readable words in the URL or its link text.
+- Do not read a referenced Slack message or thread.
+- If the task cannot be inferred from the supplied text, output exactly: UNKNOWN
+
+Output rules:
+- Output exactly two tokens separated by one space: <type> <slug>
+- <type> must be one of: feat, fix, refactor, docs, test, chore, perf
+- <slug> must be kebab-case, ASCII only, 3-7 words.
+- Do not include the type in <slug>. The shell function prefixes it.
+- Output ONLY the two tokens. No quotes, no commentary, no trailing punctuation.
+
+Task: ${prompt}"
+
+    if naming_output=$(_gwai_generate_with_codex "$naming_prompt") \
+        && branch_name=$(_gwai_parse_branch_name "$naming_output"); then
+        printf '%s\n' "$branch_name"
+        return 0
+    fi
+
+    echo "Warning: Codex branch name generation failed; trying Claude Haiku..." >&2
+    if naming_output=$(_gwai_generate_with_claude "$naming_prompt") \
+        && branch_name=$(_gwai_parse_branch_name "$naming_output"); then
+        printf '%s\n' "$branch_name"
+        return 0
+    fi
+
+    echo "Warning: branch name generation failed with Codex and Claude; using a random branch name..." >&2
+    _gwai_generate_random_branch_name
+}
+
+# AI-assisted worktree creation: prompt -> branch name -> gw -> session
 # Usage:
 #   gwai <prompt>          # generate branch name and start `cl` session with the prompt
 #   gwai -c <prompt>       # explicit claude
@@ -356,7 +466,8 @@ Usage: gwai [-c|-x] <prompt>
   -x   start codex session via `cdx`
 
 Generates a Conventional Commits style branch name from <prompt>
-using `claude -p --model haiku`, creates a worktree via `gw`,
+using Codex Luna with low reasoning effort and Claude Haiku as fallback,
+prefixes the branch with YYMMDD, and creates a worktree via `gw`,
 then launches the chosen session with <prompt> as the first message.
 
 If stdin is piped, stdin is appended to <prompt>.
@@ -384,58 +495,14 @@ ${stdin_prompt}"
         return 1
     fi
 
-    if ! command -v claude >/dev/null 2>&1; then
-        echo "Error: claude CLI not found in PATH" >&2
-        return 1
-    fi
     if ! command -v "$launcher" >/dev/null 2>&1 && ! typeset -f "$launcher" >/dev/null; then
         echo "Error: launcher '$launcher' not found" >&2
         return 1
     fi
 
-    echo "🤖 Generating branch name with claude haiku..."
-    local naming_prompt naming_output branch_type branch_slug branch_name
-    naming_prompt="Generate exactly one git branch type and slug for the task below.
-Rules:
-- Output exactly two tokens separated by one space: <type> <slug>
-- <type> must be one of: feat, fix, refactor, docs, test, chore, perf
-- <slug> must be kebab-case, ASCII only, 3-7 words.
-- Do not include the type in <slug>. The shell function prefixes it.
-- Output ONLY the two tokens. No quotes, no commentary, no trailing punctuation.
-
-Task: ${prompt}"
-
-    naming_output=$(claude -p --model haiku "$naming_prompt" 2>/dev/null \
-        | tr -d '\r`"'\''' \
-        | awk 'NF{print; exit}' \
-        | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')
-    if [[ -z "$naming_output" ]]; then
-        echo "Error: branch name generation returned empty output" >&2
-        return 1
-    fi
-
-    branch_type=$(printf '%s\n' "$naming_output" | awk '{print $1}')
-    branch_slug=$(printf '%s\n' "$naming_output" | awk '{print $2}')
-
-    if [[ "$naming_output" = "$branch_type $branch_slug" ]] \
-        && [[ "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]] \
-        && [[ "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-        branch_name="${branch_type}-${branch_slug}"
-    else
-        local fallback_stamp
-        if ! fallback_stamp=$(date "+%Y%m%d%H%M%S"); then
-            echo "Error: failed to generate fallback branch timestamp" >&2
-            return 1
-        fi
-        branch_name="chore-ai-task-${fallback_stamp}"
-        echo "Warning: generated branch components are invalid, using rough branch name: '$branch_name'" >&2
-        echo "Invalid generation output: '$naming_output'" >&2
-    fi
-
-    if [[ ! "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]]; then
-        echo "Error: generated branch name is invalid: '$branch_name'" >&2
-        return 1
-    fi
+    echo "🤖 Generating branch name with Codex Luna (low)..."
+    local branch_name
+    branch_name=$(_gwai_generate_branch_name "$prompt") || return 1
 
     echo "🌿 Branch:   $branch_name"
     echo "🚀 Launcher: $launcher"
