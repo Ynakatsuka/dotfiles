@@ -11,7 +11,10 @@
 ## Codex Subagent Routing
 
 - Delegate only when the current runtime policy permits it and the user has not prohibited or restricted delegation. Keep quick, tightly coupled, or judgment-heavy work in the main thread; delegate clear, bounded, independent work with a settled approach.
-- Use `explorer` for read-only codebase questions, `worker` for implementation and fixes, and `default` when neither specialized role fits. Use `luna_worker` only for substantial, independent leaf tasks with a settled approach, never for high-risk or judgment-heavy work. For an explicit code-review request, use the native `reviewer` and read-only `simplifier` roles when both perspectives are useful.
+- Use `explorer` for read-only codebase questions.
+- Use `luna_worker` as the first choice for low-risk implementation or test leaf tasks when the approach, authorized files, acceptance criteria, and verification are explicit. Suitable work includes a single-feature change, a targeted fix, a test addition, or a settled mechanical multi-file edit. Never give it high-risk or judgment-heavy work.
+- Use `worker` for broader implementation that requires cross-module understanding or iterative investigation. When both `luna_worker` and `worker` fit, prefer `luna_worker`. Use `default` when none of the specialized roles fit.
+- For an explicit code-review request, use the native `reviewer` and read-only `simplifier` roles when both perspectives are useful.
 - When configured subagent defaults or a native custom role are required, use `fork_turns: "none"` or the minimum necessary positive turn count and supply the remaining context in the dispatch prompt. This lets the selected role's model and instructions apply.
 - Keep approvals, dependency and public-contract decisions, integration, final verification, and completion decisions in the main thread. The main thread reviews every subagent result and diff; use an independent reviewer only for material uncertainty or elevated risk.
 - Run writing workers in parallel only with isolated worktrees and non-overlapping write sets. The main thread must not edit their files concurrently.
