@@ -10,10 +10,33 @@ fail() {
 }
 
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/disk-tree-test.XXXXXX")
-trap 'rm -rf "$test_dir"' EXIT
-mkdir -p "$test_dir/bin" "$test_dir/root/keep/child" "$test_dir/root/delete-me"
+cleanup() {
+  chmod 700 "$test_dir/root/restricted" 2>/dev/null || true
+  rm -rf "$test_dir"
+}
+trap cleanup EXIT
+mkdir -p \
+  "$test_dir/bin" \
+  "$test_dir/root/keep/child" \
+  "$test_dir/root/delete-me" \
+  "$test_dir/root/restricted"
 printf 'keep\n' >"$test_dir/root/keep/child/file.txt"
 printf 'delete\n' >"$test_dir/root/delete-me/file.txt"
+printf 'secret\n' >"$test_dir/root/restricted/file.txt"
+chmod 000 "$test_dir/root/restricted"
+
+if ! permission_output=$($disk_tree --list --depth 1 "$test_dir/root" 2>&1); then
+  printf '%s\n' "$permission_output" >&2
+  fail 'permission-denied child interrupted the scan'
+fi
+if printf '%s\n' "$permission_output" | grep -Fq ' restricted'; then
+  fail 'permission-denied child was included in the tree'
+fi
+if $disk_tree --list "$test_dir/root/restricted" >"$test_dir/restricted.out" 2>&1; then
+  fail 'permission-denied scan root unexpectedly succeeded'
+fi
+grep -Fq '容量を取得できません' "$test_dir/restricted.out" ||
+  fail 'scan root permission error was not surfaced'
 
 depth_one=$($disk_tree --list --depth 1 "$test_dir/root")
 printf '%s\n' "$depth_one" | grep -Fq ' keep' || fail 'depth 1 omitted a direct child'

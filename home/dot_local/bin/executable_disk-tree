@@ -49,11 +49,18 @@ def allocated_bytes(file_stat: os.stat_result) -> int:
 def scan_directory(root: Path) -> DirectoryNode:
     seen_files: set[tuple[int, int]] = set()
 
-    def scan(current: Path) -> DirectoryNode:
+    def scan(current: Path) -> DirectoryNode | None:
         try:
             current_stat = os.stat(current, follow_symlinks=False)
             with os.scandir(current) as scanner:
                 entries = sorted(scanner, key=lambda entry: os.fsencode(entry.name))
+        except PermissionError as error:
+            if current != root:
+                return None
+            target = Path(error.filename) if error.filename else current
+            raise DiskTreeError(
+                f"容量を取得できません: {target}: {error.strerror}"
+            ) from error
         except OSError as error:
             target = Path(error.filename) if error.filename else current
             raise DiskTreeError(
@@ -67,6 +74,8 @@ def scan_directory(root: Path) -> DirectoryNode:
             entry_path = Path(entry.path)
             try:
                 entry_stat = entry.stat(follow_symlinks=False)
+            except PermissionError:
+                continue
             except OSError as error:
                 target = Path(error.filename) if error.filename else entry_path
                 raise DiskTreeError(
@@ -75,6 +84,8 @@ def scan_directory(root: Path) -> DirectoryNode:
 
             if stat.S_ISDIR(entry_stat.st_mode):
                 child = scan(entry_path)
+                if child is None:
+                    continue
                 children.append(child)
                 total += child.size
                 continue
@@ -89,7 +100,10 @@ def scan_directory(root: Path) -> DirectoryNode:
         children.sort(key=lambda child: (-child.size, child.path.name.casefold()))
         return DirectoryNode(current, total, children)
 
-    return scan(root)
+    result = scan(root)
+    if result is None:
+        raise AssertionError("scan root must not be skipped")
+    return result
 
 
 def index_tree(root: DirectoryNode) -> tuple[dict[int, DirectoryNode], dict[Path, int]]:
