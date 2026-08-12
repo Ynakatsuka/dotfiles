@@ -48,7 +48,7 @@ run_state() {
 }
 
 working_marker=$'\342\201\240\342\200\213\342\201\240'
-idle_marker=$'\342\201\240\342\200\214\342\201\240'
+stopped_marker=$'\342\201\240\342\200\214\342\201\240'
 input_marker=$'\342\201\240\342\200\215\342\201\240'
 
 run_state working >/dev/null
@@ -69,11 +69,11 @@ grep -Fq -- "tab-action --surface surface-id --action rename --title surface${in
 grep -Fq -- 'workspace-action --workspace workspace-id --action rename --title workspace' "$calls_file"
 
 : >"$calls_file"
-MOCK_SURFACE_TITLE="surface${idle_marker}" run_state clear >/dev/null
+MOCK_SURFACE_TITLE="surface${stopped_marker}" run_state clear >/dev/null
 grep -Fq -- 'tab-action --surface surface-id --action rename --title surface' "$calls_file"
 
 : >"$calls_file"
-MOCK_WORKSPACE_TITLE="workspace${idle_marker}" run_state clear >/dev/null
+MOCK_WORKSPACE_TITLE="workspace${stopped_marker}" run_state clear >/dev/null
 grep -Fq -- 'workspace-action --workspace workspace-id --action rename --title workspace' "$calls_file"
 if grep -Fq 'tab-action' "$calls_file"; then
   printf 'marker-free surface was unexpectedly renamed during workspace migration\n' >&2
@@ -82,11 +82,11 @@ fi
 
 : >"$calls_file"
 run_state stopped >/dev/null
-grep -Fq -- "tab-action --surface surface-id --action rename --title surface${idle_marker}" "$calls_file"
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface${stopped_marker}" "$calls_file"
 
 : >"$calls_file"
-run_state idle >/dev/null
-grep -Fq -- "tab-action --surface surface-id --action rename --title surface${idle_marker}" "$calls_file"
+MOCK_SURFACE_TITLE="surface${working_marker}" run_state idle >/dev/null
+grep -Fq -- "tab-action --surface surface-id --action rename --title surface" "$calls_file"
 
 shell_home="$test_dir/home"
 shell_calls="$test_dir/shell-calls"
@@ -165,7 +165,7 @@ jq -e '
      end))
 ' <<<"$rendered_codex_hooks" >/dev/null
 
-grep -Fq "if title.hasSuffix(\"${idle_marker}\") { return \"idle\" }" "$SIDEBAR"
+grep -Fq "if title.hasSuffix(\"${stopped_marker}\") { return \"stopped\" }" "$SIDEBAR"
 python3 - "$SIDEBAR" <<'PY'
 import pathlib
 import sys
@@ -175,7 +175,9 @@ agent_state = source.split("func agentState", 1)[1].split("func stateTint", 1)[0
 tab_state = source.split("func tabState", 1)[1].split("func workspaceRow", 1)[0]
 assert agent_state.rstrip().endswith('return "idle"\n}')
 assert "workspace.tabs.contains" in agent_state
+assert 'managedTitleState($0.title) == "stopped"' in agent_state
 assert "managedTitleState(tab.title)" in tab_state
+assert 'if state == "stopped" { return "#FF9F0A" }' in source
 assert "workspaceStatusText" not in source
 assert "workspaceMemoText" not in source
 assert "cmux-workspace-note" not in source

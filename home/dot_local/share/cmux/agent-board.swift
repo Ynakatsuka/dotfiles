@@ -44,7 +44,7 @@ func managedTitleState(_ title: String) -> String {
     // Keep these zero-width markers literal. cmux 0.64.22 does not expand
     // Unicode escape sequences in interpreted sidebar string literals.
     if title.hasSuffix("⁠​⁠") { return "working" }
-    if title.hasSuffix("⁠‌⁠") { return "idle" }
+    if title.hasSuffix("⁠‌⁠") { return "stopped" }
     if title.hasSuffix("⁠‍⁠") { return "input" }
     return ""
 }
@@ -91,6 +91,13 @@ func agentState(_ workspace) -> String {
         return "done"
     }
 
+    let hasStoppedTab = workspace.tabs.contains {
+        managedTitleState($0.title) == "stopped"
+    }
+    if hasStoppedTab || legacyTitleState == "stopped" {
+        return "stopped"
+    }
+
     if label.contains("idle") {
         return "idle"
     }
@@ -103,6 +110,7 @@ func stateTint(_ state: String) -> String {
     if state == "working" { return "#30D158" }
     if state == "done" { return "#54A8FF" }
     if state == "idle" { return "#8E8E93" }
+    if state == "stopped" { return "#FF9F0A" }
     return "#636366"
 }
 
