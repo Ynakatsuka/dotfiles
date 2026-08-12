@@ -100,7 +100,10 @@ chmod +x "$shell_home/.local/bin/cmux-agent-board-state"
 HOME="$shell_home" MOCK_SHELL_CALLS="$shell_calls" \
   CMUX_WORKSPACE_ID='workspace-id' CMUX_SURFACE_ID='surface-id' \
   zsh -dfc '
+    set -e
     source "$1"
+    _cmux_agent_board_command_finished
+    [[ ! -e "$MOCK_SHELL_CALLS" ]]
     _cmux_agent_board_command_started
     _cmux_agent_board_command_finished
   ' _ "$SHELL_HOOKS"
