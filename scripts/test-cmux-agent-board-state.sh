@@ -177,7 +177,7 @@ assert agent_state.rstrip().endswith('return "idle"\n}')
 assert "workspace.tabs.contains" in agent_state
 assert 'managedTitleState($0.title) == "stopped"' in agent_state
 assert "managedTitleState(tab.title)" in tab_state
-assert 'if state == "stopped" { return "#FF9F0A" }' in source
+assert 'if state == "stopped" { return "#FFD60A" }' in source
 assert "workspaceStatusText" not in source
 assert "workspaceMemoText" not in source
 assert "cmux-workspace-note" not in source

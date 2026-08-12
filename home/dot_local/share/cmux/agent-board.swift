@@ -110,7 +110,7 @@ func stateTint(_ state: String) -> String {
     if state == "working" { return "#30D158" }
     if state == "done" { return "#54A8FF" }
     if state == "idle" { return "#8E8E93" }
-    if state == "stopped" { return "#FF9F0A" }
+    if state == "stopped" { return "#FFD60A" }
     return "#636366"
 }
 
