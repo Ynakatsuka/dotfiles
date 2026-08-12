@@ -7,10 +7,11 @@
 {{- $stopped := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" stopped; fi" -}}
 {{- $input := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" input; fi" -}}
 {{- $clear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" clear; fi" -}}
+{{- $autoTitle := "if [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ \"${CMUX_CODEX_HOOKS_DISABLED:-}\" = \"1\" ] || [ \"${CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-auto-title\"; fi" -}}
 {{- $oldWorking := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 0 --label working >/dev/null && echo '{}'; fi" -}}
 {{- $oldIdle := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 1 --label idle >/dev/null && echo '{}'; fi" -}}
 {{- $oldClear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux clear-progress >/dev/null && echo '{}'; fi" -}}
-{{ output "jq" "-n" "--argjson" "base" ($base | toJson) "--arg" "working" $working "--arg" "stopped" $stopped "--arg" "input" $input "--arg" "clear" $clear "--arg" "oldWorking" $oldWorking "--arg" "oldIdle" $oldIdle "--arg" "oldClear" $oldClear `
+{{ output "jq" "-n" "--argjson" "base" ($base | toJson) "--arg" "working" $working "--arg" "stopped" $stopped "--arg" "input" $input "--arg" "clear" $clear "--arg" "autoTitle" $autoTitle "--arg" "oldWorking" $oldWorking "--arg" "oldIdle" $oldIdle "--arg" "oldClear" $oldClear `
   def without_agent_board:
     map(select(
       ((.hooks // []) | any(
@@ -18,6 +19,18 @@
         or .command == $oldWorking or .command == $oldIdle or .command == $oldClear
       )) | not
     ));
+
+  def without_auto_title:
+    map(
+      if ((.hooks // null) | type) == "array" then
+        .hooks = [
+          .hooks[]
+          | select(((.command // "") | contains("cmux-agent-board-auto-title")) | not)
+        ]
+      else .
+      end
+    )
+    | map(select(((.hooks // null) | type) != "array" or (.hooks | length) > 0));
 
   $base
   | .hooks = (.hooks // {})
@@ -34,8 +47,11 @@
       + [{"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]}]
     )
   | .hooks.UserPromptSubmit = (
-      ((.hooks.UserPromptSubmit // []) | without_agent_board)
-      + [{"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]}]
+      ((.hooks.UserPromptSubmit // []) | without_agent_board | without_auto_title)
+      + [
+        {"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]},
+        {"hooks": [{"command": $autoTitle, "timeout": 5000, "type": "command"}]}
+      ]
     )
   | .hooks.Stop = (
       ((.hooks.Stop // []) | without_agent_board)

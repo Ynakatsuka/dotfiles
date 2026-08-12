@@ -97,6 +97,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ] || [ \"${CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-auto-title\"; fi",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -129,6 +138,6 @@
   "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
-  "model": "opus",
+  "model": "claude-fable-5[1m]",
   "cleanupPeriodDays": 180
 }

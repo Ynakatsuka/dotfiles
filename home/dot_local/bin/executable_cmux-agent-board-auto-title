@@ -1,0 +1,804 @@
+#!/usr/bin/env python3
+"""Generate a short conversation title for the current cmux Agent Board tab.
+
+This hook is substantially adapted from sh1ma/herdr-auto-title.  It reads only
+the human prompts from the invoking agent's transcript, asks that same agent's
+CLI for a short title, and applies it to the current cmux surface.  The hook is
+normally detached from the agent process; ``CMUX_AGENT_BOARD_AUTO_TITLE_FOREGROUND=1``
+keeps it synchronous for tests and troubleshooting.
+
+Source: https://github.com/sh1ma/herdr-auto-title
+"""
+
+from __future__ import annotations
+
+import fcntl
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
+from pathlib import Path
+
+CLAUDE = "claude"
+CODEX = "codex"
+JA = "ja"
+EN = "en"
+
+DEFAULT_MODEL = {CLAUDE: "haiku", CODEX: "gpt-5.4-mini"}
+DEFAULT_MAX_WIDTH = 28
+DEFAULT_MAX_LOG_CHARS = 1500
+GENERATOR_TIMEOUT_SECONDS = 90
+CMUX_TIMEOUT_SECONDS = 5
+MAX_BUDGET_USD = "0.05"
+
+WORKING_MARKER = "\u2060\u200b\u2060"
+STOPPED_MARKER = "\u2060\u200c\u2060"
+INPUT_MARKER = "\u2060\u200d\u2060"
+MARKERS = (WORKING_MARKER, STOPPED_MARKER, INPUT_MARKER)
+
+SYSTEM_REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
+COMMAND_NAME_RE = re.compile(r"<command-name>(.*?)</command-name>", re.DOTALL)
+COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.DOTALL)
+COMMAND_TAG_RE = re.compile(r"</?command-[a-z-]+>", re.IGNORECASE)
+TAG_LINE_RE = re.compile(r"<(command-message|command-contents)>.*?</\1>", re.DOTALL)
+TRIM_CHARS = " \t　\"'`「」『』【】[]()<>*#-—…。．.:："
+PREFIX_RE = re.compile(r"^(タイトル|title)\s*[:：]\s*", re.IGNORECASE)
+
+
+def env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer") from error
+
+
+def env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def state_directory() -> Path:
+    configured = os.environ.get("CMUX_AGENT_BOARD_AUTO_TITLE_STATE_DIR")
+    return Path(configured).expanduser() if configured else Path.home() / ".local/state/cmux/agent-board-auto-title"
+
+
+def debug_enabled() -> bool:
+    return env_flag("CMUX_AGENT_BOARD_AUTO_TITLE_DEBUG")
+
+
+def log(message: str) -> None:
+    if not debug_enabled():
+        return
+    try:
+        directory = state_directory()
+        directory.mkdir(parents=True, exist_ok=True)
+        with (directory / "debug.log").open("a", encoding="utf-8") as handle:
+            handle.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n")
+    except OSError:
+        # Debug logging must never break the hook.
+        pass
+
+
+def resolve_language() -> str:
+    configured = os.environ.get("CMUX_AGENT_BOARD_AUTO_TITLE_LANG", "").strip().lower()
+    if configured.startswith(JA):
+        return JA
+    if configured.startswith(EN):
+        return EN
+    for name in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        if os.environ.get(name, "").strip().lower().startswith(JA):
+            return JA
+    return EN
+
+
+def max_width() -> int:
+    value = env_int("CMUX_AGENT_BOARD_AUTO_TITLE_MAX_WIDTH", DEFAULT_MAX_WIDTH)
+    if value < 2:
+        raise ValueError("CMUX_AGENT_BOARD_AUTO_TITLE_MAX_WIDTH must be at least 2")
+    return value
+
+
+def max_log_chars() -> int:
+    value = env_int("CMUX_AGENT_BOARD_AUTO_TITLE_MAX_LOG_CHARS", DEFAULT_MAX_LOG_CHARS)
+    if value < 1:
+        raise ValueError("CMUX_AGENT_BOARD_AUTO_TITLE_MAX_LOG_CHARS must be positive")
+    return value
+
+
+def system_prompt() -> str:
+    width = max_width()
+    if resolve_language() == JA:
+        return (
+            "あなたは作業ログから短いタイトルを作るツールです。"
+            "入力された会話から、その作業内容を表す日本語タイトルを1つだけ出力します。"
+            f"制約: 全角{width // 2}文字以内 / 体言止め / "
+            "記号・引用符・句読点・絵文字を使わない / "
+            "説明や前置きを一切書かず、タイトル本文のみを1行で出力する。"
+        )
+    return (
+        "You are a tool that writes a short title for a work log. "
+        "Given a conversation, you output exactly one English title describing the work. "
+        f"Constraints: at most {width} characters / a noun phrase with no trailing period / "
+        "no symbols, quotes, punctuation or emoji / "
+        "no explanation or preamble, output only the title itself on a single line."
+    )
+
+
+def clean_prompt_text(text: str) -> str:
+    """Remove hook metadata, command wrappers, and machine-generated output."""
+    if "<local-command-stdout>" in text:
+        return ""
+    text = SYSTEM_REMINDER_RE.sub(" ", text)
+    text = TAG_LINE_RE.sub(" ", text)
+
+    command = COMMAND_NAME_RE.search(text)
+    args = COMMAND_ARGS_RE.search(text)
+    if command:
+        parts = [command.group(1).strip()]
+        if args and args.group(1).strip():
+            parts.append(args.group(1).strip())
+        text = " ".join(parts)
+
+    text = COMMAND_TAG_RE.sub(" ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def iter_transcript_entries(transcript_path: str | None):
+    if not transcript_path:
+        return
+    try:
+        raw = Path(transcript_path).read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        log(f"cannot read transcript: {error}")
+        return
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(entry, dict):
+            yield entry
+
+
+def claude_user_prompts(transcript_path: str | None) -> list[str]:
+    """Extract genuine human messages from Claude's JSONL transcript."""
+    prompts: list[str] = []
+    for entry in iter_transcript_entries(transcript_path):
+        if entry.get("type") != "user":
+            continue
+        if entry.get("toolUseResult") is not None:
+            continue
+        if entry.get("isMeta") or entry.get("isSidechain"):
+            continue
+        if entry.get("sourceToolUseID"):
+            continue
+
+        message = entry.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, str):
+            chunks = [content]
+        elif isinstance(content, list):
+            chunks = [
+                item.get("text", "")
+                for item in content
+                if isinstance(item, dict) and item.get("type") == "text"
+            ]
+        else:
+            continue
+
+        cleaned = clean_prompt_text(" ".join(chunks))
+        if cleaned:
+            prompts.append(cleaned)
+    return prompts
+
+
+def codex_user_prompts(transcript_path: str | None) -> list[str]:
+    """Extract human messages from Codex's event_msg/user_message records."""
+    prompts: list[str] = []
+    for entry in iter_transcript_entries(transcript_path):
+        if entry.get("type") != "event_msg":
+            continue
+        payload = entry.get("payload")
+        if not isinstance(payload, dict) or payload.get("type") != "user_message":
+            continue
+        message = payload.get("message")
+        if not isinstance(message, str):
+            continue
+        cleaned = clean_prompt_text(message)
+        if cleaned:
+            prompts.append(cleaned)
+    return prompts
+
+
+def extract_user_prompts(transcript_path: str | None, agent: str) -> list[str]:
+    if agent == CODEX:
+        return codex_user_prompts(transcript_path)
+    return claude_user_prompts(transcript_path)
+
+
+def build_conversation_log(prompts: list[str]) -> str:
+    """Keep the first and newest prompts inside the bounded log size."""
+    if not prompts:
+        return ""
+
+    limit = max_log_chars()
+    first_prefix = "1. "
+    first_budget = limit
+    if len(prompts) > 1:
+        latest_prefix = f"{len(prompts)}. "
+        latest_reserve = min(
+            len(latest_prefix) + len(prompts[-1]),
+            max(len(latest_prefix) + 1, limit // 2),
+        )
+        first_budget = max(len(first_prefix) + 1, limit - latest_reserve - 1)
+    first_room = max(0, first_budget - len(first_prefix))
+    first = f"{first_prefix}{prompts[0][:first_room]}"
+    if len(first) >= limit:
+        return first[:limit]
+
+    lines = [first]
+    used = len(first)
+    tail: list[str] = []
+    for index in range(len(prompts) - 1, 0, -1):
+        prefix = f"{index + 1}. "
+        remaining = limit - used - 1
+        if remaining <= len(prefix):
+            break
+        piece = prompts[index][: remaining - len(prefix)]
+        if not piece:
+            break
+        line = prefix + piece
+        tail.append(line)
+        used += len(line) + 1
+    lines.extend(reversed(tail))
+    return "\n".join(lines)
+
+
+def display_width(text: str) -> int:
+    return sum(2 if unicodedata.east_asian_width(character) in "WF" else 1 for character in text)
+
+
+def truncate(text: str, width_limit: int) -> str:
+    if display_width(text) <= width_limit:
+        return text
+    output: list[str] = []
+    used = 0
+    for character in text:
+        step = 2 if unicodedata.east_asian_width(character) in "WF" else 1
+        if used + step > max(0, width_limit - 1):
+            break
+        output.append(character)
+        used += step
+    return "".join(output).rstrip(TRIM_CHARS) + "…"
+
+
+def sanitize_title(raw: str) -> str:
+    """Convert model output to one safe, bounded cmux title."""
+    text = "".join(
+        character
+        for character in raw
+        if character == "\n" or unicodedata.category(character)[0] != "C"
+    )
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    title = PREFIX_RE.sub("", lines[-1]).strip(TRIM_CHARS)
+    title = re.sub(r"\s+", " ", title)
+    if not title:
+        return ""
+    return truncate(title, max_width())
+
+
+def user_message_for(conversation_log: str, agent: str) -> str:
+    name = "Codex" if agent == CODEX else "Claude Code"
+    if resolve_language() == JA:
+        return (
+            f"以下は {name} の作業セッションでユーザーが入力した発言のログです。"
+            "この作業に付けるタイトルを1行で出力してください。\n\n"
+            f"{conversation_log}"
+        )
+    return (
+        f"Below is a log of the prompts a user typed during a {name} session. "
+        "Output a title for this work on a single line.\n\n"
+        f"{conversation_log}"
+    )
+
+
+def child_env() -> dict[str, str]:
+    environment = dict(os.environ)
+    for key in ("CMUX_WORKSPACE_ID", "CMUX_SURFACE_ID", "CMUX_TAB_ID", "CLAUDECODE"):
+        environment.pop(key, None)
+    return environment
+
+
+def run_generator(command: list[str], stdin_text: str | None) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(
+            command,
+            input=stdin_text,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GENERATOR_TIMEOUT_SECONDS,
+            cwd=str(Path.home()),
+            env=child_env(),
+            check=False,
+        )
+    except FileNotFoundError:
+        log(f"{command[0]} command not found")
+    except subprocess.TimeoutExpired:
+        log(f"{command[0]} timed out")
+    except OSError as error:
+        log(f"{command[0]} failed to start: {error}")
+    return None
+
+
+def generate_with_claude(conversation_log: str, model: str) -> str:
+    command = [
+        CLAUDE,
+        "-p",
+        "--safe-mode",
+        "--model",
+        model,
+        "--tools",
+        "",
+        "--no-session-persistence",
+        "--max-budget-usd",
+        MAX_BUDGET_USD,
+        "--system-prompt",
+        system_prompt(),
+    ]
+    completed = run_generator(command, user_message_for(conversation_log, CLAUDE))
+    if completed is None:
+        return ""
+    if completed.returncode != 0:
+        log(f"claude -p failed ({completed.returncode}): {completed.stderr[:300]}")
+        return ""
+    return sanitize_title(completed.stdout)
+
+
+def generate_with_codex(conversation_log: str, model: str) -> str:
+    prompt = f"{system_prompt()}\n\n{user_message_for(conversation_log, CODEX)}"
+    try:
+        with tempfile.TemporaryDirectory(prefix="cmux-agent-board-auto-title-") as temporary:
+            output_file = Path(temporary) / "title.txt"
+            command = [
+                CODEX,
+                "exec",
+                "--ignore-user-config",
+                "--disable",
+                "hooks",
+                "--ephemeral",
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "--color",
+                "never",
+                "--model",
+                model,
+                "-c",
+                "project_doc_max_bytes=0",
+                "-c",
+                "model_reasoning_effort=none",
+                "--output-last-message",
+                str(output_file),
+                prompt,
+            ]
+            completed = run_generator(command, None)
+            if completed is None:
+                return ""
+            if completed.returncode != 0:
+                log(f"codex exec failed ({completed.returncode}): {completed.stderr[-300:]}")
+                return ""
+            try:
+                raw = output_file.read_text(encoding="utf-8")
+            except OSError as error:
+                log(f"cannot read codex output: {error}")
+                return ""
+    except OSError as error:
+        log(f"cannot create codex output directory: {error}")
+        return ""
+    return sanitize_title(raw)
+
+
+def generate_title(conversation_log: str, agent: str) -> str:
+    model = os.environ.get("CMUX_AGENT_BOARD_AUTO_TITLE_MODEL") or DEFAULT_MODEL[agent]
+    log(f"generating with {agent} ({model})")
+    # Deliberately dispatch only to the backend that supplied the hook input.
+    if agent == CODEX:
+        return generate_with_codex(conversation_log, model)
+    return generate_with_claude(conversation_log, model)
+
+
+def cmux_binary() -> str:
+    return os.environ.get("CMUX_BIN") or "cmux"
+
+
+def run_cmux(arguments: list[str]) -> subprocess.CompletedProcess[str] | None:
+    environment = dict(os.environ)
+    environment["CMUX_QUIET"] = "1"
+    try:
+        return subprocess.run(
+            [cmux_binary(), *arguments],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=CMUX_TIMEOUT_SECONDS,
+            env=environment,
+            check=False,
+        )
+    except FileNotFoundError:
+        log(f"cmux command not found: {cmux_binary()}")
+    except subprocess.TimeoutExpired:
+        log(f"cmux command timed out: {' '.join(arguments)}")
+    except OSError as error:
+        log(f"cmux command failed: {error}")
+    return None
+
+
+def cmux_json(arguments: list[str]) -> dict | None:
+    completed = run_cmux(arguments)
+    if completed is None:
+        return None
+    if completed.returncode != 0:
+        details = completed.stderr.strip() or completed.stdout.strip()
+        log(f"cmux {' '.join(arguments)} failed ({completed.returncode}): {details[:300]}")
+        return None
+    try:
+        document = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        log(f"cmux {' '.join(arguments)} returned invalid JSON: {error}")
+        return None
+    if not isinstance(document, dict):
+        log(f"cmux {' '.join(arguments)} returned a non-object JSON value")
+        return None
+    return document
+
+
+def surface_document(workspace_id: str) -> dict | None:
+    parameters = json.dumps({"workspace_id": workspace_id}, separators=(",", ":"))
+    return cmux_json(["rpc", "surface.list", parameters])
+
+
+def matching_surface(document: dict, surface_id: str) -> tuple[str, list[dict]] | None:
+    surfaces = document.get("surfaces")
+    if not isinstance(surfaces, list):
+        log("cmux surface.list did not contain a surfaces array")
+        return None
+    if not all(isinstance(surface, dict) for surface in surfaces):
+        log("cmux surface.list contained an invalid surface")
+        return None
+    matching = [
+        surface
+        for surface in surfaces
+        if surface.get("id") == surface_id or surface.get("ref") == surface_id
+    ]
+    if len(matching) != 1:
+        log(f"cmux surface.list found {len(matching)} matching current surfaces")
+        return None
+    title = matching[0].get("title")
+    if not isinstance(title, str):
+        log("cmux surface.list current surface title was not a string")
+        return None
+    return title, surfaces
+
+
+def workspace_document() -> dict | None:
+    return cmux_json(["workspace", "list", "--json"])
+
+
+def matching_workspace(document: dict, workspace_id: str) -> str | None:
+    workspaces = document.get("workspaces")
+    if not isinstance(workspaces, list):
+        log("cmux workspace list did not contain a workspaces array")
+        return None
+    if not all(isinstance(workspace, dict) for workspace in workspaces):
+        log("cmux workspace list contained an invalid workspace")
+        return None
+    matching = [
+        workspace
+        for workspace in workspaces
+        if workspace.get("id") == workspace_id or workspace.get("ref") == workspace_id
+    ]
+    if len(matching) != 1:
+        log(f"cmux workspace list found {len(matching)} matching current workspaces")
+        return None
+    title = matching[0].get("title")
+    if not isinstance(title, str):
+        log("cmux workspace title was not a string")
+        return None
+    return title
+
+
+def marker_in_title(title: str) -> str:
+    candidates = [(title.rfind(marker), marker) for marker in MARKERS if marker in title]
+    return max(candidates, default=(-1, ""))[1]
+
+
+def without_markers(title: str) -> str:
+    for marker in MARKERS:
+        title = title.replace(marker, "")
+    return title
+
+
+def rename_tab(surface_id: str, title: str) -> bool:
+    completed = run_cmux(
+        [
+            "tab-action",
+            "--surface",
+            surface_id,
+            "--action",
+            "rename",
+            "--title",
+            title,
+        ]
+    )
+    if completed is None:
+        return False
+    if completed.returncode != 0:
+        details = completed.stderr.strip() or completed.stdout.strip()
+        log(f"cmux tab rename failed ({completed.returncode}): {details[:300]}")
+        return False
+    return True
+
+
+def rename_workspace(workspace_id: str, title: str) -> bool:
+    completed = run_cmux(
+        [
+            "workspace-action",
+            "--workspace",
+            workspace_id,
+            "--action",
+            "rename",
+            "--title",
+            title,
+        ]
+    )
+    if completed is None:
+        return False
+    if completed.returncode != 0:
+        details = completed.stderr.strip() or completed.stdout.strip()
+        log(f"cmux workspace rename failed ({completed.returncode}): {details[:300]}")
+        return False
+    return True
+
+
+def state_path(session_id: str) -> Path:
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", session_id) or "unknown"
+    return state_directory() / f"{safe}.json"
+
+
+def surface_title_lock_path(surface_id: str) -> Path:
+    configured = os.environ.get("CMUX_AGENT_BOARD_TITLE_LOCK_DIR")
+    directory = (
+        Path(configured).expanduser()
+        if configured
+        else Path.home() / ".local/state/cmux/agent-board-title-locks"
+    )
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", surface_id) or "unknown"
+    return directory / f"{safe}.lock"
+
+
+def acquire_surface_title_lock(surface_id: str):
+    path = surface_title_lock_path(surface_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle = path.open("a+")
+        fcntl.flock(handle, fcntl.LOCK_EX)
+    except OSError as error:
+        log(f"cannot acquire surface title lock: {error}")
+        return None
+    return handle
+
+
+def load_state(path: Path) -> dict | None:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, json.JSONDecodeError) as error:
+        log(f"cannot read state: {error}")
+        return None
+    if not isinstance(document, dict):
+        log("state did not contain a JSON object")
+        return None
+    return document
+
+
+def save_state(path: Path, state: dict) -> bool:
+    try:
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(path)
+    except OSError as error:
+        log(f"cannot save state: {error}")
+        return False
+    return True
+
+
+def detect_agent(hook_input: dict) -> str:
+    # turn_id is specific to Codex UserPromptSubmit input.
+    return CODEX if hook_input.get("turn_id") else CLAUDE
+
+
+def run(hook_input: dict) -> None:
+    session_value = hook_input.get("session_id") or "unknown"
+    session_id = str(session_value)
+    state_file = state_path(session_id)
+    directory = state_file.parent
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        log(f"cannot create state directory: {error}")
+        return
+
+    try:
+        lock_handle = state_file.with_suffix(".lock").open("w")
+        fcntl.flock(lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        log("another run holds the lock; skipping")
+        return
+
+    state = load_state(state_file)
+    if state is None:
+        return
+    if state.get("complete") is True:
+        log(f"session {session_id}: title already applied")
+        return
+
+    workspace_id = os.environ.get("CMUX_WORKSPACE_ID", "")
+    surface_id = os.environ.get("CMUX_SURFACE_ID", "")
+    initial_document = surface_document(workspace_id)
+    if initial_document is None or matching_surface(initial_document, surface_id) is None:
+        return
+
+    stored_title = state.get("title")
+    title = stored_title if isinstance(stored_title, str) and stored_title else ""
+    if not title:
+        agent = detect_agent(hook_input)
+        prompts = extract_user_prompts(hook_input.get("transcript_path"), agent)
+        current_prompt = hook_input.get("prompt")
+        if isinstance(current_prompt, str):
+            current_prompt = clean_prompt_text(current_prompt)
+        else:
+            current_prompt = ""
+        if current_prompt and (not prompts or prompts[-1] != current_prompt):
+            prompts.append(current_prompt)
+        conversation_log = build_conversation_log(prompts)
+        if not conversation_log:
+            log("no usable user prompts")
+            return
+
+        title = generate_title(conversation_log, agent)
+        if not title:
+            log("no title generated")
+            return
+        title = without_markers(title)
+        state.update(
+            {
+                "generated": True,
+                "title": title,
+                "tab_applied": False,
+                "workspace_id": workspace_id,
+                "surface_id": surface_id,
+                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            }
+        )
+        if not save_state(state_file, state):
+            return
+
+    title_lock_handle = acquire_surface_title_lock(surface_id)
+    if title_lock_handle is None:
+        return
+    try:
+        document = surface_document(workspace_id)
+        if document is None:
+            return
+        current = matching_surface(document, surface_id)
+        if current is None:
+            return
+        current_surface_title, surfaces = current
+
+        if state.get("tab_applied") is not True:
+            current_marker = marker_in_title(current_surface_title)
+            tab_title = title + current_marker
+            if tab_title != current_surface_title and not rename_tab(surface_id, tab_title):
+                return
+            state["tab_applied"] = True
+            state["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            if not save_state(state_file, state):
+                return
+
+        rename_current_workspace = env_flag("CMUX_AGENT_BOARD_AUTO_TITLE_WORKSPACE")
+        if rename_current_workspace and len(surfaces) == 1:
+            if state.get("workspace_applied") is not True:
+                workspace = workspace_document()
+                if workspace is None:
+                    return
+                current_workspace_title = matching_workspace(workspace, workspace_id)
+                if current_workspace_title is None:
+                    return
+                workspace_marker = marker_in_title(current_workspace_title)
+                workspace_title = title + workspace_marker
+                if (
+                    current_workspace_title != workspace_title
+                    and not rename_workspace(workspace_id, workspace_title)
+                ):
+                    return
+                state["workspace_applied"] = True
+                state["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+                if not save_state(state_file, state):
+                    return
+        elif rename_current_workspace:
+            log(f"workspace rename skipped: surface.list reported {len(surfaces)} surfaces")
+            state["workspace_skipped"] = "multiple-surfaces"
+
+        state["complete"] = True
+        state["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        save_state(state_file, state)
+    finally:
+        title_lock_handle.close()
+
+
+def daemonize() -> None:
+    if os.fork() > 0:
+        os._exit(0)
+    os.setsid()
+    devnull = os.open(os.devnull, os.O_RDWR)
+    os.dup2(devnull, 0)
+    os.dup2(devnull, 1)
+    os.dup2(devnull, 2)
+    if devnull > 2:
+        os.close(devnull)
+
+
+def main() -> int:
+    if env_flag("CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED"):
+        return 0
+    if not os.environ.get("CMUX_WORKSPACE_ID") or not os.environ.get("CMUX_SURFACE_ID"):
+        return 0
+
+    try:
+        raw = sys.stdin.read()
+        hook_input = json.loads(raw) if raw.strip() else {}
+    except (OSError, json.JSONDecodeError) as error:
+        log(f"invalid hook input: {error}")
+        return 0
+    if not isinstance(hook_input, dict):
+        log("hook input was not a JSON object")
+        return 0
+    if hook_input.get("agent_id"):
+        return 0
+
+    if env_flag("CMUX_AGENT_BOARD_AUTO_TITLE_FOREGROUND"):
+        try:
+            run(hook_input)
+        except Exception as error:  # noqa: BLE001 - isolate the calling agent from hook failures
+            log(f"unexpected error: {error!r}")
+        return 0
+
+    try:
+        daemonize()
+    except OSError as error:
+        log(f"fork failed: {error}")
+        return 0
+    try:
+        run(hook_input)
+    except Exception as error:  # noqa: BLE001 - isolate the calling agent from hook failures
+        log(f"unexpected error: {error!r}")
+    os._exit(0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

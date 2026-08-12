@@ -13,6 +13,7 @@ trap 'rm -rf "$test_dir"' EXIT
 
 mock_cmux="$test_dir/cmux"
 calls_file="$test_dir/calls"
+flock_calls="$test_dir/flock-calls"
 
 cat >"$mock_cmux" <<'MOCK'
 #!/usr/bin/env bash
@@ -39,11 +40,20 @@ exit 1
 MOCK
 chmod +x "$mock_cmux"
 
+cat >"$test_dir/flock" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$MOCK_FLOCK_CALLS"
+MOCK
+chmod +x "$test_dir/flock"
+
 run_state() {
   PATH="$test_dir:$PATH" \
     MOCK_CALLS_FILE="$calls_file" \
+    MOCK_FLOCK_CALLS="$flock_calls" \
     CMUX_WORKSPACE_ID='workspace-id' \
     CMUX_SURFACE_ID='surface-id' \
+    CMUX_AGENT_BOARD_TITLE_LOCK_DIR="$test_dir/title-locks" \
     bash "$SCRIPT" "$@"
 }
 
@@ -57,6 +67,19 @@ if grep -Fq 'workspace-action' "$calls_file"; then
   printf 'clean workspace title was unexpectedly renamed\n' >&2
   exit 1
 fi
+
+force_flock_env="$test_dir/force-flock.bash"
+cat >"$force_flock_env" <<'ENV'
+command() {
+  if [[ "${1:-}" == "-v" && "${2:-}" == "lockf" ]]; then
+    return 1
+  fi
+  builtin command "$@"
+}
+ENV
+: >"$calls_file"
+BASH_ENV="$force_flock_env" run_state working >/dev/null
+grep -Fxq -- '-w 5 9' "$flock_calls"
 
 : >"$calls_file"
 MOCK_SURFACE_TITLE="surface${working_marker}" run_state working >/dev/null
