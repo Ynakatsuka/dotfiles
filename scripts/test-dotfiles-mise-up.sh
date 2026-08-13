@@ -26,6 +26,10 @@ case "${1:-}" in
     case "$MISE_TEST_DOCTOR_RESULT" in
       true) printf '%s\n' '{"self_update_available":true}' ;;
       false) printf '%s\n' '{"self_update_available":false}' ;;
+      false_with_problem)
+        printf '%s\n' '{"self_update_available":false,"errors":["shims are missing"]}'
+        exit 1
+        ;;
       missing) printf '%s\n' '{"version":"test"}' ;;
       invalid) printf '%s\n' '{"self_update_available":"false"}' ;;
       malformed) printf '%s\n' '{' ;;
@@ -108,6 +112,9 @@ grep -Fq '[INFO] mise is managed by the system package manager; skipping self-up
   echo "FAIL: package-manager ownership was not reported" >&2
   exit 1
 }
+
+run_success_case false_with_problem >/dev/null
+assert_not_called "self-update -y"
 
 run_success_case true >/dev/null
 assert_called "self-update -y"
