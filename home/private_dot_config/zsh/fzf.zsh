@@ -48,7 +48,7 @@ zle -N fzf-cdr
 setopt noflowcontrol
 bindkey '^f' fzf-cdr
 
-# fzf gcloud configuration select and login
+# fzf gcloud configuration select and reauthentication
 function gcloud-fzf-activate-login() {
     local config
     config=$(gcloud config configurations list --format="value(NAME)" | fzf --prompt="GCloud Config> " --height=40% --reverse)
@@ -57,11 +57,7 @@ function gcloud-fzf-activate-login() {
         local login
         login=$(printf "login\nskip" | fzf --prompt="Login? > " --height=20% --reverse)
         if [ "$login" = "login" ]; then
-            if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ] && [ "$(uname)" != "Darwin" ]; then
-                gcloud auth application-default login --no-browser
-            else
-                gcloud auth application-default login
-            fi
+            gcloud-reauth "$config"
         fi
     fi
 }

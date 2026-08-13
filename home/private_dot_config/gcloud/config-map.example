@@ -12,8 +12,11 @@
 #   is set to that file when the config is activated.
 #
 #   To create per-config ADC files:
-#     gcloud auth application-default login --project <project-id>
-#     cp ~/.config/gcloud/application_default_credentials.json ~/.config/gcloud/adc_<config-name>.json
+#     gcloud-reauth <config-name>
+#
+#   gcloud-reauth refreshes both the gcloud CLI credentials and ADC. In SSH or
+#   another browserless Linux environment, open the printed URL on a phone or
+#   another trusted browser, then paste the authorization code into the shell.
 #
 # Example:
 # my-org/my-repo:my-config
