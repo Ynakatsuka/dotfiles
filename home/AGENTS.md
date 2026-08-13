@@ -75,6 +75,24 @@ Avoid these patterns unless explicitly approved:
 - Before running a remote or container batch, verify every required executable in that environment. Do not assume host tools or the host `PATH` exist there; stop and report missing requirements.
 - Use the supported tool-discovery mechanism when capability availability is unclear.
 
+## Test Value
+
+Before adding or materially expanding a test, inspect the relevant code and existing tests, then identify:
+
+1. The observable behavior, regression, boundary, failure mode, or cross-component contract the test protects.
+2. A plausible real-world defect that would make the test fail.
+3. The gap in existing tests that leaves that defect unprotected.
+
+If you cannot identify all three, do not add the test.
+
+- Exercise the narrowest stable boundary that exposes the defect. Name the test for the behavior it actually exercises.
+- Assert an observable output, state transition, persisted or emitted effect, or specific error.
+- Do not use successful execution or shallow proxies—such as type or non-empty checks, inheritance, constructibility, signatures, source-text presence, snapshots, or mock calls—as the sole evidence unless that fact or interaction is itself the contract.
+- Prefer real collaborators or lightweight fakes. Mock external or nondeterministic boundaries only when needed; assert interactions only when they are the contract.
+- Do not duplicate the same branch and outcome at another layer unless the added test proves a distinct integration risk.
+- Do not add tests only to increase coverage, mirror production files, or preserve implementation structure.
+- Apply the deletion test before finishing; remove the test if its absence would not materially weaken regression protection.
+
 ## Verification
 
 - Turn the request into a verifiable result and define the smallest relevant checks before editing.
