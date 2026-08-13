@@ -26,6 +26,7 @@ typeset -g _git_prompt_cache_dir=""
 
 git_prompt_info() {
   local now=$EPOCHSECONDS
+  local -x GIT_OPTIONAL_LOCKS=0
   # Return cache if within 2 seconds and same directory
   if (( now - _git_prompt_cache_time < 2 )) && [[ "$PWD" == "$_git_prompt_cache_dir" ]]; then
     [[ -n "$_git_prompt_cache" ]] && print "$_git_prompt_cache"

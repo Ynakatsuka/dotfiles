@@ -10,6 +10,7 @@ import os
 import stat
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,17 +19,31 @@ BEGIN = "// BEGIN CMUX_DIFF_DATA (managed by cmux-agent-board-diff-refresh)"
 END = "// END CMUX_DIFF_DATA"
 MAX_FILES_LISTED = 20
 MAX_UNTRACKED_BYTES = 2_000_000
+UNTRACKED_REFRESH_SECONDS = 120
 GIT_TIMEOUT_SECONDS = 15
+CACHE_VERSION = 1
 
 
 def configured_path(variable: str, default: Path) -> Path:
     return Path(os.environ.get(variable, str(default))).expanduser()
 
 
-def run_command(command: list[str], *, cwd: Path | None = None) -> str:
+def read_only_git_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
+    return environment
+
+
+def run_command(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    environment: dict[str, str] | None = None,
+) -> str:
     result = subprocess.run(
         command,
         cwd=cwd,
+        env=environment,
         capture_output=True,
         text=True,
         errors="surrogateescape",
@@ -42,7 +57,9 @@ def run_command(command: list[str], *, cwd: Path | None = None) -> str:
 
 def git(directory: Path, *arguments: str) -> str:
     return run_command(
-        ["git", "-c", "core.quotepath=false", *arguments], cwd=directory
+        ["git", "-c", "core.quotepath=false", *arguments],
+        cwd=directory,
+        environment=read_only_git_environment(),
     )
 
 
@@ -73,6 +90,7 @@ def git_toplevel(directory: Path) -> Path | None:
     result = subprocess.run(
         ["git", "-c", "core.quotepath=false", "rev-parse", "--show-toplevel"],
         cwd=directory,
+        env=read_only_git_environment(),
         capture_output=True,
         text=True,
         errors="surrogateescape",
@@ -201,10 +219,41 @@ def status_kind(status: str) -> str:
     return "M"
 
 
+def load_untracked_cache(path: Path) -> dict[str, Any]:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {"version": CACHE_VERSION, "repositories": {}}
+
+    if not isinstance(document, dict) or document.get("version") != CACHE_VERSION:
+        raise RuntimeError("cmux Agent Board diff cache has an invalid version")
+    repositories = document.get("repositories")
+    if not isinstance(repositories, dict):
+        raise RuntimeError("cmux Agent Board diff cache has invalid repositories")
+    for top, record in repositories.items():
+        if not isinstance(top, str) or not isinstance(record, dict):
+            raise RuntimeError("cmux Agent Board diff cache has an invalid repository")
+        scanned_at = record.get("scanned_at")
+        entries = record.get("entries")
+        if not isinstance(scanned_at, (int, float)) or not isinstance(entries, list):
+            raise RuntimeError("cmux Agent Board diff cache has an invalid scan record")
+        for entry in entries:
+            if (
+                not isinstance(entry, dict)
+                or entry.get("kind") != "N"
+                or not isinstance(entry.get("path"), str)
+                or not isinstance(entry.get("added"), (int, str))
+                or not isinstance(entry.get("deleted"), (int, str))
+            ):
+                raise RuntimeError("cmux Agent Board diff cache has an invalid entry")
+    return document
+
+
 def diff_base(top: Path) -> str:
     result = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", "HEAD"],
         cwd=top,
+        env=read_only_git_environment(),
         capture_output=True,
         text=True,
         errors="surrogateescape",
@@ -222,30 +271,23 @@ def diff_base(top: Path) -> str:
     return empty_tree
 
 
-def repository_changes(top: Path) -> list[dict[str, Any]]:
+def repository_changes(
+    top: Path,
+    cached_untracked: list[dict[str, Any]],
+    scan_untracked: bool,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]] | None]:
     entries: dict[str, dict[str, Any]] = {}
-    numstat = git(
-        top, "diff", "--numstat", "-z", "--no-renames", diff_base(top)
+    tracked_statuses: dict[str, str] = {}
+    untracked_entries: list[dict[str, Any]] = []
+    untracked_option = "-uall" if scan_untracked else "-uno"
+    status = git(
+        top,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        untracked_option,
+        "--no-renames",
     )
-    for record in numstat.split("\0"):
-        if not record:
-            continue
-        parts = record.split("\t", 2)
-        if len(parts) != 3:
-            raise RuntimeError("git diff returned an invalid numstat record")
-        added, deleted, file_name = parts
-        if added != "-" and not added.isdecimal():
-            raise RuntimeError("git diff returned an invalid added-line count")
-        if deleted != "-" and not deleted.isdecimal():
-            raise RuntimeError("git diff returned an invalid deleted-line count")
-        entries[file_name] = {
-            "kind": "M",
-            "added": "-" if added == "-" else int(added),
-            "deleted": "-" if deleted == "-" else int(deleted),
-            "path": file_name,
-        }
-
-    status = git(top, "status", "--porcelain=v1", "-z", "-uall", "--no-renames")
     for record in status.split("\0"):
         if not record:
             continue
@@ -262,15 +304,43 @@ def repository_changes(top: Path) -> list[dict[str, Any]]:
                 "deleted": deleted,
                 "path": file_name,
             }
-        elif file_name in entries:
-            entries[file_name]["kind"] = status_kind(code)
+            untracked_entries.append(entries[file_name])
+        else:
+            tracked_statuses[file_name] = code
+
+    if tracked_statuses:
+        numstat = git(
+            top, "diff", "--numstat", "-z", "--no-renames", diff_base(top)
+        )
+        for record in numstat.split("\0"):
+            if not record:
+                continue
+            parts = record.split("\t", 2)
+            if len(parts) != 3:
+                raise RuntimeError("git diff returned an invalid numstat record")
+            added, deleted, file_name = parts
+            if added != "-" and not added.isdecimal():
+                raise RuntimeError("git diff returned an invalid added-line count")
+            if deleted != "-" and not deleted.isdecimal():
+                raise RuntimeError("git diff returned an invalid deleted-line count")
+            entries[file_name] = {
+                "kind": status_kind(tracked_statuses.get(file_name, "")),
+                "added": "-" if added == "-" else int(added),
+                "deleted": "-" if deleted == "-" else int(deleted),
+                "path": file_name,
+            }
+
+    if not scan_untracked:
+        for entry in cached_untracked:
+            entries.setdefault(entry["path"], entry.copy())
 
     def churn(entry: dict[str, Any]) -> int:
         added = entry["added"] if isinstance(entry["added"], int) else 0
         deleted = entry["deleted"] if isinstance(entry["deleted"], int) else 0
         return added + deleted
 
-    return sorted(entries.values(), key=lambda entry: (-churn(entry), entry["path"]))
+    changes = sorted(entries.values(), key=lambda entry: (-churn(entry), entry["path"]))
+    return changes, untracked_entries if scan_untracked else None
 
 
 def branches(stats: dict[str, dict[str, str]], field: str) -> str:
@@ -304,22 +374,49 @@ def generated_block(stats: dict[str, dict[str, str]]) -> str:
     return f"{BEGIN}\n{''.join(functions)}{END}"
 
 
-def collect_stats(cmux_bin: str) -> dict[str, dict[str, str]]:
+def collect_stats(
+    cmux_bin: str,
+    cache: dict[str, Any],
+    now: float,
+) -> tuple[dict[str, dict[str, str]], bool]:
     stats: dict[str, dict[str, str]] = {}
+    repositories = cache["repositories"]
+    active_toplevels: set[str] = set()
+    cache_changed = False
     for top in repository_toplevels(workspace_directories(cmux_bin)):
-        changes = repository_changes(top)
+        top_key = str(top)
+        active_toplevels.add(top_key)
+        cached = repositories.get(top_key)
+        scan_untracked = (
+            cached is None
+            or now < cached["scanned_at"]
+            or now - cached["scanned_at"] >= UNTRACKED_REFRESH_SECONDS
+        )
+        cached_untracked = [] if cached is None else cached["entries"]
+        changes, refreshed_untracked = repository_changes(
+            top, cached_untracked, scan_untracked
+        )
+        if refreshed_untracked is not None:
+            repositories[top_key] = {
+                "scanned_at": now,
+                "entries": refreshed_untracked,
+            }
+            cache_changed = True
         if not changes:
             continue
         added = sum(entry["added"] for entry in changes if isinstance(entry["added"], int))
         deleted = sum(entry["deleted"] for entry in changes if isinstance(entry["deleted"], int))
         listed = changes[:MAX_FILES_LISTED]
-        stats[str(top)] = {
+        stats[top_key] = {
             "totals": f"{len(changes)}|{added}|{deleted}",
             "tree": tree_rows(listed),
             "more": str(len(changes) - len(listed)) if len(changes) > len(listed) else "",
             "root": str(top),
         }
-    return stats
+    for stale_toplevel in repositories.keys() - active_toplevels:
+        del repositories[stale_toplevel]
+        cache_changed = True
+    return stats, cache_changed
 
 
 def render_runtime(source: str, stats: dict[str, dict[str, str]]) -> str:
@@ -347,18 +444,28 @@ def write_atomic(path: Path, content: str) -> None:
         raise
 
 
-def refresh(cmux_bin: str, source_path: Path, target_path: Path) -> bool:
+def refresh(
+    cmux_bin: str,
+    source_path: Path,
+    target_path: Path,
+    cache_path: Path,
+) -> bool:
     source = source_path.read_text(encoding="utf-8")
-    runtime = render_runtime(source, collect_stats(cmux_bin))
+    cache = load_untracked_cache(cache_path)
+    stats, cache_changed = collect_stats(cmux_bin, cache, time.time())
+    runtime = render_runtime(source, stats)
     try:
         previous_runtime = target_path.read_text(encoding="utf-8")
     except FileNotFoundError:
         previous_runtime = None
-    if runtime == previous_runtime:
-        return False
-    write_atomic(target_path, runtime)
-    run_command([cmux_bin, "sidebar", "reload", "agent-board"])
-    return True
+    runtime_changed = runtime != previous_runtime
+    if runtime_changed:
+        write_atomic(target_path, runtime)
+        run_command([cmux_bin, "sidebar", "reload", "agent-board"])
+    if cache_changed:
+        cache_content = json.dumps(cache, ensure_ascii=True, sort_keys=True) + "\n"
+        write_atomic(cache_path, cache_content)
+    return runtime_changed
 
 
 def main() -> None:
@@ -372,13 +479,17 @@ def main() -> None:
     lock_path = configured_path(
         "CMUX_AGENT_BOARD_LOCK", Path.home() / ".local/state/cmux/agent-board-diff-refresh.lock"
     )
+    cache_path = configured_path(
+        "CMUX_AGENT_BOARD_CACHE",
+        Path.home() / ".local/state/cmux/agent-board-diff-cache.json",
+    )
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+", encoding="utf-8") as lock_file:
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
             raise RuntimeError("another cmux Agent Board diff refresh is already running") from error
-        refresh(cmux_bin, source_path, target_path)
+        refresh(cmux_bin, source_path, target_path, cache_path)
 
 
 if __name__ == "__main__":
