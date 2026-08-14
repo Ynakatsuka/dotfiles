@@ -1,0 +1,4 @@
+interface:
+  display_name: "Explain Diff"
+  short_description: "コード差分の背景・設計・実装を対話式HTMLで理解する"
+  default_prompt: "Use $my-explain-diff to create a self-contained HTML explanation of the specified code change."
