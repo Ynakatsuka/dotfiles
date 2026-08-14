@@ -1,0 +1,4 @@
+interface:
+  display_name: "Portable Skill Creator"
+  short_description: "Create skills for Claude Code, Codex, and Cursor"
+  default_prompt: "Use $my-skill-creator to create or update a portable Agent Skill."

@@ -1,294 +1,227 @@
 ---
 name: my-skill-creator
 description: >-
-  Interactive guide for creating and improving Claude Code skills (SKILL.md files).
-  Use when the user explicitly asks to create, update, or fix a **skill definition**.
-  Triggers: "スキルを作って", "スキル作成", "create a skill", "new skill", "build a skill",
-  "improve this skill", "update skill", "fix my skill", "skill doesn't trigger".
-  Do NOT use for general coding tasks, PR creation, code review, or any task
-  that merely contains the word "create" without referring to skill authoring.
+  Interactive guide for creating and improving portable Agent Skills (SKILL.md files)
+  shared by Claude Code, Codex, and Cursor. Use when the user asks to create, update,
+  validate, or fix a skill definition or says a skill does not trigger. Do NOT use for
+  general coding tasks or requests that merely contain the word "create".
 license: Complete terms in LICENSE.txt
-argument-hint: "[skill-name]"
 ---
 
-# Skill Creator
+# Portable Skill Creator
 
-Interactive guide for creating effective skills that extend Claude's capabilities.
+Create one skill directory that Claude Code, Codex, and Cursor can load. Keep shared behavior in
+`SKILL.md`; add product-specific adapter files only where the clients have no common field.
 
-## Reference Materials
+## References
 
-Consult these based on your needs:
+Read only the references needed for the task:
 
-- **Complete official guide**: See `references/complete-guide.md` for Anthropic's full skill-building guide (fundamentals, planning, testing, distribution, 5 design patterns, troubleshooting)
-- **Workflow patterns**: See `references/workflows.md` for sequential and conditional workflow design
-- **Output patterns**: See `references/output-patterns.md` for template and example patterns
-- **Eval-driven iteration**: See `references/evaluating-skills.md` for the evals.json format, baseline comparison, grading, and the improvement loop
+- **Client compatibility**: Read `references/compatibility.md` before choosing frontmatter,
+  discovery paths, invocation controls, or product-specific features.
+- **Workflow patterns**: Read `references/workflows.md` for sequential and conditional workflows.
+- **Output patterns**: Read `references/output-patterns.md` for templates and examples.
+- **Evaluation**: Read `references/evaluating-skills.md` for eval cases, grading, and iteration.
 
-## Core Principles
+## Core principles
 
-1. **Concise is key**: Claude is already smart. Only add context Claude doesn't already have. Prefer concise examples over verbose explanations. Challenge each piece of information: "Does this justify its token cost?"
-2. **Progressive disclosure**: Metadata always loaded (~100 words) → SKILL.md body on trigger (<5k words, <500 lines) → Bundled resources as needed.
-3. **Appropriate degrees of freedom**: High freedom for flexible tasks (text-based instructions), medium for preferred patterns (pseudocode/scripts with parameters), low for fragile/error-prone operations (specific scripts, few parameters).
+1. Keep the skill portable by default. Use client-specific behavior only when the requested
+   workflow cannot be expressed through the shared skill body.
+2. Keep instructions concise. Add only knowledge or procedure that a capable coding agent would
+   not infer reliably.
+3. Match instruction strictness to risk. Use exact scripts for fragile operations and judgment-based
+   guidance where several approaches are valid.
+4. Load detail progressively: `name` and `description`, then the `SKILL.md` body, then referenced
+   files and scripts as needed.
 
-## Skill Structure
+## Directory structure
 
-```
+```text
 skill-name/
-├── SKILL.md (required, case-sensitive)
-│   ├── YAML frontmatter (name + description, required)
-│   └── Markdown body (instructions)
-├── scripts/          - Executable code (deterministic, token-efficient)
-├── references/       - Documentation loaded into context as needed
-└── assets/           - Files used in output (templates, icons, fonts)
+├── SKILL.md              # Required: shared metadata and instructions
+├── agents/
+│   └── openai.yaml       # Optional: Codex UI, dependencies, and invocation policy
+├── scripts/              # Optional: executable helpers
+├── references/           # Optional: documentation loaded on demand
+└── assets/               # Optional: templates and output resources
 ```
 
-**Do NOT include**: README.md, CHANGELOG.md, INSTALLATION_GUIDE.md, or other auxiliary files.
+Do not add README.md, CHANGELOG.md, installation guides, or empty resource directories.
 
-### Frontmatter
+## Frontmatter
+
+Start with the open Agent Skills fields:
 
 ```yaml
 ---
-name: kebab-case-name       # Must match folder name, no spaces/capitals
-description: |               # Under 1024 chars, no XML tags (< >)
-  What it does. Use when user asks to [specific phrases].
-  Do NOT use for [negative triggers].
-argument-hint: "[arg-name]"  # Shown in autocomplete UI (optional)
+name: kebab-case-name
+description: >-
+  What the skill does. Use when the user asks for specific tasks or mentions relevant files.
+  Do NOT use for adjacent tasks outside its scope.
 ---
 ```
 
-#### Required fields
+### Open standard fields
 
-| Field | Rules |
+| Field | Requirement |
 |---|---|
-| `name` | Lowercase, hyphens only. Max 64 chars. No reserved words (`anthropic`, `claude`). |
-| `description` | Max 1024 chars. No XML tags. Third-person voice. |
+| `name` | Required. 1-64 lowercase letters, digits, and hyphens. Match the directory name. |
+| `description` | Required. 1-1024 characters. State what the skill does and when to use it. |
+| `license` | Optional. License name or bundled license file. |
+| `compatibility` | Optional. 1-500 characters describing actual environment requirements. |
+| `metadata` | Optional. String-to-string metadata for external tooling. |
+| `allowed-tools` | Optional and experimental. Do not assume every client enforces it. |
 
-#### Optional fields
+### Shared Claude Code and Cursor extensions
 
-| Field | Purpose |
+These fields are not part of the open specification, but both Claude Code and Cursor document them:
+
+| Field | Behavior and portability requirement |
 |---|---|
-| `argument-hint` | Autocomplete hint (e.g., `[url]`, `<issue-number>`, `[create\|review]`) |
-| `when_to_use` | Extra trigger context appended to `description` in the skill listing. Combined text is truncated at 1,536 chars — put the key use case first |
-| `arguments` | Named positional arguments for `$name` substitution (space-separated string or YAML list; names map to positions in order) |
-| `disable-model-invocation` | `true` to prevent auto-triggering (manual `/name` only). Also removes the description from Claude's context |
-| `user-invocable` | `false` to hide from the `/` menu. For background knowledge only Claude should invoke |
-| `allowed-tools` | Pre-approve listed tools (no permission prompt) while the skill is active. Does NOT restrict other tools |
-| `disallowed-tools` | Remove tools from Claude's available pool while the skill is active (clears on the next user message) |
-| `model` | Model override when skill is active |
-| `effort` | Effort level: `low`, `medium`, `high`, `xhigh`, `max` |
-| `context` | `fork` to run in isolated subagent |
-| `agent` | Subagent type when `context: fork` (e.g., `Explore`, `Plan`) |
-| `paths` | Glob patterns; auto-load the skill only when working with matching files |
-| `hooks` | Hooks scoped to this skill's lifecycle |
-| `shell` | Shell for dynamic injection commands: `bash` (default) or `powershell` |
-| `license` | License identifier (e.g., `MIT`) |
-| `compatibility` | Environment requirements (1-500 chars) |
-| `metadata` | Custom key-value pairs (`author`, `version`, `mcp-server`) |
+| `disable-model-invocation` | `true` makes the skill explicit-only in Claude Code and Cursor. Add the matching Codex policy shown below. |
+| `paths` | Limits automatic discovery to matching file globs in Claude Code and Cursor. Codex has no documented equivalent. |
 
-#### Arguments in body
+For a manual-only skill, keep both declarations in the same directory:
 
-Use these variables in skill body to reference user arguments:
-
-| Variable | Description |
-|---|---|
-| `$ARGUMENTS` | All arguments as a single string |
-| `$ARGUMENTS[N]`, `$N` | Individual arguments by 0-based index (`$0`, `$1`, ...) |
-| `$name` | Named argument declared in the `arguments` frontmatter field |
-| `${CLAUDE_SKILL_DIR}` | Directory containing SKILL.md |
-| `${CLAUDE_PROJECT_DIR}` | Project root directory (also usable in `allowed-tools` rules) |
-| `${CLAUDE_SESSION_ID}` | Current session ID (logging, session-scoped files) |
-| `${CLAUDE_EFFORT}` | Active effort level (`low` ... `max`) |
-
-If `$ARGUMENTS` is not referenced in the body, arguments are auto-appended as `ARGUMENTS: <value>`.
-
-#### Dynamic context injection
-
-A `!` immediately followed by a backtick-quoted command runs that shell command BEFORE the skill content reaches Claude; the output replaces the placeholder, so the prompt arrives grounded in live state (git status, current tags, open PRs). For multi-line commands, open a fence with three backticks immediately followed by `!`, as in `my-pr/SKILL.md`.
-
-Rules:
-
-- Recognized only at line start or after whitespace (`` KEY=!`cmd` `` stays literal).
-- Never write a bare three-backtick-plus-`!` sequence in prose or an inline code span. The scanner is not a Markdown parser, so it treats the rest of the file as a command and the skill fails to load. Describe the fence in words instead.
-- Commands run on EVERY invocation, including auto-invocation: keep them fast, read-only, and side-effect free.
-- Command failure output is injected as-is — that is desirable (surfaces errors instead of hiding them). Do not wrap commands in `|| echo` fallbacks.
-- Output is not re-scanned for further placeholders.
-- Label injected sections as a snapshot taken at invocation time; skill content stays in context across turns and is not re-rendered.
-
-**Description is the primary triggering mechanism.** Structure: `[What it does] + [When to use it] + [Negative triggers]`
-
-Good descriptions:
 ```yaml
-# Specific, actionable, with negative trigger
-description: >-
-  Analyze Figma design files and generate developer handoff documentation.
-  Use when user uploads .fig files or asks for "design specs" or "design-to-code handoff".
-  Do NOT use for general image editing or non-Figma design tools.
-
-# Clear scope with subcommands
-description: >-
-  Unified PR workflow: review, auto-fix, and create/update GitHub PRs.
-  Default runs full flow (review → fix → create). Subcommands: create, review.
-  Use when creating PRs or requesting "PR作成", "レビュー".
+# SKILL.md
+disable-model-invocation: true
 ```
 
-Bad descriptions:
 ```yaml
-description: Helps with projects.  # Too vague, no triggers
-description: Creates sophisticated multi-page documentation systems.  # Missing triggers
-description: Implements the Project entity model with hierarchical relationships.  # Too technical
+# agents/openai.yaml
+policy:
+  allow_implicit_invocation: false
 ```
 
-### Resource Guidelines
+Treat `paths` as a deliberate two-client enhancement. Put essential scope in `description` as well,
+because Codex ignores the field.
 
-| Type | When to Include | Key Points |
+### Claude Code extensions
+
+Do not use these by default in a shared skill:
+
+`when_to_use`, `argument-hint`, `arguments`, `user-invocable`, `disallowed-tools`, `model`,
+`effort`, `context`, `agent`, `background`, `hooks`, and `shell`.
+
+When the user explicitly accepts a Claude Code dependency, document it in `compatibility` and read
+the current Claude Code documentation before using an extension. Do not place Claude Code-only keys
+in `metadata` to disguise them as portable fields.
+
+## Portable body content
+
+- Write instructions against capabilities, inputs, and outcomes rather than a client's tool names.
+- Refer to bundled files with paths relative to the skill root.
+- Read arguments from the user's current request. Do not rely on client-specific argument variables.
+- Do not use Claude Code dynamic command injection or `CLAUDE_*` environment substitutions by default.
+- Keep client invocation syntax out of workflow instructions. Claude Code and Cursor use `/name`;
+  Codex uses `$name`.
+- State required executables, network access, and platform assumptions in `compatibility` or the body.
+- Separate network operations from local writes so a failed dependency stops with a clear error.
+
+## Creation process
+
+### 1. Understand the use cases
+
+Identify concrete requests that should and should not use the skill. Ask only when materially
+different interpretations remain after inspecting the repository and nearby skills.
+
+### 2. Plan reusable contents
+
+For each use case, determine whether repeated work belongs in:
+
+- `scripts/` for deterministic operations;
+- `references/` for detailed knowledge loaded only when needed;
+- `assets/` for templates or files copied into outputs.
+
+Avoid duplicating the same instruction in `SKILL.md` and a reference.
+
+### 3. Choose the source directory
+
+Follow the repository's existing convention first. Do not create a second copy of a skill.
+
+- In this dotfiles repository, create under `home/dot_claude/skills/`; the existing deployment
+  links the same directory into Codex, and Cursor reads Claude skill directories directly.
+- In a repository without an established convention, prefer `.agents/skills/` as the canonical
+  directory for Codex and Cursor, then symlink the same skill directory under `.claude/skills/`
+  for Claude Code.
+- For global skills, apply the same arrangement under the user's home directory.
+
+Verify the source-to-target mapping before creating or linking anything.
+
+### 4. Initialize and edit
+
+For a new skill, run:
+
+```bash
+uv run <skill-root>/scripts/init_skill.py <skill-name> --path <output-directory>
+```
+
+Replace `<skill-root>` with the absolute path of this skill directory.
+
+Add only the resource directories that are needed:
+
+```bash
+uv run <skill-root>/scripts/init_skill.py <skill-name> --path <output-directory> \
+  --resources scripts,references
+```
+
+For a manual-only skill, generate both clients' invocation controls together:
+
+```bash
+uv run <skill-root>/scripts/init_skill.py <skill-name> --path <output-directory> --manual-only
+```
+
+When editing an existing skill, skip initialization. Preserve useful resources and repository
+conventions.
+
+### 5. Validate
+
+Run the portable profile by default:
+
+```bash
+uv run <skill-root>/scripts/quick_validate.py <skill-directory>
+```
+
+It accepts the open fields plus the two shared Claude Code and Cursor extensions. It also checks
+that a manual-only skill has the matching Codex policy. Use `--profile standard` for the strict open
+specification or `--profile claude` only for an intentionally Claude Code-specific skill.
+
+Do not create a `.skill` archive for repository-managed skills. The shared directory is the
+deployable unit.
+
+### 6. Test and iterate
+
+Test at least:
+
+- an obvious triggering request;
+- a paraphrased triggering request;
+- an unrelated request that should not trigger;
+- the workflow's main success path and material failure path.
+
+For manual-only skills, verify explicit invocation in each installed client. For automatic skills,
+test description matching separately in Claude Code, Codex, and Cursor because routing behavior is
+client-specific.
+
+For complex skills, compare representative tasks with and without the skill. Read
+`references/evaluating-skills.md` before building an evaluation set.
+
+## Writing guidelines
+
+- Use imperative instructions and explicit inputs, outputs, and stop conditions.
+- Put all trigger information in `description`; the body loads only after selection.
+- Prefer a short example over an abstract explanation.
+- Keep `SKILL.md` under 500 lines and move conditional detail to one-level-deep references.
+- Test every added script by running it.
+- Delete initializer placeholders that the finished skill does not need.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Change |
 |---|---|---|
-| `scripts/` | Same code rewritten repeatedly; deterministic reliability needed | Test by running; token-efficient; may execute without loading into context |
-| `references/` | Detailed docs that Claude should reference while working | Keeps SKILL.md lean; for files >10k words, include grep patterns in SKILL.md |
-| `assets/` | Files used in output, not loaded into context | Templates, images, fonts, boilerplate code |
-
-**Avoid duplication**: Information should live in either SKILL.md or references, not both.
-
-### Progressive Disclosure Patterns
-
-Split into reference files when SKILL.md approaches 500 lines. Reference all split files from SKILL.md with clear descriptions of when to read them.
-
-- **Pattern 1 — High-level guide**: Core instructions in SKILL.md, detailed docs in references
-- **Pattern 2 — Domain-specific**: One reference file per domain/variant (e.g., `references/aws.md`, `references/gcp.md`)
-- **Pattern 3 — Conditional**: Basic content in SKILL.md, advanced/specialized content in references
-
-Keep references one level deep from SKILL.md. For reference files >100 lines, include a table of contents.
-
-## Skill Creation Process
-
-1. Understand the skill with concrete examples
-2. Plan reusable skill contents (scripts, references, assets)
-3. Initialize the skill (run `init_skill.py`)
-4. Edit the skill (implement resources and write SKILL.md)
-5. Test and iterate based on real usage
-
-### Step 1: Understand with Concrete Examples
-
-Skip only when usage patterns are already clearly understood.
-
-Ask focused questions to understand the skill's scope:
-- "What functionality should the skill support?"
-- "Can you give examples of how this skill would be used?"
-- "What would a user say that should trigger this skill?"
-
-Avoid overwhelming users — start with the most important questions, follow up as needed. Conclude when there is a clear sense of the functionality the skill should support.
-
-### Step 2: Plan Reusable Contents
-
-For each concrete example, analyze:
-1. How to execute from scratch
-2. What scripts, references, and assets would be helpful for repeated execution
-
-Examples:
-- PDF rotation → `scripts/rotate_pdf.py` (same code rewritten each time)
-- Frontend webapp → `assets/hello-world/` template (same boilerplate each time)
-- BigQuery queries → `references/schema.md` (table schemas rediscovered each time)
-
-### Step 3: Initialize the Skill
-
-#### Determine the output directory
-
-Choose the correct skill output directory based on the current working directory:
-
-- **If inside a dotfiles repository** (i.e., the repo manages chezmoi dotfiles and contains a `dot_claude/skills/` directory, possibly under a chezmoi root subdirectory such as `home/`): create the skill under that `dot_claude/skills/` directory. This ensures the skill is tracked by Git and deployed via chezmoi.
-- **Otherwise**: create the skill under `.claude/skills/` in the project root (or `~/.claude/skills/` for global skills).
-
-#### Run the initializer
-
-For new skills, run:
-
-```bash
-scripts/init_skill.py <skill-name> --path <output-directory>
-```
-
-The script creates the directory, generates SKILL.md with TODO placeholders, and creates example resource directories. Delete unneeded example files after initialization.
-
-Skip if iterating on an existing skill.
-
-### Step 4: Edit the Skill
-
-The skill is for another Claude instance to use. Include information that is beneficial and non-obvious.
-
-#### Writing Guidelines
-
-- Use imperative/infinitive form
-- **All "when to use" information goes in the description**, not the body. The body is only loaded after triggering.
-- Be specific and actionable: provide exact commands with parameters, not vague instructions
-- Include error handling for common failure modes
-- Pre-approve narrowly: `allowed-tools` grants the listed tools without permission prompts — it does not restrict anything. List only safe, narrowly-scoped commands (e.g., `Bash(git status *)`, not `Bash(*)`). To remove tools while the skill is active, use `disallowed-tools`
-- Write standing instructions, not one-time steps: skill content stays in context for the rest of the session and is not re-read on later turns
-- Separate network-dependent operations: isolate steps that require network access (API calls, package installs) from steps that perform local file operations, so failures in one do not cascade
-- Reference bundled resources clearly with paths and context for when to read them
-
-#### Design Pattern References
-
-- **Multi-step processes**: See `references/workflows.md`
-- **Output formats/quality standards**: See `references/output-patterns.md`
-- **5 advanced patterns** (sequential workflow orchestration, multi-MCP coordination, iterative refinement, context-aware tool selection, domain-specific intelligence): See `references/complete-guide.md` Chapter 5
-
-#### Reusable Contents
-
-Start with the resources identified in Step 2. This step may require user input (e.g., brand assets, API documentation).
-
-- Test all added scripts by running them
-- Delete unneeded example files from initialization
-
-### Step 5: Test and Iterate
-
-#### Validate and package
-
-Before iterating on real usage, validate the skill structure and frontmatter:
-
-```bash
-uv run scripts/quick_validate.py <skill-directory>
-```
-
-`quick_validate.py` checks that `SKILL.md` exists, the YAML frontmatter parses, `name` is kebab-case, `description` is present and within limits, and only allowed frontmatter keys are used. To produce a distributable `.skill` archive (which also runs validation first), run:
-
-```bash
-uv run scripts/package_skill.py <skill-directory> [output-directory]
-```
-
-Skip packaging for skills managed in-repo via chezmoi; use it only when distributing a standalone skill.
-
-#### Eval-driven iteration
-
-For skills worth maintaining, author test cases in `evals/evals.json` inside the skill directory and run each prompt twice in fresh subagent contexts — once with the skill, once without (or against the previous version). Grade assertions with evidence, aggregate pass rate / tokens / time, and feed failures back into the skill. See `references/evaluating-skills.md` for the file format, workspace layout, grading rules, and the full loop.
-
-#### Testing Checklist
-
-1. **Triggering tests**: Does the skill trigger on obvious tasks? On paraphrased requests? Does it NOT trigger on unrelated topics? (Target: 90% trigger rate on relevant queries)
-2. **Functional tests**: Are outputs correct? Do scripts work? Are edge cases handled?
-3. **Performance comparison**: Run the eval loop above and compare with-skill vs without-skill:
-   - Assertion pass rate (the delta is what the skill buys)
-   - Token consumption and duration (what the skill costs)
-   - API/tool call failure rate (target: 0 failures)
-   - Number of user interventions required
-
-Debugging trigger issues: Ask Claude "When would you use the [skill name] skill?" — Claude will quote the description back. Adjust based on what's missing.
-
-#### Iteration Signals
-
-| Signal | Problem | Solution |
-|---|---|---|
-| Skill doesn't load when it should | Undertriggering | Add more detail, keywords, and trigger phrases to description |
-| Skill loads for unrelated queries | Overtriggering | Add negative triggers, be more specific, clarify scope |
-| Inconsistent results | Instruction quality | Be more specific, add validation steps, use scripts for determinism |
-| Instructions not followed | Buried or verbose | Put critical instructions at top, use bullet points, move details to references |
-| Slow or degraded responses | Context overload | Move docs to references/, keep SKILL.md under 5,000 words, reduce enabled skills |
-
-#### Production Tip: Explicit Invocation
-
-For critical or production workflows where routing accuracy matters, instruct users to invoke skills explicitly rather than relying on fuzzy description matching:
-
-```
-Use the <skill-name> skill to [do X].
-```
-
-This bypasses the description-based routing and guarantees the correct skill is loaded. Recommended for CI/CD pipelines, automated workflows, or when multiple similar skills are enabled.
-
-For detailed troubleshooting, see `references/complete-guide.md` (Chapter 5: Patterns and Troubleshooting).
+| Skill does not appear | Wrong discovery directory or invalid frontmatter | Check the client path, symlink, and validator output. |
+| Skill does not trigger | Vague or truncated description | Put the main use case and trigger words first. |
+| Skill triggers too often | Scope is broad | Add concrete negative triggers or make it manual-only. |
+| Manual-only behavior differs in Codex | Missing or stale sidecar policy | Set `policy.allow_implicit_invocation: false`. |
+| Behavior differs across clients | Product-specific field or body syntax | Remove it or document the dependency and add an adapter. |
+| Instructions are ignored | Critical steps are buried | Move them earlier and remove nonessential prose. |

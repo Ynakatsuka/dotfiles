@@ -66,11 +66,11 @@ csv-analyzer-workspace/
 
 ## Running evals
 
-Run each test case twice: once with the skill, once without (the baseline). When improving an existing skill, snapshot the current version (`cp -r <skill> <workspace>/skill-snapshot/`) and use the snapshot as the baseline instead.
+Run each test case twice: once with the skill, once without (the baseline). When improving an existing skill, snapshot the current version under a parent directory while preserving its skill directory name (`cp -R <skill> <workspace>/skill-snapshot/<skill-name>`) and use the snapshot as the baseline instead.
 
-Each run must start with a clean context — spawn a fresh subagent per run so the agent follows only what SKILL.md says, not leftover authoring context. Give each run: the skill path (or none for baseline), the prompt, input files, and the output directory.
+Each run must start with a clean client session so the agent follows only what SKILL.md says, not leftover authoring context. Give each run the skill path (or none for baseline), the prompt, input files, and the output directory.
 
-Record tokens and duration per run in `timing.json` (in Claude Code, the subagent completion notification includes `total_tokens` and `duration_ms` — save them immediately, they are not persisted elsewhere):
+Record tokens and duration per run in `timing.json` when the client exposes them. Keep the raw client output because field names and persistence differ:
 
 ```json
 { "total_tokens": 84852, "duration_ms": 23332 }
