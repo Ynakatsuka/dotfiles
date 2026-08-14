@@ -12,6 +12,8 @@ mcp.json
 .claude/rules/writing.md
 .claude/skills/my-guided-tour
 .claude/skills/my-sdd
+.claude/skills/my-skill-creator/references/complete-guide.md
+.claude/skills/my-skill-creator/scripts/package_skill.py
 .claude/skills/my-team-share
 .codex/agents/simplifier_apply.toml
 .codex/skills/my-subagent
