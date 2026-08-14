@@ -116,7 +116,7 @@ Reviewer A and Reviewer C must go through `scripts/run-codex-reviews.sh`, which 
 The underlying runner:
 
 - embeds the complete PR context and assigned diff directly into Codex stdin
-- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-5.6-terra` at `xhigh` effort, so Reviewer C alone is also independent of the configured `model`
+- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-5.6-sol` at `medium` effort, so Reviewer C alone is also independent of the configured `model`
 - caps the generated prompt at 393,216 bytes before launch
 - runs from an isolated artifact-local Git repository instead of the review target repository
 - disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox
@@ -188,7 +188,7 @@ In a Claude Code session with the Agent tool:
 
 - Launch Reviewer B first. The Agent tool runs subagents in the background, so it returns immediately and overlaps whatever follows.
 - Then call `run-codex-reviews.sh` once per chunk. Issue every chunk call in the same response; never await one chunk before issuing the next.
-- Give each `run-codex-reviews.sh` call an explicit `timeout` of `600000` ms. The default Bash timeout is 120,000 ms, and Reviewer C runs at `xhigh` effort, so the default kills a healthy review mid-run. Because the wrapper runs A and C concurrently, its wall clock is the slower reviewer, not their sum.
+- Give each `run-codex-reviews.sh` call an explicit `timeout` of `600000` ms. The default Bash timeout is 120,000 ms and can kill a healthy Codex review mid-run. Because the wrapper runs A and C concurrently, its wall clock is the slower reviewer, not their sum.
 - A timeout kill is an execution failure, not a format failure. It produces `REVIEW_INCOMPLETE` and cannot be retried without explicit user approval, so set the timeout before launching rather than recovering afterward.
 - If a chunked run needs more than the 600,000 ms ceiling, launch the wrapper with `run_in_background` and wait for its completion notification. Do not poll on a short interval.
 
@@ -201,13 +201,13 @@ In a Codex or other non-Claude host, Reviewer B runs through the blocking Claude
 
 Reviewer B is host-aware:
 
-- In a Claude Code session with the Agent tool available, use the Agent tool.
-- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`: `claude --permission-mode plan --tools Read --output-format=stream-json --verbose --json-schema "$(jq -c . "$HOME/.claude/skills/my-pr/assets/claude-review-result.schema.json")" -p "<PROMPT>"`. The final event must contain `structured_output.review_markdown` with the complete review body. Keep this schema dialect-neutral: Claude CLI validates the supported schema subset itself and rejects the Draft 2020-12 `$schema` URI before starting the review.
+- In a Claude Code session with the Agent tool available, use the Agent tool with model `opus`.
+- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`: `claude --model opus --permission-mode plan --tools Read --output-format=stream-json --verbose --json-schema "$(jq -c . "$HOME/.claude/skills/my-pr/assets/claude-review-result.schema.json")" -p "<PROMPT>"`. The final event must contain `structured_output.review_markdown` with the complete review body. Keep this schema dialect-neutral: Claude CLI validates the supported schema subset itself and rejects the Draft 2020-12 `$schema` URI before starting the review.
 - For Agent output, have the main orchestrator save the final response verbatim to the exact `<artifact-dir>/reviewer-results/reviewer-b/<chunk-id>/review.md` path. For CLI output, extract only `structured_output.review_markdown` from the final `stream-json` result event into the same path. Do not make Reviewer B inherit `MY_PR_ARTIFACT_DIR`, and do not use an interim message, handoff summary, or shortened recap as the reviewer body.
 - Validate every Reviewer B Markdown file with `bash "$HOME/.claude/skills/my-pr/scripts/validate-reviewer-b-output.sh" "/absolute/path/to/reviewer-b-review.md"` before integration.
 - If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or Reviewer B reports that the diff/context was inaccessible, return `REVIEW_INCOMPLETE` and stop before integration.
 - Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
-- Do not pass `--model` unless the user explicitly requested a model. Use the Claude Code configured default model and effort.
+- Pin Reviewer B to Claude Opus. Do not inherit the configured default model. Keep the configured Claude effort unless the user explicitly requests another effort.
 - If a prompt file is needed for quoting, write it under the exact artifact directory from the current state file. Do not use `/tmp`, and never stage or commit it.
 
 ## Reviewer A: integrated simplify review
@@ -322,7 +322,7 @@ If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times 
 
 Use the repo-local `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Do not create `/tmp` diff files.
 
-Write the following prompt under the exact artifact directory from the current state file, then pass it to `scripts/run-codex-reviews.sh` as the Reviewer C prompt. The runner pins `gpt-5.6-terra` at `xhigh` effort for this reviewer, so it is the deepest and slowest of the three; the wrapper starts it alongside Reviewer A, and the call needs the 600,000 ms timeout. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
+Write the following prompt under the exact artifact directory from the current state file, then pass it to `scripts/run-codex-reviews.sh` as the Reviewer C prompt. The runner pins `gpt-5.6-sol` at `medium` effort for this reviewer; the wrapper starts it alongside Reviewer A, and the call needs the 600,000 ms timeout. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
 
 ```text
 Review the supplied diff as a senior software engineer.

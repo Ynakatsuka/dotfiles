@@ -166,12 +166,12 @@ codex_args=(
   --output-schema "$schema_file"
   -o "$result_json"
 )
-# Pin each reviewer's model and effort instead of inheriting the global Codex
-# config, so a change to ~/.codex/config.toml cannot silently alter review depth.
+# Pin each reviewer's effort. Reviewer C also pins its model so a change to
+# ~/.codex/config.toml cannot silently alter its review profile.
 if [[ "$reviewer_mode" == "reviewer-a" ]]; then
   codex_args+=(-c 'model_reasoning_effort="medium"')
 else
-  codex_args+=(-c 'model="gpt-5.6-terra"' -c 'model_reasoning_effort="xhigh"')
+  codex_args+=(-c 'model="gpt-5.6-sol"' -c 'model_reasoning_effort="medium"')
 fi
 codex_args+=(-)
 

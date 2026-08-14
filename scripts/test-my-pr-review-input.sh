@@ -317,18 +317,14 @@ else
   review_markdown='## PR understanding
 - complete
 
-## Strengths
-- none
-
 ## Findings
-- none
-
-## Non-findings
 - none
 
 ## Assessment
 
-**Ready to merge?** Yes'
+**Ready to merge?** Yes
+
+**Reasoning:** No findings.'
 fi
 
 jq -n \
@@ -398,9 +394,8 @@ test_runner() {
     FAKE_CAPTURE="$tmp_dir/reviewer-c-input.md" \
     /bin/bash "$runner_script" reviewer-c full 1 "$prompt_file" "$context_file" "$diff_file" \
     >"$tmp_dir/reviewer-c-output.txt"
-  if grep -Fq 'model_reasoning_effort' "$tmp_dir/reviewer-c-args.txt"; then
-    fail "Reviewer C must preserve the global reasoning effort"
-  fi
+  assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model="gpt-5.6-sol"'
+  assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model_reasoning_effort="medium"'
 
   if MY_PR_CODEX_BIN="$fake_codex" \
     MY_PR_CODEX_PROMPT_MAX_BYTES=100 \
@@ -512,13 +507,7 @@ test_reviewer_b_validator() {
 ## PR understanding
 - Description: test
 
-## Strengths
-- none
-
 ## Findings
-- none
-
-## Non-findings
 - none
 
 ## Assessment
@@ -563,9 +552,18 @@ test_documented_state_contract() {
   fi
 }
 
+test_documented_model_contract() {
+  assert_file_contains "$skill_root/SKILL.md" 'Reviewer B: Claude Opus correctness review'
+  assert_file_contains "$skill_root/SKILL.md" 'Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-sol` / `medium` 固定）'
+  assert_file_contains "$skill_root/references/review.md" 'use the Agent tool with model `opus`'
+  assert_file_contains "$skill_root/references/review.md" 'claude --model opus --permission-mode plan'
+  assert_file_contains "$skill_root/references/review.md" 'pins `gpt-5.6-sol` at `medium` effort'
+}
+
 test_chunking
 test_runner
 test_reviewer_b_validator
 test_reviewer_b_schema
 test_documented_state_contract
+test_documented_model_contract
 echo "PASS: my-pr review input tests"

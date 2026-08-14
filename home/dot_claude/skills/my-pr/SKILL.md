@@ -115,12 +115,12 @@ cat "$MY_PR_CONTEXT"
 以下 3 つを同時に起動し、起動した reviewer が完了するまで統合しない。
 
 - Reviewer A: integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-- Reviewer B: Claude correctness review (Claude Code Agent when available; Claude CLI otherwise)
-- Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-terra` / `xhigh` 固定）
+- Reviewer B: Claude Opus correctness review (Claude Code Agent when available; Claude CLI otherwise)
+- Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-sol` / `medium` 固定）
 
 起動順は、まず Reviewer B（Agent は背景実行なので即座に返る）、続けて `scripts/run-codex-reviews.sh` を chunk ごとに呼ぶ。このラッパーが A と C を同時に起動して両方を待つため、A/C の並列は保証される。chunk が複数ある場合も呼び出しは1つの応答にまとめ、1本の結果を待ってから次を呼ばない。
 
-`run-codex-reviews.sh` の呼び出しには `timeout` を `600000` で明示する。既定の 120 秒では Reviewer C の `xhigh` が正常動作中に強制終了され、`REVIEW_INCOMPLETE` になる。
+`run-codex-reviews.sh` の呼び出しには `timeout` を `600000` で明示する。既定の 120 秒では正常動作中の Codex review が強制終了され、`REVIEW_INCOMPLETE` になることがある。
 
 Reviewer A/C の失敗、quota、permission、diff access 不可、timeout は review incomplete として停止する。Reviewer B の実行・入力エラーも同様に停止する。Reviewer B が読み取りを完了したが所定の本文構造を返さない場合だけ、同じ session で形式修正を1回要求する。再度不正なら Reviewer B 全体を skip し、A/C の結果を `COMPLETE_WITH_SKIPS` として統合する。
 
@@ -182,9 +182,9 @@ background 実行した reviewer が残っている間は最終回答しない�
 - chunk の単一ファイル上限を超える差分はそのファイルだけレビューから除外し、ファイル名と byte 数を最終結果に明示する。レビュー済みとして扱わない。
 - Reviewer A/C は `scripts/run-codex-reviews.sh` でまとめて起動する。単体の `run-codex-review.sh` 直接呼び出しは、ユーザーが明示的に承認した再実行のときだけ使う。runner は context-file 引数から artifact root を決定するため、別 process へ `MY_PR_ARTIFACT_DIR` を引き継ぐ必要はない。artifact path を Codex の shell tool に読ませず、stdin 埋め込み、末尾 nonce、SHA-256 receipt で完全性を検証する。Codex は対象 repo ではなく隔離済み artifact-local repo から起動する。
 - 片方の reviewer だけ失敗した場合、ラッパーは result path を出さずに非ゼロ終了する。成功した側だけを統合しない。
-- runner は reviewer ごとに effort を固定する。Reviewer A は設定中の model の medium、Reviewer C は `-c 'model="gpt-5.6-terra"'` で model 自体も `xhigh` に固定する。Reviewer A の model は設定中のものを継承するため、`~/.codex/config.toml` の `model` を変えると Reviewer A の深さは変わる。orchestrator 側は独自の `--model` を渡さない。
+- runner は reviewer ごとに effort を固定する。Reviewer A は設定中の model の medium、Reviewer C は `gpt-5.6-sol` の medium に固定する。Reviewer A の model は設定中のものを継承するため、`~/.codex/config.toml` の `model` を変えると Reviewer A のモデルだけが変わる。orchestrator 側は独自の `--model` を渡さない。
 - correctness reviewer の出力は PR understanding / Findings / Assessment のみ。Strengths と Non-findings は修正判断に使わないので出力させない。
-- Claude correctness review は host-aware に実行する。Claude Code Agent が使えるセッションでは Agent を使い、それ以外では Claude CLI の `--json-schema` で完全な review Markdown を受け取る。統合前に `scripts/validate-reviewer-b-output.sh` で必須見出しを検証する。
+- Claude correctness review は Opus に固定して host-aware に実行する。Claude Code Agent が使えるセッションでは `opus` を指定した Agent を使い、それ以外では Claude CLI の `--model opus --json-schema` で完全な review Markdown を受け取る。統合前に `scripts/validate-reviewer-b-output.sh` で必須見出しを検証する。
 - Codex、Claude reviewer、diff artifact 取得のいずれかに失敗したら停止する。Reviewer B の実行成功後に本文構造検証だけが失敗する場合は、1回の形式修正後に Reviewer B を skip する。暗黙に他 reviewer や local review へ切り替えない。
 - fallback、default substitution、broad catch を追加しない。
 - 好みの問題や style 指摘は修正対象にしない。
