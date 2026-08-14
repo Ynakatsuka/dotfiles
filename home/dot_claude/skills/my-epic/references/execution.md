@@ -46,22 +46,24 @@ PR leaf ごとに 1 つの mode を選び、leaf の実行 log に記録する�
 
 | Mode | 使う場面 | Notes |
 |---|---|---|
-| Direct | leaf が小さく、file touch map が明確で、現在の agent が安全に実装できる | Default |
-| Codex-assisted | leaf が大きいが境界が明確、または並列実装が有効 | Main agent が review と gate の責任を持つ |
-| Explore-only | 実装経路が不明で codebase research が必要 | 明示 scope がない限り編集しない |
+| Subagent-delegated | 実装方針、file touch map、受入基準、検証 gate が確定している | Default。実装 subagent に委譲する |
+| Explore-first | 実装経路が不明で codebase research が必要 | Read-only subagent の調査後に実装 node を再評価する |
+| Direct-exception | Subagent を使えない、ユーザーが委譲を禁止した、または main が保持すべき作業 | 例外理由を実行 log に先に記録する |
 
-PR 作成・更新だけは `my-pr create` に委譲する。それ以外の node 実行はこの workflow 内で完結させる。
+PR 作成・更新は `my-pr create` に委譲する。実装 node は subagent に委譲し、main は割り当て、レビュー、統合、最終 gate、状態更新を担う。
 
-## 直接実装
+## Subagent 委譲
 
-1. leaf ファイル、`ai/program.md`、`ai/tree.md` を読む
-2. 編集前に target files と最寄りの relevant tests を読む
-3. Exported behavior を変える前に shared contracts と callers を探す
-4. 承認済み file touch map の範囲だけ実装する
-5. leaf 完了前に test を追加または更新する
-6. Test / Data / Smoke gates を実行する
-7. Spec compliance review、Code quality review の順で確認する
-8. 実行部の実装記録と実行 log を更新する
+1. Main が leaf ファイル、`ai/program.md`、`ai/tree.md` を読み、依存関係と承認状態を確認する
+2. 実装経路が不明なら read-only subagent に既存コード、tests、shared contracts、callers を調査させる
+3. Main が node goal、file touch map、変更禁止範囲、受入基準、検証 gate、停止条件を確定する
+4. 方針が確定した実装を、利用可能な実装 subagent に委譲する。subagent に再委譲させない
+5. Subagent の実行中、main は同じ担当ファイルを編集しない
+6. Main が返却された差分と報告を読み、承認済み file touch map と契約に一致することを確認する
+7. Main が Test / Data / Smoke gates を実行する
+8. Spec compliance review、Code quality review の順で確認し、実行部の実装記録と実行 log を更新する
+
+書き込みを行う subagent を並列起動する場合は、各 subagent に隔離した worktree と重複しない write set を割り当てる。main が直接実装してよいのは `Direct-exception` だけであり、leaf が小さいこと自体は理由にしない。
 
 ## Operation 実行
 
@@ -70,19 +72,20 @@ Files を変更する必要がない限り、operation を PR として扱わな
 
 1. operation ファイル、`ai/program.md`、`ai/tree.md` を読む
 2. 依存 PR leaves と prior operation nodes が完了していることを確認する
-3. 関連する current account、project、region、tenant、environment、executor identity を表示する
-4. 書かれている通りに dry-run、preview、backup、snapshot、precondition checks を実行する
-5. 承認前に、現状、確認済み事実、制約、選択肢ごとの影響、推奨案、exact command / action を説明する
-6. 承認済み command / action だけを実行する。代替 command、config path、branch、credential、endpoint、manual console step を推測しない
-7. Output、log、data check、metric、dashboard、trace、その他 expected evidence を記録する
-8. 失敗した場合は停止し、root cause evidence、影響範囲、rollback / abort status、選択肢を報告する
-9. Required evidence gates が通った後だけ実行記録、`ai/tree.md`、`README.md` の進捗を更新する
+3. 関連する current account、project、region、tenant、environment、executor identity を main が表示する
+4. Read-only の dry-run、preview、precondition checks、evidence 収集は subagent に委譲し、main が結果を確認する
+5. 承認前に、main が現状、確認済み事実、制約、選択肢ごとの影響、推奨案、exact command / action を説明する
+6. 承認済みで非破壊的かつ実行範囲が明確な command / action は executor subagent に委譲する。破壊的操作または外部状態変更は main が実行し、理由を実行 log に記録する
+7. 承認済み command / action だけを実行する。代替 command、config path、branch、credential、endpoint、manual console step を推測しない
+8. Main が output、log、data check、metric、dashboard、trace、その他 expected evidence を確認して記録する
+9. 失敗した場合は停止し、root cause evidence、影響範囲、rollback / abort status、選択肢を報告する
+10. Required evidence gates が通った後だけ実行記録、`ai/tree.md`、`README.md` の進捗を更新する
 
 Partial operation 後に黙って継続しない。Partial execution は missing evidence とともに blocked or failed として記録する。
 
-## Codex 補助実装
+## Subagent prompt
 
-Codex CLI を使う場合は、`ai/leaves/{id}-{slug}.md` から self-contained prompt を渡す。
+利用可能な native subagent を優先し、`ai/leaves/{id}-{slug}.md` から self-contained prompt を渡す。実行環境に specialized role がある場合は、read-only 調査、低リスク実装、広範な実装の順に適した role を選ぶ。設定済みの model と reasoning effort をユーザー指示なしで上書きしない。
 
 Prompt には以下を含める。
 
@@ -95,14 +98,8 @@ Prompt には以下を含める。
 - Test / Data / Smoke gates
 - No implicit fallback rule
 - Required return format
-
-Example command:
-
-```bash
-codex exec "<SELF_CONTAINED_PROMPT>"
-```
-
-Model name を hardcode しない。CLI default に任せる。
+- Subagent に再委譲しないこと
+- 不明点、契約変更、破壊的操作は実装せず blocker として返すこと
 
 ## Prompt 雛形
 
@@ -197,7 +194,7 @@ Spec compliance が通るまで code quality cleanup を始めない。
 Leaf ファイルの実行部に以下を更新する。
 
 - Branch / worktree と PR URL
-- Mode: Direct | Codex-assisted | Explore-only
+- Mode: Subagent-delegated | Explore-first | Direct-exception
 - Summary
 - Files changed
 - Contracts changed

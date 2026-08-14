@@ -320,7 +320,7 @@ Return:
 ```
 
 ### 実装記録
-- **Mode**: Direct | Codex-assisted | Explore-only
+- **Mode**: Subagent-delegated | Explore-first | Direct-exception
 - **Summary**:
 - **Files changed**:
 - **Contracts changed**:

@@ -1,22 +1,32 @@
 ---
 name: my-epic
 description: >-
-  Orchestrate medium-to-large software development by turning a broad goal into
-  an implementation and verification plan made of PR-sized subtasks and
-  operational nodes, defining verification harnesses and gates for each node,
-  and stopping after epic creation on the first invocation until the user
-  explicitly asks to implement or execute approved nodes.
-  Use when the user asks for large-scale development planning, PR decomposition,
-  multi-PR execution, technical selection, or autonomous delivery of a broad
-  epic. Do NOT use for a single small bug fix, one obvious PR, pure code
-  review, ordinary SDD work that already fits in one spec/PR, or implementing
-  an epic during the same first call that created it.
+  Manual-only orchestrator for medium-to-large software development. Turns a
+  broad goal into PR-sized and operational nodes with verification gates, then
+  coordinates approved execution across follow-up prompts. Activate only when
+  the user explicitly invokes my-epic; once activated, keep orchestrating that
+  epic for the rest of the session. Do NOT use for an uninvoked planning or
+  implementation request, a single small bug fix, one obvious PR, pure code
+  review, ordinary SDD work that fits in one spec/PR, or implementing an epic
+  during the same first call that created it.
+disable-model-invocation: true
 argument-hint: "[epic-name|docs/epics/path|request]"
 ---
 
 # Epic Delivery Orchestrator
 
 中〜大規模の開発ゴールを、検証可能な PR 単位のツリーへ分解し、ユーザー確認を挟みながら実装と PR 作成まで進める。
+
+## セッション中のオーケストレーター責務
+
+このスキルは、ユーザーが `my-epic` を明示的に呼び出した場合だけ開始する。新規 epic を作成したセッションと、既存 epic のオーケストレーターとして呼ばれたセッションでは、同じ epic に関する後続 prompt でもこの責務を維持する。再呼び出しは不要。ユーザーが別の作業へ切り替えた場合は適用しない。
+
+- **main の役割**: node 分解、依存関係、承認、subagent への割り当て、結果と差分のレビュー、統合、最終検証、epic 状態更新、完了判断
+- **node 実行の既定**: PR leaf の調査・実装・テスト追加・修正と、委譲可能な operation / verification を subagent に実行させる。main が実装者を兼ねない
+- **直接実行の例外**: subagent を使えない、ユーザーが委譲を禁止した、または承認・破壊的操作・外部状態変更・統合・最終検証など main が保持すべき作業に限る。例外理由を対象 node の実行 log に先に記録する
+- **委譲契約**: node goal、対象ファイルまたは実行範囲、変更禁止範囲、受入基準、検証 gate、停止条件を渡す。subagent に再委譲させない
+- **並列実行**: 依存関係がなく、write set と外部状態が衝突しない node だけを並列化する。書き込みを行う subagent には隔離した worktree と重複しない write set を割り当てる
+- **main の確認**: subagent の報告をそのまま完了扱いにしない。main が差分、証拠、gate 結果を確認し、必要な最終検証を実行する
 
 ## PR 作成の委譲
 
@@ -84,15 +94,15 @@ docs/epics/{name}/
 
 ## 共通原則
 
-- **このスキルの責務**: 分解、合意、依存管理、PR leaf 実装、operation 実行、検証ゲート、統合、PR 作成判断と `my-pr` への handoff
+- **このスキルの責務**: 分解、合意、依存管理、node 実行の指揮、検証ゲート、統合、PR 作成判断と `my-pr` への handoff
 - **記述言語**: epic ドキュメントは日本語で書く。コードコメント、docstring、commit message、コマンド、識別子は英語を維持する
-- **実装方針**: 実装または operation 実行は、ユーザーが Phase 5 の開始または特定 node の実行を明示した後にだけ進める。必要なら Codex CLI などの外部実装エージェントを補助的に使う
+- **実装方針**: 実装または operation 実行は、ユーザーが Phase 5 の開始または特定 node の実行を明示した後にだけ進める。実行可能な node 作業は subagent へ委譲する
 - **PR leaf の定義**: 単独でレビュー・マージ可能で、受入基準と検証ゲートが明確な最小成果物
 - **確認単位**: root goal、主要分岐、PR leaf goal、operation 実行内容、技術選定、破壊的変更、PR 作成前
 - **自律性**: コード・テスト・docs・履歴から判断できることはユーザーに聞かない
 - **停止方針**: 推測で進めない。失敗、曖昧な仕様、契約変更、検証不能は停止して確認する
-- **スキル連携**: PR 作成・更新は `my-pr create` に委譲する。それ以外の検証と epic 状態更新はこのスキルの手順内で行う
-- **補助エージェント**: Codex CLI などは、PR leaf が大きい、並列化したい、第二実装案が欲しい場合だけ使う
+- **スキル連携**: PR 作成・更新は `my-pr create` に委譲する。node の作業は利用可能な subagent に委譲し、検証結果と epic 状態は main が管理する
+- **subagent 優先**: leaf の大小にかかわらず、境界と受入基準を定義できる node 作業は subagent へ渡す
 
 ## 引数と状態検出
 
@@ -223,34 +233,36 @@ operation node 実行に進んでよい条件:
 
 ## Phase 5: Execute Nodes
 
-承認済み node を依存順に実行する。並列 node は file touch map、contract、data / operational state が衝突しない場合だけ並列実行する。
+main は承認済み node を依存順に割り当て、実行結果を統合する。並列 node は file touch map、contract、data / operational state が衝突しない場合だけ subagent に並列実行させる。
 
 PR leaf の実行手順:
 
 1. leaf ファイルを読み、依存 leaf が完了していることを確認する
 2. `references/execution.md` の「ブランチ安全性」に従い、現在のブランチを検出する。保護ブランチ（`main` / `master` / `staging` / `develop` / `production` / `release/*`）上なら `origin/<base>` 起点の feature branch / worktree を先に作成し、検出に失敗したら停止してユーザーに確認する
-3. `references/execution.md` を読み、実装方法を決める
-4. 補助エージェントを使った場合は、その結果を差分レビューする
-5. leaf の Test / Data / Smoke gate を main 側で実行する
-6. Spec compliance review → Code quality review の順で確認する
-7. 実行部の実装記録を記録する
-8. 失敗した場合は root cause を特定し、1 回だけ修正サイクルを回す
-9. まだ失敗する、または設計矛盾がある場合は停止する
-10. gate が全て通ったら leaf の実行記録を更新する。PR 作成が完了するまで node は完了扱いにしない
-11. 「PR 作成の委譲」に従い、`my-pr` スキルを `create` 引数で呼び出す
-12. `my-pr` の結果から PR URL、最終 commit、検証結果、blocker / follow-up を leaf の実行記録へ反映する
-13. `my-pr` が成功した場合だけ `ai/tree.md` の node 表と `README.md` の進捗を更新する
+3. `references/execution.md` を読み、subagent への割り当てと self-contained prompt を作る
+4. 調査が必要なら read-only subagent、実装方針が確定しているなら実装 subagent に委譲する
+5. main が subagent の結果と差分を確認し、承認済み file touch map 内であることを確認する
+6. leaf の Test / Data / Smoke gate を main 側で実行する
+7. 独立レビューが有効で実行環境が許す場合は、Spec compliance review と Code quality review を別の subagent に順番に委譲し、main が結果を判定する
+8. 実行部の実装記録を記録する
+9. 失敗した場合は root cause を特定し、同じ実装 subagent に 1 回だけ修正サイクルを依頼する
+10. まだ失敗する、または設計矛盾がある場合は停止する
+11. gate が全て通ったら leaf の実行記録を更新する。PR 作成が完了するまで node は完了扱いにしない
+12. 「PR 作成の委譲」に従い、`my-pr` スキルを `create` 引数で呼び出す
+13. `my-pr` の結果から PR URL、最終 commit、検証結果、blocker / follow-up を leaf の実行記録へ反映する
+14. `my-pr` が成功した場合だけ `ai/tree.md` の node 表と `README.md` の進捗を更新する
 
 operation node の実行手順:
 
 1. operation ファイルを読み、依存 PR leaf / operation node が完了していることを確認する
 2. 実行環境、account、project、region、tenant、権限を表示して確認する
-3. precondition と dry-run / preview / backup / snapshot を実行する
-4. ユーザー承認が必要な operation は、承認ビュー形式で現状、実行内容、rollback を提示してから確認する
-5. exact command / manual action だけを実行する。未記載の補完や代替手順は使わない
-6. expected evidence、data check、observability check を実行部に記録する
-7. 失敗した場合は原因、影響範囲、rollback / abort 可否を確認し、推測で継続しない
-8. gate が全て通ったら `ai/tree.md` の node 表と `README.md` の進捗を更新する
+3. read-only の precondition、dry-run / preview、evidence 収集は subagent に委譲し、main が結果を確認する
+4. ユーザー承認が必要な operation は、main が承認ビュー形式で現状、実行内容、rollback を提示してから確認する
+5. 承認済みで非破壊的かつ実行範囲が明確な command / manual action は executor subagent に委譲する。破壊的操作または外部状態変更は main が実行し、直接実行の理由を実行 log に記録する
+6. exact command / manual action だけを実行する。未記載の補完や代替手順は使わない
+7. main が expected evidence、data check、observability check を確認し、実行部に記録する
+8. 失敗した場合は原因、影響範囲、rollback / abort 可否を確認し、推測で継続しない
+9. gate が全て通ったら `ai/tree.md` の node 表と `README.md` の進捗を更新する
 
 停止条件:
 
