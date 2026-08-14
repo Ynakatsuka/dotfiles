@@ -12,8 +12,10 @@ mcp.json
 .claude/rules/writing.md
 .claude/skills/my-guided-tour
 .claude/skills/my-sdd
+.claude/skills/my-team-share
 .codex/agents/simplifier_apply.toml
 .codex/skills/my-subagent
+.codex/skills/my-team-share
 .config/cmux/settings.json
 .local/bin/cmux-workspace-note
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf

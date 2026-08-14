@@ -30,6 +30,8 @@
 - Before admitting non-trivial work, apply a deletion test: if omitting it would not make the requested outcome, an acceptance criterion, a safety requirement, or an existing contract unprovable, exclude it.
 - Do not add abstractions, generalization, extensibility, polish, or coverage for hypothetical future needs. Add them only when the current task or repository conventions require them.
 - Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
+- Complete every explicitly requested item. If one is genuinely blocked, complete the rest and name the specific blocker.
+- Treat questions as requests for an answer, not authorization to edit files or mutate state. Make changes only when the user asks for action.
 - Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
 - Ask only when evidence cannot resolve materially different interpretations of behavior, scope, interfaces, data models, error semantics, or technology choices. Do not ask about preferences with no material effect.
 - For low-risk reversible choices, follow project conventions and proceed without confirmation. Examples include temporary names, private helpers, formatting, test fixture values, and the order of equivalent local steps. When the user omits a branch or worktree name, derive a concise task-based name from repository conventions instead of asking.
