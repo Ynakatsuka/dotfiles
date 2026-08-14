@@ -183,8 +183,8 @@ jq -e '
    | ($state_hooks | length) == 6
    and all($state_hooks[];
      if (.command | contains("cmux-agent-board-state\" clear"))
-     then .timeout == 3000
-     else .timeout == 5000
+     then .timeout == 3
+     else .timeout == 5
      end))
 ' <<<"$rendered_codex_hooks" >/dev/null
 

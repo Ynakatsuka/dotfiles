@@ -36,29 +36,29 @@
   | .hooks = (.hooks // {})
   | .hooks.SessionStart = (
       ((.hooks.SessionStart // []) | without_agent_board)
-      + [{"hooks": [{"command": $stopped, "timeout": 5000, "type": "command"}]}]
+      + [{"hooks": [{"command": $stopped, "timeout": 5, "type": "command"}]}]
     )
   | .hooks.PermissionRequest = (
       ((.hooks.PermissionRequest // []) | without_agent_board)
-      + [{"hooks": [{"command": $input, "timeout": 5000, "type": "command"}]}]
+      + [{"hooks": [{"command": $input, "timeout": 5, "type": "command"}]}]
     )
   | .hooks.PreToolUse = (
       ((.hooks.PreToolUse // []) | without_agent_board)
-      + [{"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]}]
+      + [{"hooks": [{"command": $working, "timeout": 5, "type": "command"}]}]
     )
   | .hooks.UserPromptSubmit = (
       ((.hooks.UserPromptSubmit // []) | without_agent_board | without_auto_title)
       + [
-        {"hooks": [{"command": $working, "timeout": 5000, "type": "command"}]},
-        {"hooks": [{"command": $autoTitle, "timeout": 5000, "type": "command"}]}
+        {"hooks": [{"command": $working, "timeout": 5, "type": "command"}]},
+        {"hooks": [{"command": $autoTitle, "timeout": 5, "type": "command"}]}
       ]
     )
   | .hooks.Stop = (
       ((.hooks.Stop // []) | without_agent_board)
-      + [{"hooks": [{"command": $stopped, "timeout": 5000, "type": "command"}]}]
+      + [{"hooks": [{"command": $stopped, "timeout": 5, "type": "command"}]}]
     )
   | .hooks.SessionEnd = (
       ((.hooks.SessionEnd // []) | without_agent_board)
-      + [{"hooks": [{"command": $clear, "timeout": 3000, "type": "command"}]}]
+      + [{"hooks": [{"command": $clear, "timeout": 3, "type": "command"}]}]
     )
 ` -}}
