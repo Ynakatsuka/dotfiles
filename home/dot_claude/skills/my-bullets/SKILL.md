@@ -2,11 +2,11 @@
 name: my-bullets
 description: >-
   Formats notes, findings, decisions, and drafts as concise structured bullet lists
-  for internal team sharing. Use when the user asks to prepare, rewrite, or organize
-  a team update, internal announcement, handoff, Slack or Teams post, decision note,
-  or content they plan to share with colleagues. Do NOT use for ordinary answers,
-  private analysis, public or customer-facing messages, or an explicitly requested
-  incompatible format.
+  for internal team sharing. Use when the user asks for "箇条書き", "箇条書きにして",
+  "bullet", or "bullet points", or asks to prepare, rewrite, or organize a team update,
+  internal announcement, handoff, Slack or Teams post, decision note, or content they
+  plan to share with colleagues. Do NOT use for ordinary answers, private analysis,
+  public or customer-facing messages, or an explicitly requested incompatible format.
 ---
 
 # Structured Bullets
