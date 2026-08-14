@@ -1,11 +1,14 @@
 ---
 name: my-diagnose
 description: >-
-  Disciplined bug and performance-regression diagnosis loop: build a feedback loop,
-  reproduce, hypothesize, instrument, fix, and regression-test. Use when the user reports
-  a bug, says something is broken/failing/throwing, asks to debug or diagnose, or
-  describes a performance regression. Do NOT use for planned feature work or broad
-  architecture review.
+  Disciplined diagnosis workflow for hard, intermittent, or multi-component bugs and
+  performance regressions: inspect logs and existing evidence, build a feedback loop,
+  test falsifiable hypotheses, instrument gaps, and verify the outcome. Use when the
+  root cause is unclear, reproduction is unreliable, several causes or components are
+  plausible, or performance has regressed. Do NOT use for obvious single-cause errors,
+  straightforward configuration or syntax fixes, planned feature work, or broad
+  architecture review. Diagnosis-only requests stop after reporting the root cause and
+  evidence; apply a fix only when the user requested one.
 license: MIT
 ---
 
@@ -15,13 +18,26 @@ license: MIT
 
 A discipline for hard bugs. Skip phases only when explicitly justified.
 
+Before starting, distinguish a diagnosis-only request from a request to diagnose and fix.
+A diagnosis request does not authorize product-code changes.
+
 When exploring the codebase, use the project's domain glossary to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+
+## Phase 0 — Inspect existing evidence
+
+**Do not skip available logs.** Read existing evidence before building hypotheses or adding instrumentation.
+
+1. Capture the exact symptom and relevant time window. Record the command, request ID, trace ID, environment, input, expected result, and actual result when available.
+2. Locate likely log sources from project configuration, runbooks, and execution commands when the user did not provide a path. Inspect the relevant evidence with bounded queries: user-provided output, test or CLI stdout/stderr, application logs, service or container logs, system logs, CI logs, and browser console or network traces as applicable.
+3. Correlate events across sources by timestamp or identifier. Preserve exact error text before summarising it.
+4. State which log sources and time ranges were checked. A search miss is not evidence that no logs exist.
+5. If a relevant log is inaccessible, name the exact source, artifact, or access needed. Do not claim that logs are absent without checking.
+
+Do not add temporary production instrumentation without explicit permission.
 
 ## Phase 1 — Build a feedback loop
 
-**This is the skill.** Everything else is mechanical. If you have a fast, deterministic, agent-runnable pass/fail signal for the bug, you will find the cause — bisection, hypothesis-testing, and instrumentation all just consume that signal. If you don't have one, no amount of staring at code will save you.
-
-Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**
+Build a fast, deterministic, agent-runnable pass/fail signal before testing causes. Bisection, hypothesis testing, and instrumentation all depend on this signal.
 
 ### Ways to construct one — try them in roughly this order
 
@@ -36,17 +52,13 @@ Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give
 9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.
 10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.
 
-Build the right feedback loop, and the bug is 90% fixed.
-
 ### Iterate on the loop itself
 
-Treat the loop as a product. Once you have _a_ loop, ask:
+Improve the loop before investigating:
 
 - Can I make it faster? (Cache setup, skip unrelated init, narrow the test scope.)
 - Can I make the signal sharper? (Assert on the specific symptom, not "didn't crash".)
 - Can I make it more deterministic? (Pin time, seed RNG, isolate filesystem, freeze network.)
-
-A 30-second flaky loop is barely better than no loop. A 2-second deterministic loop is a debugging superpower.
 
 ### Non-deterministic bugs
 
@@ -54,13 +66,13 @@ The goal is not a clean repro but a **higher reproduction rate**. Loop the trigg
 
 ### When you genuinely cannot build a loop
 
-Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps), or (c) permission to add temporary production instrumentation. Do **not** proceed to hypothesise without a loop.
+Do not proceed to code changes. List what you tried and ask the user for: (a) access to the reproducing environment, (b) a captured artifact such as a HAR file, log dump, core dump, or timestamped screen recording, or (c) permission to add temporary production instrumentation.
 
-Do not proceed to Phase 2 until you have a loop you believe in.
+Diagnosis may continue from logs, traces, and source evidence only when they support a falsifiable hypothesis. Mark conclusions that were not reproduced and state the remaining uncertainty.
 
 ## Phase 2 — Reproduce
 
-Run the loop. Watch the bug appear.
+When a loop exists, run it and watch the bug appear.
 
 Confirm:
 
@@ -68,11 +80,11 @@ Confirm:
 - [ ] The failure is reproducible across multiple runs (or, for non-deterministic bugs, reproducible at a high enough rate to debug against).
 - [ ] You have captured the exact symptom (error message, wrong output, slow timing) so later phases can verify the fix actually addresses it.
 
-Do not proceed until you reproduce the bug.
+Do not proceed to a fix until you reproduce the bug. If reproduction is unavailable, continue only with the evidence-based diagnosis allowed in Phase 1 and stop after reporting its uncertainty.
 
 ## Phase 3 — Hypothesise
 
-Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.
+When several plausible causes remain, generate the smallest useful ranked set of hypotheses before testing them. If the existing evidence points to one cause, state its prediction and test it directly instead of inventing alternatives.
 
 Each hypothesis must be **falsifiable**: state the prediction it makes.
 
@@ -80,11 +92,13 @@ Each hypothesis must be **falsifiable**: state the prediction it makes.
 
 If you cannot state the prediction, the hypothesis is a vibe — discard or sharpen it.
 
-**Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly ("we just deployed a change to #3"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it — proceed with your ranking if the user is AFK.
+Show the ranked list to the user before testing only when their domain knowledge could materially change the order. Do not block progress while waiting for optional re-ranking.
 
 ## Phase 4 — Instrument
 
 Each probe must map to a specific prediction from Phase 3. **Change one variable at a time.**
+
+Use the logs inspected in Phase 0 before adding probes. Instrument only the evidence gaps that distinguish the remaining hypotheses.
 
 Tool preference:
 
@@ -94,9 +108,13 @@ Tool preference:
 
 **Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
 
-**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect. Measure first, fix second.
+**Perf branch.** After inspecting existing logs in Phase 0, use measurements rather than adding more logs: establish a baseline with a timing harness, profiler, or query plan, then bisect. Measure first, fix second.
 
-## Phase 5 — Fix + regression test
+## Phase 5 — Report or fix
+
+For a diagnosis-only request, report the root cause in one sentence, the supporting logs or other evidence, reproduction status, material alternatives ruled out, remaining uncertainty, and the recommended fix. Then stop without modifying product code or adding persistent tests.
+
+Continue with this phase only when the user requested a fix.
 
 Write the regression test **before the fix** — but only if there is a **correct seam** for it.
 
@@ -114,12 +132,16 @@ If a correct seam exists:
 
 ## Phase 6 — Cleanup + post-mortem
 
-Required before declaring done:
+Required before declaring any diagnosis done:
+
+- [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
+- [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
+
+Also required before declaring a fix done:
 
 - [ ] Original repro no longer reproduces (re-run the Phase 1 loop)
 - [ ] Regression test passes (or absence of seam is documented)
-- [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
-- [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
-- [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
+- [ ] Relevant logs were checked again for the original error and any replacement failure
+- [ ] If a commit or PR is part of the task, its message states the root cause
 
-**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/my-refactor` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+**Then ask: what would have prevented this bug?** If the answer involves architectural change such as no good test seam, tangled callers, or hidden coupling, recommend a focused refactor after the fix. Do not expand the current task without user approval.
