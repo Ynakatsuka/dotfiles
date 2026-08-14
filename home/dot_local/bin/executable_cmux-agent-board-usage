@@ -1,0 +1,668 @@
+#!/usr/bin/env python3
+"""Collect cached, non-secret usage snapshots for the cmux Agent Board."""
+
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+import json
+import math
+import os
+import re
+import selectors
+import shlex
+import subprocess
+import tempfile
+import time
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+
+CACHE_TTL_SECONDS = 300
+CLAUDE_STALE_SECONDS = 900
+APP_SERVER_TIMEOUT_SECONDS = 10
+PROVIDERS = ("codex", "claude", "cursor")
+
+
+def configured_path(variable: str, default: Path) -> Path:
+    return Path(os.environ.get(variable, str(default))).expanduser()
+
+
+def now_epoch() -> int:
+    configured = os.environ.get("CMUX_AGENT_BOARD_USAGE_NOW")
+    if configured is None:
+        return int(time.time())
+    try:
+        return int(configured)
+    except ValueError as error:
+        raise RuntimeError("CMUX_AGENT_BOARD_USAGE_NOW must be an integer epoch") from error
+
+
+def command_from_environment(variable: str, default: list[str]) -> list[str]:
+    configured = os.environ.get(variable)
+    if configured is None:
+        return default
+    command = shlex.split(configured)
+    if not command:
+        raise RuntimeError(f"{variable} must not be empty")
+    return command
+
+
+def safe_percent(value: object) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if isinstance(value, int):
+        return value if 0 <= value <= 100 else None
+    if not math.isfinite(value) or value < 0 or value > 100:
+        return None
+    return value
+
+
+def safe_epoch(value: object) -> int | float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value <= 0:
+        return None
+    return value
+
+
+def timestamp_epoch(value: object) -> int | float | None:
+    numeric = safe_epoch(value)
+    if numeric is not None:
+        return numeric
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return safe_epoch(parsed.timestamp())
+
+
+def email_from(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value if value else None
+
+
+def account_name_from(document: object) -> str | None:
+    if not isinstance(document, dict):
+        return None
+    for field in ("displayName", "name", "orgName"):
+        value = document.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    account = document.get("account")
+    if isinstance(account, dict):
+        for field in ("displayName", "name"):
+            value = account.get(field)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def unavailable_provider(*, status: str = "unavailable", detail: str = "") -> dict[str, object]:
+    return {
+        "status": status,
+        "account": None,
+        "account_name": None,
+        "five_hour": None,
+        "seven_day": None,
+        "fable_week": None,
+        "five_hour_reset_at": None,
+        "seven_day_reset_at": None,
+        "fable_week_reset_at": None,
+        "detail": detail,
+    }
+
+
+def run_json(command: list[str], *, timeout: int = APP_SERVER_TIMEOUT_SECONDS) -> object:
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError("provider command failed") from error
+    if result.returncode != 0:
+        raise RuntimeError("provider command failed")
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError("provider command returned invalid JSON") from error
+
+
+def read_json_line(
+    process: subprocess.Popen[bytes], expected_id: int, deadline: float
+) -> dict[str, object]:
+    if process.stdout is None:
+        raise RuntimeError("App Server stdout was unavailable")
+
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    buffered = b""
+    try:
+        while time.monotonic() < deadline:
+            events = selector.select(max(0, deadline - time.monotonic()))
+            if not events:
+                break
+            chunk = os.read(process.stdout.fileno(), 4096)
+            if not chunk:
+                break
+            buffered += chunk
+            while b"\n" in buffered:
+                raw_line, buffered = buffered.split(b"\n", 1)
+                if not raw_line.strip():
+                    continue
+                try:
+                    message = json.loads(raw_line)
+                except json.JSONDecodeError as error:
+                    raise RuntimeError("App Server returned invalid JSON") from error
+                if not isinstance(message, dict) or message.get("id") != expected_id:
+                    continue
+                if "error" in message:
+                    raise RuntimeError("App Server request failed")
+                result = message.get("result")
+                if not isinstance(result, dict):
+                    raise RuntimeError("App Server returned an invalid response")
+                return result
+    finally:
+        selector.close()
+    raise RuntimeError("App Server request timed out")
+
+
+def send_json(process: subprocess.Popen[bytes], message: dict[str, object]) -> None:
+    if process.stdin is None:
+        raise RuntimeError("App Server stdin was unavailable")
+    try:
+        process.stdin.write(
+            json.dumps(message, separators=(",", ":")).encode("utf-8") + b"\n"
+        )
+        process.stdin.flush()
+    except OSError as error:
+        raise RuntimeError("App Server write failed") from error
+
+
+def close_app_server(process: subprocess.Popen[bytes]) -> None:
+    if process.stdin is not None:
+        try:
+            process.stdin.close()
+        except OSError:
+            pass
+    try:
+        process.wait(timeout=1)
+        return
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        process.terminate()
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=1)
+        return
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        process.kill()
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=1)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def codex_responses() -> tuple[dict[str, object], dict[str, object]]:
+    command = command_from_environment(
+        "CMUX_AGENT_BOARD_CODEX_COMMAND", ["codex", "app-server", "--stdio"]
+    )
+    deadline = time.monotonic() + APP_SERVER_TIMEOUT_SECONDS
+    try:
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError as error:
+        raise RuntimeError("Codex App Server could not start") from error
+
+    try:
+        send_json(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "clientInfo": {"name": "cmux-agent-board", "version": "1.0"}
+                },
+            },
+        )
+        read_json_line(process, 1, deadline)
+        send_json(process, {"jsonrpc": "2.0", "method": "initialized", "params": {}})
+        send_json(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "account/read",
+                "params": {"refreshToken": False},
+            },
+        )
+        account = read_json_line(process, 2, deadline)
+        send_json(
+            process,
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "account/rateLimits/read",
+                "params": {},
+            },
+        )
+        rate_limits = read_json_line(process, 3, deadline)
+        return account, rate_limits
+    finally:
+        close_app_server(process)
+
+
+def codex_snapshot(rate_limits: dict[str, object]) -> dict[str, object] | None:
+    by_limit_id = rate_limits.get("rateLimitsByLimitId")
+    if isinstance(by_limit_id, dict):
+        snapshot = by_limit_id.get("codex")
+        if isinstance(snapshot, dict):
+            return snapshot
+
+    snapshot = rate_limits.get("rateLimits")
+    if isinstance(snapshot, dict) and snapshot.get("limitId") == "codex":
+        return snapshot
+    return None
+
+
+def codex_windows(
+    snapshot: dict[str, object] | None,
+) -> tuple[int | float | None, int | float | None]:
+    if snapshot is None:
+        return None, None
+    five_hour: int | float | None = None
+    seven_day: int | float | None = None
+    for window_name in ("primary", "secondary"):
+        value = snapshot.get(window_name)
+        if not isinstance(value, dict):
+            continue
+        duration = value.get("windowDurationMins")
+        used = safe_percent(value.get("usedPercent"))
+        if used is None:
+            continue
+        if duration == 300:
+            five_hour = used
+        elif duration == 10080:
+            seven_day = used
+    return five_hour, seven_day
+
+
+def codex_reset_times(
+    snapshot: dict[str, object] | None,
+) -> tuple[int | float | None, int | float | None]:
+    if snapshot is None:
+        return None, None
+    five_hour: int | float | None = None
+    seven_day: int | float | None = None
+    for window_name in ("primary", "secondary"):
+        value = snapshot.get(window_name)
+        if not isinstance(value, dict):
+            continue
+        reset_at = timestamp_epoch(value.get("resetsAt"))
+        if reset_at is None:
+            continue
+        duration = value.get("windowDurationMins")
+        if duration == 300:
+            five_hour = reset_at
+        elif duration == 10080:
+            seven_day = reset_at
+    return five_hour, seven_day
+
+
+def collect_codex() -> dict[str, object]:
+    try:
+        account_response, rate_response = codex_responses()
+    except RuntimeError:
+        return unavailable_provider(status="error", detail="error")
+
+    account = account_response.get("account")
+    account_email = email_from(account.get("email")) if isinstance(account, dict) else None
+    account_name = account_name_from(account)
+    snapshot = codex_snapshot(rate_response)
+    five_hour, seven_day = codex_windows(snapshot)
+    five_hour_reset_at, seven_day_reset_at = codex_reset_times(snapshot)
+    if account_email is None:
+        signed_out = account is None
+        return {
+            **unavailable_provider(
+                status="signed_out" if signed_out else "unavailable",
+                detail="signed out" if signed_out else "unavailable",
+            ),
+            "five_hour": five_hour,
+            "seven_day": seven_day,
+            "five_hour_reset_at": five_hour_reset_at,
+            "seven_day_reset_at": seven_day_reset_at,
+        }
+    status = "ok" if five_hour is not None or seven_day is not None else "unavailable"
+    return {
+        "status": status,
+        "account": account_email,
+        "account_name": account_name,
+        "five_hour": five_hour,
+        "seven_day": seven_day,
+        "five_hour_reset_at": five_hour_reset_at,
+        "seven_day_reset_at": seven_day_reset_at,
+        "detail": "" if status == "ok" else "unavailable",
+    }
+
+
+def extract_email_status(document: object) -> tuple[str | None, bool]:
+    if not isinstance(document, dict):
+        raise RuntimeError("provider command returned an invalid account document")
+    direct = email_from(document.get("email"))
+    account = document.get("account")
+    nested = email_from(account.get("email")) if isinstance(account, dict) else None
+    email = direct or nested
+    signed_out = document.get("loggedIn") is False or document.get("logged_in") is False
+    return email, signed_out
+
+
+def load_claude_rate_limits(
+    path: Path,
+) -> tuple[int, int | float | None, int | float | None] | None:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    captured_at = document.get("captured_at")
+    rate_limits = document.get("rate_limits")
+    if isinstance(captured_at, bool) or not isinstance(captured_at, int):
+        return None
+    if not isinstance(rate_limits, dict):
+        return None
+    five_hour = rate_limits.get("five_hour")
+    seven_day = rate_limits.get("seven_day")
+    five_percent = safe_percent(five_hour.get("used_percentage")) if isinstance(five_hour, dict) else None
+    seven_percent = safe_percent(seven_day.get("used_percentage")) if isinstance(seven_day, dict) else None
+    return captured_at, five_percent, seven_percent
+
+
+def age_detail(age_seconds: int) -> str:
+    if age_seconds < 60:
+        return "age <1m"
+    if age_seconds < 3600:
+        return f"age {age_seconds // 60}m"
+    return f"age {age_seconds // 3600}h"
+
+
+def claude_fable_week(document: object) -> int | float | None:
+    if not isinstance(document, dict):
+        return None
+    total_cost = document.get("total_cost_usd")
+    if (
+        document.get("subtype") != "success"
+        or isinstance(total_cost, bool)
+        or not isinstance(total_cost, (int, float))
+        or total_cost != 0
+    ):
+        return None
+    result = document.get("result")
+    if not isinstance(result, str):
+        return None
+    match = re.search(
+        r"^Current week \(Fable\):\s*([0-9]+(?:\.[0-9]+)?)% used(?:\s|$)",
+        result,
+        re.MULTILINE,
+    )
+    if match is None:
+        return None
+    value = float(match.group(1))
+    if value.is_integer():
+        return safe_percent(int(value))
+    return safe_percent(value)
+
+
+def claude_reset_time(text: str, zone_name: str, now: int) -> int | float | None:
+    try:
+        zone = ZoneInfo(zone_name)
+        current = datetime.fromtimestamp(now, zone)
+        time_format = "%I:%M%p" if ":" in text else "%I%p"
+        parsed = datetime.strptime(
+            f"{current.year} {text}", f"%Y %b %d at {time_format}"
+        ).replace(tzinfo=zone)
+    except (ValueError, ZoneInfoNotFoundError):
+        return None
+    if parsed.timestamp() <= now:
+        if current.month != 12 or parsed.month != 1:
+            return None
+        parsed = parsed.replace(year=current.year + 1)
+    return safe_epoch(parsed.timestamp())
+
+
+def claude_reset_times(
+    document: object, now: int
+) -> tuple[int | float | None, int | float | None, int | float | None]:
+    if not isinstance(document, dict) or document.get("subtype") != "success":
+        return None, None, None
+    result = document.get("result")
+    if not isinstance(result, str):
+        return None, None, None
+    resets: dict[str, int | float | None] = {}
+    for label, timestamp, zone_name in re.findall(
+        r"^Current (session|week \(all models\)|week \(Fable\)):[^\n]*"
+        r"· resets ([A-Z][a-z]{2} [0-9]{1,2} at "
+        r"(?:[0-9]{1,2}:[0-9]{2}|[0-9]{1,2})(?:am|pm))"
+        r" \(([^)]+)\)$",
+        result,
+        re.MULTILINE,
+    ):
+        resets[label] = claude_reset_time(timestamp, zone_name, now)
+    return (
+        resets.get("session"),
+        resets.get("week (all models)"),
+        resets.get("week (Fable)"),
+    )
+
+
+def collect_claude(now: int, state_path: Path) -> dict[str, object]:
+    try:
+        claude_command = command_from_environment(
+            "CMUX_AGENT_BOARD_CLAUDE_COMMAND", ["claude"]
+        )
+        account_document = run_json(
+            [*claude_command, "auth", "status", "--json"]
+        )
+        account_email, signed_out = extract_email_status(account_document)
+        account_name = account_name_from(account_document)
+    except RuntimeError:
+        return unavailable_provider(status="error", detail="error")
+
+    if account_email is None:
+        return unavailable_provider(
+            status="signed_out" if signed_out else "unavailable",
+            detail="signed out" if signed_out else "unavailable",
+        )
+
+    try:
+        usage_document = run_json(
+            [
+                *claude_command,
+                "--safe-mode",
+                "-p",
+                "/usage",
+                "--output-format",
+                "json",
+                "--tools",
+                "",
+                "--no-session-persistence",
+                "--max-budget-usd",
+                "0.000001",
+            ]
+        )
+        fable_week = claude_fable_week(usage_document)
+        usage_five_reset_at, usage_seven_reset_at, fable_week_reset_at = (
+            claude_reset_times(usage_document, now)
+        )
+    except RuntimeError:
+        fable_week = None
+        usage_five_reset_at = None
+        usage_seven_reset_at = None
+        fable_week_reset_at = None
+
+    snapshot = load_claude_rate_limits(state_path)
+    if snapshot is None:
+        return {
+            "status": "ok" if fable_week is not None else "unavailable",
+            "account": account_email,
+            "account_name": account_name,
+            "five_hour": None,
+            "seven_day": None,
+            "fable_week": fable_week,
+            "five_hour_reset_at": usage_five_reset_at,
+            "seven_day_reset_at": usage_seven_reset_at,
+            "fable_week_reset_at": fable_week_reset_at,
+            "detail": "snapshot unavailable",
+        }
+
+    captured_at, five_hour, seven_day = snapshot
+    age_seconds = max(0, now - captured_at)
+    detail = age_detail(age_seconds)
+    if age_seconds > CLAUDE_STALE_SECONDS:
+        detail = f"stale {detail.removeprefix('age ')}"
+    return {
+        "status": (
+            "ok"
+            if five_hour is not None or seven_day is not None or fable_week is not None
+            else "unavailable"
+        ),
+        "account": account_email,
+        "account_name": account_name,
+        "five_hour": five_hour,
+        "seven_day": seven_day,
+        "fable_week": fable_week,
+        "five_hour_reset_at": usage_five_reset_at,
+        "seven_day_reset_at": usage_seven_reset_at,
+        "fable_week_reset_at": fable_week_reset_at,
+        "detail": detail if five_hour is not None or seven_day is not None else "snapshot unavailable",
+    }
+
+
+def collect_cursor() -> dict[str, object]:
+    try:
+        document = run_json(
+            [*command_from_environment("CMUX_AGENT_BOARD_CURSOR_COMMAND", ["cursor-agent"]), "status", "--format", "json"]
+        )
+        if not isinstance(document, dict):
+            raise RuntimeError("provider command returned an invalid account document")
+        user_info = document.get("userInfo")
+        account_email = email_from(document.get("email"))
+        if account_email is None and isinstance(user_info, dict):
+            account_email = email_from(user_info.get("email"))
+        signed_out = document.get("isAuthenticated") is False
+        account_name = account_name_from(user_info) or account_name_from(document)
+    except RuntimeError:
+        return unavailable_provider(status="error", detail="error")
+    if account_email is None:
+        return unavailable_provider(
+            status="signed_out" if signed_out else "unavailable",
+            detail="signed out" if signed_out else "unavailable",
+        )
+    return {
+        "status": "ok",
+        "account": account_email,
+        "account_name": account_name,
+        "five_hour": None,
+        "seven_day": None,
+        "five_hour_reset_at": None,
+        "seven_day_reset_at": None,
+        "fable_week_reset_at": None,
+        "detail": "monthly only",
+    }
+
+
+def cache_document(now: int, claude_state_path: Path) -> dict[str, object]:
+    with ThreadPoolExecutor(max_workers=len(PROVIDERS)) as executor:
+        futures = {
+            "codex": executor.submit(collect_codex),
+            "claude": executor.submit(collect_claude, now, claude_state_path),
+            "cursor": executor.submit(collect_cursor),
+        }
+        providers = {provider: futures[provider].result() for provider in PROVIDERS}
+    return {
+        "schema_version": 4,
+        "refreshed_at": now,
+        "providers": providers,
+    }
+
+
+def valid_cache(document: object, now: int) -> dict[str, object] | None:
+    if not isinstance(document, dict) or document.get("schema_version") != 4:
+        return None
+    refreshed_at = document.get("refreshed_at")
+    providers = document.get("providers")
+    if isinstance(refreshed_at, bool) or not isinstance(refreshed_at, int):
+        return None
+    if not isinstance(providers, dict) or any(not isinstance(providers.get(name), dict) for name in PROVIDERS):
+        return None
+    age = now - refreshed_at
+    if age < 0 or age >= CACHE_TTL_SECONDS:
+        return None
+    return document
+
+
+def write_atomic(path: Path, document: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(path.parent, 0o700)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as temporary:
+            json.dump(document, temporary, separators=(",", ":"), sort_keys=True)
+            temporary.write("\n")
+        os.chmod(temporary_name, 0o600)
+        os.replace(temporary_name, path)
+    except BaseException:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def load_cache(path: Path) -> object | None:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return None
+
+
+def main() -> None:
+    now = now_epoch()
+    cache_path = configured_path(
+        "CMUX_AGENT_BOARD_USAGE_CACHE",
+        Path.home() / ".local/state/cmux/agent-board-usage.json",
+    )
+    claude_state_path = configured_path(
+        "CMUX_CLAUDE_RATE_LIMITS_STATE",
+        Path.home() / ".local/state/cmux/claude-rate-limits.json",
+    )
+    cached = valid_cache(load_cache(cache_path), now)
+    if cached is None:
+        cached = cache_document(now, claude_state_path)
+        write_atomic(cache_path, cached)
+    print(json.dumps(cached, separators=(",", ":"), sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

@@ -10,7 +10,39 @@ func diffTotalsOf(_ dir) -> String { return "" }
 func diffTreeOf(_ dir) -> String { return "" }
 func diffMoreOf(_ dir) -> String { return "" }
 func diffRootOf(_ dir) -> String { return "" }
+func usageValue(_ provider, _ field) -> String { return "" }
+func usageProgress(_ provider, _ field) -> Double { return 0.0 }
+func usageResetAt(_ provider, _ field) -> Double { return 0.0 }
 // END CMUX_DIFF_DATA
+
+func usageTint(_ progress: Double) -> String {
+    if progress >= 0.9 { return "#FF453A" }
+    if progress >= 0.7 { return "#FF9F0A" }
+    if progress >= 0.3 { return "#FFD60A" }
+    return "#30D158"
+}
+
+func usageBar(_ progress: Double) -> some View {
+    HStack(spacing: 1) {
+        ForEach(0..<20) { index in
+            RoundedRectangle(cornerRadius: 1)
+                .fill(Double(index) < progress * 20 ? usageTint(progress) : "#FFFFFF12")
+                .frame(maxWidth: .infinity, height: 5)
+        }
+    }
+}
+
+func usageResetRemaining(_ resetAt: Double, _ now: Double) -> String {
+    if resetAt <= now { return "" }
+    let remaining = Int(resetAt - now)
+    let days = remaining / 86400
+    let hours = (remaining % 86400) / 3600
+    let minutes = (remaining % 3600) / 60
+    if days > 0 { return "\(days)d \(hours)h" }
+    if hours > 0 { return "\(hours)h \(minutes)m" }
+    if minutes > 0 { return "\(minutes)m" }
+    return "<1m"
+}
 
 func hasSpinner(_ title: String) -> Bool {
     return title.hasPrefix("⠁")
@@ -276,6 +308,90 @@ func diffTreeList(_ workspace) -> some View {
     }
 }
 
+func usageMetricRow(
+    _ provider: String,
+    _ field: String,
+    _ label: String
+) -> some View {
+    let value = usageValue(provider, field)
+    let progress = usageProgress(provider, field)
+    let resetRemaining = usageResetRemaining(
+        usageResetAt(provider, field),
+        Double(clock.epoch)
+    )
+
+    return VStack(alignment: .leading, spacing: 2) {
+        HStack {
+            Text(label)
+                .font(.system(size: 10))
+                .fontWeight(.semibold)
+                .foregroundColor("#C7C7CC")
+            if resetRemaining != "" {
+                Text("あと \(resetRemaining)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor("#8E8E93")
+                    .monospacedDigit()
+            }
+            Spacer()
+            Text(value != "" ? value : "—")
+                .font(.system(size: 11, design: .monospaced))
+                .fontWeight(.semibold)
+                .foregroundColor("#F2F2F7")
+                .monospacedDigit()
+        }
+        usageBar(progress)
+    }
+}
+
+func usageProviderRow(_ provider: String, _ name: String) -> some View {
+    let account = usageValue(provider, "account")
+    let accountName = usageValue(provider, "account_name")
+    let detail = usageValue(provider, "detail")
+
+    return VStack(alignment: .leading, spacing: 5) {
+        HStack(spacing: 6) {
+            Text(name)
+                .font(.system(size: 12))
+                .fontWeight(.semibold)
+                .foregroundColor("#F2F2F7")
+                .lineLimit(1)
+            Spacer()
+            if detail != "" {
+                Text(detail)
+                    .font(.system(size: 10))
+                    .foregroundColor("#8E8E93")
+                    .lineLimit(1)
+            }
+        }
+        HStack(spacing: 4) {
+            if accountName != "" {
+                Text(accountName)
+                    .font(.system(size: 10))
+                    .fontWeight(.semibold)
+                    .foregroundColor("#C7C7CC")
+                    .lineLimit(1)
+                Text("·")
+                    .font(.system(size: 9))
+                    .foregroundColor("#636366")
+            }
+            Text(account != "" ? account : "unavailable")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor("#8E8E93")
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+
+        usageMetricRow(provider, "five_hour", "5h")
+        usageMetricRow(provider, "seven_day", "Week")
+        if provider == "claude" {
+            usageMetricRow(provider, "fable_week", "Fable")
+        }
+    }
+    .padding(6)
+    .background("#FFFFFF0A")
+    .cornerRadius(8)
+}
+
 func workspaceBranchText(_ workspace) -> String {
     if workspace.branch != nil && workspace.branch != "" {
         return "\(workspace.branch)\(workspace.dirty == true ? " •" : "")"
@@ -510,6 +626,24 @@ VStack(alignment: .leading, spacing: 6) {
         } else {
             diffTreeList(selected)
         }
+
+        Divider()
+
+        HStack {
+            Text("Usage")
+                .font(.system(size: 12))
+                .fontWeight(.semibold)
+                .foregroundColor("#C7C7CC")
+            Spacer()
+            Text("% used")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor("#8E8E93")
+        }
+        .padding(4)
+
+        usageProviderRow("codex", "Codex")
+        usageProviderRow("claude", "Claude Code")
+        usageProviderRow("cursor", "Cursor")
     }
 
     Spacer()

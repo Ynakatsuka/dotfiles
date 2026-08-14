@@ -16,7 +16,15 @@ unborn_repo="$test_dir/unborn-repository"
 source_file="$test_dir/agent-board.swift"
 target_file="$test_dir/state/agent-board.swift"
 lock_file="$test_dir/state/agent-board-diff-refresh.lock"
+cache_file="$test_dir/state/agent-board-diff-cache.json"
 mock_cmux="$test_dir/cmux"
+mock_git_dir="$test_dir/git-bin"
+mock_git="$mock_git_dir/git"
+git_calls="$test_dir/git-calls"
+mock_usage="$test_dir/cmux-agent-board-usage"
+hanging_usage="$test_dir/hanging-usage"
+hanging_target="$test_dir/state/hanging-agent-board.swift"
+hanging_pids_file="$test_dir/hanging-pids"
 calls_file="$test_dir/calls"
 cmux_mode_file="$test_dir/cmux-mode"
 
@@ -86,11 +94,37 @@ exit 1
 MOCK
 chmod +x "$mock_cmux"
 
+mkdir -p "$mock_git_dir"
+cat >"$mock_git" <<'MOCK'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${GIT_OPTIONAL_LOCKS:-}" != '0' ]]; then
+  printf 'git read did not disable optional locks\n' >&2
+  exit 1
+fi
+printf '%s\n' "$*" >>"$MOCK_GIT_CALLS"
+exec /usr/bin/git "$@"
+MOCK
+chmod +x "$mock_git"
+
+cat >"$mock_usage" <<'USAGE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+printf '%s\n' '{"providers":{"codex":{"status":"ok","account":"codex@example.com","account_name":"Codex Personal","five_hour":23.5,"seven_day":67,"fable_week":null,"five_hour_reset_at":2000,"seven_day_reset_at":3000,"fable_week_reset_at":null,"detail":""},"claude":{"status":"ok","account":"claude@example.com","account_name":"Claude Team","five_hour":12,"seven_day":34,"fable_week":56.5,"five_hour_reset_at":4000,"seven_day_reset_at":5000,"fable_week_reset_at":5000,"detail":"age 1m"},"cursor":{"status":"ok","account":"cursor@example.com","account_name":"Cursor Personal","five_hour":null,"seven_day":null,"fable_week":null,"five_hour_reset_at":null,"seven_day_reset_at":null,"fable_week_reset_at":null,"detail":"monthly only"}}}'
+USAGE
+chmod +x "$mock_usage"
+
 run_refresh() {
-  CMUX_BIN="$mock_cmux" \
+  PATH="$mock_git_dir:$PATH" \
+    MOCK_GIT_CALLS="$git_calls" \
+    CMUX_BIN="$mock_cmux" \
     CMUX_AGENT_BOARD_SOURCE="$source_file" \
     CMUX_AGENT_BOARD_TARGET="$target_file" \
     CMUX_AGENT_BOARD_LOCK="$lock_file" \
+    CMUX_AGENT_BOARD_CACHE="$cache_file" \
+    CMUX_AGENT_BOARD_USAGE="$mock_usage" \
     "$SCRIPT"
 }
 
@@ -103,19 +137,55 @@ grep -Fq "if d == \"$git_repo\" || d.hasPrefix(\"$git_repo/\") { return \"$git_r
 grep -Fq "if d == \"$nested_repo\" || d.hasPrefix(\"$nested_repo/\") { return \"1|1|1\" }" "$target_file"
 grep -Fq "if d == \"$unborn_repo\" || d.hasPrefix(\"$unborn_repo/\") { return \"2|4|0\" }" "$target_file"
 grep -Fq "F| |N|3|0|created.txt|created.txt|Y3JlYXRlZC50eHQ;F| |N|1|0|untracked.txt|untracked.txt|dW50cmFja2VkLnR4dA" "$target_file"
+grep -Fq 'func usageValue(_ provider, _ field) -> String {' "$target_file"
+grep -Fq 'func usageProgress(_ provider, _ field) -> Double {' "$target_file"
+grep -Fq 'func usageResetAt(_ provider, _ field) -> Double {' "$target_file"
+grep -Fq 'if p == "codex" && f == "five_hour" { return "23.5%" }' "$target_file"
+grep -Fq 'if p == "codex" && f == "account_name" { return "Codex Personal" }' "$target_file"
+grep -Fq 'if p == "codex" && f == "five_hour" { return 0.235 }' "$target_file"
+grep -Fq 'if p == "codex" && f == "five_hour" { return 2000.0 }' "$target_file"
+grep -Fq 'if p == "claude" && f == "fable_week" { return "56.5%" }' "$target_file"
+grep -Fq 'if p == "claude" && f == "fable_week" { return 0.565 }' "$target_file"
+grep -Fq 'if p == "claude" && f == "fable_week" { return 5000.0 }' "$target_file"
+grep -Fq 'if p == "claude" && f == "detail" { return "age 1m" }' "$target_file"
+grep -Fq 'if p == "cursor" && f == "detail" { return "monthly only" }' "$target_file"
+jq -e --arg git_repo "$git_repo" '
+  .version == 1
+  and (.repositories[$git_repo].entries | any(.path == "untracked.txt"))
+' "$cache_file" >/dev/null
+grep -Fq 'status --porcelain=v1 -z -uall --no-renames' "$git_calls"
 nested_line=$(grep -nF "if d == \"$nested_repo\"" "$target_file" | head -n 1 | cut -d: -f1)
 parent_line=$(grep -nF "if d == \"$git_repo\"" "$target_file" | head -n 1 | cut -d: -f1)
 ((nested_line < parent_line))
 [[ "$(wc -l <"$calls_file" | tr -d ' ')" == '1' ]]
 
+: >"$git_calls"
+cache_tmp="$(mktemp "$test_dir/diff-cache.XXXXXX")"
+jq --arg stale_toplevel "$test_dir/stale-repository" \
+  '.repositories[$stale_toplevel] = {scanned_at: 0, entries: []}' \
+  "$cache_file" >"$cache_tmp"
+mv "$cache_tmp" "$cache_file"
 run_refresh
 [[ "$(wc -l <"$calls_file" | tr -d ' ')" == '1' ]]
+grep -Fq 'status --porcelain=v1 -z -uno --no-renames' "$git_calls"
+if grep -Fq -- '-uall' "$git_calls"; then
+  printf 'fresh untracked scan ran before the cache expired\n' >&2
+  exit 1
+fi
+jq -e --arg stale_toplevel "$test_dir/stale-repository" \
+  '(.repositories | has($stale_toplevel)) | not' "$cache_file" >/dev/null
+
+cache_tmp="$(mktemp "$test_dir/diff-cache.XXXXXX")"
+jq '(.repositories[] | .scanned_at) = 0' "$cache_file" >"$cache_tmp"
+mv "$cache_tmp" "$cache_file"
+: >"$git_calls"
 
 git -C "$git_repo" checkout -- tracked.txt src/lib/code.txt
 git -C "$nested_repo" checkout -- nested.txt
 rm "$git_repo/untracked.txt"
 rm "$git_repo/broken-link" "$git_repo/directory-link"
 run_refresh
+grep -Fq 'status --porcelain=v1 -z -uall --no-renames' "$git_calls"
 if grep -Fq "$git_repo" "$target_file"; then
   printf 'clean repository data remained in runtime sidebar\n' >&2
   exit 1
@@ -130,6 +200,61 @@ if run_refresh >/dev/null 2>&1; then
 fi
 cmp -s "$test_dir/runtime-before-failure.swift" "$target_file"
 rm "$cmux_mode_file"
+
+cat >"$hanging_usage" <<'USAGE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+(
+  trap '' TERM
+  exec >/dev/null 2>&1
+  while true; do sleep 1; done
+) &
+child_pid="$!"
+printf '%s %s\n' "$$" "$child_pid" >"$MOCK_HANGING_PIDS_FILE"
+trap 'exit 0' TERM
+while true; do sleep 1; done
+USAGE
+chmod +x "$hanging_usage"
+
+CMUX_BIN="$mock_cmux" \
+  PATH="$mock_git_dir:$PATH" \
+  MOCK_GIT_CALLS="$git_calls" \
+  CMUX_AGENT_BOARD_SOURCE="$source_file" \
+  CMUX_AGENT_BOARD_TARGET="$hanging_target" \
+  CMUX_AGENT_BOARD_LOCK="$test_dir/state/hanging-refresh.lock" \
+  CMUX_AGENT_BOARD_CACHE="$test_dir/state/hanging-diff-cache.json" \
+  CMUX_AGENT_BOARD_USAGE="$hanging_usage" \
+  CMUX_AGENT_BOARD_USAGE_TIMEOUT=1 \
+  MOCK_HANGING_PIDS_FILE="$hanging_pids_file" \
+  "$SCRIPT"
+grep -Fq "if d == \"$unborn_repo\" || d.hasPrefix(\"$unborn_repo/\") { return \"2|4|0\" }" "$hanging_target"
+grep -Fq 'if p == "codex" && f == "detail" { return "error" }' "$hanging_target"
+grep -Fq 'if p == "claude" && f == "detail" { return "error" }' "$hanging_target"
+grep -Fq 'if p == "cursor" && f == "detail" { return "error" }' "$hanging_target"
+[[ -s "$hanging_pids_file" ]]
+read -r hanging_parent_pid hanging_child_pid <"$hanging_pids_file"
+for pid in "$hanging_parent_pid" "$hanging_child_pid"; do
+  for _ in {1..40}; do
+    if ! kill -0 "$pid" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.05
+  done
+  if kill -0 "$pid" >/dev/null 2>&1; then
+    printf 'timed out usage collector process remained: %s\n' "$pid" >&2
+    exit 1
+  fi
+done
+
+cp "$cache_file" "$test_dir/cache-before-invalid.json"
+printf '%s\n' '{"version":999,"repositories":{}}' >"$cache_file"
+if run_refresh >/dev/null 2>&1; then
+  printf 'invalid untracked cache unexpectedly succeeded\n' >&2
+  exit 1
+fi
+cmp -s "$test_dir/runtime-before-failure.swift" "$target_file"
+mv "$test_dir/cache-before-invalid.json" "$cache_file"
 
 cat >"$source_file" <<'SWIFT'
 func staticBefore() -> String { return "before" }

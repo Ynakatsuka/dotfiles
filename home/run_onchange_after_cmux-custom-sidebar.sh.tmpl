@@ -8,6 +8,7 @@
 # The hashes keep this run_onchange script tied to all generated-sidebar inputs.
 # agent-board-source: {{ include "dot_local/share/cmux/agent-board.swift" | sha256sum }}
 # diff-refresher: {{ include "dot_local/bin/executable_cmux-agent-board-diff-refresh" | sha256sum }}
+# usage-collector: {{ include "dot_local/bin/executable_cmux-agent-board-usage" | sha256sum }}
 # launch-agent: {{ include "private_Library/private_LaunchAgents/com.cmuxterm.agent-board-diff.plist.tmpl" | sha256sum }}
 
 set -euo pipefail
@@ -23,9 +24,11 @@ readonly DIFF_JOB_PLIST="${HOME}/Library/LaunchAgents/${DIFF_JOB_LABEL}.plist"
 readonly SIDEBAR_SOURCE="${HOME}/.local/share/cmux/agent-board.swift"
 readonly SIDEBAR_RUNTIME_DIR="${HOME}/.local/state/cmux"
 readonly SIDEBAR_RUNTIME="${SIDEBAR_RUNTIME_DIR}/agent-board.swift"
+readonly USAGE_COLLECTOR="${HOME}/.local/bin/cmux-agent-board-usage"
 
 [[ -f "${SIDEBAR_SOURCE}" ]]
 [[ -f "${DIFF_JOB_PLIST}" ]]
+[[ -f "${USAGE_COLLECTOR}" ]]
 plutil -lint "${DIFF_JOB_PLIST}" >/dev/null
 
 mkdir -p "${SIDEBAR_RUNTIME_DIR}"
