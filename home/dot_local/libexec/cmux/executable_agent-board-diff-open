@@ -157,7 +157,7 @@ def file_patch(git_bin: str, root: Path, file_path: str, status: str) -> bytes:
 
 def current_pane_and_diffs(
     cmux_bin: str, workspace_id: str, surface_id: str
-) -> tuple[str, list[str]]:
+) -> tuple[str, list[str], list[str]]:
     params = json.dumps(
         {"workspace_id": workspace_id}, separators=(",", ":")
     )
@@ -184,6 +184,7 @@ def current_pane_and_diffs(
         raise DiffOpenError("current cmux pane was not found")
 
     existing_diff_ids = []
+    existing_diff_ids_in_pane = []
     for surface in surfaces:
         if not isinstance(surface, dict):
             continue
@@ -191,14 +192,15 @@ def current_pane_and_diffs(
         title = surface.get("title")
         candidate_id = surface.get("id") or surface.get("ref")
         if (
-            candidate_pane == pane_id
-            and isinstance(title, str)
+            isinstance(title, str)
             and title.startswith(DIFF_TITLE_PREFIX)
             and isinstance(candidate_id, str)
             and candidate_id
         ):
             existing_diff_ids.append(candidate_id)
-    return pane_id, existing_diff_ids
+            if candidate_pane == pane_id:
+                existing_diff_ids_in_pane.append(candidate_id)
+    return pane_id, existing_diff_ids, existing_diff_ids_in_pane
 
 
 def opened_surface(
@@ -216,15 +218,40 @@ def opened_surface(
     return surface_id
 
 
-def viewer_context(cmux_bin: str) -> tuple[str, str, str, list[str]]:
+def viewer_context(
+    cmux_bin: str,
+) -> tuple[str, str, str, list[str], list[str]]:
     workspace_id = os.environ.get("CMUX_WORKSPACE_ID", "")
     surface_id = os.environ.get("CMUX_SURFACE_ID", "")
     if not workspace_id or not surface_id:
         raise DiffOpenError("CMUX_WORKSPACE_ID and CMUX_SURFACE_ID are required")
-    pane_id, existing_diff_ids = current_pane_and_diffs(
+    pane_id, existing_diff_ids, existing_diff_ids_in_pane = current_pane_and_diffs(
         cmux_bin, workspace_id, surface_id
     )
-    return workspace_id, surface_id, pane_id, existing_diff_ids
+    return (
+        workspace_id,
+        surface_id,
+        pane_id,
+        existing_diff_ids,
+        existing_diff_ids_in_pane,
+    )
+
+
+def close_viewer_surfaces(
+    cmux_bin: str, workspace_id: str, surface_ids: list[str]
+) -> None:
+    for surface_id in surface_ids:
+        run(
+            [
+                cmux_bin,
+                "close-surface",
+                "--surface",
+                surface_id,
+                "--workspace",
+                workspace_id,
+            ],
+            timeout=CMUX_TIMEOUT_SECONDS,
+        )
 
 
 def place_viewer_surface(
@@ -233,6 +260,7 @@ def place_viewer_surface(
     pane_id: str,
     viewer_surface_id: str,
     existing_diff_ids: list[str],
+    existing_diff_ids_in_pane: list[str],
 ) -> None:
     move_command = [
         cmux_bin,
@@ -244,29 +272,24 @@ def place_viewer_surface(
         "--workspace",
         workspace_id,
     ]
-    if existing_diff_ids:
-        move_command.extend(["--before", existing_diff_ids[0]])
+    if existing_diff_ids_in_pane:
+        move_command.extend(["--before", existing_diff_ids_in_pane[0]])
     move_command.extend(["--focus", "true"])
     run(
         move_command,
         timeout=CMUX_TIMEOUT_SECONDS,
     )
-    for existing_diff_id in existing_diff_ids:
-        run(
-            [
-                cmux_bin,
-                "close-surface",
-                "--surface",
-                existing_diff_id,
-                "--workspace",
-                workspace_id,
-            ],
-            timeout=CMUX_TIMEOUT_SECONDS,
-        )
+    close_viewer_surfaces(cmux_bin, workspace_id, existing_diff_ids)
 
 
 def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
-    workspace_id, surface_id, pane_id, existing_diff_ids = viewer_context(cmux_bin)
+    (
+        workspace_id,
+        surface_id,
+        pane_id,
+        existing_diff_ids,
+        existing_diff_ids_in_pane,
+    ) = viewer_context(cmux_bin)
 
     with tempfile.TemporaryDirectory(prefix="cmux-agent-board-diff-") as temp_dir:
         patch_file = Path(temp_dir) / "change.patch"
@@ -299,6 +322,7 @@ def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
         pane_id,
         diff_surface_id,
         existing_diff_ids,
+        existing_diff_ids_in_pane,
     )
 
 
@@ -309,7 +333,7 @@ def open_markdown(cmux_bin: str, root: Path, file_path: str) -> None:
     if not absolute_path.is_file():
         raise DiffOpenError(f"Markdown file is unavailable: {file_path}")
 
-    workspace_id, surface_id, pane_id, existing_diff_ids = viewer_context(cmux_bin)
+    workspace_id, surface_id, _, existing_diff_ids, _ = viewer_context(cmux_bin)
     opened = run(
         [
             cmux_bin,
@@ -324,7 +348,7 @@ def open_markdown(cmux_bin: str, root: Path, file_path: str) -> None:
             "--surface",
             surface_id,
             "--focus",
-            "false",
+            "true",
         ],
         timeout=CMUX_TIMEOUT_SECONDS,
     )
@@ -341,13 +365,7 @@ def open_markdown(cmux_bin: str, root: Path, file_path: str) -> None:
         ],
         timeout=CMUX_TIMEOUT_SECONDS,
     )
-    place_viewer_surface(
-        cmux_bin,
-        workspace_id,
-        pane_id,
-        markdown_surface_id,
-        existing_diff_ids,
-    )
+    close_viewer_surfaces(cmux_bin, workspace_id, existing_diff_ids)
 
 
 def execute(args: argparse.Namespace) -> None:

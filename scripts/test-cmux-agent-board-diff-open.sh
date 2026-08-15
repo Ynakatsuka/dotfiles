@@ -96,9 +96,12 @@ grep -Fq 'deleted file mode' "$patch_copy"
   cd "$git_repo"
   run_open 'UkVBRE1FLm1k' --mode markdown
 )
-grep -Fq -- "markdown open $git_repo/README.md --workspace workspace-id --surface surface-id --focus false" "$calls_file"
+grep -Fq -- "markdown open $git_repo/README.md --workspace workspace-id --surface surface-id --focus true" "$calls_file"
 grep -Fq -- 'rename-tab --surface markdown-surface --workspace workspace-id Agent Board Diff: README.md (Markdown)' "$calls_file"
-grep -Fq -- 'move-surface --surface markdown-surface --pane pane-id --workspace workspace-id --before existing-diff-surface --focus true' "$calls_file"
+if grep -Fq -- 'move-surface --surface markdown-surface' "$calls_file"; then
+  printf 'Markdown surface was unexpectedly moved after opening\n' >&2
+  exit 1
+fi
 
 if (
   cd "$git_repo"

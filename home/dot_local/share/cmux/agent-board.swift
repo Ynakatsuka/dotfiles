@@ -226,18 +226,6 @@ func isMarkdownPath(_ path: String) -> Bool {
         || lowercasedPath.hasSuffix(".markdown")
 }
 
-func openDiffFile(_ workspace, _ pathToken: String, _ mode: String) {
-    let modeArgument = mode == "markdown" ? " --mode markdown" : ""
-    cmux(
-        "surface.create",
-        workspace_id: workspace.id,
-        type: "terminal",
-        working_directory: diffRootOf(workspace.directory),
-        initial_command: "~/.local/libexec/cmux/agent-board-diff-open \(pathToken)\(modeArgument) && exit",
-        focus: true
-    )
-}
-
 func diffTreeRow(_ workspace, _ entry) -> some View {
     let fields = "\(entry)".split(separator: "|")
     let rowType = fields.count > 0 ? "\(fields[0])" : ""
@@ -268,7 +256,14 @@ func diffTreeRow(_ workspace, _ entry) -> some View {
             let pathToken = fields.count > 7 ? "\(fields[7])" : ""
             HStack(spacing: 2) {
                 Button(action: {
-                    openDiffFile(workspace, pathToken, "diff")
+                    cmux(
+                        "surface.create",
+                        workspace_id: workspace.id,
+                        type: "terminal",
+                        working_directory: diffRootOf(workspace.directory),
+                        initial_command: "~/.local/libexec/cmux/agent-board-diff-open \(pathToken) && exit",
+                        focus: true
+                    )
                 }) {
                     HStack(spacing: 5) {
                         Text(indent)
@@ -303,7 +298,14 @@ func diffTreeRow(_ workspace, _ entry) -> some View {
 
                 if isMarkdownPath(filePath) && kind != "D" {
                     Button(action: {
-                        openDiffFile(workspace, pathToken, "markdown")
+                        cmux(
+                            "surface.create",
+                            workspace_id: workspace.id,
+                            type: "terminal",
+                            working_directory: diffRootOf(workspace.directory),
+                            initial_command: "~/.local/libexec/cmux/agent-board-diff-open \(pathToken) --mode markdown && exit",
+                            focus: true
+                        )
                     }) {
                         Image(systemName: "doc.richtext")
                             .font(.system(size: 10))
