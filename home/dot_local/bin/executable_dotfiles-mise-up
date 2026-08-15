@@ -64,12 +64,16 @@ resolve_github_token() {
 }
 
 main() {
-  local self_update_available status token
+  local doctor_output self_update_available status token
 
   # Package-manager builds expose self-update help but reject the update itself.
+  # `mise doctor` also exits non-zero for unrelated health findings, while still
+  # emitting usable JSON.
+  if ! doctor_output="$(mise doctor --json)"; then
+    :
+  fi
   self_update_available="$(
-    mise doctor --json |
-      jq -r 'if has("self_update_available") and (.self_update_available | type == "boolean") then .self_update_available else error("self_update_available must be a boolean") end'
+    jq -r 'if has("self_update_available") and (.self_update_available | type == "boolean") then .self_update_available else error("self_update_available must be a boolean") end' <<<"$doctor_output"
   )"
 
   case "$self_update_available" in

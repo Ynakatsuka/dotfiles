@@ -25,6 +25,10 @@ case "${1:-}" in
   doctor)
     case "$MISE_TEST_DOCTOR_RESULT" in
       true) printf '%s\n' '{"self_update_available":true}' ;;
+      true_with_problem)
+        printf '%s\n' '{"self_update_available":true}'
+        exit 1
+        ;;
       false) printf '%s\n' '{"self_update_available":false}' ;;
       missing) printf '%s\n' '{"version":"test"}' ;;
       invalid) printf '%s\n' '{"self_update_available":"false"}' ;;
@@ -110,6 +114,9 @@ grep -Fq '[INFO] mise is managed by the system package manager; skipping self-up
 }
 
 run_success_case true >/dev/null
+assert_called "self-update -y"
+
+run_success_case true_with_problem >/dev/null
 assert_called "self-update -y"
 
 for invalid_result in missing invalid malformed failure; do
