@@ -128,37 +128,29 @@ Task: ${prompt}"
 create_worktree() {
   local base_dir="$1"
   local branch_name="$2"
-  local creation_output worktree_dir output_file helper_status
-
-  output_file=$(mktemp) || die "failed to create temporary output file"
-  : >"$output_file"
+  local worktree_dir helper_status
 
   set +e
-  (cd "$base_dir" && gw-create-worktree "$branch_name") \
-    > >(tee -a "$output_file" >&2) \
-    2> >(tee -a "$output_file" >&2)
+  (cd "$base_dir" && gw-create-worktree "$branch_name")
   helper_status=$?
   set -e
-
-  creation_output=$(cat "$output_file") || {
-    rm -f "$output_file"
-    die "failed to read worktree creation output"
-  }
-  rm -f "$output_file"
 
   [[ "$helper_status" -eq 0 ]] ||
     die "failed to create worktree for branch: $branch_name"
 
-  worktree_dir=$(printf '%s\n' "$creation_output" |
-    awk -F= '$1 == "WORKTREE_PATH" { print substr($0, index($0, "=") + 1) }' |
-    tail -1)
+  worktree_dir=$(git -C "$base_dir" worktree list --porcelain |
+    awk -v b="$branch_name" '
+      /^worktree/ { wt = substr($0, index($0, " ") + 1) }
+      $1 == "branch" && $2 == "refs/heads/" b && found == "" { found = wt }
+      END { if (found != "") print found }
+    ')
 
   [[ -n "$worktree_dir" ]] ||
-    die "gw-create-worktree did not output WORKTREE_PATH"
+    die "failed to resolve worktree for branch: $branch_name"
   [[ -d "$worktree_dir" ]] ||
     die "worktree path does not exist: $worktree_dir"
 
-  printf '%s\n' "$worktree_dir"
+  created_worktree_dir="$worktree_dir"
 }
 
 create_prompt_file() {
@@ -334,6 +326,7 @@ base_dir=""
 branch_name=""
 prompt_file=""
 workspace_ref=""
+created_worktree_dir=""
 inside_tab=0
 prompt_parts=()
 
@@ -476,6 +469,7 @@ rename_current_cmux_workspace "$branch_name" "$workspace_ref"
 printf '[gwai-cmux] Branch: %s\n' "$branch_name"
 printf '[gwai-cmux] Creating worktree...\n'
 
-worktree_dir=$(create_worktree "$base_dir" "$branch_name")
+create_worktree "$base_dir" "$branch_name"
+worktree_dir="$created_worktree_dir"
 printf '[gwai-cmux] Starting %s in %s\n' "$provider" "$worktree_dir"
 start_agent "$provider" "$worktree_dir" "$prompt"
