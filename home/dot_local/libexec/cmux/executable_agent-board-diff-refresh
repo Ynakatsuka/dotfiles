@@ -750,7 +750,7 @@ def main() -> None:
         "CMUX_AGENT_BOARD_LOCK", Path.home() / ".local/state/cmux/agent-board-diff-refresh.lock"
     )
     usage_bin = configured_path(
-        "CMUX_AGENT_BOARD_USAGE", Path.home() / ".local/bin/cmux-agent-board-usage"
+        "CMUX_AGENT_BOARD_USAGE", Path.home() / ".local/libexec/cmux/agent-board-usage"
     )
     usage_timeout = configured_timeout(
         "CMUX_AGENT_BOARD_USAGE_TIMEOUT", USAGE_TIMEOUT_SECONDS

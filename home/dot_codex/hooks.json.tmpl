@@ -3,11 +3,11 @@
 {{- if stat $hooksPath -}}
 {{- $base = include $hooksPath | fromJson -}}
 {{- end -}}
-{{- $working := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" working; fi" -}}
-{{- $stopped := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" stopped; fi" -}}
-{{- $input := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" input; fi" -}}
-{{- $clear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" clear; fi" -}}
-{{- $autoTitle := "if [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ \"${CMUX_CODEX_HOOKS_DISABLED:-}\" = \"1\" ] || [ \"${CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-auto-title\"; fi" -}}
+{{- $working := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" working; fi" -}}
+{{- $stopped := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" stopped; fi" -}}
+{{- $input := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" input; fi" -}}
+{{- $clear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" clear; fi" -}}
+{{- $autoTitle := "if [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ \"${CMUX_CODEX_HOOKS_DISABLED:-}\" = \"1\" ] || [ \"${CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-auto-title\"; fi" -}}
 {{- $oldWorking := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 0 --label working >/dev/null && echo '{}'; fi" -}}
 {{- $oldIdle := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux set-progress 1 --label idle >/dev/null && echo '{}'; fi" -}}
 {{- $oldClear := "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"$CMUX_CODEX_HOOKS_DISABLED\" = \"1\" ]; then echo '{}'; else cmux clear-progress >/dev/null && echo '{}'; fi" -}}
@@ -15,7 +15,7 @@
   def without_agent_board:
     map(select(
       ((.hooks // []) | any(
-        ((.command // "") | contains("cmux-agent-board-state"))
+        ((.command // "") | contains("agent-board-state"))
         or .command == $oldWorking or .command == $oldIdle or .command == $oldClear
       )) | not
     ));
@@ -25,7 +25,7 @@
       if ((.hooks // null) | type) == "array" then
         .hooks = [
           .hooks[]
-          | select(((.command // "") | contains("cmux-agent-board-auto-title")) | not)
+          | select(((.command // "") | contains("agent-board-auto-title")) | not)
         ]
       else .
       end

@@ -4,7 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
-readonly USAGE_SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-agent-board-usage"
+readonly USAGE_SCRIPT="$REPO_ROOT/home/dot_local/libexec/cmux/executable_agent-board-usage"
 readonly STATUSLINE_PROXY="$REPO_ROOT/home/dot_claude/scripts/executable_ccv-statusline-proxy.sh"
 readonly SIDEBAR="$REPO_ROOT/home/dot_local/share/cmux/agent-board.swift"
 

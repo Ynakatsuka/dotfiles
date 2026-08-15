@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" stopped; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" stopped; fi",
             "timeout": 5
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" input; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" input; fi",
             "timeout": 5
           }
         ]
@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" working; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" working; fi",
             "timeout": 5
           }
         ]
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" input; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" input; fi",
             "timeout": 5
           }
         ]
@@ -82,7 +82,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" working; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" working; fi",
             "timeout": 5
           }
         ]
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" working; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" working; fi",
             "timeout": 5
           }
         ]
@@ -102,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ] || [ \"${CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-auto-title\"; fi",
+            "command": "if [ -z \"${CMUX_SURFACE_ID:-}\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ] || [ \"${CMUX_AGENT_BOARD_AUTO_TITLE_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-auto-title\"; fi",
             "timeout": 5
           }
         ]
@@ -113,7 +113,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" stopped; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" stopped; fi",
             "timeout": 5
           }
         ]
@@ -124,7 +124,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/bin/cmux-agent-board-state\" clear; fi",
+            "command": "if [ -z \"$CMUX_SURFACE_ID\" ] || [ \"${CMUX_CLAUDE_HOOKS_DISABLED:-}\" = \"1\" ]; then echo '{}'; else \"$HOME/.local/libexec/cmux/agent-board-state\" clear; fi",
             "timeout": 3
           }
         ]

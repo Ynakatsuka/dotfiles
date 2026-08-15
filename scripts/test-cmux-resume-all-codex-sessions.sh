@@ -4,7 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
-readonly SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-resume-all-codex-sessions"
+readonly SCRIPT="$REPO_ROOT/home/dot_local/libexec/cmux/executable_resume-all-codex-sessions"
 
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/cmux-resume-test.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT

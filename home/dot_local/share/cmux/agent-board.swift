@@ -254,7 +254,7 @@ func diffTreeRow(_ workspace, _ entry) -> some View {
                     workspace_id: workspace.id,
                     type: "terminal",
                     working_directory: diffRootOf(workspace.directory),
-                    initial_command: "~/.local/bin/cmux-agent-board-diff-open \(pathToken) && exit",
+                    initial_command: "~/.local/libexec/cmux/agent-board-diff-open \(pathToken) && exit",
                     focus: true
                 )
             }) {

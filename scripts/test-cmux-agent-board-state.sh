@@ -4,7 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
-readonly SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-agent-board-state"
+readonly SCRIPT="$REPO_ROOT/home/dot_local/libexec/cmux/executable_agent-board-state"
 readonly SIDEBAR="$REPO_ROOT/home/dot_local/share/cmux/agent-board.swift"
 readonly SHELL_HOOKS="$REPO_ROOT/home/private_dot_config/zsh/cmux-agent-board.zsh"
 
@@ -14,19 +14,31 @@ trap 'rm -rf "$test_dir"' EXIT
 mock_cmux="$test_dir/cmux"
 calls_file="$test_dir/calls"
 flock_calls="$test_dir/flock-calls"
+read_calls="$test_dir/read-calls"
 
 cat >"$mock_cmux" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$*" == 'workspace list --json' ]]; then
-  jq -n --arg title "${MOCK_WORKSPACE_TITLE:-workspace}" '{workspaces: [{id: "workspace-id", title: $title}]}'
-  exit 0
-fi
-
-if [[ "${1:-}" == 'rpc' && "${2:-}" == 'surface.list' ]]; then
-  jq -n --arg title "${MOCK_SURFACE_TITLE:-surface}" \
-    '{surfaces: [{id: "surface-id", ref: "surface:1", title: $title}]}'
+if [[ "$*" == '--json tree --workspace workspace-id' ]]; then
+  printf '%s\n' "$*" >>"$MOCK_READ_CALLS"
+  jq -n \
+    --arg workspace_title "${MOCK_WORKSPACE_TITLE:-workspace}" \
+    --arg surface_title "${MOCK_SURFACE_TITLE:-surface}" '
+      {
+        caller: {surface_ref: "surface:1"},
+        windows: [{workspaces: [{
+          id: "workspace-id",
+          ref: "workspace:1",
+          title: $workspace_title,
+          panes: [{surfaces: [{
+            id: "surface-id",
+            ref: "surface:1",
+            title: $surface_title
+          }]}]
+        }]}]
+      }
+    '
   exit 0
 fi
 
@@ -51,6 +63,7 @@ run_state() {
   PATH="$test_dir:$PATH" \
     MOCK_CALLS_FILE="$calls_file" \
     MOCK_FLOCK_CALLS="$flock_calls" \
+    MOCK_READ_CALLS="$read_calls" \
     CMUX_WORKSPACE_ID='workspace-id' \
     CMUX_SURFACE_ID='surface-id' \
     CMUX_AGENT_BOARD_TITLE_LOCK_DIR="$test_dir/title-locks" \
@@ -63,6 +76,8 @@ input_marker=$'\342\201\240\342\200\215\342\201\240'
 
 run_state working >/dev/null
 grep -Fq -- "tab-action --surface surface-id --action rename --title surface${working_marker}" "$calls_file"
+[[ $(wc -l <"$read_calls") -eq 1 ]]
+grep -Fxq -- '--json tree --workspace workspace-id' "$read_calls"
 if grep -Fq 'workspace-action' "$calls_file"; then
   printf 'clean workspace title was unexpectedly renamed\n' >&2
   exit 1
@@ -113,12 +128,12 @@ grep -Fq -- "tab-action --surface surface-id --action rename --title surface" "$
 
 shell_home="$test_dir/home"
 shell_calls="$test_dir/shell-calls"
-mkdir -p "$shell_home/.local/bin"
+mkdir -p "$shell_home/.local/libexec/cmux"
 printf '%s\n' \
   '#!/usr/bin/env bash' \
   'printf "%s\n" "$1" >>"$MOCK_SHELL_CALLS"' \
-  >"$shell_home/.local/bin/cmux-agent-board-state"
-chmod +x "$shell_home/.local/bin/cmux-agent-board-state"
+  >"$shell_home/.local/libexec/cmux/agent-board-state"
+chmod +x "$shell_home/.local/libexec/cmux/agent-board-state"
 
 HOME="$shell_home" MOCK_SHELL_CALLS="$shell_calls" \
   CMUX_WORKSPACE_ID='workspace-id' CMUX_SURFACE_ID='surface-id' \
@@ -146,43 +161,43 @@ if CMUX_WORKSPACE_ID='workspace-id' CMUX_SURFACE_ID='' PATH="$test_dir:$PATH" \
 fi
 
 jq -e '
-  .hooks.SessionStart[0].hooks[0].command | contains("cmux-agent-board-state\" stopped")
+  .hooks.SessionStart[0].hooks[0].command | contains("agent-board-state\" stopped")
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 jq -e '
-  .hooks.PermissionRequest[0].hooks[0].command | contains("cmux-agent-board-state\" input")
+  .hooks.PermissionRequest[0].hooks[0].command | contains("agent-board-state\" input")
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 jq -e '
   [.hooks.PreToolUse[]
-    | select(any(.hooks[]; .command | contains("cmux-agent-board-state\" working")))
+    | select(any(.hooks[]; .command | contains("agent-board-state\" working")))
     | .matcher] == ["^(?!AskUserQuestion$).*"]
   and
   [.hooks.PreToolUse[]
-    | select(any(.hooks[]; .command | contains("cmux-agent-board-state\" input")))
+    | select(any(.hooks[]; .command | contains("agent-board-state\" input")))
     | .matcher] == ["AskUserQuestion"]
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 jq -e '
-  .hooks.UserPromptSubmit[0].hooks[0].command | contains("cmux-agent-board-state\" working")
+  .hooks.UserPromptSubmit[0].hooks[0].command | contains("agent-board-state\" working")
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 jq -e '
-  .hooks.Stop[0].hooks[0].command | contains("cmux-agent-board-state\" stopped")
+  .hooks.Stop[0].hooks[0].command | contains("agent-board-state\" stopped")
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 jq -e '
-  .hooks.SessionEnd[0].hooks[0].command | contains("cmux-agent-board-state\" clear")
+  .hooks.SessionEnd[0].hooks[0].command | contains("agent-board-state\" clear")
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 
 rendered_codex_hooks=$(chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
 jq -e '
-  any(.hooks.SessionStart[]?.hooks[]?; .command | contains("cmux-agent-board-state\" stopped"))
+  any(.hooks.SessionStart[]?.hooks[]?; .command | contains("agent-board-state\" stopped"))
   and
-  any(.hooks.Stop[]?.hooks[]?; .command | contains("cmux-agent-board-state\" stopped"))
+  any(.hooks.Stop[]?.hooks[]?; .command | contains("agent-board-state\" stopped"))
   and
-  any(.hooks.SessionEnd[]?.hooks[]?; .command | contains("cmux-agent-board-state\" clear"))
+  any(.hooks.SessionEnd[]?.hooks[]?; .command | contains("agent-board-state\" clear"))
   and
   ([.hooks[][]?.hooks[]?
-   | select(.command | contains("cmux-agent-board-state"))] as $state_hooks
+   | select(.command | contains("agent-board-state"))] as $state_hooks
    | ($state_hooks | length) == 6
    and all($state_hooks[];
-     if (.command | contains("cmux-agent-board-state\" clear"))
+     if (.command | contains("agent-board-state\" clear"))
      then .timeout == 3
      else .timeout == 5
      end))
@@ -207,8 +222,8 @@ assert "cmux-workspace-note" not in source
 assert "noteButton" not in source
 assert "statusPill" not in source
 assert '"surface.create"' in source
-assert "cmux-agent-board-diff-open" in source
-assert 'initial_command: "~/.local/bin/cmux-agent-board-diff-open \\(pathToken) && exit"' in source
+assert "cmux/agent-board-diff-open" in source
+assert 'initial_command: "~/.local/libexec/cmux/agent-board-diff-open \\(pathToken) && exit"' in source
 assert 'cmux("file.open"' not in source
 assert "func diffTreeRow" in source
 assert "func diffTreeList" in source

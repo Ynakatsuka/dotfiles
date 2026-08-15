@@ -17,8 +17,8 @@ if [[ -z "$surface_id" ]]; then
 fi
 
 title_lock_dir="${CMUX_AGENT_BOARD_TITLE_LOCK_DIR:-$HOME/.local/state/cmux/agent-board-title-locks}"
-safe_surface_id="$(printf '%s' "$surface_id" | sed 's/[^A-Za-z0-9._-]/_/g')"
-mkdir -p "$title_lock_dir"
+safe_surface_id="${surface_id//[^A-Za-z0-9._-]/_}"
+[[ -d "$title_lock_dir" ]] || mkdir -p "$title_lock_dir"
 exec 9>"$title_lock_dir/${safe_surface_id}.lock"
 if command -v lockf >/dev/null 2>&1; then
   lockf -s -t 5 9 || lock_status=$?
@@ -49,25 +49,21 @@ case "$state" in
     ;;
 esac
 
-current_workspace_title="$({
-  CMUX_QUIET=1 cmux workspace list --json
+title_assignments="$({
+  CMUX_QUIET=1 cmux --json tree --workspace "$workspace_id"
 } | jq -er --arg workspace_id "$workspace_id" '
-  .workspaces[]
-  | select(.id == $workspace_id or .ref == $workspace_id)
-  | .title
-')"
-
-surface_list_params="$(jq -cn --arg workspace_id "$workspace_id" '{workspace_id: $workspace_id}')"
-current_surface_title="$({
-  CMUX_QUIET=1 cmux rpc surface.list "$surface_list_params"
-} | jq -er --arg surface_id "$surface_id" '
-  .surfaces
-  | map(select(.id == $surface_id or .ref == $surface_id))
+  .caller.surface_ref as $surface_ref
+  | [.windows[].workspaces[] | select(.id == $workspace_id or .ref == $workspace_id)]
+  | if length != 1 then error("workspace not found or not unique") else .[0] end
+  | . as $workspace
+  | [$workspace.panes[].surfaces[] | select(.ref == $surface_ref)]
   | if length != 1 then error("surface not found or not unique")
+    elif ($workspace.title | type) != "string" then error("workspace title was not a string")
     elif (.[0].title | type) != "string" then error("surface title was not a string")
-    else .[0].title
+    else @sh "current_workspace_title=\($workspace.title) current_surface_title=\(.[0].title)"
     end
 ')"
+eval "$title_assignments"
 
 workspace_has_marker=false
 if [[ "$current_workspace_title" == *"$working_marker"*

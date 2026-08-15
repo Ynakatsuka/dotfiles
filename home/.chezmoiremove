@@ -20,6 +20,13 @@ mcp.json
 .codex/skills/my-team-share
 .config/cmux/settings.json
 .local/bin/cmux-workspace-note
+.local/bin/cmux-agent-board-auto-title
+.local/bin/cmux-agent-board-diff-open
+.local/bin/cmux-agent-board-diff-refresh
+.local/bin/cmux-agent-board-state
+.local/bin/cmux-agent-board-usage
+.local/bin/cmux-agent-status-sync
+.local/bin/cmux-resume-all-codex-sessions
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy
 CLAUDE.md

@@ -3,6 +3,7 @@
 .hammerspoon
 .raycast
 Library
+.local/libexec/cmux
 {{- end }}
 
 {{- if ne .chezmoi.os "linux" }}

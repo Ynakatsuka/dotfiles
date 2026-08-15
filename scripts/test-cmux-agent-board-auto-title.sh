@@ -4,8 +4,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
-readonly SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-agent-board-auto-title"
-readonly STATE_SCRIPT="$REPO_ROOT/home/dot_local/bin/executable_cmux-agent-board-state"
+readonly SCRIPT="$REPO_ROOT/home/dot_local/libexec/cmux/executable_agent-board-auto-title"
+readonly STATE_SCRIPT="$REPO_ROOT/home/dot_local/libexec/cmux/executable_agent-board-state"
 
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/cmux-agent-board-auto-title-test.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT
@@ -21,6 +21,27 @@ mkdir -p "$mock_bin"
 cat >"$mock_bin/cmux" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
+
+if [[ "$*" == "--json tree --workspace ${CMUX_WORKSPACE_ID:-workspace-id}" ]]; then
+  jq -n \
+    --arg workspace_title "${MOCK_WORKSPACE_TITLE:-workspace}" \
+    --arg surface_title "${MOCK_SURFACE_TITLE:-surface}" '
+      {
+        caller: {surface_ref: "surface:1"},
+        windows: [{workspaces: [{
+          id: env.CMUX_WORKSPACE_ID,
+          ref: "workspace:1",
+          title: $workspace_title,
+          panes: [{surfaces: [{
+            id: env.CMUX_SURFACE_ID,
+            ref: "surface:1",
+            title: $surface_title
+          }]}]
+        }]}]
+      }
+    '
+  exit 0
+fi
 
 if [[ "${1:-}" == "rpc" && "${2:-}" == "surface.list" ]]; then
   if [[ -n "${MOCK_SURFACE_LIST_COUNT_FILE:-}" ]]; then
@@ -337,16 +358,16 @@ printf '%s' "$(jq -cn '{session_id: "outside", turn_id: "turn-7", prompt: "ç„¡è¦
 jq -e '
   [.hooks.UserPromptSubmit[]?.hooks[]?.command] as $commands
   | ($commands | length) == 2
-    and ($commands[0] | contains("cmux-agent-board-state\" working"))
-    and ($commands[1] | contains("cmux-agent-board-auto-title"))
+    and ($commands[0] | contains("agent-board-state\" working"))
+    and ($commands[1] | contains("agent-board-auto-title"))
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 
 rendered_codex_hooks=$(chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
 jq -e '
   [.hooks.UserPromptSubmit[]?.hooks[]?.command] as $commands
-  | ([$commands[] | select(contains("cmux-agent-board-auto-title"))] | length) == 1
-    and ($commands[-2] | contains("cmux-agent-board-state\" working"))
-    and ($commands[-1] | contains("cmux-agent-board-auto-title"))
+  | ([$commands[] | select(contains("agent-board-auto-title"))] | length) == 1
+    and ($commands[-2] | contains("agent-board-state\" working"))
+    and ($commands[-1] | contains("agent-board-auto-title"))
 ' <<<"$rendered_codex_hooks" >/dev/null
 
 render_home="$test_dir/render-home"
@@ -376,7 +397,7 @@ first_render=$(HOME="$render_home" PATH="/opt/homebrew/bin:/usr/bin:/bin" \
   <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
 jq -e '
   ([.hooks.UserPromptSubmit[]?.hooks[]?.command
-    | select(contains("cmux-agent-board-auto-title"))] | length) == 1
+    | select(contains("agent-board-auto-title"))] | length) == 1
   and ([.hooks.UserPromptSubmit[]?.hooks[]?.command
     | select(. == "keep-me")] | length) == 1
 ' <<<"$first_render" >/dev/null

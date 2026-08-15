@@ -18,7 +18,7 @@
       "subtitle": "Restart every Codex tab from its saved session",
       "keywords": ["codex", "resume", "restart", "session", "all tabs"],
       "palette": true,
-      "command": "\"$HOME/.local/bin/cmux-resume-all-codex-sessions\" && exit",
+      "command": "\"$HOME/.local/libexec/cmux/resume-all-codex-sessions\" && exit",
       "target": "newTabInCurrentPane"
     }
   },
