@@ -220,6 +220,24 @@ func diffKindColor(_ kind: String) -> String {
     return "#54A8FF"
 }
 
+func isMarkdownPath(_ path: String) -> Bool {
+    let lowercasedPath = path.lowercased()
+    return lowercasedPath.hasSuffix(".md")
+        || lowercasedPath.hasSuffix(".markdown")
+}
+
+func openDiffFile(_ workspace, _ pathToken: String, _ mode: String) {
+    let modeArgument = mode == "markdown" ? " --mode markdown" : ""
+    cmux(
+        "surface.create",
+        workspace_id: workspace.id,
+        type: "terminal",
+        working_directory: diffRootOf(workspace.directory),
+        initial_command: "~/.local/libexec/cmux/agent-board-diff-open \(pathToken)\(modeArgument) && exit",
+        focus: true
+    )
+}
+
 func diffTreeRow(_ workspace, _ entry) -> some View {
     let fields = "\(entry)".split(separator: "|")
     let rowType = fields.count > 0 ? "\(fields[0])" : ""
@@ -248,46 +266,54 @@ func diffTreeRow(_ workspace, _ entry) -> some View {
             let fileName = fields.count > 5 ? "\(fields[5])" : ""
             let filePath = fields.count > 6 ? "\(fields[6])" : ""
             let pathToken = fields.count > 7 ? "\(fields[7])" : ""
-            Button(action: {
-                cmux(
-                    "surface.create",
-                    workspace_id: workspace.id,
-                    type: "terminal",
-                    working_directory: diffRootOf(workspace.directory),
-                    initial_command: "~/.local/libexec/cmux/agent-board-diff-open \(pathToken) && exit",
-                    focus: true
-                )
-            }) {
-                HStack(spacing: 5) {
-                    Text(indent)
-                        .font(.system(size: 8, design: .monospaced))
-                    Image(systemName: diffKindIcon(kind))
-                        .font(.system(size: 9))
-                        .foregroundColor(diffKindColor(kind))
-                        .frame(width: 12)
-                    Text(fileName)
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundColor("#8E8E93")
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    if added == "-" {
-                        Text("bin")
+            HStack(spacing: 2) {
+                Button(action: {
+                    openDiffFile(workspace, pathToken, "diff")
+                }) {
+                    HStack(spacing: 5) {
+                        Text(indent)
                             .font(.system(size: 8, design: .monospaced))
-                            .foregroundColor("#636366")
-                    } else {
-                        Text("+\(added)")
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundColor("#30D158")
-                        Text("−\(deleted)")
-                            .font(.system(size: 8, design: .monospaced))
-                            .foregroundColor("#FF453A")
+                        Image(systemName: diffKindIcon(kind))
+                            .font(.system(size: 9))
+                            .foregroundColor(diffKindColor(kind))
+                            .frame(width: 12)
+                        Text(fileName)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor("#8E8E93")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        if added == "-" {
+                            Text("bin")
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundColor("#636366")
+                        } else {
+                            Text("+\(added)")
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundColor("#30D158")
+                            Text("−\(deleted)")
+                                .font(.system(size: 8, design: .monospaced))
+                                .foregroundColor("#FF453A")
+                        }
                     }
+                    .padding(4)
                 }
-                .padding(4)
+                .disabled(filePath == "" || pathToken == "")
+                .help("View diff for \(filePath)")
+
+                if isMarkdownPath(filePath) && kind != "D" {
+                    Button(action: {
+                        openDiffFile(workspace, pathToken, "markdown")
+                    }) {
+                        Image(systemName: "doc.richtext")
+                            .font(.system(size: 10))
+                            .foregroundColor("#54A8FF")
+                            .padding(4)
+                    }
+                    .disabled(pathToken == "")
+                    .help("Preview rendered Markdown for \(filePath)")
+                }
             }
-            .disabled(filePath == "" || pathToken == "")
-            .help("View diff for \(filePath)")
         }
     }
 }

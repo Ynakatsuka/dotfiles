@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open one Agent Board file change in cmux's built-in diff viewer."""
+"""Open one Agent Board file change in cmux's diff or Markdown viewer."""
 
 from __future__ import annotations
 
@@ -25,9 +25,15 @@ class DiffOpenError(RuntimeError):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Open one changed file in cmux's diff viewer."
+        description="Open one changed file in cmux's diff or Markdown viewer."
     )
     parser.add_argument("path_token", help="URL-safe base64 repository-relative path")
+    parser.add_argument(
+        "--mode",
+        choices=("diff", "markdown"),
+        default="diff",
+        help="viewer mode (default: diff)",
+    )
     return parser.parse_args()
 
 
@@ -195,20 +201,22 @@ def current_pane_and_diffs(
     return pane_id, existing_diff_ids
 
 
-def opened_diff_surface(result: subprocess.CompletedProcess[bytes]) -> str:
+def opened_surface(
+    result: subprocess.CompletedProcess[bytes], command_name: str
+) -> str:
     try:
         document = json.loads(result.stdout)
     except json.JSONDecodeError as error:
-        raise DiffOpenError("cmux diff returned invalid JSON") from error
+        raise DiffOpenError(f"cmux {command_name} returned invalid JSON") from error
     if not isinstance(document, dict):
-        raise DiffOpenError("cmux diff did not return an object")
+        raise DiffOpenError(f"cmux {command_name} did not return an object")
     surface_id = document.get("surface_id") or document.get("surface_ref")
     if not isinstance(surface_id, str) or not surface_id:
-        raise DiffOpenError("cmux diff did not return a surface")
+        raise DiffOpenError(f"cmux {command_name} did not return a surface")
     return surface_id
 
 
-def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
+def viewer_context(cmux_bin: str) -> tuple[str, str, str, list[str]]:
     workspace_id = os.environ.get("CMUX_WORKSPACE_ID", "")
     surface_id = os.environ.get("CMUX_SURFACE_ID", "")
     if not workspace_id or not surface_id:
@@ -216,37 +224,21 @@ def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
     pane_id, existing_diff_ids = current_pane_and_diffs(
         cmux_bin, workspace_id, surface_id
     )
+    return workspace_id, surface_id, pane_id, existing_diff_ids
 
-    with tempfile.TemporaryDirectory(prefix="cmux-agent-board-diff-") as temp_dir:
-        patch_file = Path(temp_dir) / "change.patch"
-        patch_file.write_bytes(patch)
-        opened = run(
-            [
-                cmux_bin,
-                "--json",
-                "--id-format",
-                "uuids",
-                "diff",
-                str(patch_file),
-                "--cwd",
-                str(root),
-                "--workspace",
-                workspace_id,
-                "--surface",
-                surface_id,
-                "--focus",
-                "false",
-                "--title",
-                f"{DIFF_TITLE_PREFIX}{file_path}",
-            ],
-            timeout=CMUX_TIMEOUT_SECONDS,
-        )
-    diff_surface_id = opened_diff_surface(opened)
+
+def place_viewer_surface(
+    cmux_bin: str,
+    workspace_id: str,
+    pane_id: str,
+    viewer_surface_id: str,
+    existing_diff_ids: list[str],
+) -> None:
     move_command = [
         cmux_bin,
         "move-surface",
         "--surface",
-        diff_surface_id,
+        viewer_surface_id,
         "--pane",
         pane_id,
         "--workspace",
@@ -273,14 +265,102 @@ def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
         )
 
 
+def open_diff(cmux_bin: str, root: Path, file_path: str, patch: bytes) -> None:
+    workspace_id, surface_id, pane_id, existing_diff_ids = viewer_context(cmux_bin)
+
+    with tempfile.TemporaryDirectory(prefix="cmux-agent-board-diff-") as temp_dir:
+        patch_file = Path(temp_dir) / "change.patch"
+        patch_file.write_bytes(patch)
+        opened = run(
+            [
+                cmux_bin,
+                "--json",
+                "--id-format",
+                "uuids",
+                "diff",
+                str(patch_file),
+                "--cwd",
+                str(root),
+                "--workspace",
+                workspace_id,
+                "--surface",
+                surface_id,
+                "--focus",
+                "false",
+                "--title",
+                f"{DIFF_TITLE_PREFIX}{file_path}",
+            ],
+            timeout=CMUX_TIMEOUT_SECONDS,
+        )
+    diff_surface_id = opened_surface(opened, "diff")
+    place_viewer_surface(
+        cmux_bin,
+        workspace_id,
+        pane_id,
+        diff_surface_id,
+        existing_diff_ids,
+    )
+
+
+def open_markdown(cmux_bin: str, root: Path, file_path: str) -> None:
+    if Path(file_path).suffix.lower() not in {".md", ".markdown"}:
+        raise DiffOpenError(f"file is not Markdown: {file_path}")
+    absolute_path = root / file_path
+    if not absolute_path.is_file():
+        raise DiffOpenError(f"Markdown file is unavailable: {file_path}")
+
+    workspace_id, surface_id, pane_id, existing_diff_ids = viewer_context(cmux_bin)
+    opened = run(
+        [
+            cmux_bin,
+            "--json",
+            "--id-format",
+            "uuids",
+            "markdown",
+            "open",
+            str(absolute_path),
+            "--workspace",
+            workspace_id,
+            "--surface",
+            surface_id,
+            "--focus",
+            "false",
+        ],
+        timeout=CMUX_TIMEOUT_SECONDS,
+    )
+    markdown_surface_id = opened_surface(opened, "markdown")
+    run(
+        [
+            cmux_bin,
+            "rename-tab",
+            "--surface",
+            markdown_surface_id,
+            "--workspace",
+            workspace_id,
+            f"{DIFF_TITLE_PREFIX}{file_path} (Markdown)",
+        ],
+        timeout=CMUX_TIMEOUT_SECONDS,
+    )
+    place_viewer_surface(
+        cmux_bin,
+        workspace_id,
+        pane_id,
+        markdown_surface_id,
+        existing_diff_ids,
+    )
+
+
 def execute(args: argparse.Namespace) -> None:
     file_path = decode_path(args.path_token)
     git_bin = executable("git", "GIT_BIN")
     cmux_bin = executable("cmux", "CMUX_BIN")
     root = repository_root(git_bin)
     status = changed_file_status(git_bin, root, file_path)
-    patch = file_patch(git_bin, root, file_path, status)
-    open_diff(cmux_bin, root, file_path, patch)
+    if args.mode == "markdown":
+        open_markdown(cmux_bin, root, file_path)
+    else:
+        patch = file_patch(git_bin, root, file_path, status)
+        open_diff(cmux_bin, root, file_path, patch)
 
 
 def main() -> int:

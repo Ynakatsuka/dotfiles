@@ -223,7 +223,12 @@ assert "noteButton" not in source
 assert "statusPill" not in source
 assert '"surface.create"' in source
 assert "cmux/agent-board-diff-open" in source
-assert 'initial_command: "~/.local/libexec/cmux/agent-board-diff-open \\(pathToken) && exit"' in source
+assert 'func isMarkdownPath' in source
+assert 'lowercasedPath.hasSuffix(".markdown")' in source
+assert 'openDiffFile(workspace, pathToken, "diff")' in source
+assert 'openDiffFile(workspace, pathToken, "markdown")' in source
+assert 'Image(systemName: "doc.richtext")' in source
+assert 'initial_command: "~/.local/libexec/cmux/agent-board-diff-open \\(pathToken)\\(modeArgument) && exit"' in source
 assert 'cmux("file.open"' not in source
 assert "func diffTreeRow" in source
 assert "func diffTreeList" in source

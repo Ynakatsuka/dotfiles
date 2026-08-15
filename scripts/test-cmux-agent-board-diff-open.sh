@@ -15,14 +15,17 @@ calls_file="$test_dir/calls"
 patch_copy="$test_dir/change.patch"
 
 git init -q "$git_repo"
+git_repo=$(cd "$git_repo" && pwd -P)
 git -C "$git_repo" config user.email 'test@example.com'
 git -C "$git_repo" config user.name 'Test User'
 printf 'before\n' >"$git_repo/tracked.txt"
 printf 'deleted\n' >"$git_repo/deleted.txt"
-git -C "$git_repo" add tracked.txt deleted.txt
+printf '# Before\n' >"$git_repo/README.md"
+git -C "$git_repo" add tracked.txt deleted.txt README.md
 git -C "$git_repo" commit -qm 'initial commit'
 printf 'after\n' >"$git_repo/tracked.txt"
 printf 'untracked\n' >"$git_repo/untracked.txt"
+printf '# After\n\nRendered content.\n' >"$git_repo/README.md"
 rm "$git_repo/deleted.txt"
 
 cat >"$mock_cmux" <<'MOCK'
@@ -37,6 +40,13 @@ fi
 if [[ "${1:-}" == '--json' && "${4:-}" == 'diff' ]]; then
   cp "${5:-}" "$MOCK_PATCH_COPY"
   printf '{"surface_id":"diff-surface"}'
+  exit 0
+fi
+if [[ "${1:-}" == '--json' && "${4:-}" == 'markdown' ]]; then
+  printf '{"surface_id":"markdown-surface"}'
+  exit 0
+fi
+if [[ "${1:-}" == 'rename-tab' ]]; then
   exit 0
 fi
 if [[ "${1:-}" == 'move-surface' ]]; then
@@ -81,6 +91,22 @@ grep -Fq 'new file mode' "$patch_copy"
 )
 grep -Fq 'diff --git a/deleted.txt b/deleted.txt' "$patch_copy"
 grep -Fq 'deleted file mode' "$patch_copy"
+
+(
+  cd "$git_repo"
+  run_open 'UkVBRE1FLm1k' --mode markdown
+)
+grep -Fq -- "markdown open $git_repo/README.md --workspace workspace-id --surface surface-id --focus false" "$calls_file"
+grep -Fq -- 'rename-tab --surface markdown-surface --workspace workspace-id Agent Board Diff: README.md (Markdown)' "$calls_file"
+grep -Fq -- 'move-surface --surface markdown-surface --pane pane-id --workspace workspace-id --before existing-diff-surface --focus true' "$calls_file"
+
+if (
+  cd "$git_repo"
+  run_open 'dHJhY2tlZC50eHQ' --mode markdown
+) >/dev/null 2>&1; then
+  printf 'non-Markdown file unexpectedly opened in Markdown mode\n' >&2
+  exit 1
+fi
 
 if (
   cd "$git_repo"
