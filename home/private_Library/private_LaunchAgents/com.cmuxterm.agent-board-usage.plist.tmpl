@@ -3,17 +3,19 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.cmuxterm.agent-board-diff</string>
+  <string>com.cmuxterm.agent-board-usage</string>
   <key>ProgramArguments</key>
   <array>
-    <string>{{ .chezmoi.homeDir }}/.local/libexec/cmux/agent-board-diff-refresh</string>
+    <string>{{ .chezmoi.homeDir }}/.local/libexec/cmux/agent-board-usage</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
   <key>StartInterval</key>
-  <integer>120</integer>
+  <integer>300</integer>
   <key>ProcessType</key>
   <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/dev/null</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>

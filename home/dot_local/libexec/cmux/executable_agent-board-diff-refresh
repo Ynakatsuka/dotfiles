@@ -8,7 +8,6 @@ import fcntl
 import json
 import math
 import os
-import signal
 import stat
 import subprocess
 import tempfile
@@ -21,9 +20,8 @@ BEGIN = "// BEGIN CMUX_DIFF_DATA (managed by cmux-agent-board-diff-refresh)"
 END = "// END CMUX_DIFF_DATA"
 MAX_FILES_LISTED = 20
 MAX_UNTRACKED_BYTES = 2_000_000
-UNTRACKED_REFRESH_SECONDS = 120
+UNTRACKED_REFRESH_SECONDS = 600
 GIT_TIMEOUT_SECONDS = 15
-USAGE_TIMEOUT_SECONDS = 25
 USAGE_PROVIDERS = ("codex", "claude", "cursor")
 CACHE_VERSION = 1
 
@@ -36,19 +34,6 @@ def read_only_git_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment["GIT_OPTIONAL_LOCKS"] = "0"
     return environment
-
-
-def configured_timeout(variable: str, default: float) -> float:
-    configured = os.environ.get(variable)
-    if configured is None:
-        return default
-    try:
-        timeout = float(configured)
-    except ValueError as error:
-        raise RuntimeError(f"{variable} must be a positive number") from error
-    if timeout <= 0:
-        raise RuntimeError(f"{variable} must be a positive number")
-    return timeout
 
 
 def run_command(
@@ -128,7 +113,9 @@ def git_toplevel(directory: Path) -> Path | None:
 
 def repository_toplevels(directories: list[Path]) -> list[Path]:
     toplevels: dict[str, Path] = {}
-    for directory in directories:
+    unique_directories = {str(directory): directory for directory in directories}
+    for directory_key in sorted(unique_directories):
+        directory = unique_directories[directory_key]
         top = git_toplevel(directory)
         if top is not None:
             toplevels.setdefault(str(top), top)
@@ -374,69 +361,11 @@ def branches(stats: dict[str, dict[str, str]], field: str) -> str:
     return "".join(lines)
 
 
-def signal_usage_process_group(process: subprocess.Popen[str], signal_number: int) -> None:
+def usage_snapshot(usage_cache_path: Path) -> dict[str, dict[str, str]]:
     try:
-        os.killpg(process.pid, signal_number)
-    except (OSError, ProcessLookupError):
-        pass
-
-
-def stop_usage_collector(process: subprocess.Popen[str]) -> None:
-    signal_usage_process_group(process, signal.SIGTERM)
-    grace_deadline = time.monotonic() + 1
-    try:
-        process.communicate(timeout=1)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-
-    remaining_grace = grace_deadline - time.monotonic()
-    if remaining_grace > 0:
-        time.sleep(remaining_grace)
-    signal_usage_process_group(process, signal.SIGKILL)
-    try:
-        process.communicate(timeout=1)
-    except (OSError, subprocess.TimeoutExpired):
-        try:
-            process.kill()
-        except OSError:
-            pass
-        try:
-            process.wait(timeout=1)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-
-
-def run_usage_collector(usage_bin: Path, timeout: float) -> str:
-    try:
-        process = subprocess.Popen(
-            [str(usage_bin)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            errors="surrogateescape",
-            start_new_session=True,
-        )
-    except OSError as error:
-        raise RuntimeError("usage collector could not start") from error
-    try:
-        output, _ = process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired as error:
-        stop_usage_collector(process)
-        raise RuntimeError("usage collector timed out") from error
-    except OSError:
-        stop_usage_collector(process)
-        raise
-    if process.returncode != 0:
-        raise RuntimeError("usage collector failed")
-    return output
-
-
-def usage_snapshot(
-    usage_bin: Path, timeout: float = USAGE_TIMEOUT_SECONDS
-) -> dict[str, dict[str, str]]:
-    try:
-        output = run_usage_collector(usage_bin, timeout)
-        document = json.loads(output)
+        document = json.loads(usage_cache_path.read_text(encoding="utf-8"))
+        if not isinstance(document, dict) or document.get("schema_version") != 4:
+            raise RuntimeError("usage snapshot had an unsupported schema")
         providers = document["providers"]
         if not isinstance(providers, dict):
             raise RuntimeError("usage snapshot did not contain a providers object")
@@ -446,7 +375,6 @@ def usage_snapshot(
         TypeError,
         json.JSONDecodeError,
         RuntimeError,
-        subprocess.TimeoutExpired,
     ):
         return {
             provider: {
@@ -712,16 +640,13 @@ def refresh(
     cmux_bin: str,
     source_path: Path,
     target_path: Path,
-    usage_bin: Path,
-    usage_timeout: float,
+    usage_cache_path: Path,
     cache_path: Path,
 ) -> bool:
     source = source_path.read_text(encoding="utf-8")
     cache = load_untracked_cache(cache_path)
     stats, cache_changed = collect_stats(cmux_bin, cache, time.time())
-    runtime = render_runtime(
-        source, stats, usage_snapshot(usage_bin, usage_timeout)
-    )
+    runtime = render_runtime(source, stats, usage_snapshot(usage_cache_path))
     try:
         previous_runtime = target_path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -749,11 +674,9 @@ def main() -> None:
     lock_path = configured_path(
         "CMUX_AGENT_BOARD_LOCK", Path.home() / ".local/state/cmux/agent-board-diff-refresh.lock"
     )
-    usage_bin = configured_path(
-        "CMUX_AGENT_BOARD_USAGE", Path.home() / ".local/libexec/cmux/agent-board-usage"
-    )
-    usage_timeout = configured_timeout(
-        "CMUX_AGENT_BOARD_USAGE_TIMEOUT", USAGE_TIMEOUT_SECONDS
+    usage_cache_path = configured_path(
+        "CMUX_AGENT_BOARD_USAGE_CACHE",
+        Path.home() / ".local/state/cmux/agent-board-usage.json",
     )
     cache_path = configured_path(
         "CMUX_AGENT_BOARD_CACHE",
@@ -769,8 +692,7 @@ def main() -> None:
             cmux_bin,
             source_path,
             target_path,
-            usage_bin,
-            usage_timeout,
+            usage_cache_path,
             cache_path,
         )
 

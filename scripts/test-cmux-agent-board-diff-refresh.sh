@@ -21,10 +21,7 @@ mock_cmux="$test_dir/cmux"
 mock_git_dir="$test_dir/git-bin"
 mock_git="$mock_git_dir/git"
 git_calls="$test_dir/git-calls"
-mock_usage="$test_dir/cmux-agent-board-usage"
-hanging_usage="$test_dir/hanging-usage"
-hanging_target="$test_dir/state/hanging-agent-board.swift"
-hanging_pids_file="$test_dir/hanging-pids"
+usage_cache_file="$test_dir/state/agent-board-usage.json"
 calls_file="$test_dir/calls"
 cmux_mode_file="$test_dir/cmux-mode"
 
@@ -80,7 +77,7 @@ if [[ "$*" == '--json workspace list' ]]; then
     printf '{not json\n'
     exit 0
   fi
-  printf '{"workspaces":[{"current_directory":"@REPOSITORY@"},{"current_directory":"@NESTED_REPOSITORY@"},{"current_directory":"@UNBORN_REPOSITORY@"},{"current_directory":"/tmp/not-a-git-directory"}]}'
+  printf '{"workspaces":[{"current_directory":"@REPOSITORY@"},{"current_directory":"@REPOSITORY@"},{"current_directory":"@NESTED_REPOSITORY@"},{"current_directory":"@UNBORN_REPOSITORY@"},{"current_directory":"/tmp/not-a-git-directory"}]}'
   exit 0
 fi
 
@@ -108,13 +105,8 @@ exec /usr/bin/git "$@"
 MOCK
 chmod +x "$mock_git"
 
-cat >"$mock_usage" <<'USAGE'
-#!/usr/bin/env bash
-set -euo pipefail
-
-printf '%s\n' '{"providers":{"codex":{"status":"ok","account":"codex@example.com","account_name":"Codex Personal","five_hour":23.5,"seven_day":67,"fable_week":null,"five_hour_reset_at":2000,"seven_day_reset_at":3000,"fable_week_reset_at":null,"detail":""},"claude":{"status":"ok","account":"claude@example.com","account_name":"Claude Team","five_hour":12,"seven_day":34,"fable_week":56.5,"five_hour_reset_at":4000,"seven_day_reset_at":5000,"fable_week_reset_at":5000,"detail":"age 1m"},"cursor":{"status":"ok","account":"cursor@example.com","account_name":"Cursor Personal","five_hour":null,"seven_day":null,"fable_week":null,"five_hour_reset_at":null,"seven_day_reset_at":null,"fable_week_reset_at":null,"detail":"monthly only"}}}'
-USAGE
-chmod +x "$mock_usage"
+mkdir -p "$(dirname "$usage_cache_file")"
+printf '%s\n' '{"schema_version":4,"refreshed_at":1000,"providers":{"codex":{"status":"ok","account":"codex@example.com","account_name":"Codex Personal","five_hour":23.5,"seven_day":67,"fable_week":null,"five_hour_reset_at":2000,"seven_day_reset_at":3000,"fable_week_reset_at":null,"detail":""},"claude":{"status":"ok","account":"claude@example.com","account_name":"Claude Team","five_hour":12,"seven_day":34,"fable_week":56.5,"five_hour_reset_at":4000,"seven_day_reset_at":5000,"fable_week_reset_at":5000,"detail":"age 1m"},"cursor":{"status":"ok","account":"cursor@example.com","account_name":"Cursor Personal","five_hour":null,"seven_day":null,"fable_week":null,"five_hour_reset_at":null,"seven_day_reset_at":null,"fable_week_reset_at":null,"detail":"monthly only"}}}' >"$usage_cache_file"
 
 run_refresh() {
   PATH="$mock_git_dir:$PATH" \
@@ -124,7 +116,7 @@ run_refresh() {
     CMUX_AGENT_BOARD_TARGET="$target_file" \
     CMUX_AGENT_BOARD_LOCK="$lock_file" \
     CMUX_AGENT_BOARD_CACHE="$cache_file" \
-    CMUX_AGENT_BOARD_USAGE="$mock_usage" \
+    CMUX_AGENT_BOARD_USAGE_CACHE="$usage_cache_file" \
     "$SCRIPT"
 }
 
@@ -154,6 +146,7 @@ jq -e --arg git_repo "$git_repo" '
   and (.repositories[$git_repo].entries | any(.path == "untracked.txt"))
 ' "$cache_file" >/dev/null
 grep -Fq 'status --porcelain=v1 -z -uall --no-renames' "$git_calls"
+[[ "$(grep -cF 'rev-parse --show-toplevel' "$git_calls")" == '3' ]]
 nested_line=$(grep -nF "if d == \"$nested_repo\"" "$target_file" | head -n 1 | cut -d: -f1)
 parent_line=$(grep -nF "if d == \"$git_repo\"" "$target_file" | head -n 1 | cut -d: -f1)
 ((nested_line < parent_line))
@@ -192,6 +185,15 @@ if grep -Fq "$git_repo" "$target_file"; then
 fi
 [[ "$(wc -l <"$calls_file" | tr -d ' ')" == '2' ]]
 
+mv "$usage_cache_file" "$test_dir/usage-cache-before-missing.json"
+run_refresh
+grep -Fq 'if p == "codex" && f == "detail" { return "error" }' "$target_file"
+grep -Fq 'if p == "claude" && f == "detail" { return "error" }' "$target_file"
+grep -Fq 'if p == "cursor" && f == "detail" { return "error" }' "$target_file"
+mv "$test_dir/usage-cache-before-missing.json" "$usage_cache_file"
+run_refresh
+grep -Fq 'if p == "codex" && f == "five_hour" { return "23.5%" }' "$target_file"
+
 cp "$target_file" "$test_dir/runtime-before-failure.swift"
 printf 'malformed-json\n' >"$cmux_mode_file"
 if run_refresh >/dev/null 2>&1; then
@@ -200,52 +202,6 @@ if run_refresh >/dev/null 2>&1; then
 fi
 cmp -s "$test_dir/runtime-before-failure.swift" "$target_file"
 rm "$cmux_mode_file"
-
-cat >"$hanging_usage" <<'USAGE'
-#!/usr/bin/env bash
-set -euo pipefail
-
-(
-  trap '' TERM
-  exec >/dev/null 2>&1
-  while true; do sleep 1; done
-) &
-child_pid="$!"
-printf '%s %s\n' "$$" "$child_pid" >"$MOCK_HANGING_PIDS_FILE"
-trap 'exit 0' TERM
-while true; do sleep 1; done
-USAGE
-chmod +x "$hanging_usage"
-
-CMUX_BIN="$mock_cmux" \
-  PATH="$mock_git_dir:$PATH" \
-  MOCK_GIT_CALLS="$git_calls" \
-  CMUX_AGENT_BOARD_SOURCE="$source_file" \
-  CMUX_AGENT_BOARD_TARGET="$hanging_target" \
-  CMUX_AGENT_BOARD_LOCK="$test_dir/state/hanging-refresh.lock" \
-  CMUX_AGENT_BOARD_CACHE="$test_dir/state/hanging-diff-cache.json" \
-  CMUX_AGENT_BOARD_USAGE="$hanging_usage" \
-  CMUX_AGENT_BOARD_USAGE_TIMEOUT=1 \
-  MOCK_HANGING_PIDS_FILE="$hanging_pids_file" \
-  "$SCRIPT"
-grep -Fq "if d == \"$unborn_repo\" || d.hasPrefix(\"$unborn_repo/\") { return \"2|4|0\" }" "$hanging_target"
-grep -Fq 'if p == "codex" && f == "detail" { return "error" }' "$hanging_target"
-grep -Fq 'if p == "claude" && f == "detail" { return "error" }' "$hanging_target"
-grep -Fq 'if p == "cursor" && f == "detail" { return "error" }' "$hanging_target"
-[[ -s "$hanging_pids_file" ]]
-read -r hanging_parent_pid hanging_child_pid <"$hanging_pids_file"
-for pid in "$hanging_parent_pid" "$hanging_child_pid"; do
-  for _ in {1..40}; do
-    if ! kill -0 "$pid" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 0.05
-  done
-  if kill -0 "$pid" >/dev/null 2>&1; then
-    printf 'timed out usage collector process remained: %s\n' "$pid" >&2
-    exit 1
-  fi
-done
 
 cp "$cache_file" "$test_dir/cache-before-invalid.json"
 printf '%s\n' '{"version":999,"repositories":{}}' >"$cache_file"
