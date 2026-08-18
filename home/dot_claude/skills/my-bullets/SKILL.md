@@ -1,7 +1,7 @@
 ---
 name: my-bullets
 description: >-
-  Formats notes, findings, decisions, and drafts as concise structured bullet lists
+  Formats notes, findings, decisions, and drafts as concise, undecorated bullet lists
   for internal team sharing. Use when the user asks for "箇条書き", "箇条書きにして",
   "bullet", or "bullet points", or asks to prepare, rewrite, or organize a team update,
   internal announcement, handoff, Slack or Teams post, decision note, or content they
@@ -19,6 +19,9 @@ Create a draft that the user can paste into an internal team channel or document
 - Otherwise, lead with the main point or requested action.
 - Use a short labeled top-level bullet for each useful section.
 - Put supporting facts in nested bullets.
+- Use plain text only. Do not add Markdown decoration such as bold, italics, headings, blockquotes, inline code, or horizontal rules.
+- Use hyphens only as bullet markers. Keep section labels as undecorated text.
+- Remove existing Markdown decoration when rewriting source text unless the user explicitly asks to preserve the original formatting.
 - Include only sections that contain useful information. Choose labels such as:
   - Discussion points
   - Summary
@@ -34,17 +37,17 @@ Create a draft that the user can paste into an internal team channel or document
 Use this default shape when the user does not specify one:
 
 ```markdown
-- **Discussion points**
+- Discussion points
   - [What the team should discuss or decide now]
-- **Summary**
+- Summary
   - [The main point]
-- **Background**
+- Background
   - [Facts needed to understand it]
-- **Action items**
+- Action items
   - [Action]
     - Owner: [Use only when supplied]
     - Due: [Use only when supplied]
-- **Open questions**
+- Open questions
   - [An unresolved fact or follow-up that does not need a decision now]
 ```
 
@@ -67,16 +70,16 @@ Input: "検索基盤のリリースはエラーが出たので延期。佐藤さ
 Output:
 
 ```markdown
-- **論点**
+- 論点
   - 再リリース日を明日午後と来週月曜のどちらにするか
-- **要点**
+- 要点
   - 検索基盤のリリースを延期
-- **理由**
+- 理由
   - リリース時にエラー発生
-- **対応**
+- 対応
   - 原因を調査
     - 担当: 佐藤さん
     - 期限: 明日11時
-- **依頼**
+- 依頼
   - 調査完了まで再実行しない
 ```
