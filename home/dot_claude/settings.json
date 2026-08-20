@@ -139,5 +139,6 @@
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
   "model": "claude-fable-5[1m]",
+  "outputStyle": "Concise",
   "cleanupPeriodDays": 180
 }
