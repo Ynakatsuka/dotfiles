@@ -33,12 +33,12 @@ Inside `home/`, follow chezmoi naming conventions:
 - Apply and validate managed changes before any requested commit or push.
 - Do not create configuration directly in `~/.claude/`, `~/.codex/`, `~/.gemini/`, or `~/.config/`; create the corresponding source under `home/` first.
 
-## Environment Variables
+## 環境変数
 
-- Add an environment variable only for secrets or values that legitimately differ between deployment environments. For a non-secret value, identify at least two real environments that require different values; otherwise do not use an environment variable.
-- Use an explicit CLI option for per-run behavior, checked-in configuration for version-controlled policy, and a code constant for invariants.
-- Do not use environment variables for fixed project identity, application constants, feature or implementation selection, values fixed by the build, or duplicate selectors that must remain consistent.
-- Before adding, renaming, or removing an environment variable, search its producers, consumers, tests, templates, and deployment definitions. Keep one authoritative owner, avoid silent defaults, and update any environment template in the same change.
+- 環境変数を追加できるのは、秘密情報か、実行環境によって値が異なる場合に限る。秘密情報でない場合は、異なる値を必要とする実際の実行環境を少なくとも二つ挙げる。挙げられない場合は環境変数を使わない。
+- 実行ごとの動作には明示的なCLIオプション、バージョン管理する方針にはリポジトリ内の設定、不変値にはコード上の定数を使う。
+- 固定されたプロジェクト識別子やアプリケーション定数、機能や実装の選択、ビルドで確定する値、常に一致させる必要がある重複した選択値には環境変数を使わない。
+- 環境変数を追加、改名、削除する前に、設定元と利用箇所、テスト、テンプレート、配備設定をすべて調べる。管理元を一つに定め、暗黙の既定値を避け、環境変数テンプレートも同じ変更で更新する。
 
 ## Agent Instruction Sources
 
