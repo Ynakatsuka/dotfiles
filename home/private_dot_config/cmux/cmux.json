@@ -3,15 +3,6 @@
   "schemaVersion": 1,
 
   "actions": {
-    "difit-review": {
-      "type": "command",
-      "title": "Open Difit Review",
-      "subtitle": "Review the current Git diff in cmux",
-      "keywords": ["difit", "diff", "review", "git"],
-      "palette": true,
-      "command": "\"$HOME/.local/bin/difit-cmux\" && exit",
-      "target": "newTabInCurrentPane"
-    },
     "resume-all-codex-sessions": {
       "type": "command",
       "title": "Resume All Codex Sessions",
