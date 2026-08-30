@@ -33,6 +33,13 @@ Inside `home/`, follow chezmoi naming conventions:
 - Apply and validate managed changes before any requested commit or push.
 - Do not create configuration directly in `~/.claude/`, `~/.codex/`, `~/.gemini/`, or `~/.config/`; create the corresponding source under `home/` first.
 
+## 環境変数
+
+- 環境変数を追加できるのは、秘密情報か、実行環境によって値が異なる場合に限る。秘密情報でない場合は、異なる値を必要とする実際の実行環境を少なくとも二つ挙げる。挙げられない場合は環境変数を使わない。
+- 実行ごとの動作には明示的なCLIオプション、バージョン管理する方針にはリポジトリ内の設定、不変値にはコード上の定数を使う。
+- 固定されたプロジェクト識別子やアプリケーション定数、機能や実装の選択、ビルドで確定する値、常に一致させる必要がある重複した選択値には環境変数を使わない。
+- 環境変数を追加、改名、削除する前に、設定元と利用箇所、テスト、テンプレート、配備設定をすべて調べる。管理元を一つに定め、暗黙の既定値を避け、環境変数テンプレートも同じ変更で更新する。
+
 ## Agent Instruction Sources
 
 - `home/AGENTS.md` contains global rules for work in every repository. Do not put dotfiles- or chezmoi-specific guidance there.
