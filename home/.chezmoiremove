@@ -27,6 +27,8 @@ mcp.json
 .local/bin/cmux-agent-board-usage
 .local/bin/cmux-agent-status-sync
 .local/bin/cmux-resume-all-codex-sessions
+.local/bin/difit-cmux
+.raycast/scripts/difit-review.sh
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy
 CLAUDE.md
