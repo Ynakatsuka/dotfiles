@@ -33,6 +33,13 @@ Inside `home/`, follow chezmoi naming conventions:
 - Apply and validate managed changes before any requested commit or push.
 - Do not create configuration directly in `~/.claude/`, `~/.codex/`, `~/.gemini/`, or `~/.config/`; create the corresponding source under `home/` first.
 
+## Environment Variables
+
+- Add an environment variable only for secrets or values that legitimately differ between deployment environments. For a non-secret value, identify at least two real environments that require different values; otherwise do not use an environment variable.
+- Use an explicit CLI option for per-run behavior, checked-in configuration for version-controlled policy, and a code constant for invariants.
+- Do not use environment variables for fixed project identity, application constants, feature or implementation selection, values fixed by the build, or duplicate selectors that must remain consistent.
+- Before adding, renaming, or removing an environment variable, search its producers, consumers, tests, templates, and deployment definitions. Keep one authoritative owner, avoid silent defaults, and update any environment template in the same change.
+
 ## Agent Instruction Sources
 
 - `home/AGENTS.md` contains global rules for work in every repository. Do not put dotfiles- or chezmoi-specific guidance there.
