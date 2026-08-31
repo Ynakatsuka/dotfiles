@@ -9,10 +9,12 @@
         "Mod+Shift+ArrowLeft"
       ],
       "terminal.focusNextPane": [
-        "Mod+Alt+ArrowRight"
+        "Mod+Alt+ArrowRight",
+        "Mod+Alt+ArrowDown"
       ],
       "terminal.focusPreviousPane": [
-        "Mod+Alt+ArrowLeft"
+        "Mod+Alt+ArrowLeft",
+        "Mod+Alt+ArrowUp"
       ],
       "worktree.history.back": [],
       "worktree.history.forward": []
