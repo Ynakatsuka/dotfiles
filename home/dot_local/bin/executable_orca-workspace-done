@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Mark the current Orca workspace as Done.
+
+set -euo pipefail
+
+if ! command -v orca >/dev/null 2>&1; then
+  printf 'Error: orca not found in PATH\n' >&2
+  exit 1
+fi
+
+if [[ -z "${ORCA_WORKTREE_ID:-}" ]]; then
+  printf 'Error: ORCA_WORKTREE_ID is not set; run this inside an Orca workspace\n' >&2
+  exit 1
+fi
+
+orca worktree set \
+  --worktree "id:${ORCA_WORKTREE_ID}" \
+  --workspace-status completed \
+  --json >/dev/null
+
+printf 'Workspace marked Done.\n'
