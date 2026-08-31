@@ -7,7 +7,15 @@
       ],
       "tab.previousAllTypes": [
         "Mod+Shift+ArrowLeft"
-      ]
+      ],
+      "terminal.focusNextPane": [
+        "Mod+Alt+ArrowRight"
+      ],
+      "terminal.focusPreviousPane": [
+        "Mod+Alt+ArrowLeft"
+      ],
+      "worktree.history.back": [],
+      "worktree.history.forward": []
     },
     "linux": {},
     "win32": {}
