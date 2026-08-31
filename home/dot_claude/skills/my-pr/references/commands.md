@@ -46,7 +46,7 @@ Run the full workflow:
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently
    - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-   - Claude Opus correctness review (host-aware Agent or Claude CLI)
+   - embedded-input Claude Opus correctness review (`high` effort, no tools; configured Agent or bundled CLI runner)
    - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-sol` at `medium`)
 
    Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
@@ -82,7 +82,7 @@ Run local quality review in read-only mode.
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently
    - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-   - Claude Opus correctness review (host-aware Agent or Claude CLI)
+   - embedded-input Claude Opus correctness review (`high` effort, no tools; configured Agent or bundled CLI runner)
    - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-sol` at `medium`)
 
    Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
@@ -101,7 +101,7 @@ Fix only Required findings, verify, and commit without pushing.
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Start all three quality reviewers concurrently in read-only mode
    - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-   - Claude Opus correctness review (host-aware Agent or Claude CLI)
+   - embedded-input Claude Opus correctness review (`high` effort, no tools; configured Agent or bundled CLI runner)
    - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-sol` at `medium`)
 
    Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
