@@ -2,8 +2,15 @@
   "version": 1,
   "platforms": {
     "darwin": {
-      "tab.nextAllTypes": ["Mod+Shift+ArrowRight"],
-      "tab.previousAllTypes": ["Mod+Shift+ArrowLeft"]
-    }
-  }
+      "tab.nextAllTypes": [
+        "Mod+Shift+ArrowRight"
+      ],
+      "tab.previousAllTypes": [
+        "Mod+Shift+ArrowLeft"
+      ]
+    },
+    "linux": {},
+    "win32": {}
+  },
+  "keybindings": {}
 }
