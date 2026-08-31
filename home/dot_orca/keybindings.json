@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "platforms": {
+    "darwin": {
+      "tab.nextAllTypes": ["Mod+Shift+ArrowRight"],
+      "tab.previousAllTypes": ["Mod+Shift+ArrowLeft"]
+    }
+  }
+}

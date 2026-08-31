@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Keep Orca's workspace order manual and install the dotfiles-owned Quick Command.
+# Orca stores these settings with dynamic workspace and tab state, so only merge
+# the fields owned here and preserve the rest of the file.
+
+set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf 'Error: jq is required to manage Orca settings\n' >&2
+  exit 1
+fi
+
+input=$(cat)
+if [[ -z "$input" ]]; then
+  printf 'Error: Orca data file is empty or missing\n' >&2
+  exit 1
+fi
+
+printf '%s' "$input" | jq -cj '
+  if (.settings | type) != "object" then
+    error("Orca settings must be an object")
+  elif (.settings.terminalQuickCommands | type) != "array" then
+    error("Orca terminalQuickCommands must be an array")
+  elif (.ui | type) != "object" then
+    error("Orca ui settings must be an object")
+  else
+    .ui.sortBy = "manual"
+    | .settings.terminalQuickCommands = (
+        [.settings.terminalQuickCommands[]
+          | select(
+              .id != "dotfiles-workspace-done"
+              and .command != "orca-workspace-done"
+            )]
+        + [
+            (
+              ([.settings.terminalQuickCommands[]
+                | select(
+                    .id == "dotfiles-workspace-done"
+                    or .command == "orca-workspace-done"
+                  )][0] // {"id": "dotfiles-workspace-done"})
+              + {
+                  "label": "Mark workspace Done",
+                  "action": "terminal-command",
+                  "command": "orca-workspace-done",
+                  "appendEnter": true,
+                  "scope": {"type": "global"}
+                }
+            )
+          ]
+      )
+  end
+'
