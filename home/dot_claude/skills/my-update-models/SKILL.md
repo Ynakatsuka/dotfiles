@@ -68,7 +68,7 @@ Always edit in the ghq repo, never in `~/`.
 
 | File | Field | Example value | Notes |
 |---|---|---|---|
-| `home/dot_claude/settings.json` | top-level `model` | `"opus"` | Default Claude Code model alias. Effort is managed separately via `env.CLAUDE_CODE_EFFORT_LEVEL`. |
+| `home/dot_claude/settings.json` | top-level `model` | `"opus"` | Default Claude Code model alias. Effort is managed separately via the top-level `effortLevel`. |
 | `home/dot_claude/settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
 | `home/dot_claude/settings.json` | `autoUpdatesChannel` | `"latest"` | Native Claude Code update channel. Read it when checking or updating the CLI; do not change it unless requested. |
 | `home/dot_codex/private_config.toml.tmpl` | `model` | `"gpt-5.5"` | Codex CLI default model (full ID, not an alias). |

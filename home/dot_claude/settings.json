@@ -2,7 +2,6 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ENABLE_TOOL_SEARCH": "true",
-    "CLAUDE_CODE_EFFORT_LEVEL": "xhigh",
     "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "permissions": {
@@ -140,5 +139,6 @@
   "autoUpdatesChannel": "latest",
   "model": "claude-fable-5[1m]",
   "outputStyle": "Concise",
+  "effortLevel": "xhigh",
   "cleanupPeriodDays": 180
 }

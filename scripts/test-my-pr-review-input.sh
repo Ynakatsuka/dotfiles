@@ -28,8 +28,12 @@ split_script=$(resolve_skill_script split-review-chunks.sh)
 runner_script=$(resolve_skill_script run-codex-review.sh)
 prepare_script=$(resolve_skill_script prepare-review-artifacts.sh)
 context_script=$(resolve_skill_script prepare-pr-context.sh)
+reviewer_b_input_builder=$(resolve_skill_script prepare-reviewer-b-input.sh)
+reviewer_b_runner=$(resolve_skill_script run-claude-review.sh)
 reviewer_b_validator=$(resolve_skill_script validate-reviewer-b-output.sh)
 reviewer_b_schema="$skill_root/assets/claude-review-result.schema.json"
+reviewer_b_agent="$repo_root/home/dot_claude/agents/my-pr-reviewer.md"
+claude_settings="$repo_root/home/dot_claude/settings.json"
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/my-pr-review-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
@@ -499,6 +503,133 @@ test_runner() {
   assert_file_contains "$tmp_dir/short-markdown-error.txt" "missing required section"
 }
 
+write_fake_claude() {
+  local fake="$tmp_dir/fake-claude"
+  cat >"$fake" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+: >"${FAKE_ARGS:?}"
+for arg in "$@"; do
+  if [[ -n "$arg" ]]; then
+    printf '%s\n' "$arg" >>"$FAKE_ARGS"
+  else
+    printf '<EMPTY>\n' >>"$FAKE_ARGS"
+  fi
+done
+printf '%s\n' "${CLAUDE_CODE_EFFORT_LEVEL:-}" >"${FAKE_EFFORT:?}"
+pwd -P >"${FAKE_CWD:?}"
+cat >"${FAKE_CAPTURE:?}"
+
+if [[ -n "${FAKE_EXIT_CODE:-}" ]]; then
+  exit "$FAKE_EXIT_CODE"
+fi
+if [[ "${FAKE_NO_RESULT:-0}" == "1" ]]; then
+  jq -nc '{type:"system", subtype:"init"}'
+  exit 0
+fi
+
+review_markdown='## PR understanding
+- complete
+
+## Findings
+- none
+
+## Assessment
+
+**Ready to merge?** Yes
+
+**Reasoning:** No findings.'
+
+jq -nc '{type:"system", subtype:"init"}'
+jq -nc \
+  --arg review_markdown "$review_markdown" \
+  --argjson is_error "${FAKE_IS_ERROR:-false}" \
+  --argjson permission_denials "${FAKE_PERMISSION_DENIALS:-[]}" \
+  '{
+    type: "result",
+    subtype: "success",
+    is_error: $is_error,
+    permission_denials: $permission_denials,
+    structured_output: {review_markdown: $review_markdown}
+  }'
+EOF
+  chmod +x "$fake"
+  printf '%s\n' "$fake"
+}
+
+test_reviewer_b_runner() {
+  local artifact_dir="$tmp_dir/reviewer b artifacts"
+  local prompt_file="$artifact_dir/reviewer-b-prompt.md"
+  local context_file="$artifact_dir/pr-context.md"
+  local diff_file="$artifact_dir/review.diff"
+  local fake_claude
+  local input_prompt
+  local canonical_artifact_dir
+
+  mkdir -p "$artifact_dir"
+  canonical_artifact_dir=$(cd "$artifact_dir" && pwd -P)
+  printf 'Review the embedded input and return the required Markdown.\n' >"$prompt_file"
+  awk 'BEGIN { for (i = 1; i <= 30; i++) print "context line " i " 日本語" }' >"$context_file"
+  awk 'BEGIN { for (i = 1; i <= 50; i++) print "+diff line " i }' >"$diff_file"
+
+  input_prompt=$(
+    /bin/bash "$reviewer_b_input_builder" full 1 "$prompt_file" "$context_file" "$diff_file"
+  )
+  [[ "$input_prompt" == "$canonical_artifact_dir/reviewer-results/reviewer-b/full/input.md" ]] ||
+    fail "Reviewer B input path mismatch: $input_prompt"
+  assert_file_contains "$input_prompt" "context line 30 日本語"
+  assert_file_contains "$input_prompt" "+diff line 50"
+  assert_file_contains "$input_prompt" "MY_PR_END_RECEIPT reviewer=B chunk_id=full chunk_count=1"
+  assert_file_contains "$input_prompt" "No tools are available."
+
+  if MY_PR_CLAUDE_PROMPT_MAX_BYTES=100 \
+    /bin/bash "$reviewer_b_input_builder" oversized 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/reviewer-b-oversized-output.txt" 2>"$tmp_dir/reviewer-b-oversized-error.txt"; then
+    fail "oversized Reviewer B prompt unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/reviewer-b-oversized-error.txt" "Claude review prompt exceeds byte limit"
+
+  fake_claude=$(write_fake_claude)
+  MY_PR_CLAUDE_BIN="$fake_claude" \
+    FAKE_ARGS="$tmp_dir/claude-args.txt" \
+    FAKE_EFFORT="$tmp_dir/claude-effort.txt" \
+    FAKE_CWD="$tmp_dir/claude-cwd.txt" \
+    FAKE_CAPTURE="$tmp_dir/claude-input.md" \
+    /bin/bash "$reviewer_b_runner" full 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/claude-output.txt"
+
+  assert_file_contains "$tmp_dir/claude-args.txt" "--model"
+  assert_file_contains "$tmp_dir/claude-args.txt" "opus"
+  assert_file_contains "$tmp_dir/claude-args.txt" "--effort"
+  assert_file_contains "$tmp_dir/claude-args.txt" "high"
+  assert_file_contains "$tmp_dir/claude-args.txt" "--tools"
+  assert_file_contains "$tmp_dir/claude-args.txt" "<EMPTY>"
+  assert_file_contains "$tmp_dir/claude-args.txt" "--safe-mode"
+  assert_file_contains "$tmp_dir/claude-args.txt" "--strict-mcp-config"
+  [[ "$(cat "$tmp_dir/claude-effort.txt")" == "high" ]] || fail "Claude effort environment was not fixed to high"
+  [[ "$(cat "$tmp_dir/claude-cwd.txt")" == "$canonical_artifact_dir/reviewer-results/reviewer-b/full/claude-cwd" ]] ||
+    fail "Claude did not run from the isolated artifact directory"
+  assert_file_contains "$tmp_dir/claude-input.md" "context line 30 日本語"
+  assert_file_contains "$tmp_dir/claude-input.md" "+diff line 50"
+  assert_file_contains "$artifact_dir/reviewer-results/reviewer-b/full/review.md" "## PR understanding"
+  [[ "$(cat "$tmp_dir/claude-output.txt")" == "$canonical_artifact_dir/reviewer-results/reviewer-b/full/review.md" ]] ||
+    fail "Reviewer B runner output path mismatch"
+
+  if MY_PR_CLAUDE_BIN="$fake_claude" \
+    FAKE_ARGS="$tmp_dir/claude-denied-args.txt" \
+    FAKE_EFFORT="$tmp_dir/claude-denied-effort.txt" \
+    FAKE_CWD="$tmp_dir/claude-denied-cwd.txt" \
+    FAKE_CAPTURE="$tmp_dir/claude-denied-input.md" \
+    FAKE_PERMISSION_DENIALS='["Read"]' \
+    /bin/bash "$reviewer_b_runner" denied 1 "$prompt_file" "$context_file" "$diff_file" \
+    >"$tmp_dir/claude-denied-output.txt" 2>"$tmp_dir/claude-denied-error.txt"; then
+    fail "permission-denied Reviewer B unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/claude-denied-error.txt" "missing, incomplete, or denied"
+
+}
+
 test_reviewer_b_validator() {
   local valid="$tmp_dir/reviewer-b-valid.md"
   local summary="$tmp_dir/reviewer-b-summary.md"
@@ -553,15 +684,28 @@ test_documented_state_contract() {
 }
 
 test_documented_model_contract() {
-  assert_file_contains "$skill_root/SKILL.md" 'Reviewer B: Claude Opus correctness review'
+  assert_file_contains "$skill_root/SKILL.md" 'Reviewer B: embedded-input Claude Opus correctness review (`high` effort, no tools'
   assert_file_contains "$skill_root/SKILL.md" 'Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-sol` / `medium` 固定）'
-  assert_file_contains "$skill_root/references/review.md" 'use the Agent tool with model `opus`'
-  assert_file_contains "$skill_root/references/review.md" 'claude --model opus --permission-mode plan'
+  assert_file_contains "$skill_root/references/review.md" 'use only the configured `my-pr-reviewer` Agent'
+  assert_file_contains "$skill_root/references/review.md" '`--model opus`, `--effort high`, `--tools ""`'
   assert_file_contains "$skill_root/references/review.md" 'pins `gpt-5.6-sol` at `medium` effort'
+
+  jq -e '
+    .effortLevel == "xhigh" and
+    (.env | has("CLAUDE_CODE_EFFORT_LEVEL") | not)
+  ' "$claude_settings" >/dev/null ||
+    fail "Claude settings must keep xhigh as effortLevel without a global effort environment variable"
+
+  assert_file_contains "$reviewer_b_agent" 'name: my-pr-reviewer'
+  assert_file_contains "$reviewer_b_agent" 'tools: []'
+  assert_file_contains "$reviewer_b_agent" 'model: opus'
+  assert_file_contains "$reviewer_b_agent" 'effort: high'
+  assert_file_contains "$reviewer_b_agent" 'background: true'
 }
 
 test_chunking
 test_runner
+test_reviewer_b_runner
 test_reviewer_b_validator
 test_reviewer_b_schema
 test_documented_state_contract

@@ -180,34 +180,48 @@ MY_PR_CONTEXT_BYTES=<PR context bytes>
 
 Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all launched reviewer and chunk results before integration.
 
+Before launching Reviewer B, write its role prompt under the exact artifact directory and build one self-contained input per chunk:
+
+```bash
+bash "$HOME/.claude/skills/my-pr/scripts/prepare-reviewer-b-input.sh" \
+  "full" "1" \
+  "/absolute/artifact/path/reviewer-b-prompt.md" \
+  "/absolute/artifact/path/pr-context.md" \
+  "/absolute/artifact/path/review.diff"
+```
+
+The script embeds the complete PR context and diff, applies the same 393,216-byte prompt ceiling as the Codex runners, and prints the absolute `input.md` path. Use that file as the only Reviewer B task input. Do not replace it with artifact paths or current repository state.
+
 ### Launch mechanics
 
 Concurrency across A and C is enforced by `scripts/run-codex-reviews.sh`, which backgrounds both runners and waits for both. Concurrency with Reviewer B is not enforced, so order the launch deliberately. The exact mechanism is host-dependent because Reviewer B's executor differs by host (see below).
 
 In a Claude Code session with the Agent tool:
 
-- Launch Reviewer B first. The Agent tool runs subagents in the background, so it returns immediately and overlaps whatever follows.
+- Read the complete generated Reviewer B `input.md`, then launch the configured `my-pr-reviewer` Agent with that content as its prompt. Do not invoke a generic Agent and do not add artifact paths, repository-reading instructions, or tools.
+- `my-pr-reviewer` fixes the model to Opus, effort to `high`, available tools to none, and background execution to true. Launch every Reviewer B chunk in the same response so chunked reviews overlap.
 - Then call `run-codex-reviews.sh` once per chunk. Issue every chunk call in the same response; never await one chunk before issuing the next.
 - Give each `run-codex-reviews.sh` call an explicit `timeout` of `600000` ms. The default Bash timeout is 120,000 ms and can kill a healthy Codex review mid-run. Because the wrapper runs A and C concurrently, its wall clock is the slower reviewer, not their sum.
 - A timeout kill is an execution failure, not a format failure. It produces `REVIEW_INCOMPLETE` and cannot be retried without explicit user approval, so set the timeout before launching rather than recovering afterward.
 - If a chunked run needs more than the 600,000 ms ceiling, launch the wrapper with `run_in_background` and wait for its completion notification. Do not poll on a short interval.
 
-In a Codex or other non-Claude host, Reviewer B runs through the blocking Claude CLI command below, so there is no equivalent to Agent-tool backgrounding or a `run_in_background` flag:
+In a Codex or other non-Claude host, Reviewer B runs through the bundled Claude CLI wrapper:
 
-- Start `run-codex-reviews.sh` in the background first (for example with `&`, capturing its PID and redirecting stdout/stderr to files under the artifact directory), since it is the call this host can actually parallelize.
-- Then run the Reviewer B Claude CLI command, which blocks until it returns.
-- After the CLI command returns, wait on the backgrounded wrapper's PID and read its captured output before integration.
+- Start `run-codex-reviews.sh` in the background first, capturing its PID and redirecting stdout/stderr to files under the artifact directory.
+- Run `scripts/run-claude-review.sh` with the same chunk id, count, role prompt, context, and diff. The wrapper builds the embedded input itself and blocks until Reviewer B returns.
+- For multiple chunks, background every A/C wrapper and Reviewer B wrapper before waiting. Keep each process's stdout/stderr under the artifact directory.
+- After Reviewer B returns, wait on the backgrounded wrappers and read their captured output before integration.
 - If this host cannot execute concurrent tasks at all, report that limitation before starting review instead of silently serializing.
 
 Reviewer B is host-aware:
 
-- In a Claude Code session with the Agent tool available, use the Agent tool with model `opus`.
-- In a Codex or other non-Claude host session, use the Claude Code CLI in non-interactive read-only mode with tools restricted to `Read`: `claude --model opus --permission-mode plan --tools Read --output-format=stream-json --verbose --json-schema "$(jq -c . "$HOME/.claude/skills/my-pr/assets/claude-review-result.schema.json")" -p "<PROMPT>"`. The final event must contain `structured_output.review_markdown` with the complete review body. Keep this schema dialect-neutral: Claude CLI validates the supported schema subset itself and rejects the Draft 2020-12 `$schema` URI before starting the review.
-- For Agent output, have the main orchestrator save the final response verbatim to the exact `<artifact-dir>/reviewer-results/reviewer-b/<chunk-id>/review.md` path. For CLI output, extract only `structured_output.review_markdown` from the final `stream-json` result event into the same path. Do not make Reviewer B inherit `MY_PR_ARTIFACT_DIR`, and do not use an interim message, handoff summary, or shortened recap as the reviewer body.
+- In a Claude Code session with the Agent tool available, use only the configured `my-pr-reviewer` Agent and pass the complete generated `input.md` as its prompt.
+- In a Codex or other non-Claude host session, use `scripts/run-claude-review.sh`. It launches `claude -p` with `--model opus`, `--effort high`, `--tools ""`, safe mode, an empty MCP configuration, an isolated artifact-local Git repository, and the complete generated input on stdin. Do not invoke Claude CLI directly.
+- For Agent output, have the main orchestrator save the final response verbatim to the exact `<artifact-dir>/reviewer-results/reviewer-b/<chunk-id>/review.md` path. For CLI output, use the review path printed by `run-claude-review.sh`; the wrapper extracts only `structured_output.review_markdown` from the final `stream-json` result event. Do not make Reviewer B inherit `MY_PR_ARTIFACT_DIR`, and do not use an interim message, handoff summary, or shortened recap as the reviewer body.
 - Validate every Reviewer B Markdown file with `bash "$HOME/.claude/skills/my-pr/scripts/validate-reviewer-b-output.sh" "/absolute/path/to/reviewer-b-review.md"` before integration.
 - If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or Reviewer B reports that the diff/context was inaccessible, return `REVIEW_INCOMPLETE` and stop before integration.
 - Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
-- Pin Reviewer B to Claude Opus. Do not inherit the configured default model. Keep the configured Claude effort unless the user explicitly requests another effort.
+- Pin Reviewer B to Claude Opus at `high` effort. Do not inherit the configured default model or effort and do not allow the global session effort to override this profile.
 - If a prompt file is needed for quoting, write it under the exact artifact directory from the current state file. Do not use `/tmp`, and never stage or commit it.
 
 ## Reviewer A: integrated simplify review
@@ -239,17 +253,14 @@ Base branch: <BASE_BRANCH>
 Base ref: <BASE_REF>
 Changed files:
 <MY_PR_CHANGED_FILES contents>
-Review diff artifact:
-<MY_PR_REVIEW_DIFF>
-PR context artifact:
-<MY_PR_CONTEXT>
+The complete PR context and review diff are embedded after these instructions.
 </context>
 
 <scope>
 Review the supplied full branch diff or assigned chunk against the base branch. Do not review only the latest simplify changes.
 For an assigned chunk, report findings only for `Files covered`; do not claim coverage of `Files not covered`.
-Use the review diff artifact as the source of truth. If you cannot read it completely, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
-Read the PR context artifact before the diff. You are seeing this PR for the first time, so first identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
+Use the embedded review diff as the source of truth. If the embedded input is incomplete, return REVIEW_INCOMPLETE and do not review current file state as a substitute.
+Read the embedded PR context before the diff. You are seeing this PR for the first time, so first identify the problem it is trying to solve, intended behavior, constraints, and prior discussion decisions. If the PR context says no existing PR exists, state that limitation and do not invent missing intent.
 Focus on:
 1. Approach fit: whether the current implementation is a sound way to solve the stated PR problem, whether it leaves the problem partly unsolved, violates explicit constraints, bypasses the intended architecture, or ignores a simpler, safer, or already-existing implementation path
 2. Correctness bugs, edge cases, data loss, race conditions, and error semantics
@@ -270,11 +281,10 @@ Code quality, duplication, naming style, formatting, and efficiency are handled 
 <read_only_rules>
 Do not edit files.
 Do not write files anywhere, including the repository, .plans, .tmp, or /tmp.
-Do not use Bash or any shell command.
-Use only the Read tool and the supplied diff artifact.
-Use the supplied PR context artifact as the source of truth for PR body and prior GitHub conversation. If it cannot be read, return REVIEW_INCOMPLETE.
+Do not call tools, use Bash, read repository files, inspect memory, invoke skills, browse the web, or use external sources.
+Use the embedded PR context as the source of truth for PR body and prior GitHub conversation. If it is incomplete, return REVIEW_INCOMPLETE.
 Do not run formatters, tests, generators, migrations, reproductions, grep, rg, git, or commands of any kind.
-If additional evidence would require a shell command or another unavailable tool, report the uncertainty inside the affected finding instead of trying to execute it.
+If additional evidence is absent from the embedded input, report the uncertainty inside the affected finding instead of trying to obtain it.
 </read_only_rules>
 
 <finding_policy>
