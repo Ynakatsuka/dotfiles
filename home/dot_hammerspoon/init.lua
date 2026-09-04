@@ -311,6 +311,12 @@ end
 
 -- Bind hotkeys
 hs.hotkey.bind({"cmd"}, "space", function()
+    local app = hs.application.get(apps.orca)
+    if app and app:isFrontmost() then
+        app:hide()
+        return
+    end
+
     hs.application.launchOrFocus(apps.orca)
 end)
 
