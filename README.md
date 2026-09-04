@@ -163,7 +163,7 @@ The rewrite hook deliberately bypasses compound `find` syntax that RTK 0.43.0 re
 | `lb` | Select a branch with FZF |
 | `gw` | Create or switch a worktree with FZF, newest first |
 | `gw <branch>` | Open or create a worktree for a branch |
-| `gwai-cmux` | Open a left-sidebar cmux tab, create an AI-named worktree from the top cmux tab, and start Claude/Codex |
+| `gwai-orca` | Create an AI-named Orca worktree from the selected workspace and start Claude/Codex |
 | `gwc [-j jobs]` | Remove worktrees in parallel with multi-select confirmation |
 | `gwt` | `git worktree` |
 | `gwta` | `git worktree add` |
@@ -215,19 +215,32 @@ deleted. Run `prune-old-worktrees` without `--apply` to preview candidates.
 
 | Keybinding | Action |
 |------------|--------|
+| `Cmd+Space` | Launch or focus Orca |
 | `Alt+Ctrl+H` | Apply the smart layout for the current display setup |
 | `Alt+Ctrl+E` | Force the external display layout |
 | `Alt+Ctrl+I` | Force the built-in display layout |
+| `Alt+Ctrl+J` | Move the active window to the other display and maximize it |
+| `Alt+Ctrl+L` | Maximize Orca when no external display is connected |
 
 External display layout:
 
-- Left 45%: Sublime Text (top 20%), Google Chrome (bottom 80%)
-- Right 55%: ghostty (top 25%), Cursor (bottom 75%)
+- Left 50%: Sublime Text (top 20%), Google Chrome (bottom 80%)
+- Right 50%: Orca (full height), Cursor (bottom 55%, overlapping Orca)
 
 Built-in display layout:
 
-- Top 40%: Sublime Text, ghostty
+- Top 80%: Sublime Text, Orca
 - Fullscreen: Google Chrome, Cursor
+
+### Orca
+
+Run `aio` in Raycast to create an AI-named worktree from the selected Orca workspace and start a Claude or Codex session.
+
+| Keybinding | Action |
+|------------|--------|
+| `Cmd+Shift+Right` / `Cmd+Shift+Left` | Move to the next / previous tab |
+| `Cmd+Alt+Right` / `Cmd+Alt+Down` | Focus the next terminal pane |
+| `Cmd+Alt+Left` / `Cmd+Alt+Up` | Focus the previous terminal pane |
 
 ### Tmux
 

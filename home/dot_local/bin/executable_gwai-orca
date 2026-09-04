@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+# Create an Orca worktree from the workspace selected in the Orca UI and start
+# an agent with the original prompt.
+
+set -euo pipefail
+
+readonly ORCA_BIN="${ORCA_BIN:-/Applications/Orca.app/Contents/Resources/bin/orca}"
+readonly ORCA_DATA_FILE="${ORCA_DATA_FILE:-$HOME/Library/Application Support/orca/profiles/local-default/orca-data.json}"
+readonly BRANCH_NAME_MODEL="${GWAI_BRANCH_MODEL:-haiku}"
+
+usage() {
+  cat <<'USAGE'
+Usage: gwai-orca [--provider claude|codex] <prompt>
+
+Creates an Orca worktree from the workspace currently selected in the Orca UI,
+generates a branch name with a lightweight Claude model, and starts the chosen
+agent with <prompt> in the new workspace.
+
+If --provider is omitted, codex is used.
+USAGE
+}
+
+die() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  local name="$1"
+
+  command -v "$name" >/dev/null 2>&1 || die "$name not found in PATH"
+}
+
+print_orca_response() {
+  local response="$1"
+
+  [[ -n "$response" ]] || return 0
+  printf '%s\n' "$response" >&2
+}
+
+validate_provider() {
+  local provider="$1"
+
+  [[ "$provider" == 'claude' || "$provider" == 'codex' ]] ||
+    die "provider is invalid: $provider"
+}
+
+validate_branch_name() {
+  local branch_name="$1"
+
+  [[ "$branch_name" =~ ^(feat|fix|refactor|docs|test|chore|perf)-[a-z0-9][a-z0-9-]*$ ]] ||
+    die "branch name is invalid: $branch_name"
+}
+
+generate_branch_name() {
+  local prompt="$1"
+  local naming_prompt naming_output branch_type branch_slug branch_name field_count
+
+  naming_prompt="Generate exactly one git branch type and slug for the task below.
+Rules:
+- Output exactly two tokens separated by one space: <type> <slug>
+- <type> must be one of: feat, fix, refactor, docs, test, chore, perf
+- <slug> must be kebab-case, ASCII only, 3-7 words.
+- Do not include the type in <slug>. The shell function prefixes it.
+- Output ONLY the two tokens. No quotes, no commentary, no trailing punctuation.
+
+Task: ${prompt}"
+
+  naming_output=$(claude -p --model "$BRANCH_NAME_MODEL" "$naming_prompt" 2>/dev/null |
+    tr -d '\r`"' |
+    sed -E "s/'//g; s/^[[:space:]]+|[[:space:]]+$//g" |
+    awk 'NF { print; exit }') ||
+    die "branch name generation failed"
+
+  [[ -n "$naming_output" ]] ||
+    die "branch name generation returned empty output"
+
+  field_count=$(printf '%s\n' "$naming_output" | awk '{ print NF }')
+  [[ "$field_count" == '2' ]] ||
+    die "branch name generation returned invalid output: $naming_output"
+
+  branch_type=${naming_output%% *}
+  branch_slug=${naming_output#* }
+
+  [[ "$branch_type" =~ ^(feat|fix|refactor|docs|test|chore|perf)$ ]] ||
+    die "generated branch type is invalid: $branch_type"
+  [[ "$branch_slug" =~ ^[a-z0-9][a-z0-9-]*$ ]] ||
+    die "generated branch slug is invalid: $branch_slug"
+
+  branch_name="${branch_type}-${branch_slug}"
+  validate_branch_name "$branch_name"
+
+  printf '%s\n' "$branch_name"
+}
+
+read_active_workspace_ids() {
+  local workspace_ids_json
+
+  [[ -f "$ORCA_DATA_FILE" ]] ||
+    die "Orca data file does not exist: $ORCA_DATA_FILE"
+  [[ -r "$ORCA_DATA_FILE" ]] ||
+    die "Orca data file is not readable: $ORCA_DATA_FILE"
+
+  workspace_ids_json=$(jq -ce '
+    if (
+      (.workspaceSession.activeRepoId? | type == "string" and length > 0) and
+      (.workspaceSession.activeWorktreeId? | type == "string" and length > 0)
+    ) then
+      {
+        repoId: .workspaceSession.activeRepoId,
+        worktreeId: .workspaceSession.activeWorktreeId
+      }
+    else
+      error("active Orca workspace is missing")
+    end
+  ' "$ORCA_DATA_FILE") ||
+    die "failed to read the active Orca workspace from: $ORCA_DATA_FILE"
+
+  active_repo_id=$(jq -er '.repoId' <<<"$workspace_ids_json") ||
+    die "failed to parse the active Orca repository ID"
+  active_worktree_id=$(jq -er '.worktreeId' <<<"$workspace_ids_json") ||
+    die "failed to parse the active Orca worktree ID"
+}
+
+validate_active_worktree() {
+  local show_json
+
+  if ! show_json=$("$ORCA_BIN" worktree show --worktree "worktree:${active_worktree_id}" --json); then
+    print_orca_response "$show_json"
+    die "failed to read the active Orca worktree"
+  fi
+
+  if ! jq -e \
+    --arg active_repo_id "$active_repo_id" \
+    --arg active_worktree_id "$active_worktree_id" \
+    '.ok == true and .result.worktree.repoId == $active_repo_id and .result.worktree.id == $active_worktree_id' \
+    <<<"$show_json" >/dev/null; then
+    print_orca_response "$show_json"
+    die "active Orca worktree is invalid or does not match the selected workspace"
+  fi
+}
+
+create_worktree() {
+  local branch_name="$1"
+  local create_json
+
+  if ! create_json=$("$ORCA_BIN" worktree create \
+    --repo "id:${active_repo_id}" \
+    --parent-worktree "worktree:${active_worktree_id}" \
+    --name "$branch_name" \
+    --agent "$provider" \
+    --prompt "$prompt" \
+    --activate \
+    --json); then
+    print_orca_response "$create_json"
+    die "failed to create the Orca worktree"
+  fi
+
+  if ! jq -e '.ok == true' <<<"$create_json" >/dev/null; then
+    print_orca_response "$create_json"
+    die "Orca did not confirm worktree creation"
+  fi
+}
+
+provider='codex'
+prompt=''
+
+while (($# > 0)); do
+  case "$1" in
+  --provider)
+    (($# >= 2)) || die '--provider requires claude or codex'
+    provider="$2"
+    shift 2
+    ;;
+  --provider=*)
+    provider="${1#--provider=}"
+    shift
+    ;;
+  --help | -h)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -*)
+    die "unknown option: $1"
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+(($# == 1)) || die 'exactly one prompt is required'
+prompt="$1"
+
+[[ -n "$prompt" ]] || die 'prompt is empty'
+validate_provider "$provider"
+require_command jq
+require_command claude
+[[ -x "$ORCA_BIN" ]] || die "Orca executable not found: $ORCA_BIN"
+
+active_repo_id=''
+active_worktree_id=''
+read_active_workspace_ids
+validate_active_worktree
+branch_name=$(generate_branch_name "$prompt")
+create_worktree "$branch_name"
+
+printf 'Created Orca worktree: %s\n' "$branch_name"

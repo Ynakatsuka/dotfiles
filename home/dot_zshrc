@@ -17,7 +17,6 @@ if [[ -d "$_zsh_config_dir" ]]; then
     "$_zsh_config_dir/keybindings.zsh" \
     "$_zsh_config_dir/git-worktree.zsh" \
     "$_zsh_config_dir/codex.zsh" \
-    "$_zsh_config_dir/cmux-agent-board.zsh" \
     "$_zsh_config_dir/fzf.zsh" \
     "$_zsh_config_dir/copy-last-output.zsh" \
     "$_zsh_config_dir/claude.zsh" \

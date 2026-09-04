@@ -25,14 +25,14 @@ local externalLayout = {
     rightWidth = 0.5,  -- Right side: 50%
     leftTopHeight = 0.2,     -- Left top area: 20%
     leftBottomHeight = 0.8,  -- Left bottom area: 80%
-    rightTopHeight = 1.0,    -- Right top area: 100% (cmux full height)
+    rightTopHeight = 1.0,    -- Right top area: 100% (Orca full height)
     rightBottomHeight = 0.55, -- Right bottom area: 55%
 
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
     leftBottom = "Google Chrome", -- Left bottom (45% x 80%)
-    rightTop = "cmux",            -- Right full height
-    rightBottom = "Cursor"        -- Right bottom (overlaps cmux)
+    rightTop = "Orca",            -- Right full height
+    rightBottom = "Cursor"        -- Right bottom (overlaps Orca)
 }
 
 -- Built-in Display Layout
@@ -42,7 +42,7 @@ local builtInLayout = {
 
     topApps = {
         "Sublime Text",
-        "cmux"
+        "Orca"
     },
 
     fullscreenApps = {
@@ -60,7 +60,7 @@ local apps = {
     chrome = "Google Chrome",
     sublime = "Sublime Text",
     cursor = "Cursor",
-    cmux = "cmux"
+    orca = "Orca"
 }
 
 -- Check if external display is connected
@@ -211,14 +211,14 @@ local function layoutExternalDisplay()
             w = leftWidth,
             h = leftBottomHeight
         },
-        -- Right: cmux (full height)
+        -- Right: Orca (full height)
         [externalLayout.rightTop] = {
             x = frame.x + leftWidth,
             y = frame.y,
             w = rightWidth,
             h = rightTopHeight
         },
-        -- Right bottom: Cursor (overlaps cmux)
+        -- Right bottom: Cursor (overlaps Orca)
         [externalLayout.rightBottom] = {
             x = frame.x + leftWidth,
             y = frame.y + frame.h - rightBottomHeight,
@@ -247,7 +247,7 @@ local function layoutBuiltInDisplay()
     local frame = builtInScreen:frame()
     local topHeight = frame.h * builtInLayout.topHeight
 
-    -- Position apps that use top 20% (Sublime Text, ghostty)
+    -- Position apps that use the top area (Sublime Text, Orca)
     for _, appName in ipairs(builtInLayout.topApps) do
         local app = hs.application.get(appName)
         if app then
@@ -282,6 +282,24 @@ local function layoutBuiltInDisplay()
     end
 end
 
+-- Maximize Orca when only the built-in display is in use
+local function maximizeOrcaOnBuiltInDisplay()
+    if isExternalDisplayConnected() then
+        return
+    end
+
+    local builtInScreen = getBuiltInScreen()
+    local app = hs.application.get(apps.orca)
+    if not builtInScreen or not app then
+        return
+    end
+
+    local frame = builtInScreen:frame()
+    for _, window in ipairs(getAppWindows(app)) do
+        window:setFrame(frame, 0)
+    end
+end
+
 -- Smart layout: applies the correct layout based on display configuration
 local function smartLayout()
     if isExternalDisplayConnected() then
@@ -292,6 +310,10 @@ local function smartLayout()
 end
 
 -- Bind hotkeys
+hs.hotkey.bind({"cmd"}, "space", function()
+    hs.application.launchOrFocus(apps.orca)
+end)
+
 hs.hotkey.bind(hyper, "H", function()
     smartLayout()
 end)
@@ -329,4 +351,8 @@ hs.hotkey.bind(hyper, "J", function()
 
     local frame = targetScreen:frame()
     window:setFrame(frame, 0)
+end)
+
+hs.hotkey.bind(hyper, "L", function()
+    maximizeOrcaOnBuiltInDisplay()
 end)

@@ -29,6 +29,15 @@ mcp.json
 .local/bin/cmux-resume-all-codex-sessions
 .local/bin/difit-cmux
 .raycast/scripts/difit-review.sh
+.config/cmux/sidebars/agent-board.swift
+.local/libexec/cmux/agent-board-auto-title
+.local/libexec/cmux/agent-board-diff-open
+.local/libexec/cmux/agent-board-diff-refresh
+.local/libexec/cmux/agent-board-state
+.local/libexec/cmux/agent-board-usage
+.local/libexec/cmux/resume-all-codex-sessions
+.local/share/cmux/agent-board.swift
+.local/share/licenses/cmux-agent-board-auto-title/LICENSE
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy
 CLAUDE.md

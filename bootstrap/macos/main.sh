@@ -88,7 +88,6 @@ case "$PLAN" in
     run "$BREW" bundle --file "${SCRIPT_DIR}/Brewfile"
 
     apply_macos_defaults
-    run bash "${SCRIPT_DIR}/31_cmux.sh"
     run bash "${SCRIPT_DIR}/10_git.sh"
     run bash "${SCRIPT_DIR}/40_ssh.sh"
 

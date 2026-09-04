@@ -3,7 +3,6 @@
 .hammerspoon
 .raycast
 Library
-.local/libexec/cmux
 {{- end }}
 
 {{- if ne .chezmoi.os "linux" }}
@@ -13,6 +12,17 @@ Library
 
 # Python bytecode cache — never deploy
 **/__pycache__
+
+# Retain cmux sources in the repository, but keep them undeployed while Orca is primary.
+.config/cmux
+.config/zsh/cmux-agent-board.zsh
+.local/bin/gwai-cmux
+.local/libexec/cmux
+.local/share/cmux
+.local/share/licenses/cmux-agent-board-auto-title
+.raycast/scripts/gwai-cmux.sh
+Library/LaunchAgents/com.cmuxterm.agent-board-diff.plist
+Library/LaunchAgents/com.cmuxterm.agent-board-usage.plist
 
 {{- $ageCmd := includeTemplate "age-command.tmpl" . -}}
 {{- if not (and (eq .chezmoi.config.encryption "age") $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt"))) }}

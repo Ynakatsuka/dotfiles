@@ -1,16 +1,5 @@
 #!/usr/bin/env bash
-# Enable cmux custom sidebars and select the managed Agent Board sidebar.
-#
-# cmux stores these values in macOS preferences rather than settings.json.
-# Running this after chezmoi applies the sidebar file makes a fresh dotfiles
-# installation activate Agent Board without requiring UI setup.
-#
-# The hashes keep this run_onchange script tied to all generated-sidebar inputs.
-# agent-board-source: {{ include "dot_local/share/cmux/agent-board.swift" | sha256sum }}
-# diff-refresher: {{ include "dot_local/libexec/cmux/executable_agent-board-diff-refresh" | sha256sum }}
-# usage-collector: {{ include "dot_local/libexec/cmux/executable_agent-board-usage" | sha256sum }}
-# diff-launch-agent: {{ include "private_Library/private_LaunchAgents/com.cmuxterm.agent-board-diff.plist.tmpl" | sha256sum }}
-# usage-launch-agent: {{ include "private_Library/private_LaunchAgents/com.cmuxterm.agent-board-usage.plist.tmpl" | sha256sum }}
+# Disable the retained cmux Agent Board integration while Orca is primary.
 
 set -euo pipefail
 
@@ -19,50 +8,34 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 readonly CMUX_BUNDLE_ID="com.cmuxterm.app"
-readonly SIDEBAR_PROVIDER_ID="cmux.sidebar.custom.agent-board"
 readonly DIFF_JOB_LABEL="com.cmuxterm.agent-board-diff"
-readonly DIFF_JOB_PLIST="${HOME}/Library/LaunchAgents/${DIFF_JOB_LABEL}.plist"
 readonly USAGE_JOB_LABEL="com.cmuxterm.agent-board-usage"
-readonly USAGE_JOB_PLIST="${HOME}/Library/LaunchAgents/${USAGE_JOB_LABEL}.plist"
-readonly SIDEBAR_SOURCE="${HOME}/.local/share/cmux/agent-board.swift"
-readonly SIDEBAR_RUNTIME_DIR="${HOME}/.local/state/cmux"
-readonly SIDEBAR_RUNTIME="${SIDEBAR_RUNTIME_DIR}/agent-board.swift"
-readonly USAGE_COLLECTOR="${HOME}/.local/libexec/cmux/agent-board-usage"
-
-[[ -f "${SIDEBAR_SOURCE}" ]]
-[[ -f "${DIFF_JOB_PLIST}" ]]
-[[ -f "${USAGE_JOB_PLIST}" ]]
-[[ -f "${USAGE_COLLECTOR}" ]]
-plutil -lint "${DIFF_JOB_PLIST}" >/dev/null
-plutil -lint "${USAGE_JOB_PLIST}" >/dev/null
-
-mkdir -p "${SIDEBAR_RUNTIME_DIR}"
-runtime_tmp="$(mktemp "${SIDEBAR_RUNTIME_DIR}/.agent-board.swift.XXXXXX")"
-trap 'rm -f "${runtime_tmp}"' EXIT
-install -m 0644 "${SIDEBAR_SOURCE}" "${runtime_tmp}"
-mv "${runtime_tmp}" "${SIDEBAR_RUNTIME}"
-trap - EXIT
-
-defaults write "${CMUX_BUNDLE_ID}" customSidebars.beta.enabled -bool true
-defaults write "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId \
-  -string "${SIDEBAR_PROVIDER_ID}"
-
-[[ "$(defaults read "${CMUX_BUNDLE_ID}" customSidebars.beta.enabled)" == "1" ]]
-[[ "$(defaults read "${CMUX_BUNDLE_ID}" cmuxExtensionSidebar.providerId)" == \
-  "${SIDEBAR_PROVIDER_ID}" ]]
 
 launch_domain="gui/$(id -u)"
-restart_launch_agent() {
-  local job_label="$1"
-  local job_plist="$2"
-
+for job_label in "${USAGE_JOB_LABEL}" "${DIFF_JOB_LABEL}"; do
   if launchctl print "${launch_domain}/${job_label}" >/dev/null 2>&1; then
     launchctl bootout "${launch_domain}/${job_label}"
   fi
-  launchctl bootstrap "${launch_domain}" "${job_plist}"
-}
+done
 
-restart_launch_agent "${USAGE_JOB_LABEL}" "${USAGE_JOB_PLIST}"
-restart_launch_agent "${DIFF_JOB_LABEL}" "${DIFF_JOB_PLIST}"
+for preference_key in customSidebars.beta.enabled cmuxExtensionSidebar.providerId; do
+  if defaults read "${CMUX_BUNDLE_ID}" "${preference_key}" >/dev/null 2>&1; then
+    defaults delete "${CMUX_BUNDLE_ID}" "${preference_key}"
+  fi
+done
 
-echo "Enabled cmux Agent Board and its Git diff and usage refresh jobs."
+disabled_targets=(
+  "${HOME}/.config/zsh/cmux-agent-board.zsh"
+  "${HOME}/.local/bin/gwai-cmux"
+  "${HOME}/.raycast/scripts/gwai-cmux.sh"
+  "${HOME}/Library/LaunchAgents/${DIFF_JOB_LABEL}.plist"
+  "${HOME}/Library/LaunchAgents/${USAGE_JOB_LABEL}.plist"
+  "${HOME}/.local/state/cmux/agent-board.swift"
+)
+for target_file in "${disabled_targets[@]}"; do
+  if [[ -f "${target_file}" || -L "${target_file}" ]]; then
+    rm "${target_file}"
+  fi
+done
+
+echo "Disabled cmux Agent Board and its refresh jobs."
