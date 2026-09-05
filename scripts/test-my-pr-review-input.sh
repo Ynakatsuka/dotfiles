@@ -683,13 +683,7 @@ test_documented_state_contract() {
   fi
 }
 
-test_documented_model_contract() {
-  assert_file_contains "$skill_root/SKILL.md" 'Reviewer B: embedded-input Claude Opus correctness review (`high` effort, no tools'
-  assert_file_contains "$skill_root/SKILL.md" 'Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-sol` / `medium` 固定）'
-  assert_file_contains "$skill_root/references/review.md" 'use only the configured `my-pr-reviewer` Agent'
-  assert_file_contains "$skill_root/references/review.md" '`--model opus`, `--effort high`, `--tools ""`'
-  assert_file_contains "$skill_root/references/review.md" 'pins `gpt-5.6-sol` at `medium` effort'
-
+test_reviewer_model_configuration() {
   jq -e '
     .effortLevel == "xhigh" and
     (.env | has("CLAUDE_CODE_EFFORT_LEVEL") | not)
@@ -709,5 +703,5 @@ test_reviewer_b_runner
 test_reviewer_b_validator
 test_reviewer_b_schema
 test_documented_state_contract
-test_documented_model_contract
+test_reviewer_model_configuration
 echo "PASS: my-pr review input tests"

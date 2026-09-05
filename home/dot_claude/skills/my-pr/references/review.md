@@ -15,7 +15,7 @@ This reference is read-only for repository behavior. It collects and integrates 
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
 - Check approach fit against the PR problem: whether the chosen solution actually solves the stated issue, and whether a simpler, safer, or existing path would solve it better. Report alternatives only when there is concrete evidence, such as an existing extension point, duplicated implementation, violated constraint, or avoidable operational/maintenance risk.
-- Do not continue with degraded evidence. If a diff artifact, Reviewer A/C, Codex run, or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path. The only standing exception is a structurally invalid Reviewer B result after the bounded format-correction step below: skip Reviewer B, disclose the skip, and integrate Reviewer A/C.
+- Do not continue with degraded evidence. If a diff artifact or any selected reviewer run or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path. The only standing exception is a structurally invalid Reviewer B result after the bounded format-correction step below: skip Reviewer B, disclose the skip, and integrate Reviewer A/C.
 
 ## Artifact and scope gate
 
@@ -81,9 +81,39 @@ If `MY_PR_CONTEXT_STATE=found`, reviewers must read `MY_PR_CONTEXT` before the d
 
 If `MY_PR_CONTEXT_STATE=no_existing_pr`, state that no PR body or prior GitHub conversation exists. Do not invent missing intent; infer only from the diff and repository files, and mark intent uncertainty in the affected findings.
 
+## Reviewer selection
+
+Select the reviewer set after reading the scope summary, PR context, and diff. Use Reviewer C alone for small, low-risk changes. Use all three reviewers (A: simplify, B: Claude correctness, C: Codex correctness) when any of these applies:
+
+- public contract, authentication/authorization, secret-handling, or data-migration changes
+- a large scope (`MY_PR_SCOPE_GATE=large` after scope approval) or any condition in Large diff chunking below
+- material uncertainty about correctness or cross-component impact
+- an explicit request for multiple reviewers
+
+Record the selected reviewer names and a short reason in the current artifact's `state.md` before launch. This selection does not bypass the scope gate or authorize retries. Do not silently reduce the selected set after a failure. A/B are not skipped or missing when C alone was selected.
+
+Verify only the selected executors before launch:
+
+- C alone: `scripts/run-codex-review.sh` and its Codex CLI prerequisites.
+- A/B/C: also `scripts/run-codex-reviews.sh`; for B, `scripts/prepare-reviewer-b-input.sh` and `scripts/validate-reviewer-b-output.sh`, plus the configured `my-pr-reviewer` Agent in Claude Code or `scripts/run-claude-review.sh` and its Claude CLI prerequisites on other hosts.
+
+### Single-reviewer launch
+
+Write the Reviewer C prompt below under the recorded artifact directory. Run the existing single-reviewer runner directly:
+
+```bash
+bash "$HOME/.claude/skills/my-pr/scripts/run-codex-review.sh" \
+  "reviewer-c" "full" "1" \
+  "/absolute/artifact/path/reviewer-c-prompt.md" \
+  "/absolute/artifact/path/pr-context.md" \
+  "/absolute/artifact/path/review.diff"
+```
+
+Use the absolute review Markdown path printed by the runner. Give the execution a 600,000 ms timeout where supported, or keep the returned background session alive until completion. Early tool yielding is not execution completion. On non-zero exit, timeout, or invalid input/receipt, return `REVIEW_INCOMPLETE`; do not substitute A/B or retry without approval. On success, follow Integration rules using C's result. Skip all A/B prompt preparation and multi-reviewer launch steps.
+
 ## Large diff chunking
 
-Use the full `MY_PR_REVIEW_DIFF` by default. Split Reviewer A, Reviewer B, and Reviewer C by file groups or top-level domains when any condition is true:
+Use the full `MY_PR_REVIEW_DIFF` by default. These conditions select A/B/C and split their input by file groups or top-level domains:
 
 - review diff lines > 10,000
 - review diff bytes > 196,608
@@ -111,7 +141,7 @@ Reviewer A chunks run integrated simplify in `review` mode with the simplify per
 
 ## Codex review input integrity
 
-Reviewer A and Reviewer C must go through `scripts/run-codex-reviews.sh`, which launches both concurrently using the underlying `scripts/run-codex-review.sh`. Do not pass artifact paths to Codex and ask Codex to read them with `cat`, `sed`, `Read`, or another tool.
+For A/B/C, launch A and C together through `scripts/run-codex-reviews.sh`. For C alone, use `scripts/run-codex-review.sh` directly as shown above. Both paths use the same underlying runner. Do not pass artifact paths to Codex and ask Codex to read them with `cat`, `sed`, `Read`, or another tool.
 
 The underlying runner:
 
@@ -125,7 +155,7 @@ The underlying runner:
 - requires JSON Schema output with matching SHA-256 receipts and an unpredictable nonce disclosed only after the final diff boundary
 - exits non-zero on missing input, oversized prompt, Codex failure, incomplete status, or receipt mismatch
 
-Write each role-specific prompt under the exact artifact directory recorded in `artifact.env`. Launch both reviewers for an assigned chunk through `scripts/run-codex-reviews.sh`, which starts the two runner processes concurrently and waits for both. Use literal values from that state file or chunk manifest; do not rely on shell variables inherited from orchestration:
+For A/B/C, write each role-specific prompt under the exact artifact directory recorded in `artifact.env`. Launch A and C for an assigned chunk through `scripts/run-codex-reviews.sh`, which starts the two runner processes concurrently and waits for both. Use literal values from that state file or chunk manifest; do not rely on shell variables inherited from orchestration:
 
 ```bash
 bash "$HOME/.claude/skills/my-pr/scripts/run-codex-reviews.sh" \
@@ -140,7 +170,7 @@ It prints one `<reviewer>\t<absolute review Markdown path>` line per reviewer. U
 
 If either reviewer fails, the wrapper reports which one, echoes that reviewer's stderr, prints no result paths, and exits non-zero. Treat that as `REVIEW_INCOMPLETE`; do not integrate the reviewer that happened to succeed.
 
-Call `run-codex-review.sh` directly only when relaunching a single reviewer after the user explicitly approved it. The argument order differs: `<reviewer-a|reviewer-c> <chunk-id> <chunk-count> <prompt> <context> <diff>`.
+Direct `run-codex-review.sh` execution is the normal C-only path. In A/B/C mode, use it only for a single-reviewer relaunch explicitly approved by the user. The argument order differs: `<reviewer-a|reviewer-c> <chunk-id> <chunk-count> <prompt> <context> <diff>`.
 
 Do not set or forward `MY_PR_ARTIFACT_DIR` solely for the runner. Its context-file argument is the source of truth for the result directory, including when Reviewer A/C runs in another process or shell.
 
@@ -178,7 +208,7 @@ MY_PR_CONTEXT_STATE=found|no_existing_pr
 MY_PR_CONTEXT_BYTES=<PR context bytes>
 ```
 
-Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all launched reviewer and chunk results before integration.
+The following launch steps apply only when A/B/C was selected. Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all launched reviewer and chunk results before integration.
 
 Before launching Reviewer B, write its role prompt under the exact artifact directory and build one self-contained input per chunk:
 
@@ -192,7 +222,7 @@ bash "$HOME/.claude/skills/my-pr/scripts/prepare-reviewer-b-input.sh" \
 
 The script embeds the complete PR context and diff, applies the same 393,216-byte prompt ceiling as the Codex runners, and prints the absolute `input.md` path. Use that file as the only Reviewer B task input. Do not replace it with artifact paths or current repository state.
 
-### Launch mechanics
+### Multi-reviewer launch mechanics
 
 Concurrency across A and C is enforced by `scripts/run-codex-reviews.sh`, which backgrounds both runners and waits for both. Concurrency with Reviewer B is not enforced, so order the launch deliberately. The exact mechanism is host-dependent because Reviewer B's executor differs by host (see below).
 
@@ -226,6 +256,8 @@ Reviewer B is host-aware:
 
 ## Reviewer A: integrated simplify review
 
+Prepare this role only for A/B/C.
+
 Read `references/simplify/overview.md`. Write its review-mode prompt under the exact artifact directory from the current state file, then pass that prompt to `scripts/run-codex-reviews.sh` together with the Reviewer C prompt and the absolute full-diff path or assigned chunk path. The runner applies `model_reasoning_effort="medium"`, embeds the complete inputs, disables nested delegation, and validates the receipt. Do not invoke Codex directly for Reviewer A.
 
 If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
@@ -240,7 +272,7 @@ Keep its output categories as-is:
 
 ## Reviewer B: Claude correctness review
 
-Use the host-aware executor above with this prompt.
+Prepare this role only for A/B/C. Use the host-aware executor above with this prompt.
 
 ```text
 <role>
@@ -332,7 +364,7 @@ If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times 
 
 Use the repo-local `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Do not create `/tmp` diff files.
 
-Write the following prompt under the exact artifact directory from the current state file, then pass it to `scripts/run-codex-reviews.sh` as the Reviewer C prompt. The runner pins `gpt-5.6-sol` at `medium` effort for this reviewer; the wrapper starts it alongside Reviewer A, and the call needs the 600,000 ms timeout. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
+Write the following prompt under the exact artifact directory from the current state file. For C alone, use the Single-reviewer launch command; for A/B/C, pass it to `scripts/run-codex-reviews.sh` alongside the A prompt. The runner pins `gpt-5.6-sol` at `medium` effort; allow 600,000 ms for execution where supported. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
 
 ```text
 Review the supplied diff as a senior software engineer.
@@ -355,7 +387,7 @@ Scope:
 - Check operational risks around deploy order, feature flags, environment variables, observability, alerting, rate limits, resource usage, and visible failure modes.
 - Check performance regressions: algorithmic complexity, N+1 queries, redundant I/O or network calls, blocking work on hot paths, missing pagination/streaming, unbounded memory growth, large allocations or copies inside loops, or lost caching/batching.
 - Check missing or weak tests for changed behavior, especially regression, security, downstream, and cross-client compatibility coverage.
-- Do not report code quality, duplication, naming style, formatting, or efficiency issues; integrated simplify handles those separately.
+- Exclude preference-only quality, naming, formatting, duplication, or micro-efficiency findings without a concrete risk. Report correctness and performance risks even when no separate simplify reviewer runs.
 - Do not report issues already enforced by CI, generated files, lockfiles, vendored dependencies, snapshots, or preference-only nits unless the diff creates a concrete correctness or security risk.
 - Do not edit or write files anywhere. Do not create notes under .plans, .tmp, or /tmp.
 - Do not call tools, run shell commands, read repository files, delegate, or spawn subagents. All review inputs are embedded in the prompt.
@@ -409,9 +441,9 @@ If the environment provides a background monitor, register the task before the f
 
 ## Integration rules
 
-Deduplicate findings from simplify, Claude, and Codex. Put each finding in exactly one category.
+Deduplicate findings from the selected reviewers. Put each finding in exactly one category.
 
-Before classifying, confirm all Reviewer A/C chunks completed. If any required A/C chunk is missing or failed, output `REVIEW_INCOMPLETE` and stop. Reviewer B is also required unless its completed result failed only the Markdown structure validation after one format-correction attempt. In that case, omit all Reviewer B results, mark it skipped, and continue classification using Reviewer A/C.
+Before classifying, confirm that every selected reviewer and assigned chunk completed. For C alone, require its result only. For A/B/C, missing or failed A/C chunks mean `REVIEW_INCOMPLETE`; B is also required unless its completed result failed only Markdown structure validation after one format-correction attempt. In that existing exception, omit all B results, disclose the skip, and classify A/C. Never treat an execution or input failure as a format-only skip.
 
 Every integrated finding must include a severity: `critical`, `high`, `medium`, or `low`. Do not output a Required, Recommended, or Not needed item without severity. If a reviewer omits severity, assign severity from the impact and evidence, include it in the output, and set `Severity source: integration-inferred`.
 
@@ -468,7 +500,7 @@ Review URL: <PR URL or unavailable (no existing PR)>
 - Stop before fixes, commits, pushes, or PR creation unless the user explicitly approves a degraded path.
 ```
 
-If Reviewer B or any oversized file was skipped, use `COMPLETE_WITH_SKIPS`; otherwise use `COMPLETE`. A format-only Reviewer B skip does not add a retry request or `Next step` section.
+If a selected Reviewer B or any oversized file was skipped, use `COMPLETE_WITH_SKIPS`; otherwise use `COMPLETE`. Successful C-only review is `COMPLETE`; unselected A/B do not count as skips. State which reviewer set ran in the result. A format-only Reviewer B skip does not add a retry request or `Next step` section.
 
 For a complete review, use this structure:
 

@@ -46,9 +46,6 @@ bundled scripts は chezmoi により `$HOME/.claude/skills/my-pr/` へ配置さ
 ```bash
 test -f "$HOME/.claude/skills/my-pr/SKILL.md"
 test -x "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh"
-test -x "$HOME/.claude/skills/my-pr/scripts/prepare-reviewer-b-input.sh"
-test -x "$HOME/.claude/skills/my-pr/scripts/run-claude-review.sh"
-test -f "$HOME/.claude/agents/my-pr-reviewer.md"
 ```
 
 以後、bundled scripts は各 shell call から `$HOME/.claude/skills/my-pr/scripts/...` で直接参照する。前の shell call で設定した変数が残ると仮定しない。
@@ -109,27 +106,13 @@ cat "$MY_PR_CONTEXT"
 
 ### 3-2. デフォルト / `review` / `fix`: read-only quality review
 
-`references/review.md` を読み、そこに定義された Reviewer A/B/C と統合ルールに従う。
+`references/review.md` の Reviewer selection に従い、変更のリスクと規模から構成を決める。小変更は Reviewer C 単独、それ以外の指定条件では A/B/C を使う。選択理由を短く記録し、その構成の実行・入力検証・失敗処理に従う。
 
-最初に simplify apply を実行しない。先に apply すると、Claude/Codex が古い diff をレビューするため。
-
-`prepare-review-artifacts.sh` が作成した repo-local artifact を使う。`/tmp` の diff や「現在のファイル状態」レビューへ暗黙に切り替えない。
-
-以下 3 つを同時に起動し、起動した reviewer が完了するまで統合しない。
-
-- Reviewer A: integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-- Reviewer B: embedded-input Claude Opus correctness review (`high` effort, no tools; configured Claude Code Agent when available, bundled Claude CLI runner otherwise)
-- Reviewer C: stdin-embedded Codex correctness review（`gpt-5.6-sol` / `medium` 固定）
-
-起動順は、まず Reviewer B（Agent は背景実行なので即座に返る）、続けて `scripts/run-codex-reviews.sh` を chunk ごとに呼ぶ。このラッパーが A と C を同時に起動して両方を待つため、A/C の並列は保証される。chunk が複数ある場合も呼び出しは1つの応答にまとめ、1本の結果を待ってから次を呼ばない。
-
-`run-codex-reviews.sh` の呼び出しには `timeout` を `600000` で明示する。既定の 120 秒では正常動作中の Codex review が強制終了され、`REVIEW_INCOMPLETE` になることがある。
-
-Reviewer A/C の失敗、quota、permission、diff access 不可、timeout は review incomplete として停止する。Reviewer B の実行・入力エラーも同様に停止する。Reviewer B が読み取りを完了したが所定の本文構造を返さない場合だけ、同じ session で形式修正を1回要求する。再度不正なら Reviewer B 全体を skip し、A/C の結果を `COMPLETE_WITH_SKIPS` として統合する。
+最初に simplify apply を実行せず、`prepare-review-artifacts.sh` が作成した repo-local artifact をレビューする。すべての選択済み reviewer が完了してから統合する。
 
 ### 3-3. 統合
 
-`references/review.md` の Integration rules と Integration output に従う。3つの結果を重複排除し、各指摘を Required / Recommended / Not needed のどれか1つに分類する。
+`references/review.md` の Integration rules と Integration output に従う。選択した担当の結果を重複排除し、各指摘を Required / Recommended / Not needed のどれか1つに分類する。
 
 background 実行した reviewer が残っている間は最終回答しない。やむを得ず待機に入る場合は、再開に必要な artifact path、reviewer output path、次の手順を保存し、CCV の background monitor が利用可能なら監視登録する。
 
@@ -175,20 +158,10 @@ background 実行した reviewer が残っている間は最終回答しない�
 - draft PR を作成する。ready 化は行わない。
 - `--assignee @me` を付ける。
 - commit message は Conventional Commits 形式の英語。
-- `create` でも integrated simplify apply は必ず実行する。
-- `review` は read-only。指摘の収集と統合だけを行う。
 - read-only reviewer は repo 内外を問わずファイルを書かない。`.plans`、`/tmp`、`.tmp/my-pr` への追加メモも禁止する。main orchestrator が作る `.tmp/my-pr/` artifact だけは例外。
-- `fix` は Required だけ修正・検証・commit し、push しない。
-- デフォルトでは read-only review → Required fix → PR作成/更新 → verify の順に実行する。
 - Simplify は Codex CLI の `model_reasoning_effort="medium"` を使う。model は上書きしない。
 - Simplify は full diff を優先する。`references/review.md` の line/byte chunking 条件を満たす場合だけ file-boundary chunking し、各 run/chunk の Required と Recommended をそれぞれ最大 5 件に制限する。
 - chunk の単一ファイル上限を超える差分はそのファイルだけレビューから除外し、ファイル名と byte 数を最終結果に明示する。レビュー済みとして扱わない。
-- Reviewer A/C は `scripts/run-codex-reviews.sh` でまとめて起動する。単体の `run-codex-review.sh` 直接呼び出しは、ユーザーが明示的に承認した再実行のときだけ使う。runner は context-file 引数から artifact root を決定するため、別 process へ `MY_PR_ARTIFACT_DIR` を引き継ぐ必要はない。artifact path を Codex の shell tool に読ませず、stdin 埋め込み、末尾 nonce、SHA-256 receipt で完全性を検証する。Codex は対象 repo ではなく隔離済み artifact-local repo から起動する。
-- 片方の reviewer だけ失敗した場合、ラッパーは result path を出さずに非ゼロ終了する。成功した側だけを統合しない。
-- runner は reviewer ごとに effort を固定する。Reviewer A は設定中の model の medium、Reviewer C は `gpt-5.6-sol` の medium に固定する。Reviewer A の model は設定中のものを継承するため、`~/.codex/config.toml` の `model` を変えると Reviewer A のモデルだけが変わる。orchestrator 側は独自の `--model` を渡さない。
-- correctness reviewer の出力は PR understanding / Findings / Assessment のみ。Strengths と Non-findings は修正判断に使わないので出力させない。
-- Claude correctness review は Opus / `high` に固定して host-aware に実行する。Claude Code Agent が使えるセッションでは tool-less の `my-pr-reviewer` Agent に生成済みの埋め込み入力を渡し、それ以外では `scripts/run-claude-review.sh` を使う。CLI runner は `--model opus --effort high --tools ""`、safe mode、空の MCP 設定を固定し、対象リポジトリを読ませない。統合前に `scripts/validate-reviewer-b-output.sh` で必須見出しを検証する。
-- Codex、Claude reviewer、diff artifact 取得のいずれかに失敗したら停止する。Reviewer B の実行成功後に本文構造検証だけが失敗する場合は、1回の形式修正後に Reviewer B を skip する。暗黙に他 reviewer や local review へ切り替えない。
 - fallback、default substitution、broad catch を追加しない。
 - 好みの問題や style 指摘は修正対象にしない。
 - テストが壊れる修正はしない。

@@ -35,7 +35,7 @@ All commands except `verify` must complete these gates before review, simplify, 
    - `large+untracked`: resolve both conditions before continuing.
 7. Use the generated repo-local artifacts for review and PR body work. Do not use `/tmp` review patches.
 
-If Reviewer A/C, an artifact read, a Codex invocation, or a background review fails, the review is incomplete. Reviewer B execution/input failures are also incomplete. A Reviewer B Markdown structure failure follows the bounded correction and skip policy in `review.md`; after one failed correction, integrate A/C as `COMPLETE_WITH_SKIPS` without substituting another reviewer.
+For default, `review`, and `fix`, select the reviewer set using `review.md` before launch. Failure of an artifact read or any selected reviewer means `REVIEW_INCOMPLETE`. Only a selected Reviewer B Markdown structure failure follows the existing bounded correction and skip policy in `review.md`. Unselected reviewers are not skipped or required inputs.
 
 ## default
 
@@ -44,12 +44,7 @@ Run the full workflow:
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
-4. Start all three quality reviewers concurrently
-   - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-   - embedded-input Claude Opus correctness review (`high` effort, no tools; configured Agent or bundled CLI runner)
-   - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-sol` at `medium`)
-
-   Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
+4. Select and launch the read-only reviewer set using `review.md`: C alone for small, low-risk changes; A/B/C for its listed risk, scope, or explicit-request conditions.
 5. Wait for all reviewers; do not final-answer while background reviewers are running
 6. Integrate findings
 7. Fix Required findings
@@ -80,12 +75,7 @@ Run local quality review in read-only mode.
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
-4. Start all three quality reviewers concurrently
-   - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-   - embedded-input Claude Opus correctness review (`high` effort, no tools; configured Agent or bundled CLI runner)
-   - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-sol` at `medium`)
-
-   Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
+4. Select and launch the read-only reviewer set using `review.md`: C alone for small, low-risk changes; A/B/C for its listed risk, scope, or explicit-request conditions.
 5. Wait for all reviewers
 6. Integrate findings
 7. Stop
@@ -99,12 +89,7 @@ Fix only Required findings, verify, and commit without pushing.
 1. Safety gate
 2. Base and PR state
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
-4. Start all three quality reviewers concurrently in read-only mode
-   - integrated simplify review (stdin-embedded Codex medium effort, byte-chunked when needed, capped findings)
-   - embedded-input Claude Opus correctness review (`high` effort, no tools; configured Agent or bundled CLI runner)
-   - stdin-embedded Codex review via `scripts/run-codex-reviews.sh` (`gpt-5.6-sol` at `medium`)
-
-   Launch order is host-dependent; follow the launch mechanics in `review.md`. That wrapper runs Reviewer A and C concurrently; give it `timeout` `600000`.
+4. Select and launch the read-only reviewer set using `review.md`: C alone for small, low-risk changes; A/B/C for its listed risk, scope, or explicit-request conditions.
 5. Wait for all reviewers
 6. Integrate findings
 7. Fix Required findings only
