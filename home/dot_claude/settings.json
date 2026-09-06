@@ -42,7 +42,7 @@
   "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
-  "model": "claude-fable-5[1m]",
+  "model": "fable",
   "outputStyle": "Concise",
   "effortLevel": "xhigh",
   "cleanupPeriodDays": 180
