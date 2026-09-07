@@ -9,8 +9,11 @@ suppress_unstable_features_warning = true
 
 [features]
 hooks = true
-# Temporarily disable subagents due to excessive token usage with GPT-6 Astra.
-multi_agent = false
+multi_agent = true
+# Avoid repeated parent-model calls while waiting for subagents.
+multi_agent_v2.enabled = true
+multi_agent_v2.min_wait_timeout_ms = 120000
+multi_agent_v2.default_wait_timeout_ms = 120000
 external_migration = false
 goals = true
 default_mode_request_user_input = true
