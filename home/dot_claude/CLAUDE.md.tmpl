@@ -6,6 +6,6 @@
 - Delegate isolated research or verification only when the user and current runtime policy permit it and a separate context materially helps. Keep approvals, public-contract decisions, integration, and final verification in the main agent.
 - The Bash tool has no `workdir` argument. Prefer the session working directory or absolute paths; use `cd` only when necessary.
 - A `PreToolUse` hook rewrites supported Bash commands through `rtk` to reduce output tokens. Use native commands for exact raw output or syntax that RTK does not support, and surface hook warnings rather than assuming a rewrite succeeded.
-- Before reading a large file, search for the relevant section or use `offset` and `limit`.
+- A `PreToolUse` guard denies unbounded `Read` and `cat` of files over 350 lines. Search for the relevant section, read a bounded range with `offset` and `limit`, or delegate the reading with `bulk-read` as described in the `my-bulk-read` skill.
 - Use a headless browser unless the user explicitly requests a visible browser.
 - When a referenced skill is not in the surfaced skill list, check `~/.claude/skills/` before reporting it missing.

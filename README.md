@@ -101,6 +101,7 @@ Run these checks after changing agent instructions or shell tool management:
 ```bash
 mise run check-agent-environment
 bash scripts/test-rtk-rewrite-hook.sh
+bash scripts/test-delegation.sh
 codex exec --ephemeral --sandbox read-only -c 'approval_policy="never"' \
   "Summarize the current instructions and list their source files. Do not modify files."
 ```
@@ -127,10 +128,31 @@ separate apply-script dependency.
 
 RTK reduces token-heavy shell output. Codex is instructed to invoke it directly, while Claude Code uses the ordered Bash `PreToolUse` hooks in `home/dot_claude/settings.json`:
 
-1. `ensure-mise-path.sh` exposes mise-managed tools.
-2. `rtk-rewrite.sh` delegates supported commands to `rtk rewrite`.
+1. `bulk-read-guard` denies unbounded reads of text files over 350 lines (see Model Delegation).
+2. `ensure-mise-path.sh` exposes mise-managed tools.
+3. `rtk-rewrite.sh` delegates supported commands to `rtk rewrite`.
 
 The rewrite hook deliberately bypasses compound `find` syntax that RTK 0.43.0 rewrites but cannot execute correctly. Run `bash scripts/test-rtk-rewrite-hook.sh` after changing RTK, either hook, or their ordering.
+
+### Model Delegation
+
+Reading a whole large file loads it into the agent's context. Following the
+model-routing pattern from Spotify's Portal write-up, `~/.local/bin/bulk-read`
+sends files with a question to a cheaper Codex reader (`gpt-5.6-luna`,
+reasoning effort `max`) and prints only its answer, `~/.local/bin/code-write`
+has the same model write a predictable file (tests, scaffolding, pattern
+copies) in place and returns only a path and summary, and
+`~/.local/bin/bulk-read-guard` is a `PreToolUse` hook that denies unbounded
+`Read` and `cat` of text files over 350 lines. The guard is registered for
+Claude Code in `home/dot_claude/settings.json` and for Codex by
+`home/dot_codex/hooks.json.tmpl`; the shared `my-bulk-read` and
+`my-code-write` skills under `~/.agents/skills/` tell both agents when to
+delegate.
+
+Codex treats the guard as an unmanaged hook. After `chezmoi apply`, review and
+trust it with `/hooks` in an interactive Codex session; until then Codex skips
+it. Run `bash scripts/test-delegation.sh` after changing any of the scripts,
+the threshold, or the hook registration.
 
 ## Shortcuts
 

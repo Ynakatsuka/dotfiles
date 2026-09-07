@@ -68,6 +68,7 @@ chezmoi apply -v
 ```bash
 mise run check-agent-environment
 bash scripts/test-rtk-rewrite-hook.sh
+bash scripts/test-delegation.sh
 ```
 
 - After changing managed files, verify both `chezmoi diff` and the deployed behavior.
@@ -78,7 +79,7 @@ bash scripts/test-rtk-rewrite-hook.sh
 ## RTK Integration
 
 - RTK is installed through `home/private_dot_config/mise/config.toml` and updated by maintenance.
-- Claude Bash commands pass through two ordered `PreToolUse` hooks configured in `home/dot_claude/settings.json`: `ensure-mise-path.sh` first, then `rtk-rewrite.sh`.
+- Claude Bash commands pass through three ordered `PreToolUse` hooks configured in `home/dot_claude/settings.json`: `bulk-read-guard` first, then `ensure-mise-path.sh`, then `rtk-rewrite.sh`.
 - `home/dot_claude/hooks/executable_rtk-rewrite.sh` delegates supported rewrites and permission decisions to `rtk rewrite`. It requires `jq` and RTK 0.23.0 or newer.
 - Preserve the rewrite protocol: exit 0 rewrites and auto-allows, exit 1 or 2 passes through, exit 3 rewrites without auto-allowing so Claude can ask, and unexpected failures emit a warning before passing through.
 - RTK 0.43.0 cannot execute some compound `find` expressions that it rewrites. Keep native `find` for expressions containing `-o`, `-not`, `-exec`, `-execdir`, `-delete`, or parentheses until upstream behavior is verified compatible.
@@ -89,3 +90,4 @@ bash scripts/test-rtk-rewrite-hook.sh
 
 - When adding a tool to `home/private_dot_config/mise/config.toml`, run `mise install` and ensure shims resolve in a clean shell.
 - Keep the deployed Claude rule files documented and intact: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.
+- The model delegation scripts `bulk-read`, `code-write`, and the `bulk-read-guard` hook live in `home/dot_local/bin/`. The guard is registered in `home/dot_claude/settings.json` and `home/dot_codex/hooks.json.tmpl`; Codex skips it until it is trusted with `/hooks` after `chezmoi apply`.

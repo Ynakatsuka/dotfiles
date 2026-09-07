@@ -6,6 +6,7 @@
 - Use `rtk` for token-heavy shell output when it is available and supports the command: `rtk git status`, `rtk git diff`, `rtk rg`, `rtk pytest -q`, `rtk cargo test`.
 - Use `rtk proxy` only when raw output is required.
 - For unsupported syntax, use the native command; do not force an incompatible rewrite.
+- A `PreToolUse` hook denies `cat` of files over 350 lines. Read a bounded range with `sed -n`, or delegate the reading with `bulk-read` as described in the `my-bulk-read` skill.
 - Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
 
 ## Codex Subagent Routing
