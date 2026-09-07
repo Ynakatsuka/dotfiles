@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# PreToolUse guard shared by Claude Code and Codex. Denies unbounded reads of
+# large text files so the agent delegates them to `bulk-read` or reads a
+# bounded range instead of loading the whole file into its context.
+#
+# Inspected tools:
+#   Read (Claude Code): tool_input.file_path, offset (1-based), limit
+#   Bash (Claude Code and Codex, which reports its shell tool as "Bash" with
+#        tool_input.command as a string): `cat`, `rtk cat`, and `cat <file`
+#        arguments, resolved against the event-level `cwd`
+# Anything else, unreadable or binary targets, and unparsable commands pass
+# through. This is a guard against accidental whole-file reads, not a security
+# boundary: `head -n 100000`, `awk`, `bat`, `xargs cat`, globs, quoted paths
+# with spaces, and relative paths after `cd` are not inspected.
+# A deny is emitted as PreToolUse JSON, which both clients honour.
+# Requires: jq.
+
+set -uo pipefail
+
+BULK_READ_MAX_LINES=350
+
+# Claude Code hooks inherit the launching process PATH, which may not include
+# mise shims; jq is installed through mise in this dotfiles setup.
+export PATH="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims:${PATH}"
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "[bulk-read-guard] WARNING: jq is not installed. Hook cannot inspect tool input." >&2
+  exit 0
+fi
+
+INPUT=$(cat)
+TOOL_NAME=$(jq -r '.tool_name // empty' <<<"$INPUT")
+CWD=$(jq -r '.cwd // empty' <<<"$INPUT")
+[ -n "$CWD" ] || CWD="$PWD"
+
+# Print the line count of a readable text file; fail for anything else.
+count_lines() {
+  local target=$1
+  [[ "$target" == /* ]] || target="$CWD/$target"
+  [ -f "$target" ] && [ -r "$target" ] || return 1
+  grep -Iq '' "$target" || return 1
+  wc -l <"$target" | tr -d ' '
+}
+
+# Emit the deny decision. Targets are shell-quoted so the suggested command
+# stays runnable and inert for paths containing spaces or metacharacters.
+deny() {
+  local lines=$1
+  shift
+  local quoted
+  quoted=$(printf '%q ' "$@")
+  quoted=${quoted% }
+  jq -n \
+    --arg reason "bulk-read-guard: ${quoted} spans ${lines} lines (limit ${BULK_READ_MAX_LINES}). Delegate the reading with \`bulk-read --question \"<what you need to know>\" ${quoted}\` and work from its answer, or read a bounded range (offset/limit, sed -n 'A,Bp') when you need exact lines for an edit." \
+    '{
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": $reason
+      }
+    }'
+  exit 0
+}
+
+case "$TOOL_NAME" in
+  Read)
+    file_path=$(jq -r '.tool_input.file_path // empty' <<<"$INPUT")
+    limit=$(jq -r '.tool_input.limit // empty' <<<"$INPUT")
+    offset=$(jq -r '.tool_input.offset // empty' <<<"$INPUT")
+    [ -n "$file_path" ] || exit 0
+    lines=$(count_lines "$file_path") || exit 0
+    span=$lines
+    if [[ "$offset" =~ ^[0-9]+$ ]] && [ "$offset" -ge 1 ]; then
+      span=$((lines - offset + 1))
+    fi
+    if [[ "$limit" =~ ^[0-9]+$ ]] && [ "$limit" -lt "$span" ]; then
+      span=$limit
+    fi
+    [ "$span" -gt "$BULK_READ_MAX_LINES" ] && deny "$lines" "$file_path"
+    ;;
+  Bash)
+    command_text=$(jq -r '.tool_input.command // empty' <<<"$INPUT")
+    [ -n "$command_text" ] || exit 0
+    normalized=${command_text//$'\n'/;}
+    normalized=${normalized//&&/;}
+    normalized=${normalized//||/;}
+    normalized=${normalized//|/;}
+    total=0
+    targets=()
+    IFS=';' read -ra segments <<<"$normalized"
+    for segment in "${segments[@]}"; do
+      read -ra tokens <<<"$segment"
+      [ "${#tokens[@]}" -gt 0 ] || continue
+      start=0
+      [ "${tokens[0]}" = "rtk" ] && start=1
+      [ "${tokens[$start]##*/}" = "cat" ] || continue
+      skip_next=0
+      for token in "${tokens[@]:start+1}"; do
+        if [ "$skip_next" -eq 1 ]; then
+          skip_next=0
+          continue
+        fi
+        case "$token" in
+          '>' | '>>')
+            skip_next=1
+            continue
+            ;;
+          '<')
+            # `cat < file` reads the file; inspect the operand.
+            continue
+            ;;
+          '<<'*)
+            continue
+            ;;
+          '<'*)
+            token=${token#<}
+            ;;
+          -* | *'>'*)
+            continue
+            ;;
+        esac
+        token=${token#\"}
+        token=${token%\"}
+        token=${token#\'}
+        token=${token%\'}
+        lines=$(count_lines "$token") || continue
+        total=$((total + lines))
+        targets+=("$token")
+      done
+    done
+    [ "$total" -gt "$BULK_READ_MAX_LINES" ] && deny "$total" "${targets[@]}"
+    ;;
+esac
+
+exit 0

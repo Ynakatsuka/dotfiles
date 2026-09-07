@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Delegate reading large or multiple files to a cheaper Codex model and print
+# only its answer, so the calling agent never loads the file contents into its
+# own context. Shared by Claude Code and Codex through the my-bulk-read skill
+# and enforced by bulk-read-guard.
+
+set -euo pipefail
+
+BULK_READ_MODEL="gpt-5.6-luna"
+BULK_READ_REASONING_EFFORT="max"
+
+usage() {
+  cat <<'USAGE'
+Usage: bulk-read --question "<question>" <file>...
+
+Sends the given files with the question to the delegated reader model and
+prints its answer on stdout. Files are wrapped verbatim, so pass only the
+files needed for the question.
+USAGE
+}
+
+question=""
+files=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -q | --question)
+      if [[ $# -lt 2 ]]; then
+        echo "bulk-read: --question requires a value" >&2
+        usage >&2
+        exit 2
+      fi
+      question="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      files+=("$@")
+      break
+      ;;
+    -*)
+      echo "bulk-read: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      files+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$question" ]]; then
+  echo "bulk-read: --question is required" >&2
+  usage >&2
+  exit 2
+fi
+if [[ ${#files[@]} -eq 0 ]]; then
+  echo "bulk-read: at least one file is required" >&2
+  usage >&2
+  exit 2
+fi
+for file_path in "${files[@]}"; do
+  if [[ ! -f "$file_path" || ! -r "$file_path" ]]; then
+    echo "bulk-read: not a readable file: $file_path" >&2
+    exit 2
+  fi
+done
+if ! command -v codex >/dev/null 2>&1; then
+  echo "bulk-read: codex is not installed or not in PATH" >&2
+  exit 1
+fi
+
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/bulk-read.XXXXXX")"
+trap 'rm -rf "$work_dir"' EXIT
+prompt_file="$work_dir/prompt.md"
+answer_file="$work_dir/answer.md"
+
+total_lines=0
+{
+  cat <<'PROMPT'
+You are a bulk reader for another coding agent. Answer the question using only the files provided below. Do not run commands and do not read other files. Reply in the language of the question. Be precise: name file paths and identifiers, quote short relevant excerpts when they matter, and state explicitly when the provided files do not contain the answer.
+
+<question>
+PROMPT
+  printf '%s\n' "$question"
+  printf '</question>\n'
+  for file_path in "${files[@]}"; do
+    line_count="$(wc -l <"$file_path")"
+    total_lines=$((total_lines + line_count))
+    printf '\n<file path="%s" lines="%s">\n' "$file_path" "$line_count"
+    cat "$file_path"
+    printf '\n</file>\n'
+  done
+} >"$prompt_file"
+
+echo "bulk-read: ${#files[@]} file(s), ${total_lines} lines -> ${BULK_READ_MODEL} (${BULK_READ_REASONING_EFFORT})" >&2
+
+# codex exec echoes the whole prompt, including every file, to its output
+# streams. Keep both out of the caller's context and surface only errors.
+codex_log="$work_dir/codex.log"
+status=0
+codex exec \
+  --model "$BULK_READ_MODEL" \
+  -c "model_reasoning_effort=\"${BULK_READ_REASONING_EFFORT}\"" \
+  -c 'approval_policy="never"' \
+  --sandbox read-only \
+  --ephemeral \
+  --skip-git-repo-check \
+  --disable hooks \
+  --disable multi_agent \
+  --color never \
+  --output-last-message "$answer_file" \
+  - <"$prompt_file" >"$codex_log" 2>&1 || status=$?
+if [[ "$status" -ne 0 ]]; then
+  echo "bulk-read: codex exec failed with exit code ${status}" >&2
+  grep -E '^(ERROR|error)' "$codex_log" >&2 || tail -n 20 "$codex_log" >&2
+  exit "$status"
+fi
+
+if [[ ! -s "$answer_file" ]]; then
+  echo "bulk-read: codex exec produced no final message" >&2
+  tail -n 20 "$codex_log" >&2
+  exit 1
+fi
+cat "$answer_file"

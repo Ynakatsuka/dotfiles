@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+# Delegate writing predictable code (tests, scaffolding, pattern copies) to a
+# cheaper Codex model that writes the target file directly, so the calling
+# agent never loads the generated code into its own context. Shared by Claude
+# Code and Codex through the my-code-write skill.
+
+set -euo pipefail
+
+CODE_WRITE_MODEL="gpt-5.6-luna"
+CODE_WRITE_REASONING_EFFORT="max"
+
+usage() {
+  cat <<'USAGE'
+Usage: code-write --spec "<what to write>" --target <file> [--reference <file>]...
+
+Sends the spec, the reference files, and the current target content (if any)
+to the delegated writer model, which writes the target file in place. Prints
+the written path with its line count and the writer's short summary on stdout.
+The target must be inside the current working directory.
+USAGE
+}
+
+spec=""
+target=""
+references=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s | --spec)
+      [[ $# -ge 2 ]] || {
+        echo "code-write: --spec requires a value" >&2
+        usage >&2
+        exit 2
+      }
+      spec="$2"
+      shift 2
+      ;;
+    -t | --target)
+      [[ $# -ge 2 ]] || {
+        echo "code-write: --target requires a value" >&2
+        usage >&2
+        exit 2
+      }
+      target="$2"
+      shift 2
+      ;;
+    -r | --reference)
+      [[ $# -ge 2 ]] || {
+        echo "code-write: --reference requires a value" >&2
+        usage >&2
+        exit 2
+      }
+      references+=("$2")
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "code-write: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$spec" ]]; then
+  echo "code-write: --spec is required" >&2
+  usage >&2
+  exit 2
+fi
+if [[ -z "$target" ]]; then
+  echo "code-write: --target is required" >&2
+  usage >&2
+  exit 2
+fi
+target_dir="$(dirname "$target")"
+if [[ ! -d "$target_dir" ]]; then
+  echo "code-write: target directory does not exist: $target_dir" >&2
+  exit 2
+fi
+if [[ -e "$target" && ! -f "$target" ]]; then
+  echo "code-write: target is not a regular file: $target" >&2
+  exit 2
+fi
+workspace="$(pwd -P)"
+target_abs="$(cd "$target_dir" && pwd -P)/$(basename "$target")"
+if [[ "$target_abs" != "$workspace"/* ]]; then
+  echo "code-write: target must be inside the current working directory: $target" >&2
+  exit 2
+fi
+for file_path in ${references[@]+"${references[@]}"}; do
+  if [[ ! -f "$file_path" || ! -r "$file_path" ]]; then
+    echo "code-write: not a readable reference file: $file_path" >&2
+    exit 2
+  fi
+done
+if ! command -v codex >/dev/null 2>&1; then
+  echo "code-write: codex is not installed or not in PATH" >&2
+  exit 1
+fi
+
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/code-write.XXXXXX")"
+trap 'rm -rf "$work_dir"' EXIT
+prompt_file="$work_dir/prompt.md"
+answer_file="$work_dir/answer.md"
+codex_log="$work_dir/codex.log"
+
+{
+  cat <<'PROMPT'
+You are a code writer for another coding agent. Write the target file so that it satisfies the spec. Match the patterns of the reference files exactly: language, style, imports, naming, and test framework. Modify only the target file; do not create, edit, or delete any other file, and do not run commands, because the caller runs verification. When you are done, reply with at most three sentences describing what you wrote. Do not include code in the reply.
+
+<spec>
+PROMPT
+  printf '%s\n' "$spec"
+  printf '</spec>\n'
+  if [[ -f "$target" ]]; then
+    printf '\n<target path="%s" exists="true" lines="%s">\n' "$target" "$(wc -l <"$target")"
+    cat "$target"
+    printf '\n</target>\n'
+  else
+    printf '\n<target path="%s" exists="false" />\n' "$target"
+  fi
+  for file_path in ${references[@]+"${references[@]}"}; do
+    printf '\n<reference path="%s" lines="%s">\n' "$file_path" "$(wc -l <"$file_path")"
+    cat "$file_path"
+    printf '\n</reference>\n'
+  done
+} >"$prompt_file"
+
+# Remember the target's current content so an untouched target is reported
+# as a failure instead of a successful write.
+before_checksum=""
+if [[ -f "$target" ]]; then
+  before_checksum="$(cksum <"$target")"
+fi
+
+echo "code-write: ${#references[@]} reference(s) -> ${CODE_WRITE_MODEL} (${CODE_WRITE_REASONING_EFFORT}) writing ${target}" >&2
+
+# codex exec echoes the whole prompt and every file edit to its output
+# streams. Keep them out of the caller's context and surface only errors.
+status=0
+codex exec \
+  --model "$CODE_WRITE_MODEL" \
+  -c "model_reasoning_effort=\"${CODE_WRITE_REASONING_EFFORT}\"" \
+  -c 'approval_policy="never"' \
+  --sandbox workspace-write \
+  --ephemeral \
+  --skip-git-repo-check \
+  --disable hooks \
+  --disable multi_agent \
+  --color never \
+  --output-last-message "$answer_file" \
+  - <"$prompt_file" >"$codex_log" 2>&1 || status=$?
+if [[ "$status" -ne 0 ]]; then
+  echo "code-write: codex exec failed with exit code ${status}" >&2
+  grep -E '^(ERROR|error)' "$codex_log" >&2 || tail -n 20 "$codex_log" >&2
+  exit "$status"
+fi
+
+if [[ ! -s "$target" ]]; then
+  echo "code-write: the writer did not write ${target}" >&2
+  tail -n 20 "$codex_log" >&2
+  exit 1
+fi
+if [[ -n "$before_checksum" && "$(cksum <"$target")" == "$before_checksum" ]]; then
+  echo "code-write: the writer did not change ${target}" >&2
+  tail -n 20 "$codex_log" >&2
+  exit 1
+fi
+
+echo "code-write: wrote ${target} ($(wc -l <"$target") lines)"
+if [[ -s "$answer_file" ]]; then
+  cat "$answer_file"
+fi

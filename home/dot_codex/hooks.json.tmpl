@@ -3,17 +3,14 @@
 {{- if stat $hooksPath -}}
 {{- $base = include $hooksPath | fromJson -}}
 {{- end -}}
-{{ output "jq" "-n" "--argjson" "base" ($base | toJson) `
-  def without_cmux_hooks:
+{{- $bulkReadGuard := "\"$HOME/.local/bin/bulk-read-guard\"" -}}
+{{ output "jq" "-n" "--argjson" "base" ($base | toJson) "--arg" "bulkReadGuard" $bulkReadGuard `
+  def without_commands(pattern):
     map(
       if ((.hooks // null) | type) == "array" then
         .hooks = [
           .hooks[]
-          | select(
-              ((.command // "")
-                | test("(^|[[:space:]/])cmux([[:space:]/]|$)"; "i"))
-              | not
-            )
+          | select(((.command // "") | test(pattern; "i")) | not)
         ]
       else .
       end
@@ -22,5 +19,14 @@
 
   $base
   | .hooks = (.hooks // {})
-  | .hooks |= with_entries(.value |= without_cmux_hooks)
+  | .hooks |= with_entries(
+      .value |= (
+        without_commands("(^|[[:space:]/])cmux([[:space:]/]|$)")
+        | without_commands("bulk-read-guard")
+      )
+    )
+  | .hooks.PreToolUse = (
+      (.hooks.PreToolUse // [])
+      + [{"matcher": "Bash", "hooks": [{"command": $bulkReadGuard, "timeout": 10, "type": "command"}]}]
+    )
 ` -}}
