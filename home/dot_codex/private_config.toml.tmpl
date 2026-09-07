@@ -9,7 +9,8 @@ suppress_unstable_features_warning = true
 
 [features]
 hooks = true
-multi_agent = true
+# Temporarily disable subagents due to excessive token usage with GPT-6 Astra.
+multi_agent = false
 external_migration = false
 goals = true
 default_mode_request_user_input = true
