@@ -143,7 +143,8 @@ reasoning effort `max`) and prints only its answer, `~/.local/bin/code-write`
 has the same model write a predictable file (tests, scaffolding, pattern
 copies) in place and returns only a path and summary, and
 `~/.local/bin/bulk-read-guard` is a `PreToolUse` hook that denies unbounded
-`Read` and `cat` of text files over 350 lines. The guard is registered for
+`Read` and `cat` of text files over 350 lines. The guard catches accidental
+whole-file reads; it is not a security boundary. It is registered for
 Claude Code in `home/dot_claude/settings.json` and for Codex by
 `home/dot_codex/hooks.json.tmpl`; the shared `my-bulk-read` and
 `my-code-write` skills under `~/.agents/skills/` tell both agents when to

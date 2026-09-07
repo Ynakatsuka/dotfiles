@@ -34,7 +34,8 @@ fi
 if grep -q '^<spec>$' "$CODEX_TEST_PROMPT"; then
   target="$(sed -n 's/^<target path="\([^"]*\)".*/\1/p' "$CODEX_TEST_PROMPT")"
   if ! grep -q 'SKIP_THE_WRITE' "$CODEX_TEST_PROMPT"; then
-    printf 'def test_generated():\n    assert True\n' >"$target"
+    spec_line="$(sed -n '/^<spec>$/{n;p;q;}' "$CODEX_TEST_PROMPT")"
+    printf 'def test_generated():\n    assert True  # %s\n' "$spec_line" >"$target"
   fi
   echo "Wrote one generated test." >"$out"
   exit 0
@@ -44,13 +45,27 @@ echo "progress noise that must not reach stdout"
 EOF
 chmod +x "$TMP_DIR/bin/codex"
 
-export PATH="$TMP_DIR/bin:/usr/bin:/bin"
+# jq and chezmoi may come from mise shims, which the restricted PATH below
+# would drop; keep their directories reachable behind the fake codex.
+JQ_BIN="$(command -v jq)" || {
+  echo "test-delegation: jq is required" >&2
+  exit 1
+}
+CHEZMOI_BIN="$(command -v chezmoi)" || {
+  echo "test-delegation: chezmoi is required" >&2
+  exit 1
+}
+JQ_DIR="$(dirname "$JQ_BIN")"
+CHEZMOI_DIR="$(dirname "$CHEZMOI_BIN")"
+export PATH="$TMP_DIR/bin:$JQ_DIR:$CHEZMOI_DIR:/usr/bin:/bin"
 export CODEX_TEST_ARGS="$TMP_DIR/codex-args"
 export CODEX_TEST_PROMPT="$TMP_DIR/codex-prompt"
 
 cd "$TMP_DIR/work"
 printf 'alpha\nbeta\ngamma\n' >small.txt
 seq 1 400 >big.txt
+seq 1 351 >edge.txt
+seq 1 400 >'sp ace.txt'
 printf 'bin\0ary\n' >blob.bin
 
 fail() {
@@ -105,6 +120,9 @@ fi
 if bash "$CODE_WRITE" --spec "s" --target out.py --reference nope.py 2>/dev/null; then
   fail "code-write accepted a missing reference file"
 fi
+if bash "$CODE_WRITE" --spec "s" --target ../outside.py 2>/dev/null; then
+  fail "code-write accepted a target outside the working directory"
+fi
 [ ! -s "$CODEX_TEST_ARGS" ] || fail "code-write called codex for invalid arguments"
 
 printf 'def test_existing():\n    assert 1 == 1\n' >ref_test.py
@@ -130,6 +148,13 @@ failure_status=$?
 set -e
 [ "$failure_status" -eq 1 ] || fail "code-write did not fail when nothing was written: $failure_status"
 grep -q 'did not write never.py' <<<"$failure_output" || fail "code-write did not report the missing write: $failure_output"
+
+set +e
+failure_output="$(bash "$CODE_WRITE" --spec "SKIP_THE_WRITE" --target ref_test.py 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 1 ] || fail "code-write reported success for an untouched existing target: $failure_status"
+grep -q 'did not change ref_test.py' <<<"$failure_output" || fail "code-write did not report the unchanged target: $failure_output"
 
 # --- bulk-read-guard -------------------------------------------------------------
 
@@ -165,15 +190,47 @@ assert_allowed "Read with a bounded range" Read '{"file_path":"'"$TMP_DIR"'/work
 assert_allowed "Read near the end of a large file" Read '{"file_path":"'"$TMP_DIR"'/work/big.txt","offset":300}'
 assert_allowed "Read of a small file" Read '{"file_path":"'"$TMP_DIR"'/work/small.txt"}'
 assert_allowed "Read of a binary file" Read '{"file_path":"'"$TMP_DIR"'/work/blob.bin"}'
+assert_denied "Read from line 1 of a file just over the threshold" Read '{"file_path":"'"$TMP_DIR"'/work/edge.txt","offset":1}'
+assert_allowed "Read from line 2 of a file just over the threshold" Read '{"file_path":"'"$TMP_DIR"'/work/edge.txt","offset":2}'
+assert_denied "Read with a non-numeric limit" Read '{"file_path":"'"$TMP_DIR"'/work/big.txt","limit":"all"}'
+space_output="$(run_guard Read '{"file_path":"'"$TMP_DIR"'/work/sp ace.txt"}')"
+jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$space_output" | grep -qF 'sp\ ace.txt' ||
+  fail "deny reason does not shell-quote a path with a space: $space_output"
 
 assert_denied "cat of a large file" Bash '{"command":"cat big.txt"}'
 assert_denied "rtk cat of a large file" Bash '{"command":"rtk cat big.txt"}'
 assert_denied "cat inside a pipeline" Bash '{"command":"cat big.txt | grep x"}'
 assert_denied "cat of files that together exceed the threshold" Bash '{"command":"cat big.txt small.txt"}'
+assert_denied "cat reading from stdin redirection" Bash '{"command":"cat < big.txt"}'
+assert_denied "cat with an attached stdin redirection" Bash '{"command":"cat <big.txt"}'
+assert_denied "cat invoked by absolute path" Bash '{"command":"/bin/cat big.txt"}'
 assert_allowed "bounded sed of a large file" Bash "{\"command\":\"sed -n '1,40p' big.txt\"}"
 assert_allowed "cat of a small file" Bash '{"command":"cat small.txt | head"}'
 assert_allowed "heredoc write into a large file" Bash "{\"command\":\"cat <<'EOF' > big.txt\\nline\\nEOF\"}"
 assert_allowed "cat of a missing file" Bash '{"command":"cat nope.txt"}'
 assert_allowed "unrelated tool" Write '{"file_path":"'"$TMP_DIR"'/work/big.txt","content":"x"}'
+
+# --- hooks.json.tmpl ---------------------------------------------------------------
+# The Codex template re-reads the deployed file, so it must drop stale cmux and
+# guard entries and re-add exactly one guard, and rendering its own output
+# must be a fixed point.
+
+mkdir -p "$TMP_DIR/home/.codex"
+cat >"$TMP_DIR/home/.codex/hooks.json" <<'EOF'
+{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"\"$HOME/.local/libexec/cmux/agent-board-state\" working","timeout":5},{"type":"command","command":"\"$HOME/.local/bin/bulk-read-guard\"","timeout":10}]}],"Stop":[{"hooks":[{"type":"command","command":"keep-me"}]}]}}
+EOF
+render_hooks() {
+  HOME="$TMP_DIR/home" chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl"
+}
+first_render="$(render_hooks)"
+[ "$(jq '[.. | strings | select(contains("bulk-read-guard"))] | length' <<<"$first_render")" -eq 1 ] ||
+  fail "hooks.json.tmpl did not render exactly one guard: $first_render"
+jq -e '[.. | strings | select(contains("cmux"))] | length == 0' <<<"$first_render" >/dev/null ||
+  fail "hooks.json.tmpl kept a cmux hook: $first_render"
+jq -e '.hooks.Stop[0].hooks[0].command == "keep-me"' <<<"$first_render" >/dev/null ||
+  fail "hooks.json.tmpl dropped an unrelated hook: $first_render"
+printf '%s\n' "$first_render" >"$TMP_DIR/home/.codex/hooks.json"
+second_render="$(render_hooks)"
+[ "$first_render" = "$second_render" ] || fail "hooks.json.tmpl is not idempotent"
 
 echo "test-delegation: OK"

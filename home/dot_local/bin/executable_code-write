@@ -83,7 +83,13 @@ if [[ -e "$target" && ! -f "$target" ]]; then
   echo "code-write: target is not a regular file: $target" >&2
   exit 2
 fi
-for file_path in "${references[@]}"; do
+workspace="$(pwd -P)"
+target_abs="$(cd "$target_dir" && pwd -P)/$(basename "$target")"
+if [[ "$target_abs" != "$workspace"/* ]]; then
+  echo "code-write: target must be inside the current working directory: $target" >&2
+  exit 2
+fi
+for file_path in ${references[@]+"${references[@]}"}; do
   if [[ ! -f "$file_path" || ! -r "$file_path" ]]; then
     echo "code-write: not a readable reference file: $file_path" >&2
     exit 2
@@ -115,12 +121,19 @@ PROMPT
   else
     printf '\n<target path="%s" exists="false" />\n' "$target"
   fi
-  for file_path in "${references[@]}"; do
+  for file_path in ${references[@]+"${references[@]}"}; do
     printf '\n<reference path="%s" lines="%s">\n' "$file_path" "$(wc -l <"$file_path")"
     cat "$file_path"
     printf '\n</reference>\n'
   done
 } >"$prompt_file"
+
+# Remember the target's current content so an untouched target is reported
+# as a failure instead of a successful write.
+before_checksum=""
+if [[ -f "$target" ]]; then
+  before_checksum="$(cksum <"$target")"
+fi
 
 echo "code-write: ${#references[@]} reference(s) -> ${CODE_WRITE_MODEL} (${CODE_WRITE_REASONING_EFFORT}) writing ${target}" >&2
 
@@ -147,6 +160,11 @@ fi
 
 if [[ ! -s "$target" ]]; then
   echo "code-write: the writer did not write ${target}" >&2
+  tail -n 20 "$codex_log" >&2
+  exit 1
+fi
+if [[ -n "$before_checksum" && "$(cksum <"$target")" == "$before_checksum" ]]; then
+  echo "code-write: the writer did not change ${target}" >&2
   tail -n 20 "$codex_log" >&2
   exit 1
 fi
