@@ -41,13 +41,13 @@ local builtInLayout = {
     topHeight = 0.8,
 
     topApps = {
-        "Sublime Text",
-        "Orca"
+        "Sublime Text"
     },
 
     fullscreenApps = {
         "Google Chrome",
-        "Cursor"
+        "Cursor",
+        "Orca"
     }
 }
 
@@ -247,7 +247,7 @@ local function layoutBuiltInDisplay()
     local frame = builtInScreen:frame()
     local topHeight = frame.h * builtInLayout.topHeight
 
-    -- Position apps that use the top area (Sublime Text, Orca)
+    -- Position apps that use the top area (Sublime Text)
     for _, appName in ipairs(builtInLayout.topApps) do
         local app = hs.application.get(appName)
         if app then
@@ -263,7 +263,7 @@ local function layoutBuiltInDisplay()
         end
     end
 
-    -- Position apps that use fullscreen (Chrome, Cursor)
+    -- Position apps that use fullscreen (Chrome, Cursor, Orca)
     for _, appName in ipairs(builtInLayout.fullscreenApps) do
         local app = hs.application.get(appName)
         if app then
