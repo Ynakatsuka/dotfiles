@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Keep Orca's workspace order manual and install the dotfiles-owned Quick Command.
+# Manage Orca's base-ref refresh, workspace order, and dotfiles-owned Quick Command.
 # Orca stores these settings with dynamic workspace and tab state, so only merge
 # the fields owned here and preserve the rest of the file.
 
@@ -25,6 +25,7 @@ printf '%s' "$input" | jq -cj '
     error("Orca ui settings must be an object")
   else
     .ui.sortBy = "manual"
+    | .settings.refreshLocalBaseRefOnWorktreeCreate = true
     | .settings.terminalQuickCommands = (
         [.settings.terminalQuickCommands[]
           | select(

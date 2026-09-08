@@ -259,6 +259,11 @@ Built-in display layout:
 
 Run `aio` in Raycast to create an AI-named worktree from the selected Orca workspace and start a Claude or Codex session.
 
+Dotfiles enables Orca's `refreshLocalBaseRefOnWorktreeCreate` setting through `chezmoi apply`.
+Orca fetches remote base refs during worktree creation; this setting also updates the corresponding local branch when it can safely fast-forward.
+No manual pull is needed for each new workspace. Without a repository-specific base ref, Orca prefers `origin/HEAD`; set a repository override when development uses a different branch, such as `origin/staging`.
+Fetch failures can leave Orca using an older ref, so this does not guarantee the latest remote commit when fetching fails.
+
 | Keybinding | Action |
 |------------|--------|
 | `Cmd+Shift+Right` / `Cmd+Shift+Left` | Move to the next / previous tab |
