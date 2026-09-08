@@ -30,8 +30,26 @@ bulk-read --question "<one precise question>" <file>...
 - Ask one specific question per call and name the identifiers or behavior you need. Vague
   questions return vague summaries.
 - Pass only the files the question needs. Each file is sent verbatim.
-- The answer arrives on stdout after roughly 10 to 60 seconds; progress goes to stderr. A non-zero
-  exit means the delegation failed. Report the error instead of retrying with the same input.
+- The answer arrives on stdout; startup information goes to stderr. Runtime depends on input
+  size and reasoning. Silence is not evidence of completion or failure. A non-zero exit means
+  the delegation failed. Report the error instead of retrying with the same input.
+
+## Collecting completion
+
+- This command is a shell process, not a `spawn_agent` task. Do not use `wait_agent`,
+  `clock.sleep`, or shell `sleep` to wait for its result, and do not rely on a completion notification.
+- In Codex, when `exec_command` returns a `session_id`, collect output with `write_stdin`
+  using that ID and empty `chars`. Use `yield_time_ms: 1000` while waiting for this result;
+  repeat while a `session_id` remains, until an `exit_code` and the final output arrive.
+  The tool may enforce a longer minimum wait, but returns early when the process finishes.
+- `functions.exec` saying `Script completed` only ends the JavaScript wrapper. An inner
+  `session_id` still needs collection. If the wrapper instead yields a running `cell_id`,
+  resume it with `functions.wait` and `yield_time_ms: 1000`, then inspect the inner result.
+- Do independent work while the reader runs, but check its result at the next tool boundary.
+  When its answer is the only remaining dependency, keep collecting directly without an
+  extra delay. Once the exit code and answer arrive, consume them and stop waiting.
+- In Claude Code, collect a background Bash task with `TaskOutput` using its returned task ID;
+  a finished task's output should be read immediately rather than waiting for another notification.
 
 ## Working with the answer
 
