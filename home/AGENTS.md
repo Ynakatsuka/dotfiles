@@ -27,10 +27,12 @@
 ## Effort and Scope
 
 - Solve the underlying cause within the requested scope. Do not stop at a symptom-level workaround, and do not broaden the task into adjacent cleanup or redesign.
-- Take the shortest safe path to the requested outcome. Apply a deletion test: omit work whose absence would not weaken correctness, verification, safety, an existing contract, or explicit acceptance criteria. Do not add abstractions, generalization, polish, or coverage for hypothetical future needs.
-- Prefer a local change within existing responsibilities and contracts. Judge minimality by the state, concepts, and callers maintainers must keep consistent, not just changed lines. Do not compress code or duplicate business rules merely to shrink the diff.
-- Before adding a field to a dataclass, model, or shared context, check whether existing data or a local computation can express the required behavior. Add stored state only when it represents independently required information with a clear owner and lifetime; do not store derived values or pass one caller's temporary needs through unrelated layers.
-- When a fix requires changes across constructors, callers, serialization, or fixtures, reassess the design before extending it. Briefly explain why the existing contract cannot solve the problem locally and why the added maintenance cost is necessary for the request.
+- Among implementations that satisfy the requested behavior and existing contracts, prefer the one with less stored state, fewer independent branches, and fewer callers that need changes. Keep changes within existing responsibilities. Do not compress code or duplicate business rules merely to shrink the diff.
+- First check whether the existing data structures can satisfy the request. Add a field to a dataclass, struct, model, or shared context only when existing information and computation at the point of use cannot satisfy it. Before adding the field, briefly show one concrete input and expected behavior that cannot be handled without it. This explanation does not itself require an approval pause.
+- Keep temporary values used by only one operation local to that operation; do not pass them through unrelated layers or store them in shared models.
+- Do not add fields, configuration, or abstractions solely for future use, symmetry, generality, or ease of testing. Claims such as "more extensible" or "clearer responsibilities" do not establish necessity on their own.
+- Before finishing, review the state and abstractions added by this change. Remove anything whose removal still allows the requested behavior and existing contracts to be satisfied.
+- Apply a deletion test to the remaining work: omit work whose absence would not weaken correctness, verification, safety, an existing contract, or explicit acceptance criteria.
 - Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
 - Complete every explicitly requested item. If one is genuinely blocked, complete the rest and name the specific blocker.
 - Treat questions as requests for an answer, not authorization to edit files or mutate state. Make changes only when the user asks for action.
