@@ -118,6 +118,12 @@ Codex subagent defaults. Its standard `[agents]` section is deployed to
 chezmoi apply
 ```
 
+The config template preserves Codex-managed desktop preferences, hook trust
+state, and project entries whose paths do not exactly match the home directory
+or a ghq repository root. Those exact paths remain trusted by the dotfiles
+policy; existing entries for subdirectories are preserved. Run
+`bash scripts/test-codex-config.sh` to verify config preservation and idempotence.
+
 The personal `my-subagent` skill is managed at
 `~/.agents/skills/my-subagent`; `~/.claude/skills/my-subagent` is a
 compatibility symlink to it. No duplicate is generated under
