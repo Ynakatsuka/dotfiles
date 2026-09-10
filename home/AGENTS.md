@@ -66,6 +66,7 @@ Avoid these patterns unless explicitly approved:
 ## Safety and Git
 
 - Ask before adding or changing production dependencies, performing destructive or irreversible actions, or sending, publishing, deploying, or mutating external state.
+- Never infer or transfer merge authorization to another pull request.
 - Complete local, reversible validation before external side effects. Do not chain a push, deployment, publication, or send operation with checks that can still fail afterward.
 - Never commit or push unless the user explicitly requests it. A request to fix or update an existing pull request authorizes committing the requested fixes and pushing the validated commits to that pull request's existing source branch without separate approval. Confirm the current branch and pull request head branch before committing or pushing.
 - Never commit secrets, credentials, or environment files. Read the staged diff before committing and check it for them.
