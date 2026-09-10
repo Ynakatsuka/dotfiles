@@ -169,7 +169,10 @@ the threshold, or the hook registration.
 | `Ctrl+O` | Copy the last command output to the clipboard |
 | `Ctrl+K` | Resume a recent Claude Code or Codex session for the current directory |
 
-`Ctrl+K` lists up to 50 recent sessions by default. Set `FZF_SESSION_RESUME_LIMIT` to adjust the limit.
+`Ctrl+K` lists the 100 most recently updated Claude Code and Codex sessions in total
+for the current directory, with the first and latest prompts. The preview shows both
+prompts in full. Set `FZF_SESSION_RESUME_LIMIT` to a positive integer to lower the
+limit; values above 100 are capped at 100.
 
 ### Git
 

@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+"""List recent sessions for the current directory without scanning whole logs."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import mmap
+import os
+import sys
+from collections.abc import Iterator
+from pathlib import Path
+from time import localtime, strftime
+from typing import Any
+
+
+def prompt(row: dict[str, Any], tool: str) -> str:
+    if tool == "claude":
+        if (
+            row.get("type") != "user"
+            or row.get("isMeta")
+            or row.get("isCompactSummary")
+        ):
+            return ""
+        content = row["message"]["content"]
+        if isinstance(content, str):
+            return content
+        return "\n".join(part["text"] for part in content if part["type"] == "text")
+
+    payload = row.get("payload", {})
+    if row.get("type") == "event_msg" and payload.get("type") == "user_message":
+        return payload["message"]
+    if (
+        row.get("type") == "response_item"
+        and payload.get("type") == "message"
+        and payload.get("role") == "user"
+    ):
+        return "\n".join(
+            part["text"]
+            for part in payload["content"]
+            if part["type"] == "input_text"
+            and not part["text"].startswith(
+                ("# AGENTS.md instructions", "<environment_context>")
+            )
+            and "<INSTRUCTIONS>" not in part["text"]
+        )
+    return ""
+
+
+def lines(data: mmap.mmap, *, reverse: bool) -> Iterator[bytes]:
+    if not reverse:
+        while line := data.readline():
+            yield line
+        return
+
+    end = len(data)
+    while end:
+        if data[end - 1 : end] == b"\n":
+            end -= 1
+        start = data.rfind(b"\n", 0, end) + 1
+        yield data[start:end]
+        end = start
+
+
+def read_prompt(data: mmap.mmap, tool: str, *, reverse: bool) -> str:
+    for line in lines(data, reverse=reverse):
+        # Most log entries are assistant output or tool results. Avoid decoding
+        # those large JSON objects when looking for user messages.
+        if b'"user"' not in line and b'"user_message"' not in line:
+            continue
+        text = prompt(json.loads(line), tool)
+        if text.strip():
+            return text
+    return ""
+
+
+def prompts(file_path: Path, tool: str) -> tuple[str, str]:
+    with file_path.open("rb") as stream:
+        if os.fstat(stream.fileno()).st_size == 0:
+            return "", ""
+        with mmap.mmap(stream.fileno(), 0, access=mmap.ACCESS_READ) as data:
+            return read_prompt(data, tool, reverse=False), read_prompt(
+                data, tool, reverse=True
+            )
+
+
+def sessions(home: Path, cwd: str, limit: int) -> Iterator[str]:
+    project = cwd.replace("/", "-").replace(".", "-")
+    candidates = [
+        (file_path.stat().st_mtime, "claude", file_path)
+        for file_path in (home / ".claude/projects" / project).glob("*.jsonl")
+        if len(file_path.stem) == 36 and not file_path.stem.startswith("agent-")
+    ]
+    candidates.extend(
+        (file_path.stat().st_mtime, "codex", file_path)
+        for file_path in (home / ".codex/sessions").rglob("*.jsonl")
+    )
+    count = 0
+    for mtime, tool, file_path in sorted(candidates, reverse=True):
+        if tool == "codex":
+            # cwd and id are in the first record; unrelated session bodies do
+            # not need to be searched, even when they contain this cwd as text.
+            with file_path.open("rb") as stream:
+                first_line = stream.readline()
+            if not first_line:
+                continue
+            meta = json.loads(first_line)
+            if meta["type"] != "session_meta":
+                raise ValueError(f"Missing session_meta in {file_path}")
+            if meta["payload"]["cwd"] != cwd:
+                continue
+            session_id = meta["payload"]["id"]
+        else:
+            session_id = file_path.stem
+
+        first, latest = prompts(file_path, tool)
+        yield "\t".join(
+            (
+                tool,
+                strftime("%m/%d %H:%M", localtime(mtime)),
+                "First: " + (" ".join(first.split())[:120] if first else "(no prompt)"),
+                "Latest: "
+                + (" ".join(latest.split())[:120] if latest else "(no prompt)"),
+                session_id,
+                str(file_path),
+            )
+        )
+        count += 1
+        if count >= limit:
+            break
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--preview", nargs=2, metavar=("TOOL", "FILE"))
+    args = parser.parse_args()
+    if args.limit < 1:
+        parser.error("--limit must be a positive integer")
+    if args.preview:
+        tool, filename = args.preview
+        if tool not in ("claude", "codex"):
+            parser.error("TOOL must be claude or codex")
+        first, latest = prompts(Path(filename), tool)
+        print(f"First prompt\n{first}\n\nLatest prompt\n{latest}")
+    else:
+        # Buffer at most 100 rows so a read error never looks like a successful
+        # partial list to the calling widget.
+        rows = list(sessions(Path.home(), os.getcwd(), min(args.limit, 100)))
+        if rows:
+            print("\n".join(rows))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        print(f"session-resume-list: {error}", file=sys.stderr)
+        sys.exit(1)
