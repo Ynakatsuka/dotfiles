@@ -11,6 +11,6 @@
 
 ## Codex Subagent Routing
 
-- Before delegating, read the `my-subagent` skill for execution conditions, role selection, dispatch, and review procedures.
+- Use subagents for independent work when parallel execution can reduce completion time after dispatch and review overhead. Read the `my-subagent` skill for task selection, dispatch, and verification.
 - Default to `fork_turns="none"` when calling `spawn_agent` and include the required context in the task prompt. Inherit only the minimum necessary turns when the task requires conversation history.
 - Every time you call `wait_agent`, explicitly set `timeout_ms` to twice the estimated remaining completion time in milliseconds, within the tool's minimum and maximum limits. If you cannot estimate it, explicitly use the configured default of `120000` ms. Completion notifications end the wait early, so do not shorten it for status polling. After a timeout, update the estimate and apply the same rule.

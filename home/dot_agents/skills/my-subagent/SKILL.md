@@ -1,21 +1,20 @@
 ---
 name: my-subagent
 description: >-
-  Delegate subagent-suitable work to subagents and keep the main agent focused
-  on orchestration, decisions, integration, and final verification. Use
-  automatically whenever a clear, bounded investigation or implementation with
-  settled policy can be isolated; also use when the user says "subagent",
-  "委譲", or "並列実行". Do NOT use for simple one-shot answers, short work
-  where delegation or review overhead is not worthwhile, unresolved decisions
-  or work requiring user approval, or final integration and verification.
+  Delegate independent research, implementation, or verification in parallel when
+  it can save time after dispatch and review overhead, or when explicitly requested.
+  Keep decisions and final integration in the main agent.
 ---
 
 # Subagent Delegation
 
 ## 委譲の判断
 
-現在の実行時方針とユーザー指示が許す場合に、範囲と方針が確定した独立作業を委譲する。
-短時間の作業、密接に関係する変更、委譲と結果確認の負担に見合わない作業は main が行う。
+現在の実行時方針とユーザー指示の範囲内で、独立作業を並列に進め、依頼と結果確認の負担を含めても完了時間を短縮できる場合は subagent を起動する。
+
+- 調査は、問い・調査範囲・求める成果が明確なら、原因や実装方針が未確定でも委譲する。
+- 実装は、方針・担当範囲・受入基準が確定し、他の作業の結果を待たずに進められる部分を委譲する。
+- 短い検索・読み取り・チェックコマンドだけなら、main が独立したツール呼び出しをまとめて並列実行する。密接に関係する変更や、委譲の負担に見合わない作業は main が行う。
 
 - main は作業分解、承認、依存関係・公開契約・設定・破壊的操作の判断、統合、最終検証と完了判断を担う。
 - subagent は割り当てられた調査、実装、テスト、自己レビューを行う。さらに subagent へ委譲しない。
@@ -37,6 +36,10 @@ Codex の full-history fork は親の model と reasoning effort を継承する
 他の実行環境でも設定済みの defaults を使い、起動ツールが扱えない引数を推測して付けない。
 
 ## 依頼と並列化
+
+最初の作業分解時と依存関係が解消した時点で、委譲できる作業を確認する。
+main がその作業へ着手する前に subagent を起動し、main は結果に依存しない必要作業を進める。
+結果が次の作業に必要になるか、独立して進める必要作業がなくなるまで待機しない。委譲済みの調査や実装を main で重複して行わず、返された成果の確認に集中する。
 
 `references/prompts.md` を使い、各依頼に次を含める。
 
