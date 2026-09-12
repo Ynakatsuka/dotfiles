@@ -23,6 +23,11 @@ main() {
   brew update
   brew upgrade --formula
 
+  # Homebrew omits auto-updating casks such as Orca from the default outdated list.
+  if brew list --cask stablyai/orca/orca >/dev/null 2>&1; then
+    brew upgrade --cask stablyai/orca/orca
+  fi
+
   brew outdated --cask --quiet >"$CASK_LIST"
   awk '
     $0 == "google-chrome" {
