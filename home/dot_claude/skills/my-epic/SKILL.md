@@ -15,13 +15,13 @@ argument-hint: "[epic-name|docs/epics/path|request]"
 
 # Epic Delivery Orchestrator
 
-中〜大規模の開発ゴールを、検証可能な PR 単位のツリーへ分解し、ユーザー確認を挟みながら実装と PR 作成まで進める。
+中〜大規模の開発ゴールを、目的達成に必要な最小数の検証可能な node へ分解し、ユーザー確認を挟みながら実装と PR 作成まで進める。
 
 ## セッション中のオーケストレーター責務
 
 このスキルは、ユーザーが `my-epic` を明示的に呼び出した場合だけ開始する。新規 epic を作成したセッションと、既存 epic のオーケストレーターとして呼ばれたセッションでは、同じ epic に関する後続 prompt でもこの責務を維持する。再呼び出しは不要。ユーザーが別の作業へ切り替えた場合は適用しない。
 
-- **main の役割**: node 分解、依存関係、承認、subagent への割り当て、結果と差分のレビュー、統合、最終検証、epic 状態更新、完了判断
+- **main の役割**: node 分解、構成最小化レビュー、依存関係、承認、subagent への割り当て、結果と差分のレビュー、統合、最終検証、epic 状態更新、完了判断
 - **node 実行の既定**: PR leaf の調査・実装・テスト追加・修正と、委譲可能な operation / verification を subagent に実行させる。main が実装者を兼ねない
 - **直接実行の例外**: subagent を使えない、ユーザーが委譲を禁止した、または承認・破壊的操作・外部状態変更・統合・最終検証など main が保持すべき作業に限る。例外理由を対象 node の実行 log に先に記録する
 - **委譲契約**: node goal、対象ファイルまたは実行範囲、変更禁止範囲、受入基準、検証 gate、停止条件を渡す。subagent に再委譲させない
@@ -44,7 +44,7 @@ PR leaf の draft PR を作成または更新するときは、必ず `my-pr` �
 
 - 実行してよいこと: Phase 0〜4 の調査、goal contract、delivery tree、harness plan、`docs/epics/{name}/` 配下の計画ドキュメント作成
 - 実行してはいけないこと: Phase 5 の leaf 実装、operation 実行、draft PR 作成、実装エージェント起動、`references/execution.md` の読み込み
-- 停止位置: `README.md` を更新し、承認ビューで次に実装または実行する node の候補を提示して終了する
+- 停止位置: 構成最小化レビューと `README.md` の更新を終え、承認ビューで epic の全体像と次に実装または実行する node を提示して終了する
 - 再開条件: ユーザーが「実装して」「実行して」「node を進めて」「Phase 5 へ進んで」など、実装または operation 実行を明示した場合だけ Phase 5 に入る
 
 既存 epic の再開でも、ユーザーの依頼が状態確認、計画更新、分解、承認ビュー作成だけなら Phase 5 に入らない。
@@ -79,17 +79,20 @@ docs/epics/{name}/
     └── operations/      # operation node の承認部と実行部
 ```
 
-- 同じ情報は 1 ファイルにだけ書く。node 状態は `ai/tree.md` の node 表、file touch map と gate 詳細は leaf / operation ファイルが正。`README.md` は判断に必要な要約
-- 承認を求めるときは `README.md` を更新してから、該当部分だけをチャットに提示する。`ai/` 配下の全文を人間に読ませない
+- 同じ詳細情報は 1 ファイルにだけ書く。node 状態は `ai/tree.md` の node 表、file touch map と gate 詳細は leaf / operation ファイルが正。`README.md` とチャットは、これらから作る承認用の要約とする
+- 承認を求めるときは `README.md` を更新してから、承認判断に必要な情報をチャットだけで判断できる形にして提示する。`ai/` 配下を開くことを承認の前提にしない
 
 ## 承認ビュー
 
-すべてのユーザー確認をこの形式で行う。
+すべてのユーザー確認をこの形式で行う。承認は epic の範囲、作業順、外部影響を確定する重要な判断である。短さのために判断材料を省かない。
 
-- チャット提示は 1 画面以内。冒頭に現状理解と確定事実を 3 行以内で示す
-- 質問は最大 3 問。各質問は 5 行以内で、推奨案を先頭に置き、選択肢ごとの分岐後の処理を付ける
+- チャットに、承認対象、現状と確認済み事実、目的と成功基準、対象と対象外、前提と未確定事項を示す
+- 提案構成について、critical path、並列化できる部分、実行順を示す。各 node は、目的、成果物または実行範囲、依存関係、受入基準、検証方法、契約・データ・運用への影響、主なリスク、独立 node にする理由を示す
+- 変更後に何を開始するか、まだ許可されていない外部状態変更や破壊的操作は何か、失敗時の停止・rollback 方針を示す
+- 質問は一度に判断できる最大 3 件へまとめる。各質問は推奨案と理由を先に示し、選択肢ごとに scope、node、順序、リスクがどう変わるかを書く。情報量に一律の行数上限を置かない
 - 返答選択肢は `承認 / 分割 / 統合 / 順序変更 / スコープ変更` を基本にする
-- 再承認では前回承認版との差分だけを示す
+- 再承認では、前回承認版からの差分と、差分を反映した承認対象の全体を示す。ユーザーに旧版との差分を頭の中で統合させない
+- 詳細ファイルへのリンクは補足として付けてよいが、リンク先を読まなくても判断できる内容にする
 - 結果は `README.md` の承認履歴と、`ai/program.md` の判断表または `ai/decisions.md` に記録する
 
 ## 共通原則
@@ -98,6 +101,7 @@ docs/epics/{name}/
 - **記述言語**: epic ドキュメントは日本語で書く。コードコメント、docstring、commit message、コマンド、識別子は英語を維持する
 - **実装方針**: 実装または operation 実行は、ユーザーが Phase 5 の開始または特定 node の実行を明示した後にだけ進める。実行可能な node 作業は subagent へ委譲する
 - **PR leaf の定義**: 単独でレビュー・マージ可能で、受入基準と検証ゲートが明確な最小成果物
+- **最小構成**: node 数ではなく、安全にレビュー・実行できる範囲で handoff と critical path が最小になる構成を選ぶ。独立した成果物、実行、承認、環境、rollout、rollback の境界がない作業は同じ node にまとめる
 - **確認単位**: root goal、主要分岐、PR leaf goal、operation 実行内容、技術選定、破壊的変更、PR 作成前
 - **自律性**: コード・テスト・docs・履歴から判断できることはユーザーに聞かない
 - **停止方針**: 推測で進めない。失敗、曖昧な仕様、契約変更、検証不能は停止して確認する
@@ -184,20 +188,33 @@ README.md の Phase 計画の書き方、判断表の作り方（Phase 0 調査�
 
 `ai/tree.md` を作成し、root goal を PR leaf と operation node を含む delivery tree へ分解する。node 状態は `ai/tree.md` の node 表を single source of truth にする。
 
-Delivery tree は、調査で「PR 以外の作業が不要」と確認できた場合を除き、PR leaf だけで完結させない。初回実行、one-off script、migration、backfill、feature flag 切替、外部サービス設定、手動確認、検証だけの作業を必ず operation / verification / decision node として検討し、不要なら理由を `ai/tree.md` に記録する。
+Delivery tree には、目的と成功基準の達成に必要な node だけを置く。初回実行、one-off script、migration、backfill、feature flag 切替、外部サービス設定など、PR の成果物とは別の実行が実際に必要な場合だけ operation node を作る。該当しない作業のための placeholder node や「不要」と記録するためだけの node は作らない。
 
 node 種別:
 
 - **PR leaf**: コード、テスト、docs、config 変更をレビュー・マージする PR
 - **Operation node**: PR ではなく、移行、backfill、初期 script 実行、feature flag 切替、外部サービス設定、手動確認などを行う作業
-- **Verification node**: 既存状態、データ、監視、移行結果を確認するだけの作業
-- **Decision node**: 実行前にユーザー、owner、運用担当の判断が必要な作業
+- **Verification node**: 別の時点、環境、owner で既存状態、データ、監視、移行結果を確認し、その証跡が後続作業を独立して block する作業。実装直後のテストや同じ operation の結果確認は元 node の gate に含める
+- **Decision node**: 計画承認では確定できず、将来の観測結果や別 owner の判断が後続作業を独立して block する作業。今の承認で決められる事項は承認待ち事項と判断記録で扱う
 
 分解の形（milestone / PR / OP / VERIFY のツリー例）と分解ルールの詳細は `references/planning.md` の Phase 3 節に従う。
 
+### 構成最小化レビュー
+
+epic の新規作成後と、goal、scope、成功基準、delivery tree、harness の更新後に必ず行う。このレビュー自体を delivery node や README.md の Phase にしない。
+
+1. 各 node を外した場合に、成功基準、正しさ、安全性、既存 contract のいずれが満たせなくなるか確認する。どれも弱まらない node は削除する
+2. 隣接 node 間に独立した review / merge、実行環境、owner、承認、rollout、rollback の境界がなければ統合する
+3. test、docs、config、同じ変更直後の検証は、独立して配布または実行する理由がない限り対象 PR leaf または operation node に含める
+4. verification は元 node の gate で表現できない場合だけ独立 node にする。decision は今回の承認で解決できない場合だけ独立 node にする
+5. 不要な直列依存を外し、競合しない作業は並列化する。ただし分割・統合・調整の時間が短縮時間を上回る並列化は行わない
+6. 全成功基準が少なくとも 1 つの node と gate に対応し、全 node が少なくとも 1 つの成功基準または必須の安全条件に対応することを確認する
+
+レビュー後の delivery tree を承認対象とする。安全な境界を保ったまま、PR 数、operation 数、handoff 数、critical path を最小にする。
+
 ユーザー確認:
 
-- `README.md` の Phase 計画、node 一覧（1 node 1 行）、主要リスク、成功基準を更新してから、承認ビュー形式で確認する
+- `README.md` の Phase 計画、node 一覧、主要リスク、成功基準、承認対象の詳細を更新してから、承認ビュー形式で確認する
 - `README.md` の Phase 計画は、delivery tree を作った後に「今回の目的を達成する実装・実行・テストの順序」へ言い換える。承認、tree 分解、harness plan などの内部作業を phase として載せない
 - milestone 単位でまとめて確認してよい。operation node と破壊的変更を含む node は個別に明示する
 - ユーザー承認前に Phase 5 の実装・実行へ進まない
@@ -211,7 +228,7 @@ node 種別:
 - PR leaf 承認部: PR goal、依存関係、file touch map、contract impact、受入基準、検証 gate、review gate 観点
 - operation 承認部: operation goal、依存関係、実行 scope、前提条件、実行手順、rollback / abort、承認 gate
 
-ハーネスが未整備なら、実装 PR leaf より前に `Harness PR` を作る。
+ハーネスが未整備でも、対象 leaf 内の最小変更で検証可能なら同じ leaf に含める。複数 leaf が先に依存する共有 harness など、独立した merge 境界が必要な場合だけ `references/harness.md` の条件に従って `Harness PR` を作る。
 
 PR 作成に進んでよい条件:
 
@@ -243,7 +260,7 @@ PR leaf の実行手順:
 4. 調査が必要なら read-only subagent、実装方針が確定しているなら実装 subagent に委譲する
 5. main が subagent の結果と差分を確認し、承認済み file touch map 内であることを確認する
 6. leaf の Test / Data / Smoke gate を main 側で実行する
-7. 独立レビューが有効で実行環境が許す場合は、Spec compliance review と Code quality review を別の subagent に順番に委譲し、main が結果を判定する
+7. main が Spec compliance と Code quality を 1 回の統合レビューで確認する。公開 contract、security、migration、データ損失など高リスクな変更、またはユーザーが求めた場合だけ独立 reviewer を追加する
 8. 実行部の実装記録を記録する
 9. 失敗した場合は root cause を特定し、同じ実装 subagent に 1 回だけ修正サイクルを依頼する
 10. まだ失敗する、または設計矛盾がある場合は停止する

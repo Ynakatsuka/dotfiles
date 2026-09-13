@@ -61,7 +61,7 @@ PR 作成・更新は `my-pr create` に委譲する。実装 node は subagent 
 5. Subagent の実行中、main は同じ担当ファイルを編集しない
 6. Main が返却された差分と報告を読み、承認済み file touch map と契約に一致することを確認する
 7. Main が Test / Data / Smoke gates を実行する
-8. Spec compliance review、Code quality review の順で確認し、実行部の実装記録と実行 log を更新する
+8. Main が Spec compliance と Code quality を 1 回の統合レビューで確認し、実行部の実装記録と実行 log を更新する。高リスク変更またはユーザー要求がある場合だけ独立 reviewer を追加する
 
 書き込みを行う subagent を並列起動する場合は、各 subagent に隔離した worktree と重複しない write set を割り当てる。main が直接実装してよいのは `Direct-exception` だけであり、leaf が小さいこと自体は理由にしない。
 
@@ -154,7 +154,7 @@ PR leaf 実装後:
 2. すべての編集が承認済み file touch map 内であることを確認する
 3. leaf gates を直接実行する
 4. Public or shared contract に触れた場合は related call sites を探す
-5. Code quality review の前に Spec compliance review を実行する
+5. Spec compliance と Code quality の観点を 1 回の統合レビューで確認する
 6. 実行部の実装記録と実行 log を更新する
 7. Required gates がすべて通った後だけ `ai/tree.md` の node 表と `README.md` の進捗を更新する
 
@@ -168,8 +168,7 @@ Operation 実行後:
 
 ## Review gates
 
-実装後、PR creation 前に実行する。
-Spec compliance が通るまで code quality cleanup を始めない。
+実装後、PR creation 前に main が 1 回の統合レビューとして実行する。これらを delivery node にしない。公開 contract、security、migration、データ損失など高リスクな変更、またはユーザーが求めた場合だけ独立 reviewer を追加する。
 
 ### Spec compliance review
 
