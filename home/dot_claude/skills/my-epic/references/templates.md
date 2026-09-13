@@ -39,6 +39,7 @@ docs/epics/{epic}/
 - **Root goal**: {一文}
 - **対象**: {in-scope の要約}
 - **対象外**: {non-goals の要約}
+- **前提 / 制約**: {構成判断に影響する確認済み事実}
 
 ## 成功基準
 <!-- 完了判断に使う基準だけを書く。各基準は code / test / data / operation / PR の証跡に接続する。 -->
@@ -47,29 +48,38 @@ docs/epics/{epic}/
 | {期待成果} | {command / query / PR / dashboard / manual evidence} | {PR-001 / OP-001 / VERIFY-001} |
 
 ## Phase 計画
-<!-- 今回の目的を達成するための実装・実行・テストの順序を書く。スキル内部の承認、tree 分解、harness plan、closure を phase として載せない。 -->
+<!-- 今回の目的を達成するために実際に必要な実装・実行・テストの順序だけを書く。固定の Phase を埋めず、同じ変更境界の作業はまとめる。スキル内部の承認、tree 分解、harness plan、closure を phase として載せない。 -->
 | Phase | 目的 | 実装・実行内容 | 確認方法 | 状態 |
 |---|---|---|---|---|
-| 1 現状確認 | 変更対象と既存挙動を特定する | docs、code、tests、contract、運用制約を確認する | 変更対象、影響範囲、未確定事項が記録済み | planned |
-| 2 テスト準備 | 期待挙動を先に固定する | unit / integration / contract / data / smoke の必要な gate を追加または選定する | 失敗再現または回帰検知できる command が明記済み | planned |
-| 3 実装 | 目的達成に必要な code / config / docs / script を変更する | 依存順に PR leaf を実装し、必要な operation 手順を整える | 各 leaf の受入基準と test gate が通る | planned |
-| 4 実行 | PR だけでは完了しない作業を行う | migration、backfill、初期 script、feature flag、manual operation を実行する | dry-run、実行ログ、data check、rollback 証跡が記録済み | planned |
-| 5 総合確認 | 完了条件を横断確認する | CI、smoke、observability、data invariant、PR 状態を確認する | 成功基準がすべて証跡に接続済み | planned |
-| 6 仕上げ | 残リスクと後続作業を閉じる | cleanup、follow-up、未マージ PR、rollback 条件を整理する | 完了サマリーと残タスクが記録済み | planned |
+| 1 {利用者に分かる作業名} |  |  |  | planned |
 
 ## 主要リスク
 <!-- 3 件以内。承認判断に影響するものだけ。 -->
--
+| リスク | 影響 | 回避・検知・rollback |
+|---|---|---|
+
+## 承認対象
+- **対象**: {新規計画 / 更新内容}
+- **確認済み事実**: {計画の根拠にした code、docs、tests、運用情報}
+- **提案方針**: {採用する実装・実行方針と理由}
+- **Critical path**: {node の順序}
+- **並列実行**: {同時に進める node と、安全に並列化できる根拠 / なし}
+- **公開 contract への影響**: {API / schema / CLI / config / event}
+- **データ・運用・外部状態への影響**: {対象環境、変更内容、権限、不可逆性 / なし}
+- **停止・rollback 方針**: {失敗条件と戻し方}
+- **承認後に開始する作業**: {最初の node と、承認によって許可される範囲}
+- **まだ許可されない作業**: {push / PR / migration / production 操作など / なし}
+- **前回承認版との差分**: {新規の場合は n/a}
 
 ## Node 一覧
-<!-- 1 node 1 行。詳細は ai/leaves/ ai/operations/ を参照。 -->
-| Node | 種別 | 目的 | 成功基準 | 状態 |
-|---|---|---|---|---|
+<!-- 承認対象の全 node を載せる。各セルは、ai/leaves/ ai/operations/ の承認部から判断に必要な内容を要約する。 -->
+| Node | 目的・成果 | 変更・実行範囲 | 依存・順序 | 受入基準・検証 | 影響・リスク | 独立 node にする理由 | 状態 |
+|---|---|---|---|---|---|---|---|
 
 ## 承認待ち事項
-<!-- 質問は最大 3 問。推奨案を先頭に置く。決定したら承認履歴へ移す。 -->
-| # | 質問 | 推奨案 | 選択肢と分岐 |
-|---|---|---|---|
+<!-- 質問は一度に判断できる最大 3 問。根拠と分岐後の影響を省かない。決定したら承認履歴へ移す。 -->
+| # | 判断に必要な事実 | 質問 | 推奨案と理由 | 選択肢ごとの scope・node・順序・リスクへの影響 |
+|---|---|---|---|---|
 
 ## 承認履歴
 | 日付 | 対象 | 決定 |
@@ -174,22 +184,26 @@ docs/epics/{epic}/
 - **不要と判断した根拠**:
 - **再確認する条件**:
 
+## 構成最小化レビュー
+- **削除・統合した候補**: {候補 → 統合先と理由 / なし}
+- **残した分割境界**: {node → 独立した review / merge / owner / environment / approval / rollout / rollback 境界}
+- **並列化**: {並列 group と短縮できる理由 / なし}
+
 ## Tree
 
 ```text
 Root Initiative
 └── M1: {milestone}
-    ├── PR-001: {leaf title}
-    ├── OP-001: {operation title}
-    └── VERIFY-001: {verification title}
+    └── PR-001: {leaf title including its tests and immediate verification}
 ```
+
+<!-- PR 外の実行や独立した確認が実際に必要な場合だけ OP / VERIFY / DECISION node を追加する。 -->
 
 ## Node 表（状態の single source of truth）
 <!-- file touch map と gate 詳細は各 leaf / operation ファイルに書く。 -->
 | Node | 種別 | 内容 | 依存 | Unlocks | 並列 group | 承認 | 状態 | PR |
 |---|---|---|---|---|---|---|---|---|
-| PR-001 | PR leaf |  | none | OP-001 | P1 | pending | planned | - |
-| OP-001 | Operation |  | PR-001 | - | serial | pending | planned | n/a |
+| PR-001 | PR leaf |  | none | - | serial | pending | planned | - |
 
 承認: pending | approved。状態: planned | in-progress | blocked | PR-open | complete | merged | skipped。
 
@@ -198,7 +212,7 @@ Root Initiative
 ### M1: {milestone}
 - **Goal**:
 - **Exit criteria**:
-- **Nodes**: PR-001, OP-001
+- **Nodes**: PR-001
 - **承認**: pending | approved
 ````
 

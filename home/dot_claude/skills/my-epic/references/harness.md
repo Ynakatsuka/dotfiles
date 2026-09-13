@@ -95,14 +95,14 @@ operation gate を「手で実行する」で置き換えない。手動実行�
 
 ## Harness-first rule
 
-以下の場合は、実装 PR より前に separate Harness PR を作る。
+以下のいずれかに該当し、対象実装 leaf に含めると独立した merge 順序または review 境界を失う場合だけ、実装 PR より前に separate Harness PR を作る。
 
 - 必要な test が存在せず、複数 leaf で再利用される
 - Contract behavior が不明
 - Data validation に reusable script や fixture が必要
 - Smoke testing に新しい local / staging tooling が必要
 
-Acceptance criteria を弱めて、harness 不足を隠さない。
+1 つの実装 leaf だけが使う test、fixture、script、tooling は、同じ leaf に含める。Acceptance criteria を弱めて、harness 不足を隠さない。
 
 ## PR leaf ready checklist
 
