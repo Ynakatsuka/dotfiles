@@ -88,6 +88,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 ### Manual Steps
 
 - `gh auth login`, `tailscale up`
+- On macOS with Orca installed, run `orca-browser-setup`, then import the Chrome work session into Orca's `Work` browser profile
 - Re-login after adding user to Docker group
 - Google Japanese IME may require macOS restart
 

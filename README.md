@@ -268,6 +268,18 @@ Built-in display layout:
 
 Run `aio` in Raycast to create an AI-named worktree from the selected Orca workspace and start a Claude or Codex session.
 
+After installing Orca on a new machine, create the non-secret browser profile managed by these dotfiles:
+
+```bash
+orca-browser-setup
+```
+
+The command starts Orca when needed and idempotently creates an imported-session profile named `Work`.
+It exits successfully without changing anything when the platform-specific Orca CLI is not installed.
+Then open **Settings > Browser > Session & Cookies** and import the required Chrome work profile into `Work`.
+Cookies, passwords, profile IDs, and browser storage remain machine-local and are never stored in this repository.
+The shared `orca-cli` skill loads the guide bundled with the installed Orca version, so agents use the matching CLI contract.
+
 Dotfiles enables Orca's `refreshLocalBaseRefOnWorktreeCreate` setting through `chezmoi apply`.
 Orca fetches remote base refs during worktree creation; this setting also updates the corresponding local branch when it can safely fast-forward.
 No manual pull is needed for each new workspace. Without a repository-specific base ref, Orca prefers `origin/HEAD`; set a repository override when development uses a different branch, such as `origin/staging`.
