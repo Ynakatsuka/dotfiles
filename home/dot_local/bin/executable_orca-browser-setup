@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# Create the non-secret Orca browser profile managed by these dotfiles.
+
+set -euo pipefail
+
+readonly PROFILE_LABEL='Work'
+readonly PROFILE_SCOPE='imported'
+
+die() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
+resolve_orca_cli() {
+  local candidate
+
+  if [[ -n "${ORCA_CLI_COMMAND:-}" ]]; then
+    candidate="$ORCA_CLI_COMMAND"
+  elif [[ -n "${ORCA_DEV_REPO_ROOT:-}" ]]; then
+    candidate='orca-dev'
+  elif [[ "$(uname -s)" == 'Linux' ]]; then
+    candidate='orca-ide'
+  else
+    candidate='orca'
+  fi
+
+  if ! command -v "$candidate" >/dev/null 2>&1; then
+    printf 'Orca CLI not found; skipping browser profile setup: %s\n' "$candidate" >&2
+    return 1
+  fi
+  command -v "$candidate"
+}
+
+orca_json() {
+  local response
+
+  if ! response=$("$orca_bin" "$@" --json); then
+    [[ -z "$response" ]] || printf '%s\n' "$response" >&2
+    die "Orca command failed: $*"
+  fi
+  if ! jq -e '.ok == true' <<<"$response" >/dev/null; then
+    printf '%s\n' "$response" >&2
+    die "Orca command did not report success: $*"
+  fi
+
+  printf '%s\n' "$response"
+}
+
+require_command() {
+  local name="$1"
+
+  command -v "$name" >/dev/null 2>&1 || die "$name not found in PATH"
+}
+
+if ! orca_bin=$(resolve_orca_cli); then
+  exit 0
+fi
+readonly orca_bin
+require_command jq
+
+orca_json open >/dev/null
+profiles_json=$(orca_json tab profile list)
+work_profiles=$(jq -ce \
+  --arg label "$PROFILE_LABEL" \
+  '[.result.profiles[] | select(.label == $label)]' \
+  <<<"$profiles_json") || die 'failed to parse Orca browser profiles'
+profile_count=$(jq -r 'length' <<<"$work_profiles")
+
+case "$profile_count" in
+  0)
+    orca_json tab profile create \
+      --label "$PROFILE_LABEL" \
+      --scope "$PROFILE_SCOPE" >/dev/null
+    ;;
+  1)
+    existing_scope=$(jq -r '.[0].scope' <<<"$work_profiles")
+    [[ "$existing_scope" == "$PROFILE_SCOPE" ]] ||
+      die "Orca browser profile '$PROFILE_LABEL' has unexpected scope: $existing_scope"
+    ;;
+  *)
+    die "multiple Orca browser profiles are named '$PROFILE_LABEL'"
+    ;;
+esac
+
+profiles_json=$(orca_json tab profile list)
+if ! jq -e \
+  --arg label "$PROFILE_LABEL" \
+  --arg scope "$PROFILE_SCOPE" \
+  '[.result.profiles[] | select(.label == $label and .scope == $scope)] | length == 1' \
+  <<<"$profiles_json" >/dev/null; then
+  die "Orca browser profile '$PROFILE_LABEL' was not created correctly"
+fi
+
+printf 'Orca browser profile %q is ready.\n' "$PROFILE_LABEL"
+printf '%s\n' 'Import the required Chrome work profile in Orca Settings > Browser > Session & Cookies.'

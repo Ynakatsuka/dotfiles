@@ -9,6 +9,15 @@
 - A `PreToolUse` hook denies `cat` of files over 350 lines. Read a bounded range with `sed -n`, or delegate the reading with `bulk-read` as described in the `my-bulk-read` skill.
 - Use skills for occasional multi-step workflows so their detailed instructions load only when relevant.
 
+## Codex Browser Routing
+
+- Use web search or a purpose-built connector for public, read-only research that does not require rendered or interactive page state.
+- When a safely resolved Orca CLI is available in an Orca-managed session, use it and Orca's embedded browser for browser UI automation. Use the `Work` browser profile only for approved work sites that require its imported session. Resolve its current ID with `orca tab profile list --json`; do not hardcode the ID or pass the label to `--profile`.
+- Do not use the `Work` profile for unrelated or untrusted sites. Treat its cookies and authenticated session as credentials, and never print cookie values or request, copy, or expose passwords.
+- Use Chrome or Computer Use only when the user explicitly requests it or the task requires a live Chrome tab, extension, password manager, passkey, or other state unavailable in Orca's browser.
+- Do not silently switch from an available, selected Orca browser to Chrome, Computer Use, or standalone `agent-browser`. If the `Work` profile is missing, authentication has expired, or Orca cannot complete the task, stop and report the specific blocker.
+- Outside an Orca-managed session, or when no safe Orca CLI executable is installed, use standalone `agent-browser` for browser UI automation when it is available. On Linux, never probe or invoke bare `orca`; follow the `orca-cli` skill's executable selection rules.
+
 ## Codex Subagent Routing
 
 - Use subagents for independent work when parallel execution can reduce completion time after dispatch and review overhead. Read the `my-subagent` skill for task selection, dispatch, and verification.
