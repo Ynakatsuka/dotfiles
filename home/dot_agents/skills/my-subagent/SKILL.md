@@ -32,8 +32,16 @@ description: >-
 | `default` | 上記に当てはまらない作業 |
 
 設定済みの subagent defaults を使い、ユーザーが指定しない限り `model` と `reasoning_effort` を上書きしない。指定がある場合も設定済みの reasoning effort を下げない。
-Codex の full-history fork は親の model と reasoning effort を継承するため、役割別の設定を使う場合は `fork_turns: "none"` または必要最小限の正のターン数を指定し、残りの文脈を依頼文に含める。
 他の実行環境でも設定済みの defaults を使い、起動ツールが扱えない引数を推測して付けない。
+
+### 文脈の継承
+
+Codex で `spawn_agent` を呼ぶときは `fork_turns` を省略しない。
+
+- 通常は `"none"` を使い、subagent が必要とする目的、範囲、制約、判断済みの事項、出力条件を依頼文へ含める。
+- subtask が直前の修正、原文、参照関係など、要約すると意味を損なう会話内容に依存する場合だけ、必要な範囲を覆う最小の正のターン数を使う。
+- `"all"` は、会話全体が短く、全ターンが subtask に必要な場合に限る。full-history fork は親の model と reasoning effort を継承するため、役割別の設定を使う場合は選ばない。
+- 継承する会話内容を依頼文へ重複して書かない。ターンを継承する場合も、subtask の目的、担当範囲、出力条件は依頼文へ明記する。
 
 ## 依頼と並列化
 
