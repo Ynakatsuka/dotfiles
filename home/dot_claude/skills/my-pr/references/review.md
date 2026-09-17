@@ -457,9 +457,11 @@ This phase only classifies findings. Required fixes are applied later by the def
 
 ## Integration output
 
-For `my-pr review`, create the final response as the review comment. Optimize for the decisions a reviewer or fixer must make. Group findings by action (`Required`, then `Recommended`), not by severity. Sort findings within each action by severity: critical, high, medium, low.
+For `my-pr review`, create the final response as the review comment. Optimize for the decisions a reviewer or fixer must make. Start with the PR identity and overview so the reader knows what was reviewed before seeing the decision or findings. Group findings by action (`Required`, then `Recommended`), not by severity. Sort findings within each action by severity: critical, high, medium, low.
 
-The first line must identify the reviewed PR URL again, before the title or status. Read it from `.url` in `MY_PR_METADATA`. Do not reconstruct or guess it. If `MY_PR_CONTEXT_STATE=no_existing_pr`, write `Review URL: unavailable (no existing PR)` instead.
+Read the PR number, title, URL, state/draft status, and base/head branches from `MY_PR_METADATA`; do not reconstruct or guess them. Follow that metadata with a concise purpose, main-change summary, and main risk based on the PR context and diff. If `MY_PR_CONTEXT_STATE=no_existing_pr`, identify the PR and URL as unavailable and use the known base/current branch for scope instead.
+
+After the overview, include `Good points`. Summarize concrete strengths supported by the diff, such as a sound approach, well-contained scope, clear failure behavior, or meaningful regression coverage. Avoid generic praise. If no evidence-backed strength is identifiable, write `- none identified`. If the review is incomplete, write `- unavailable: review incomplete` instead of drawing a positive conclusion from partial coverage.
 
 Separate execution coverage from the code decision:
 
@@ -485,7 +487,17 @@ Omit empty Required and Recommended sections. Summarize Not needed findings as a
 If review is incomplete, output only:
 
 ```markdown
-Review URL: <PR URL or unavailable (no existing PR)>
+# PR overview
+- PR: #<number> <title>, or unavailable (no existing PR)
+- URL: <PR URL or unavailable (no existing PR)>
+- Status: <state and draft status, or unavailable>
+- Branches: <base> ← <head/current branch>
+- Purpose: why the PR exists, based on PR context when available
+- Main changes: concise summary of the implemented changes
+- Main risk: unavailable because the review is incomplete
+
+## Good points
+- unavailable: review incomplete
 
 # Review result
 
@@ -505,7 +517,17 @@ If a selected Reviewer B or any oversized file was skipped, use `COMPLETE_WITH_S
 For a complete review, use this structure:
 
 ```markdown
-Review URL: <PR URL or unavailable (no existing PR)>
+# PR overview
+- PR: #<number> <title>, or unavailable (no existing PR)
+- URL: <PR URL or unavailable (no existing PR)>
+- Status: <state and draft status, or unavailable>
+- Branches: <base> ← <head/current branch>
+- Purpose: why the PR exists, based on PR context when available
+- Main changes: concise summary of the implemented changes
+- Main risk: the most important risk, or `none identified`
+
+## Good points
+- concrete, evidence-backed strength in the implementation, design, or verification
 
 # Review result
 
@@ -515,11 +537,6 @@ Review URL: <PR URL or unavailable (no existing PR)>
 - Findings: Required <count> / Recommended <count>
 - Coverage: <reviewed file count> / <changed file count> files
 - Skipped: <count> inputs
-
-## PR overview
-- Purpose: why the PR exists, based on PR context when available
-- Main changes: concise summary of the implemented changes
-- Main risk: the most important risk, or `none identified`
 
 ## Required
 
@@ -546,4 +563,4 @@ Review URL: <PR URL or unavailable (no existing PR)>
 - Not needed: <count> findings
 ```
 
-Omit `Required`, `Recommended`, `Verification plan`, or `Excluded / reference` when the section has no content. For `NO_ACTION`, the Decision and PR overview are sufficient.
+Omit `Required`, `Recommended`, `Verification plan`, or `Excluded / reference` when the section has no content. Always retain `PR overview` and `Good points`. For `NO_ACTION`, those sections and the Decision are sufficient.

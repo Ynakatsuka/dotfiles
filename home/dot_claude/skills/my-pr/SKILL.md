@@ -116,7 +116,7 @@ cat "$MY_PR_CONTEXT"
 
 background 実行した reviewer が残っている間は最終回答しない。やむを得ず待機に入る場合は、再開に必要な artifact path、reviewer output path、次の手順を保存し、CCV の background monitor が利用可能なら監視登録する。
 
-`review` は read-only なのでここで終了する。ファイル編集、検証、commit、push、PR作成をしない。
+`review` は read-only なのでここで終了する。最終回答は PR の番号・タイトル・URL・状態・base/head と概要から始め、差分から確認できた具体的な良い点もまとめる。ファイル編集、検証、commit、push、PR作成をしない。
 
 ### 3-4. Required fix
 
