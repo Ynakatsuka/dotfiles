@@ -138,7 +138,7 @@ background 実行した reviewer が残っている間は最終回答しない�
 
 `review` / `fix` / `simplify` の場合はスキップする。
 
-`references/pr-body.md` を読み、PR title/body を作る。push 前には `references/branching.md` の Push destination safety を実行する。
+`references/pr-body.md` を読み、PR title/body を作る。PR 本文の推敲には `my-japanese-editor` skill を使う。push 前には `references/branching.md` の Push destination safety を実行する。
 
 既存 PR がなければ draft PR を作成し、既存 PR があれば本文を更新する。
 
