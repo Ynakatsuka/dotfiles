@@ -80,7 +80,7 @@ fi
 
 # Install agent CLIs via their vendor install scripts
 install_cli_via_script claude "Claude Code" https://claude.ai/install.sh
-install_cli_via_script antigravity "Antigravity CLI" https://antigravity.google/cli/install.sh
+install_cli_via_script agy "Antigravity CLI" https://antigravity.google/cli/install.sh
 install_cli_via_script cursor-agent "Cursor Agent CLI" https://cursor.com/install
 
 log "Dotfiles setup completed"

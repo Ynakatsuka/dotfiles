@@ -10,7 +10,6 @@ description: >-
   for delegation or consultation (e.g., "fableで実行", "fableに相談",
   "Fableに聞いて", "ask fable").
   Do NOT use for general coding tasks that don't mention codex, gemini, claude, or fable.
-argument-hint: "[codex|gemini|claude|fable] <task-description>"
 ---
 
 # CLI Agent Runner
@@ -18,7 +17,7 @@ argument-hint: "[codex|gemini|claude|fable] <task-description>"
 Delegate tasks to an external CLI agent from within Claude Code. Supports three providers plus Claude's explicit `fable` model alias:
 
 - **codex** — OpenAI Codex CLI (`codex exec ...`)
-- **gemini** — Google Gemini CLI (`gemini -p ...`)
+- **gemini** — Google Antigravity CLI (`agy -p ...`)
 - **claude** — Claude Code CLI (`claude -p ...`)
 - **fable** — Claude Code CLI with explicit model alias (`claude --model fable -p ...`)
 
@@ -38,7 +37,7 @@ The remaining arguments form the task prompt. For consultation phrasing such as 
 
 ## Common Notes (all providers)
 
-- Always use the Bash tool with `timeout: 600000` (10 minutes); delegated tasks can take time.
+- Always use the shell command tool with a 10-minute timeout; delegated tasks can take time.
 - Do NOT hardcode model names as defaults — let each CLI's own default handle it so it stays current. Pass `--model fable` only when the user explicitly requests Fable.
 - Output streams to stdout; capture or display results directly.
 - For long-running tasks, warn the user that the delegate may take time.
@@ -56,13 +55,13 @@ For image input, model override, resume, configuration details, and more example
 
 ### Gemini
 
-**Before the first `gemini -p` of the session, read `references/gemini.md`.** It contains the mandatory preflight (env var + credential file check) and the `--skip-trust` requirement; skipping either causes immediate failure or an indefinite hang.
+**Before the first `agy -p` of the session, read `references/gemini.md`.** It contains the mandatory preflight, sandbox, and headless-mode requirements.
 
 ```bash
-gemini --skip-trust -y -p "<PROMPT>"
+agy --sandbox --disable-slash-commands -p "<PROMPT>"
 ```
 
-For approval modes, structured output, model override, troubleshooting, and more examples, read `references/gemini.md`.
+For execution modes, structured output, model override, troubleshooting, and more examples, read `references/gemini.md`.
 
 ### Claude
 
