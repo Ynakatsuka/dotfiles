@@ -28,8 +28,8 @@
 
 ## Failure Handling
 
-- Surface failures. Do not add fallbacks, default substitution for missing or invalid data, mock or cached continuation, broad catches, or retries unless explicitly approved for the current task. Do not guess alternate config paths, branches, models, endpoints, parsers, or commands. If a fallback is necessary, stop and propose its exact behavior, trade-off, and error path before editing.
-- Approved retries need bounded attempts, backoff, logging, and a final error. Do not report partial results as complete or hide a dependency failure. If existing fallback behavior is touched, call it out and leave it unchanged unless it is part of the task.
+- Surface failures. Do not add fallbacks, default substitution for missing or invalid data, mock or cached continuation, or broad catches unless explicitly approved for the current task. Do not guess alternate config paths, branches, models, endpoints, parsers, or commands. If a fallback is necessary, stop and propose its exact behavior, trade-off, and error path before editing.
+- Do not report partial results as complete or hide a dependency failure. If existing fallback behavior is touched, call it out and leave it unchanged unless it is part of the task.
 
 ## Safety and Git
 
