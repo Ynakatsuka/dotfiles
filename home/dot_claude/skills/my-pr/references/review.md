@@ -146,7 +146,7 @@ For A/B/C, launch A and C together through `scripts/run-codex-reviews.sh`. For C
 The underlying runner:
 
 - embeds the complete PR context and assigned diff directly into Codex stdin
-- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-5.6-sol` at `medium` effort, so Reviewer C alone is also independent of the configured `model`
+- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-6-sol` at `medium` effort, so Reviewer C alone is also independent of the configured `model`
 - caps the generated prompt at 393,216 bytes before launch
 - runs from an isolated artifact-local Git repository instead of the review target repository
 - disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox
@@ -364,7 +364,7 @@ If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times 
 
 Use the repo-local `MY_PR_REVIEW_DIFF` or the assigned chunk artifact. Do not create `/tmp` diff files.
 
-Write the following prompt under the exact artifact directory from the current state file. For C alone, use the Single-reviewer launch command; for A/B/C, pass it to `scripts/run-codex-reviews.sh` alongside the A prompt. The runner pins `gpt-5.6-sol` at `medium` effort; allow 600,000 ms for execution where supported. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
+Write the following prompt under the exact artifact directory from the current state file. For C alone, use the Single-reviewer launch command; for A/B/C, pass it to `scripts/run-codex-reviews.sh` alongside the A prompt. The runner pins `gpt-6-sol` at `medium` effort; allow 600,000 ms for execution where supported. Do not use `/my-agent codex`; it streams token-heavy output and inherits nested multi-agent settings that this read-only leaf reviewer must disable.
 
 ```text
 Review the supplied diff as a senior software engineer.

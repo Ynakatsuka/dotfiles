@@ -203,7 +203,7 @@ if grep -Fq 'workspace-action' "$calls_file"; then
   printf 'workspace was renamed without opt-in\n' >&2
   exit 1
 fi
-grep -Fq -- '--model gpt-5.4-mini' "$codex_calls"
+grep -Fq -- '--model gpt-6-luna' "$codex_calls"
 grep -Fq '最初の依頼' "$generator_prompt"
 grep -Fq '現在の依頼' "$generator_prompt"
 if grep -Fq '合成された入力' "$generator_prompt"; then

@@ -1,6 +1,6 @@
 name = "reviewer"
 description = "Read-only code reviewer for explicit review workflows. Produces concrete, evidence-backed findings without modifying files."
-model = "gpt-5.6-sol"
+model = "gpt-6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 

@@ -385,7 +385,7 @@ _gwai_generate_with_codex() {
         --disable shell_tool \
         -c 'approval_policy="never"' \
         -c 'network_access=false' \
-        --model gpt-5.6-luna \
+        --model gpt-6-luna \
         -c 'model_reasoning_effort="low"' \
         --output-last-message "$output_file" \
         "$naming_prompt" >/dev/null 2>&1; then

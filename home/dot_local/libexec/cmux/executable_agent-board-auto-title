@@ -28,7 +28,7 @@ CODEX = "codex"
 JA = "ja"
 EN = "en"
 
-DEFAULT_MODEL = {CLAUDE: "haiku", CODEX: "gpt-5.4-mini"}
+DEFAULT_MODEL = {CLAUDE: "haiku", CODEX: "gpt-6-luna"}
 DEFAULT_MAX_WIDTH = 28
 DEFAULT_MAX_LOG_CHARS = 1500
 GENERATOR_TIMEOUT_SECONDS = 90

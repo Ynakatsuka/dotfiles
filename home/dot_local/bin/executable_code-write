@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-CODE_WRITE_MODEL="gpt-5.6-luna"
+CODE_WRITE_MODEL="gpt-6-luna"
 CODE_WRITE_REASONING_EFFORT="max"
 
 usage() {
