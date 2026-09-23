@@ -4,33 +4,28 @@ web_search = "live"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 model = "gpt-6-sol"
-model_reasoning_effort = "xhigh"
+model_reasoning_effort = "high"
 service_tier = "default"
 suppress_unstable_features_warning = true
 
 [features]
-hooks = true
-multi_agent = true
 # Avoid repeated parent-model calls while waiting for subagents.
 multi_agent_v2.enabled = true
 multi_agent_v2.min_wait_timeout_ms = 120000
 multi_agent_v2.default_wait_timeout_ms = 120000
-external_migration = false
-goals = true
 default_mode_request_user_input = true
 
 [features.context_management]
 experimental_mode = true
 
 [tools]
-unified_exec = true
 streamable_shell = true
 
 [agents]
 max_concurrent_threads_per_session = 6
 max_depth = 1
 default_subagent_model = "gpt-6-sol"
-default_subagent_reasoning_effort = "xhigh"
+default_subagent_reasoning_effort = "high"
 
 [tui]
 status_line = [
@@ -44,11 +39,6 @@ status_line = [
   "used-tokens",
   "current-dir",
 ]
-
-# Suppress model-availability NUX banners by pinning shown_count to the
-# MAX_SHOW_COUNT (4) defined in codex-rs/tui/src/app/startup_prompts.rs.
-[tui.model_availability_nux]
-"gpt-6-sol" = 4
 
 {{- $managedProjects := list .chezmoi.homeDir }}
 {{- if lookPath "ghq" }}

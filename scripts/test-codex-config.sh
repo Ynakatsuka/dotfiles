@@ -34,8 +34,6 @@ EOF
 chmod +x "$TMP_DIR/bin/ghq"
 
 export PATH="$TMP_DIR/bin:$PATH"
-OVERRIDE_DATA="$("$JQ_BIN" -cn --arg home_dir "$FIXTURE_HOME" \
-  '{chezmoi: {homeDir: $home_dir}}')"
 
 fail() {
   echo "FAIL: $*" >&2
@@ -43,19 +41,30 @@ fail() {
 }
 
 render_config() {
-  "$CHEZMOI_BIN" --config "$CHEZMOI_CONFIG" --source "$REPO_ROOT" \
-    execute-template --override-data "$OVERRIDE_DATA" <"$TEMPLATE"
+  HOME="$FIXTURE_HOME" "$CHEZMOI_BIN" --config "$CHEZMOI_CONFIG" --source "$REPO_ROOT" \
+    execute-template <"$TEMPLATE"
 }
 
 parse_toml() {
-  "$CHEZMOI_BIN" --config "$CHEZMOI_CONFIG" --source "$REPO_ROOT" \
-    execute-template --override-data "$OVERRIDE_DATA" --with-stdin \
+  HOME="$FIXTURE_HOME" "$CHEZMOI_BIN" --config "$CHEZMOI_CONFIG" --source "$REPO_ROOT" \
+    execute-template --with-stdin \
     '{{ .chezmoi.stdin | fromToml | toJson }}' <"$1"
 }
 
 assert_jq() {
   local label="$1" filter="$2" document="$3"
   "$JQ_BIN" -e "$filter" <<<"$document" >/dev/null 2>&1 || fail "$label"
+}
+
+assert_obsolete_settings_absent() {
+  local label="$1" document="$2"
+  assert_jq "$label" \
+    '(.features | has("external_migration") | not)
+      and (.features | has("hooks") | not)
+      and (.features | has("multi_agent") | not)
+      and (.features | has("goals") | not)
+      and (.tools | has("unified_exec") | not)
+      and (.tui | has("model_availability_nux") | not)' "$document"
 }
 
 assert_project_trust() {
@@ -70,11 +79,13 @@ render_config >"$TMP_DIR/missing.toml"
 missing_json="$(parse_toml "$TMP_DIR/missing.toml")"
 assert_jq "missing config defaults" \
   '.model == "gpt-6-sol"
-    and .model_reasoning_effort == "xhigh"
+    and .model_reasoning_effort == "high"
     and .web_search == "live"
     and .agents.default_subagent_model == "gpt-6-sol"
-    and .tui.model_availability_nux."gpt-6-sol" == 4' \
+    and .agents.default_subagent_reasoning_effort == "high"
+    and .features.multi_agent_v2.enabled == true' \
   "$missing_json"
+assert_obsolete_settings_absent "missing config preserved obsolete settings" "$missing_json"
 assert_project_trust "missing config home trust" "$FIXTURE_HOME" trusted "$missing_json"
 assert_project_trust "missing config ghq repo trust" "$GHQ_REPO" trusted "$missing_json"
 
@@ -91,6 +102,19 @@ realtimeVoiceScreenContextEnabled = false
 [hooks.state]
 [hooks.state."fixture-hook"]
 trusted_hash = "sha256:fixture"
+
+[features]
+external_migration = false
+hooks = true
+multi_agent = true
+multi_agent_v2.enabled = true
+goals = true
+
+[tools]
+unified_exec = true
+
+[tui.model_availability_nux]
+"gpt-6-sol" = 4
 
 [projects."$FIXTURE_HOME"]
 trust_level = "untrusted"
@@ -110,6 +134,8 @@ render_config >"$TMP_DIR/full.toml"
 full_json="$(parse_toml "$TMP_DIR/full.toml")"
 assert_jq "desktop preference=false was not preserved with hook state" '.desktop.realtimeVoiceScreenContextEnabled == false' "$full_json"
 assert_jq "hook hash was not preserved" '.hooks.state["fixture-hook"].trusted_hash == "sha256:fixture"' "$full_json"
+assert_jq "multi-agent v2 was not retained" '.features.multi_agent_v2.enabled == true' "$full_json"
+assert_obsolete_settings_absent "obsolete Codex settings were preserved" "$full_json"
 assert_project_trust "managed home trust changed" "$FIXTURE_HOME" trusted "$full_json"
 assert_project_trust "managed ghq repo trust changed" "$GHQ_REPO" trusted "$full_json"
 assert_project_trust "external project trust was lost" "$EXTERNAL_PROJECT" untrusted "$full_json"
