@@ -6,13 +6,17 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BULK_READ="$REPO_ROOT/home/dot_local/bin/executable_bulk-read"
 GUARD="$REPO_ROOT/home/dot_local/bin/executable_bulk-read-guard"
-CODE_WRITE="$REPO_ROOT/home/dot_local/bin/executable_code-write"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-mkdir -p "$TMP_DIR/bin" "$TMP_DIR/work"
+mkdir -p "$TMP_DIR/bin" "$TMP_DIR/work" "$TMP_DIR/deployed/.local/bin" "$TMP_DIR/deployed/.local/libexec/delegation"
+cp "$REPO_ROOT/home/dot_local/bin/executable_bulk-read" "$TMP_DIR/deployed/.local/bin/bulk-read"
+cp "$REPO_ROOT/home/dot_local/bin/executable_code-write" "$TMP_DIR/deployed/.local/bin/code-write"
+cp "$REPO_ROOT/home/dot_local/libexec/delegation/codex-exec.bash" \
+  "$TMP_DIR/deployed/.local/libexec/delegation/codex-exec.bash"
+BULK_READ="$TMP_DIR/deployed/.local/bin/bulk-read"
+CODE_WRITE="$TMP_DIR/deployed/.local/bin/code-write"
 cat >"$TMP_DIR/bin/codex" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -30,6 +34,14 @@ done
 if grep -q 'FAIL_THE_READER' "$CODEX_TEST_PROMPT"; then
   echo "ERROR: You've hit your usage limit." >&2
   exit 3
+fi
+if grep -q 'FAIL_THE_WRITER' "$CODEX_TEST_PROMPT"; then
+  echo "ERROR: writer failed." >&2
+  exit 5
+fi
+if grep -q 'FAIL_WITHOUT_ERROR_LINE' "$CODEX_TEST_PROMPT"; then
+  echo "diagnostic without an ERROR prefix" >&2
+  exit 4
 fi
 if grep -q '^<spec>$' "$CODEX_TEST_PROMPT"; then
   target="$(sed -n 's/^<target path="\([^"]*\)".*/\1/p' "$CODEX_TEST_PROMPT")"
@@ -105,6 +117,14 @@ set -e
 grep -q 'codex exec failed with exit code 3' <<<"$failure_output" || fail "bulk-read did not report the failure: $failure_output"
 grep -q "ERROR: You've hit your usage limit." <<<"$failure_output" || fail "bulk-read hid the reader's error: $failure_output"
 
+set +e
+failure_output="$(bash "$BULK_READ" --question "FAIL_WITHOUT_ERROR_LINE" small.txt 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 4 ] || fail "bulk-read did not propagate the unprefixed failure: $failure_status"
+grep -q 'diagnostic without an ERROR prefix' <<<"$failure_output" ||
+  fail "bulk-read hid the unprefixed diagnostic: $failure_output"
+
 # --- code-write -----------------------------------------------------------------
 
 : >"$CODEX_TEST_ARGS"
@@ -155,6 +175,17 @@ failure_status=$?
 set -e
 [ "$failure_status" -eq 1 ] || fail "code-write reported success for an untouched existing target: $failure_status"
 grep -q 'did not change ref_test.py' <<<"$failure_output" || fail "code-write did not report the unchanged target: $failure_output"
+
+set +e
+failure_output="$(bash "$CODE_WRITE" --spec "FAIL_THE_WRITER" --target failed.py 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 5 ] || fail "code-write did not propagate the writer's exit code: $failure_status"
+grep -q 'codex exec failed with exit code 5' <<<"$failure_output" ||
+  fail "code-write did not report the writer failure: $failure_output"
+grep -q 'ERROR: writer failed.' <<<"$failure_output" ||
+  fail "code-write hid the writer's error: $failure_output"
+[ ! -e failed.py ] || fail "code-write changed the target after a writer failure"
 
 # --- bulk-read-guard -------------------------------------------------------------
 

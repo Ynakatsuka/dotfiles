@@ -99,27 +99,10 @@ PROMPT
 
 echo "bulk-read: ${#files[@]} file(s), ${total_lines} lines -> ${BULK_READ_MODEL} (${BULK_READ_REASONING_EFFORT})" >&2
 
-# codex exec echoes the whole prompt, including every file, to its output
-# streams. Keep both out of the caller's context and surface only errors.
 codex_log="$work_dir/codex.log"
-status=0
-codex exec \
-  --model "$BULK_READ_MODEL" \
-  -c "model_reasoning_effort=\"${BULK_READ_REASONING_EFFORT}\"" \
-  -c 'approval_policy="never"' \
-  --sandbox read-only \
-  --ephemeral \
-  --skip-git-repo-check \
-  --disable hooks \
-  --disable multi_agent \
-  --color never \
-  --output-last-message "$answer_file" \
-  - <"$prompt_file" >"$codex_log" 2>&1 || status=$?
-if [[ "$status" -ne 0 ]]; then
-  echo "bulk-read: codex exec failed with exit code ${status}" >&2
-  grep -E '^(ERROR|error)' "$codex_log" >&2 || tail -n 20 "$codex_log" >&2
-  exit "$status"
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/../libexec/delegation/codex-exec.bash"
+delegation_codex_exec bulk-read "$BULK_READ_MODEL" "$BULK_READ_REASONING_EFFORT" \
+  read-only "$prompt_file" "$answer_file" "$codex_log"
 
 if [[ ! -s "$answer_file" ]]; then
   echo "bulk-read: codex exec produced no final message" >&2
