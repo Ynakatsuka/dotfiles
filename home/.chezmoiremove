@@ -15,6 +15,15 @@ mcp.json
 .claude/skills/my-skill-creator/references/complete-guide.md
 .claude/skills/my-skill-creator/scripts/package_skill.py
 .claude/skills/my-team-share
+.claude/skills/my-bullets
+.claude/skills/my-explain-diff
+.claude/skills/my-japanese-editor/references/examples.md
+.claude/skills/my-japanese-editor/references/phrases.md
+.claude/skills/my-japanese-editor/references/structures.md
+.claude/skills/my-pr-briefing
+.claude/skills/my-refactor
+.claude/skills/my-stop-ai-slop-jp
+.claude/skills/my-worktree
 .codex/agents/simplifier_apply.toml
 .codex/skills/my-subagent
 .codex/skills/my-team-share
