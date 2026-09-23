@@ -1,90 +1,89 @@
 # Gemini Reference
 
-Detailed usage for the `gemini` provider in `my-agent`. Read this **before** running `gemini -p` for the first time in a session.
+Use Google Gemini through Antigravity CLI (`agy`). Read this before the first Gemini delegation in
+a session.
 
-## Preflight (run BEFORE every `gemini -p` invocation)
+## Preflight
 
-This environment exports `GEMINI_FORCE_FILE_STORAGE=true` in `~/.zshenv` so `@github/keytar` is bypassed and OAuth tokens live in a file under `~/.gemini/`. Without this, headless invocations can hang indefinitely on a locked GNOME Keyring (Secret Service over D-Bus) on SSH-only servers. Filename varies by backend: `oauth_creds.json` (default OAuth) or `gemini-credentials.json` (FileKeychain).
-
-1. **Confirm the env var is exported and at least one credential file exists:**
+1. Confirm that `agy` is installed:
 
    ```bash
-   test "$GEMINI_FORCE_FILE_STORAGE" = "true" \
-     && { test -f "$HOME/.gemini/oauth_creds.json" || test -f "$HOME/.gemini/gemini-credentials.json"; } \
-     && echo ok
+   command -v agy
+   agy --version
    ```
 
-   If `GEMINI_FORCE_FILE_STORAGE` is missing, source `~/.zshenv` or export it before invoking `gemini -p`. If neither credential file exists, the user has not authenticated — instruct them to run `gemini` once in a TTY to complete OAuth. Do NOT run `gemini -p` in either case.
+2. When the user requests a specific model, confirm that it is available before invoking it:
 
-2. **Always pass `--skip-trust`.** Gemini CLI 0.39+ refuses to run headlessly in directories that are not registered as trusted ("Gemini CLI is not running in a trusted directory"). Since Claude Code invokes Gemini from arbitrary working directories, every `gemini -p` call MUST include `--skip-trust` (or set `GEMINI_CLI_TRUST_WORKSPACE=true` for the call). Omitting this is the most common cause of immediate failure.
+   ```bash
+   agy models
+   ```
+
+3. Authentication is managed by Antigravity. If a headless call reports that authentication is
+   missing or expired, stop and ask the user to run `agy` interactively. Do not inspect or print
+   credential files.
 
 ## Invocation
 
-Run Gemini headless with `-p`/`--prompt`. `--skip-trust` is required (see Preflight #2).
+Run Gemini headlessly with `-p`. Use the sandbox and disable slash-command expansion so prompt text
+cannot invoke local commands or skills implicitly.
 
 ```bash
-# Default (configured default model)
-gemini --skip-trust -p "<PROMPT>"
-
-# With explicit model override
-gemini --skip-trust -m <MODEL> -p "<PROMPT>"
+agy --sandbox --disable-slash-commands -p "<PROMPT>"
 ```
 
-### Approval mode
-
-Gemini prompts for approval by default. For autonomous delegation pass `-y` or `--approval-mode`:
+For analysis that should not edit files, add plan mode:
 
 ```bash
-# Auto-approve all tool actions (default for delegated execution)
-gemini --skip-trust -y -p "<PROMPT>"
-
-# Read-only (plan mode) — safe for analysis
-gemini --skip-trust --approval-mode plan -p "<PROMPT>"
-
-# Auto-approve edits only
-gemini --skip-trust --approval-mode auto_edit -p "<PROMPT>"
+agy --mode plan --sandbox -p "<PROMPT>"
 ```
 
-Default to `-y`. Use `--approval-mode plan` when the user asks for planning/analysis only.
+Antigravity CLI 1.2.5 ignores plan mode when `--disable-slash-commands` is present, so do not
+combine those options. Keep untrusted document contents out of the command prompt in this mode.
 
-### Other options
+For an explicitly requested implementation task, use accept-edits inside the sandbox:
 
 ```bash
-# Include extra directories
-gemini --skip-trust -y --include-directories path/to/dir1,path/to/dir2 -p "<PROMPT>"
-
-# Resume sessions
-gemini -r latest        # Most recent
-gemini -r 5             # Session index 5
-gemini --list-sessions  # List available
-
-# Structured output
-gemini --skip-trust -y -o json -p "<PROMPT>"
-gemini --skip-trust -y -o stream-json -p "<PROMPT>"
+agy --mode accept-edits --sandbox --disable-slash-commands -p "<PROMPT>"
 ```
 
-## Model Selection
+Do not use `--dangerously-skip-permissions`. If a required operation is denied, report it rather
+than weakening the permission boundary.
 
-- **Default**: Do NOT specify `-m`. The Gemini CLI default is used.
-- **User-specified model**: Add `-m <model>` only when the user explicitly requests one. Resolve the current value from `~/.gemini/settings.json`; omit `-m` to use the CLI default.
+## Model selection
 
-## Examples
+- Default: omit `--model` and use the Antigravity default.
+- User-specified model: confirm the ID with `agy models`, then pass `--model <MODEL>`.
+- Workflow-pinned model: a skill may specify a model when that exact model is part of its tested
+  contract. Fail clearly if it is unavailable; do not silently substitute another model.
+
+Example:
 
 ```bash
-# Simple task
-gemini --skip-trust -y -p "Fix the type error in src/utils.ts"
-
-# With context
-gemini --skip-trust -y -p "Add input validation to src/auth/handler.py: email format and password length (min 8 chars)."
-
-# Code review (read-only)
-gemini --skip-trust --approval-mode plan -p "Review the changes in the current branch vs main. Focus on security and performance."
-
-# Explicit model (resolve current ID from ~/.gemini/settings.json, or omit -m to use CLI default)
-gemini --skip-trust -y -m <model> -p "Analyze the architecture of this project"
+agy --model gemini-3.8-flash-high --effort high \
+  --sandbox --disable-slash-commands -p "<PROMPT>"
 ```
+
+## Structured output
+
+Use JSON or stream-JSON output when the caller must validate the response.
+
+```bash
+agy --sandbox --disable-slash-commands \
+  --output-format json -p "<PROMPT>"
+```
+
+For stream input, `--input-format stream-json` requires `--output-format stream-json`. Parse the
+final `result` event and verify its status instead of reconstructing the answer from text deltas.
+Also inspect tool events when the workflow forbids tool use.
 
 ## Troubleshooting
 
-- **Trusted-folder error**: stderr contains `Gemini CLI is not running in a trusted directory` — you forgot `--skip-trust`. Re-run with the flag.
-- **Zero-output hang**: If `gemini -p` is killed by timeout AND both stdout and stderr are 0 byte, the most likely cause is that `GEMINI_FORCE_FILE_STORAGE=true` was not inherited by the calling shell, so keytar tried to read from a locked GNOME Keyring over D-Bus and stalled. Verify the env var is exported in the invoking shell, then retry. Do NOT retry blindly with the same environment.
+- `agy: command not found`: install Antigravity CLI with the repository bootstrap script.
+- Unknown model: run `agy models`; do not choose a replacement without an explicit workflow rule.
+- Authentication error: run `agy` interactively and complete sign-in.
+- Plan-mode warning: remove `--disable-slash-commands`; Antigravity 1.2.5 otherwise ignores plan
+  mode.
+- Permission denial: keep the sandbox and permission policy; change only the scoped task or report
+  the blocked operation.
+- Invalid or incomplete structured output: treat the delegation as failed. Do not accept partial
+  output as a successful result.
