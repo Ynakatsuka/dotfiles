@@ -88,7 +88,7 @@ fi
 answer="$(bash "$BULK_READ" --question "What does small.txt contain?" small.txt 2>/dev/null)"
 [ "$answer" = "Service.java defines the entry point." ] ||
   fail "bulk-read stdout is not the reader's final message: $answer"
-grep -q -- '--model gpt-5.6-luna' "$CODEX_TEST_ARGS" || fail "bulk-read did not select gpt-5.6-luna"
+grep -q -- '--model gpt-6-luna' "$CODEX_TEST_ARGS" || fail "bulk-read did not select gpt-6-luna"
 grep -q -- 'model_reasoning_effort="max"' "$CODEX_TEST_ARGS" || fail "bulk-read did not set max reasoning effort"
 grep -q -- '--sandbox read-only' "$CODEX_TEST_ARGS" || fail "bulk-read did not run read-only"
 grep -q -- '--disable hooks' "$CODEX_TEST_ARGS" || fail "bulk-read did not disable hooks in the reader"
@@ -131,7 +131,7 @@ grep -q '^code-write: wrote out_test.py (2 lines)$' <<<"$write_output" ||
   fail "code-write did not report the written target: $write_output"
 grep -q 'Wrote one generated test.' <<<"$write_output" || fail "code-write stdout lacks the writer summary: $write_output"
 grep -q 'def test_generated' out_test.py || fail "code-write target was not written"
-grep -q -- '--model gpt-5.6-luna' "$CODEX_TEST_ARGS" || fail "code-write did not select gpt-5.6-luna"
+grep -q -- '--model gpt-6-luna' "$CODEX_TEST_ARGS" || fail "code-write did not select gpt-6-luna"
 grep -q -- '--sandbox workspace-write' "$CODEX_TEST_ARGS" || fail "code-write did not allow workspace writes"
 grep -q -- '--disable hooks' "$CODEX_TEST_ARGS" || fail "code-write did not disable hooks in the writer"
 grep -q 'Write a test for the greeter.' "$CODEX_TEST_PROMPT" || fail "prompt lacks the spec"

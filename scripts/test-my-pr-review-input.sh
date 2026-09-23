@@ -398,7 +398,7 @@ test_runner() {
     FAKE_CAPTURE="$tmp_dir/reviewer-c-input.md" \
     /bin/bash "$runner_script" reviewer-c full 1 "$prompt_file" "$context_file" "$diff_file" \
     >"$tmp_dir/reviewer-c-output.txt"
-  assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model="gpt-5.6-sol"'
+  assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model="gpt-6-sol"'
   assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model_reasoning_effort="medium"'
 
   if MY_PR_CODEX_BIN="$fake_codex" \

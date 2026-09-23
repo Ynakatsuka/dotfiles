@@ -6,7 +6,7 @@
 
 set -euo pipefail
 
-BULK_READ_MODEL="gpt-5.6-luna"
+BULK_READ_MODEL="gpt-6-luna"
 BULK_READ_REASONING_EFFORT="max"
 
 usage() {

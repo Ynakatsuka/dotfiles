@@ -69,7 +69,11 @@ assert_project_trust() {
 render_config >"$TMP_DIR/missing.toml"
 missing_json="$(parse_toml "$TMP_DIR/missing.toml")"
 assert_jq "missing config defaults" \
-  '.model == "gpt-5.6-sol" and .model_reasoning_effort == "xhigh" and .web_search == "live"' \
+  '.model == "gpt-6-sol"
+    and .model_reasoning_effort == "xhigh"
+    and .web_search == "live"
+    and .agents.default_subagent_model == "gpt-6-sol"
+    and .tui.model_availability_nux."gpt-6-sol" == 4' \
   "$missing_json"
 assert_project_trust "missing config home trust" "$FIXTURE_HOME" trusted "$missing_json"
 assert_project_trust "missing config ghq repo trust" "$GHQ_REPO" trusted "$missing_json"

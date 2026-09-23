@@ -1,6 +1,6 @@
 name = "simplifier"
 description = "Read-only code simplifier for explicit review workflows."
-model = "gpt-5.6-terra"
+model = "gpt-6-luna"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 

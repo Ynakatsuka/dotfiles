@@ -82,7 +82,7 @@ assert_file_contains "$tmp_dir/slack-url.err" 'Slack URL has no descriptive text
 
 actual=$(_gwai_generate_branch_name "[resolve task context]($slack_url)")
 assert_equal '260811-fix-resolve-slack-task-context' "$actual" "Codex output should become a dated branch name"
-assert_file_contains "$tmp_dir/codex.args" 'gpt-5.6-luna'
+assert_file_contains "$tmp_dir/codex.args" 'gpt-6-luna'
 assert_file_contains "$tmp_dir/codex.args" 'model_reasoning_effort="low"'
 assert_file_contains "$tmp_dir/codex.args" '--sandbox'
 assert_file_contains "$tmp_dir/codex.args" 'read-only'
