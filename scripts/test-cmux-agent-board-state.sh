@@ -147,7 +147,10 @@ HOME="$shell_home" MOCK_SHELL_CALLS="$shell_calls" \
   ' _ "$SHELL_HOOKS"
 grep -Fxq 'working' "$shell_calls"
 grep -Fxq 'idle' "$shell_calls"
-grep -Fq '"$_zsh_config_dir/cmux-agent-board.zsh"' "$REPO_ROOT/home/dot_zshrc"
+if grep -Fq 'cmux-agent-board.zsh' "$REPO_ROOT/home/dot_zshrc"; then
+  printf 'cmux Agent Board zsh hooks were unexpectedly enabled\n' >&2
+  exit 1
+fi
 
 if CMUX_WORKSPACE_ID='' PATH="$test_dir:$PATH" bash "$SCRIPT" idle >/dev/null 2>&1; then
   printf 'missing workspace ID unexpectedly succeeded\n' >&2
@@ -161,46 +164,50 @@ if CMUX_WORKSPACE_ID='workspace-id' CMUX_SURFACE_ID='' PATH="$test_dir:$PATH" \
 fi
 
 jq -e '
-  .hooks.SessionStart[0].hooks[0].command | contains("agent-board-state\" stopped")
-' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
-jq -e '
-  .hooks.PermissionRequest[0].hooks[0].command | contains("agent-board-state\" input")
-' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
-jq -e '
-  [.hooks.PreToolUse[]
-    | select(any(.hooks[]; .command | contains("agent-board-state\" working")))
-    | .matcher] == ["^(?!AskUserQuestion$).*"]
-  and
-  [.hooks.PreToolUse[]
-    | select(any(.hooks[]; .command | contains("agent-board-state\" input")))
-    | .matcher] == ["AskUserQuestion"]
-' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
-jq -e '
-  .hooks.UserPromptSubmit[0].hooks[0].command | contains("agent-board-state\" working")
-' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
-jq -e '
-  .hooks.Stop[0].hooks[0].command | contains("agent-board-state\" stopped")
-' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
-jq -e '
-  .hooks.SessionEnd[0].hooks[0].command | contains("agent-board-state\" clear")
+  ([.hooks // {} | .. | strings
+    | select(contains("agent-board-state") or contains("agent-board-auto-title"))]
+    | length) == 0
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 
-rendered_codex_hooks=$(chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
+codex_template_home="$test_dir/codex-template-home"
+template_bin="$test_dir/template-bin"
+mkdir -p "$codex_template_home/.codex" "$template_bin"
+# Keep host tool shims in their own HOME while rendering the fixture's hooks.
+printf '#!/usr/bin/env bash\nexec env HOME=%q %q "$@"\n' \
+  "$HOME" "$(command -v jq)" >"$template_bin/jq"
+chmod +x "$template_bin/jq"
+cat >"$codex_template_home/.codex/hooks.json" <<'JSON'
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "command": "\"$HOME/.local/libexec/cmux/agent-board-state\" working",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "keep-me"}
+        ]
+      }
+    ]
+  }
+}
+JSON
+rendered_codex_hooks=$(HOME="$codex_template_home" PATH="$template_bin:$PATH" chezmoi execute-template \
+  <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
 jq -e '
-  any(.hooks.SessionStart[]?.hooks[]?; .command | contains("agent-board-state\" stopped"))
-  and
-  any(.hooks.Stop[]?.hooks[]?; .command | contains("agent-board-state\" stopped"))
-  and
-  any(.hooks.SessionEnd[]?.hooks[]?; .command | contains("agent-board-state\" clear"))
-  and
-  ([.hooks[][]?.hooks[]?
-   | select(.command | contains("agent-board-state"))] as $state_hooks
-   | ($state_hooks | length) == 6
-   and all($state_hooks[];
-     if (.command | contains("agent-board-state\" clear"))
-     then .timeout == 3
-     else .timeout == 5
-     end))
+  ([.. | strings | select(contains("cmux"))] | length) == 0
+  and ([.hooks.PreToolUse[]?.hooks[]?.command
+    | select(contains("bulk-read-guard"))] | length) == 1
+  and .hooks.Stop[0].hooks[0].command == "keep-me"
 ' <<<"$rendered_codex_hooks" >/dev/null
 
 grep -Fq "if title.hasSuffix(\"${stopped_marker}\") { return \"stopped\" }" "$SIDEBAR"

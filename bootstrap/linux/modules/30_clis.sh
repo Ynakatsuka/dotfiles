@@ -43,7 +43,7 @@ elif confirm "Install uv (via installer script)?"; then
   run bash -lc 'uvx sqlfluff || true'
 fi
 
-if command -v mise >/dev/null 2>&1 || [ -x "$HOME/.local/bin/mise" ]; then
+if resolve_mise >/dev/null 2>&1; then
   log "mise already installed, skipping"
 elif confirm "Install mise (via official installer)?"; then
   run bash -lc '_s=$(mktemp) && curl --fail -sS https://mise.run -o "$_s" && sh "$_s" && rm -f "$_s"'

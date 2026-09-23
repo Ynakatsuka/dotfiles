@@ -107,6 +107,11 @@ resolve_mise() {
   fi
 }
 
+# Keep the caller's shell mode: macOS standalone uses -c, Linux uses -lc.
+install_chezmoi_official() {
+  run bash "$1" 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
+}
+
 run_mise_install() {
   local mise_cmd
   if mise_cmd="$(resolve_mise)"; then

@@ -137,26 +137,9 @@ fi
 
 echo "code-write: ${#references[@]} reference(s) -> ${CODE_WRITE_MODEL} (${CODE_WRITE_REASONING_EFFORT}) writing ${target}" >&2
 
-# codex exec echoes the whole prompt and every file edit to its output
-# streams. Keep them out of the caller's context and surface only errors.
-status=0
-codex exec \
-  --model "$CODE_WRITE_MODEL" \
-  -c "model_reasoning_effort=\"${CODE_WRITE_REASONING_EFFORT}\"" \
-  -c 'approval_policy="never"' \
-  --sandbox workspace-write \
-  --ephemeral \
-  --skip-git-repo-check \
-  --disable hooks \
-  --disable multi_agent \
-  --color never \
-  --output-last-message "$answer_file" \
-  - <"$prompt_file" >"$codex_log" 2>&1 || status=$?
-if [[ "$status" -ne 0 ]]; then
-  echo "code-write: codex exec failed with exit code ${status}" >&2
-  grep -E '^(ERROR|error)' "$codex_log" >&2 || tail -n 20 "$codex_log" >&2
-  exit "$status"
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/../libexec/delegation/codex-exec.bash"
+delegation_codex_exec code-write "$CODE_WRITE_MODEL" "$CODE_WRITE_REASONING_EFFORT" \
+  workspace-write "$prompt_file" "$answer_file" "$codex_log"
 
 if [[ ! -s "$target" ]]; then
   echo "code-write: the writer did not write ${target}" >&2

@@ -23,6 +23,8 @@ MAX_UNTRACKED_BYTES = 2_000_000
 UNTRACKED_REFRESH_SECONDS = 600
 GIT_TIMEOUT_SECONDS = 15
 USAGE_PROVIDERS = ("codex", "claude", "cursor")
+USAGE_METRIC_FIELDS = ("five_hour", "seven_day", "fable_week")
+USAGE_DISPLAY_FIELDS = ("account", "account_name", *USAGE_METRIC_FIELDS, "detail")
 CACHE_VERSION = 1
 
 
@@ -361,6 +363,23 @@ def branches(stats: dict[str, dict[str, str]], field: str) -> str:
     return "".join(lines)
 
 
+def empty_usage(detail: str) -> dict[str, str]:
+    return {
+        "account": "unavailable",
+        "account_name": "",
+        "five_hour": "—",
+        "seven_day": "—",
+        "fable_week": "—",
+        "five_hour_progress": "0.0",
+        "seven_day_progress": "0.0",
+        "fable_week_progress": "0.0",
+        "five_hour_reset_at": "0.0",
+        "seven_day_reset_at": "0.0",
+        "fable_week_reset_at": "0.0",
+        "detail": detail,
+    }
+
+
 def usage_snapshot(usage_cache_path: Path) -> dict[str, dict[str, str]]:
     try:
         document = json.loads(usage_cache_path.read_text(encoding="utf-8"))
@@ -376,42 +395,13 @@ def usage_snapshot(usage_cache_path: Path) -> dict[str, dict[str, str]]:
         json.JSONDecodeError,
         RuntimeError,
     ):
-        return {
-            provider: {
-                "account": "unavailable",
-                "account_name": "",
-                "five_hour": "—",
-                "seven_day": "—",
-                "fable_week": "—",
-                "five_hour_progress": "0.0",
-                "seven_day_progress": "0.0",
-                "fable_week_progress": "0.0",
-                "five_hour_reset_at": "0.0",
-                "seven_day_reset_at": "0.0",
-                "fable_week_reset_at": "0.0",
-                "detail": "error",
-            }
-            for provider in USAGE_PROVIDERS
-        }
+        return {provider: empty_usage("error") for provider in USAGE_PROVIDERS}
 
     snapshot: dict[str, dict[str, str]] = {}
     for provider in USAGE_PROVIDERS:
         value = providers.get(provider)
         if not isinstance(value, dict):
-            snapshot[provider] = {
-                "account": "unavailable",
-                "account_name": "",
-                "five_hour": "—",
-                "seven_day": "—",
-                "fable_week": "—",
-                "five_hour_progress": "0.0",
-                "seven_day_progress": "0.0",
-                "fable_week_progress": "0.0",
-                "five_hour_reset_at": "0.0",
-                "seven_day_reset_at": "0.0",
-                "fable_week_reset_at": "0.0",
-                "detail": "unavailable",
-            }
+            snapshot[provider] = empty_usage("unavailable")
             continue
 
         status = value.get("status")
@@ -483,14 +473,7 @@ def usage_epoch(value: object) -> str:
 def usage_branches(usage: dict[str, dict[str, str]]) -> str:
     lines: list[str] = []
     for provider in USAGE_PROVIDERS:
-        for field in (
-            "account",
-            "account_name",
-            "five_hour",
-            "seven_day",
-            "fable_week",
-            "detail",
-        ):
+        for field in USAGE_DISPLAY_FIELDS:
             value = swift_literal(usage[provider][field])
             lines.append(
                 f'  if p == "{provider}" && f == "{field}" {{ return "{value}" }}\n'
@@ -501,7 +484,7 @@ def usage_branches(usage: dict[str, dict[str, str]]) -> str:
 def usage_progress_branches(usage: dict[str, dict[str, str]]) -> str:
     lines: list[str] = []
     for provider in USAGE_PROVIDERS:
-        for field in ("five_hour", "seven_day", "fable_week"):
+        for field in USAGE_METRIC_FIELDS:
             value = usage[provider][f"{field}_progress"]
             lines.append(
                 f'  if p == "{provider}" && f == "{field}" {{ return {value} }}\n'
@@ -512,7 +495,7 @@ def usage_progress_branches(usage: dict[str, dict[str, str]]) -> str:
 def usage_reset_branches(usage: dict[str, dict[str, str]]) -> str:
     lines: list[str] = []
     for provider in USAGE_PROVIDERS:
-        for field in ("five_hour", "seven_day", "fable_week"):
+        for field in USAGE_METRIC_FIELDS:
             value = usage[provider][f"{field}_reset_at"]
             lines.append(
                 f'  if p == "{provider}" && f == "{field}" {{ return {value} }}\n'

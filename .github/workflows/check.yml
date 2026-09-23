@@ -10,26 +10,41 @@ on:
     - cron: "0 21 * * 5"
 
 jobs:
-  stale-check:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: jdx/mise-action@v4
+        with:
+          install: false
+          export_path: false
+      - name: Install test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq zsh
+          mkdir -p "$HOME/.local/bin"
+          curl -fsLS https://get.chezmoi.io -o "$RUNNER_TEMP/chezmoi-install.sh"
+          sh "$RUNNER_TEMP/chezmoi-install.sh" -b "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Detect stale repo content
         run: bash scripts/check-stale.sh
-      - name: Test RTK rewrite hook guards
-        run: bash scripts/test-rtk-rewrite-hook.sh
-      - name: Test my-pr worktree transfer
-        run: bash scripts/test-my-pr-worktree-move.sh
-      - name: Test gwai-orca workspace creation
-        run: bash scripts/test-gwai-orca.sh
-      - name: Test mise upgrade wrapper
-        run: |
-          command -v jq >/dev/null
-          bash scripts/test-dotfiles-mise-up.sh
+      - name: Run repository tests
+        run: bash scripts/test.sh
 
   pre-commit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install zsh for syntax hooks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
       - name: Run pre-commit hooks on all files
         run: pipx run pre-commit run --all-files --show-diff-on-failure

@@ -187,9 +187,21 @@ fi
 description = "Update dotfiles and development environment"
 run = """
 set -e
-chezmoi git pull -- --ff-only
-chezmoi apply --force -v
-"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+update_dotfiles() {
+  if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "$1" != "--verify" ]; }; then
+    echo "[ERROR] update-dotfiles accepts only --verify" >&2
+    return 2
+  fi
+
+  chezmoi git pull -- --ff-only
+  chezmoi apply --force -v
+  if [ "${1:-}" = "--verify" ]; then
+    chezmoi verify
+  fi
+  "$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+}
+# mise appends task arguments to this final command.
+update_dotfiles
 """
 
 [tasks.update-brew]
@@ -205,10 +217,7 @@ description = "Apply and verify dotfiles, then update mise tools, Cursor Agent C
 run = """
 set -e
 
-chezmoi git pull -- --ff-only
-chezmoi apply --force -v
-chezmoi verify
-"$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
+mise run -C / update-dotfiles --verify
 "$(chezmoi source-path ~/.local/bin/dotfiles-cursor-agent-upgrade)"
 if command -v brew >/dev/null 2>&1; then
   "$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
