@@ -58,7 +58,7 @@ orca_cli=${ORCA_CLI_COMMAND:-orca}
 command -v "$orca_cli" >/dev/null 2>&1 || fail "Orca CLI missing: $orca_cli"
 [[ -z "${ORCA_ENVIRONMENT:-}" && -z "${ORCA_PAIRING_CODE:-}" ]] || fail 'this helper requires the local Orca runtime'
 [[ ! -t 0 ]] || fail 'supply a handoff brief on standard input'
-brief=$(</dev/stdin)
+brief=$(cat)
 [[ "$brief" =~ [^[:space:]] ]] || fail 'handoff brief is empty'
 
 stage=source
