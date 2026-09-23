@@ -22,6 +22,7 @@ mcp.json
 .claude/skills/my-japanese-editor/references/structures.md
 .claude/skills/my-pr-briefing
 .claude/skills/my-refactor
+.claude/skills/my-agent-friendly-code
 .claude/skills/my-stop-ai-slop-jp
 .claude/skills/my-worktree
 .codex/agents/simplifier_apply.toml
