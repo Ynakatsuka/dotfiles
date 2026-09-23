@@ -5,6 +5,9 @@
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
+# Google Gemini CLI
+"npm:@google/gemini-cli" = "latest"
+
 # OpenCode CLI
 # Pinned to the last macos-arm64 release with GitHub attestations.
 "github:anomalyco/opencode" = "1.17.7"

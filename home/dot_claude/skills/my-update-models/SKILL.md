@@ -3,16 +3,15 @@ name: my-update-models
 description: >-
   Check the latest Claude (Anthropic), OpenAI Codex, and Google Gemini model
   releases from official primary sources, update model selections in this
-  dotfiles repo, and update the Codex and Claude Code CLIs through their existing
-  managers. The model track also scans the invoking repository for hardcoded
-  model IDs and offers to bump them. Use when the user asks to "モデル更新", "モデルを最新に",
-  "最新モデル確認", "Codex/Claude Code本体の更新", "model bump", "update models",
-  or "update agent CLIs". Subcommands: harness, model, both (default). Do NOT
-  use for one-off model selection in a single conversation, general model
-  questions, or unrelated package updates.
-argument-hint: "[harness|model|both] [claude|codex|gemini|all]"
+  dotfiles repo, and update the Claude Code, Codex, and Gemini CLIs through their
+  configured managers. Every run checks both the model settings and CLI for the
+  selected provider, then scans the invoking repository for hardcoded model IDs.
+  Use when the user asks to "モデル更新", "モデルを最新に", "最新モデル確認",
+  "Codex/Claude Code/Gemini CLI本体の更新", "model bump", "update models", or
+  "update agent CLIs". Do NOT use for one-off model selection in a single
+  conversation, general model questions, or unrelated package updates.
+argument-hint: "[claude|codex|gemini|all]"
 arguments:
-  - mode
   - provider
 ---
 
@@ -20,45 +19,30 @@ arguments:
 
 Refresh the default model selections in this dotfiles repo using the latest
 official release information from Anthropic, OpenAI, and Google. Update the
-Codex and Claude Code CLIs through their current managers, then sweep the
-invoking repository for any hardcoded model IDs that should be bumped too.
+Claude Code, Codex, and Gemini CLIs through their configured managers, then
+sweep the invoking repository for any hardcoded model IDs that should be bumped
+too.
 
-## Subcommands and Targets
+## Targets
 
-Invocation: `$my-update-models [$mode] [$provider]`.
+Invocation: `$my-update-models [$provider]`.
 
-Treat an omitted `$mode` as `both` and an omitted `$provider` as `all`.
-Therefore, invoking the skill without arguments updates both tracks for every
-supported provider.
+Treat an omitted `$provider` as `all`. Every target always includes its model
+settings, CLI, and the invoking repository's model-ID scan.
 
-### Mode
+- `claude` — Anthropic model settings and native Claude Code
+- `codex` — OpenAI model settings and mise-managed Codex CLI
+- `gemini` — Google model settings and mise-managed Gemini CLI
+- `all` — all three model settings and CLIs
 
-- `harness` — check and update the Codex and/or Claude Code CLI. Do not edit
-  model settings or run the model-ID repo scan.
-- `model` — check and update model settings, then run the model-ID repo scan.
-  Do not update a CLI.
-- `both` — run both `harness` and `model` for the selected provider. This is
-  the default.
-
-### Provider
-
-- `claude` — Anthropic model settings and, when selected, native Claude Code
-- `codex` — OpenAI model settings and, when selected, mise-managed Codex CLI
-- `gemini` — Google Gemini model settings only
-- `all` — all model providers plus the Codex and Claude Code CLIs
-
-Reject unknown modes or providers before making network calls. Also reject
-`harness gemini` and `both gemini`; this skill does not manage the Gemini CLI.
-Tell the user to use `model gemini` for Gemini model settings.
+Reject unknown providers before making network calls.
 
 Examples:
 
 ```text
-$my-update-models                 # both all
-$my-update-models harness         # harness all
-$my-update-models harness codex   # Codex CLI only
-$my-update-models model gemini    # Gemini model settings only
-$my-update-models both claude     # Claude model settings and Claude Code CLI
+$my-update-models          # all model settings, CLIs, and the repo scan
+$my-update-models codex    # Codex model settings, CLI, and the repo scan
+$my-update-models gemini   # Gemini model settings, CLI, and the repo scan
 ```
 
 ## Dotfiles Config Files
@@ -80,24 +64,33 @@ Do NOT modify model IDs that appear inside skill examples
 
 ## CLI Management
 
-Keep the existing split ownership. Do not migrate either CLI to another
+Keep the configured split ownership. Do not migrate a CLI to another
 manager as part of this skill.
 
-| CLI | Expected manager | Current version | Latest/update command |
+| CLI | Expected manager | Current version | Latest/install/update command |
 |---|---|---|---|
-| Codex | mise entry `npm:@openai/codex = "latest"` | `codex --version` | `mise latest npm:@openai/codex`; update with `mise upgrade npm:@openai/codex --yes` |
+| Codex | mise entry `npm:@openai/codex = "latest"` | `codex --version` | Latest: `mise latest npm:@openai/codex`; install: `mise install npm:@openai/codex@latest`; update: `mise upgrade npm:@openai/codex --yes` |
+| Gemini | mise entry `npm:@google/gemini-cli = "latest"` | `gemini --version` | Latest: `mise latest npm:@google/gemini-cli`; install: `mise install npm:@google/gemini-cli@latest`; update: `mise upgrade npm:@google/gemini-cli --yes` |
 | Claude Code | Anthropic native installer under `~/.local/share/claude/versions/` | `claude --version` | Check the configured channel and official releases; update with `claude update` |
 
-Before proposing an update, resolve each selected executable with `command -v`
-and inspect symlinks with `realpath`. For Codex, also run:
+For Codex and Gemini, first verify the expected mise entry and inspect the
+installed state:
 
 ```bash
 mise ls --json npm:@openai/codex
+mise ls --json npm:@google/gemini-cli
 ```
 
-Stop and report an ownership mismatch instead of updating through a guessed
-manager. Do not fall back to `npm install -g`, `curl | sh`, or another installer.
-For Claude Code, also stop if `DISABLE_UPDATES=1` prevents manual updates.
+If the selected package is configured but not installed, report its installed
+version as `not installed` and propose the table's `mise install` command. This
+is not an ownership mismatch. For an installed mise package, resolve the
+executable with `command -v`, inspect the symlink with `realpath`, and run its
+version command. Resolve Claude Code the same way before proposing an update.
+
+Stop and report an ownership mismatch if the configured manager or resolved
+executable differs from the table. Do not fall back to `npm install -g`,
+`curl | sh`, or another installer. For Claude Code, also stop if
+`DISABLE_UPDATES=1` prevents manual updates.
 
 ## Primary Sources
 
@@ -106,6 +99,7 @@ the failure and stop before proposing or applying an update.
 
 ### Anthropic (Claude / Claude Code)
 - Models overview: https://docs.anthropic.com/en/docs/about-claude/models/overview
+- API pricing: https://platform.claude.com/docs/en/about-claude/pricing
 - News: https://www.anthropic.com/news
 - Claude Code setup and updates: https://docs.anthropic.com/en/docs/claude-code/setup
 - Claude Code release notes: https://docs.claude.com/en/release-notes/claude-code
@@ -113,61 +107,72 @@ the failure and stop before proposing or applying an update.
 
 ### OpenAI (Codex)
 - Models reference: https://platform.openai.com/docs/models
+- API pricing: https://developers.openai.com/api/docs/pricing
+- Prompt caching: https://developers.openai.com/api/docs/guides/prompt-caching
 - News: https://openai.com/news
 - Codex CLI repo (releases / changelog): https://github.com/openai/codex
 
 ### Google (Gemini)
 - Models reference: https://ai.google.dev/gemini-api/docs/models
+- API pricing: https://ai.google.dev/gemini-api/docs/pricing
+- Context caching: https://ai.google.dev/gemini-api/docs/caching
+- Gemini CLI installation and release channels: https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/installation.mdx
 - Gemini CLI releases: https://github.com/google-gemini/gemini-cli/releases
 - Gemini CLI default + alias table: https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/config/models.ts
 
 ## Workflow
 
-1. **Parse scope.** Resolve `$mode` and `$provider` using the defaults and
-   validation rules above. Report the resolved scope before continuing.
-2. **Read current state.** For the `model` track, open the managed files for the
-   selected provider(s) and capture the current model values. For the `harness`
-   track, verify selected CLI ownership and capture installed versions. Report
-   the current state up front.
+1. **Parse scope.** Resolve `$provider` using the default and validation rules
+   above. Report the selected provider(s), model settings, CLIs, and invoking
+   repository before continuing.
+2. **Read current state.** Open the managed model settings for the selected
+   provider(s), verify each selected CLI's ownership, and capture the current
+   model values and installed CLI versions. Report the current state up front.
 3. **Fetch latest info.** Use WebFetch on the primary sources. If a required
    source cannot be read, report the failure and stop before proposing an
-   update. Fetch only information required by the selected track(s):
+   update. Fetch only information required by the selected provider(s):
    - Newest available model IDs (new Claude family generation, new
      `gpt-*-codex` release, new `gemini-*` generation)
    - Release date and any deprecation notice on the currently configured model
    - Whether a new alias has been introduced (e.g., a new Claude family, or a
      new Gemini alias)
+   - When a model update is available, the current and proposed models' API
+     prices, including every published cache write, cache read/hit, and cache
+     storage rate
    - Latest selected CLI versions. Use `mise latest npm:@openai/codex` for
-     Codex. For Claude Code on the `latest` channel, use the official GitHub
-     release and cross-check it against the changelog. For another channel,
-     report the channel explicitly and use only a target documented for it.
-4. **Compare models when selected.** Build a short table:
+     Codex and `mise latest npm:@google/gemini-cli` for Gemini. For Claude Code
+     on the `latest` channel, use the official GitHub release and cross-check it
+     against the changelog. For another channel, report the channel explicitly
+     and use only a target documented for it. The mise-managed Gemini entry
+     tracks npm's `latest` dist-tag, so compare it with the newest stable,
+     non-prerelease GitHub release and report any mismatch.
+4. **Compare models.** Build a short table:
    `file | field | current | proposed | reason`. Note trade-offs (capability,
-   latency, cost) when relevant. Omit this step for `harness`.
-5. **Compare CLIs when selected.** Build a short table:
-   `CLI | manager | installed | latest | action`. Omit this step for `model`.
-6. **Confirm before mutating anything.** Let the user independently approve
+   latency, cost) when relevant.
+5. **Compare prices when an update is available.** Before asking for approval,
+   show the pricing table defined below. Include adjacent `current` and
+   `proposed` rows for every model change. Omit this table only when no model
+   update is available.
+6. **Compare CLIs.** Build a short table:
+   `CLI | manager | installed | latest | action`.
+7. **Confirm before mutating anything.** Let the user independently approve
    model config edits, each CLI update, and repo-scan edits. If the user picks a
    different choice, follow it.
-7. **Update selected CLIs.** For `harness` or `both`, run only the approved
-   commands:
-   ```bash
-   mise upgrade npm:@openai/codex --yes
-   mise reshim --force
-   claude update
-   ```
-   Run the Codex pair only for `codex` or `all`, and `claude update` only for
-   `claude` or `all`. If a command fails, surface the error and stop that update;
-   do not switch installers or claim partial success as complete.
-8. **Verify CLI updates.** Re-resolve each updated executable, run its
+8. **Update selected CLIs.** Run only the approved install or update command
+   from the CLI Management table. For a mise-managed CLI, use `mise install`
+   when it is configured but absent and `mise upgrade` when it is installed.
+   Run `mise reshim --force` once after any successful mise install or upgrade.
+   If a command fails, surface the error and stop that update; do not switch
+   installers or claim partial success as complete.
+9. **Verify CLI updates.** Re-resolve each updated executable, run its
    `--version` command, and compare the result with the proposed version. Report
    an error if the executable moved to an unexpected manager or the installed
    version did not change as expected.
-9. **Apply approved model edits.** For `model` or `both`, edit the ghq repo with
-   the Edit tool. Change one field per edit.
-10. **Scan the invoking repository.** For `model` or `both`, scan for hardcoded
-   model IDs as described below. Skip the scan for `harness`.
-11. **Deploy model config changes.** Tell the user the deploy steps; only run
+10. **Apply approved model edits.** Edit the ghq repo with the Edit tool. Change
+   one field per edit.
+11. **Scan the invoking repository.** Scan for hardcoded model IDs as described
+   below.
+12. **Deploy model config changes.** Tell the user the deploy steps; only run
    them if asked.
    The chezmoi source dir is the ghq clone, so the canonical sequence is:
    ```bash
@@ -176,9 +181,43 @@ the failure and stop before proposing or applying an update.
    chezmoi apply -v
    ```
    Per repo policy, do not commit automatically — wait for explicit approval.
-12. **Verify model config changes.** After `chezmoi apply`, read `~/.codex/config.toml`,
+13. **Verify model config changes.** After `chezmoi apply`, read `~/.codex/config.toml`,
    `~/.claude/settings.json`, and `~/.gemini/settings.json` to confirm the
    change landed.
+
+## Model Price Comparison
+
+When at least one configured model has a newer proposed model, ALWAYS show both
+the current and proposed models in this exact table shape:
+
+| Provider | Role | Model | Input | Cache write | Cache read/hit | Cache storage | Output | Pricing basis |
+|---|---|---|---:|---:|---:|---:|---:|---|
+| ... | current | ... | ... | ... | ... | ... | ... | ... |
+| ... | proposed | ... | ... | ... | ... | ... | ... | ... |
+
+Use the public paid, standard, on-demand API tier as the common comparison
+basis unless the configured model is available only through another documented
+tier. State the currency and units, normally `USD per 1M tokens`; include
+`per hour` for cache storage. Preserve context-length bands and other pricing
+thresholds instead of choosing the cheapest row. If the CLI or subscription
+plan bills differently from the API, say that the API prices are comparison
+figures and do not represent the subscription charge.
+
+Never leave a cache column blank and never use an unexplained dash. Copy every
+applicable cache rate from the provider's official pricing page:
+
+- Include all cache-write durations when they have different rates, such as
+  5-minute and 1-hour writes.
+- Include both the cached-input/read rate and token-hour storage rate when the
+  provider prices them separately.
+- If the official pricing scheme has no separate charge for a cache operation,
+  write `not separately charged` and cite the official source.
+- If the provider does not publish any input, cache, storage, or output rate,
+  write `not published (checked YYYY-MM-DD)` in that cell. Do not substitute a
+  sibling model's price or infer a value.
+
+Put the official pricing link in `Pricing basis` for each row. Use the same
+pricing basis for the current and proposed rows so the comparison is valid.
 
 ## Repo Scan (hardcoded model IDs)
 
