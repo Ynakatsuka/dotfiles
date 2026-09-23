@@ -3,9 +3,13 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-gwai_orca_script="${GWAI_ORCA_SCRIPT:-$repo_root/home/dot_local/bin/executable_gwai-orca}"
+gwai_orca_source="${GWAI_ORCA_SCRIPT:-$repo_root/home/dot_local/bin/executable_gwai-orca}"
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/gwai-orca-test.XXXXXX")
 test_dir=$(cd "$test_dir" && pwd -P)
+mkdir -p "$test_dir/.local/bin" "$test_dir/.local/libexec/gwai"
+cp "$gwai_orca_source" "$test_dir/.local/bin/gwai-orca"
+cp "$repo_root/home/dot_local/libexec/gwai/branch-name.bash" "$test_dir/.local/libexec/gwai/branch-name.bash"
+gwai_orca_script="$test_dir/.local/bin/gwai-orca"
 
 cleanup() {
   rm -rf "$test_dir"
@@ -49,7 +53,7 @@ cat >"$bin_dir/claude" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 
-printf '%s\n' "${TEST_CLAUDE_OUTPUT:-fix create-orca-worktree}"
+printf '%s\n' "${TEST_CLAUDE_OUTPUT:-\"fix create-orca-worktree\"}"
 MOCK
 
 cat >"$bin_dir/orca" <<'MOCK'

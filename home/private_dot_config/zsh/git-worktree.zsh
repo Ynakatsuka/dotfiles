@@ -62,6 +62,7 @@ _gw_worktree_format_created_at() {
 }
 
 _gw_worktree_list_with_created_epoch() {
+    # Internal rows: creation epoch<TAB>full path<TAB>display text.
     if [ "${1:-}" = "--prune-stale" ]; then
         if ! git worktree prune; then
             echo "Error: failed to prune stale worktree metadata" >&2
@@ -69,26 +70,149 @@ _gw_worktree_list_with_created_epoch() {
         fi
     fi
 
-    local line
-    local worktree_path
-    local created_at
-    local worktree_list
-    local -a entries
+    local line worktree_path created_at porcelain_list max_width=0 index short_head display record_ended=1 width padding
+    local common_dir candidate_common_dir candidate_root previous
+    local -a paths widths heads labels suffixes entries
 
-    if ! worktree_list=$(git worktree list); then
+    if ! porcelain_list=$(git worktree list --porcelain); then
         echo "Error: failed to list git worktrees" >&2
         return 1
     fi
 
     while IFS= read -r line; do
-        [ -n "$line" ] || continue
-        worktree_path="${line%%[[:space:]]*}"
+        case "$line" in
+            'worktree '*)
+                if (( ! record_ended )); then
+                    echo "Error: malformed git worktree record: $line" >&2
+                    return 1
+                fi
+                record_ended=0
+                worktree_path="${line#worktree }"
+                if [[ -z "$worktree_path" || "$worktree_path" == *$'\t'* ]]; then
+                    echo "Error: unsupported worktree path: $worktree_path" >&2
+                    return 1
+                fi
+                paths+=("$worktree_path")
+                # zsh's (m) length counts the terminal width of wide Unicode characters.
+                width=${(m)#worktree_path}
+                widths+=("$width")
+                heads+=("")
+                labels+=("")
+                suffixes+=("")
+                (( width > max_width )) && max_width=$width
+                ;;
+            'HEAD '*)
+                if (( record_ended )) || [[ -n "${heads[-1]:-}" ]]; then
+                    echo "Error: malformed git worktree record: $line" >&2
+                    return 1
+                fi
+                heads[-1]="${line#HEAD }"
+                ;;
+            'branch refs/heads/'*)
+                if (( record_ended )) || [[ -n "${labels[-1]:-}" ]]; then
+                    echo "Error: malformed git worktree record: $line" >&2
+                    return 1
+                fi
+                labels[-1]="[${line#branch refs/heads/}]"
+                ;;
+            detached)
+                if (( record_ended )) || [[ -n "${labels[-1]:-}" ]]; then
+                    echo "Error: malformed git worktree record: $line" >&2
+                    return 1
+                fi
+                labels[-1]='(detached HEAD)'
+                ;;
+            bare)
+                if (( record_ended )) || [[ -n "${labels[-1]:-}" ]]; then
+                    echo "Error: malformed git worktree record: $line" >&2
+                    return 1
+                fi
+                labels[-1]='(bare)'
+                ;;
+            locked*)
+                (( ! record_ended )) || return 1
+                suffixes[-1]+=' locked'
+                ;;
+            prunable*)
+                (( ! record_ended )) || return 1
+                suffixes[-1]+=' prunable'
+                ;;
+            '') record_ended=1 ;;
+            *)
+                echo "Error: unsupported git worktree record: $line" >&2
+                return 1
+                ;;
+        esac
+    done <<< "$porcelain_list"
+
+    common_dir=$(git rev-parse --git-common-dir) || {
+        echo "Error: failed to resolve git common directory" >&2
+        return 1
+    }
+    common_dir=${common_dir:A}
+
+    for (( index = 1; index <= ${#paths[@]}; index++ )); do
+        worktree_path="${paths[index]}"
+        if [[ -z "${labels[index]}" || ( "${labels[index]}" != '(bare)' && -z "${heads[index]}" ) ]]; then
+            echo "Error: incomplete git worktree record: $worktree_path" >&2
+            return 1
+        fi
+        if (( index != 1 )) && [[ "${labels[index]}" == '(bare)' ]]; then
+            echo "Error: invalid git worktree path: $worktree_path" >&2
+            return 1
+        fi
+        for (( previous = 1; previous < index; previous++ )); do
+            if [[ "$worktree_path" == "${paths[previous]}" ]]; then
+                echo "Error: duplicate git worktree path: $worktree_path" >&2
+                return 1
+            fi
+        done
+        candidate_common_dir=$(git -C "$worktree_path" rev-parse --git-common-dir 2>/dev/null) || {
+            echo "Error: invalid git worktree path: $worktree_path" >&2
+            return 1
+        }
+        if [[ "$candidate_common_dir" != /* ]]; then
+            candidate_common_dir="$worktree_path/$candidate_common_dir"
+        fi
+        candidate_common_dir=${candidate_common_dir:A}
+        if [[ "$candidate_common_dir" != "$common_dir" ]]; then
+            echo "Error: invalid git worktree path: $worktree_path" >&2
+            return 1
+        fi
+        # Git lists the common Git directory as the first record for separate Git dirs and submodules.
+        if (( index != 1 )) || [[ "$worktree_path" != "$common_dir" ]]; then
+            if [[ "${labels[index]}" == '(bare)' ]]; then
+                candidate_root=$(git -C "$worktree_path" rev-parse --absolute-git-dir 2>/dev/null) || {
+                    echo "Error: invalid git worktree path: $worktree_path" >&2
+                    return 1
+                }
+            else
+                candidate_root=$(git -C "$worktree_path" rev-parse --show-toplevel 2>/dev/null) || {
+                    echo "Error: invalid git worktree path: $worktree_path" >&2
+                    return 1
+                }
+            fi
+            if [[ "$candidate_root" != "$worktree_path" ]]; then
+                echo "Error: invalid git worktree path: $worktree_path" >&2
+                return 1
+            fi
+        fi
         if ! created_at=$(_gw_worktree_created_at "$worktree_path"); then
             return 1
         fi
 
-        entries+=("${created_at}"$'\t'"${line}")
-    done <<< "$worktree_list"
+        padding=$(printf '%*s' "$(( max_width - widths[index] + 2 ))" '')
+        if [[ "${labels[index]}" == '(bare)' ]]; then
+            display="${worktree_path}${padding}${labels[index]}${suffixes[index]}"
+        else
+            short_head=$(git rev-parse --short "${heads[index]}") || {
+                echo "Error: failed to abbreviate worktree HEAD: $worktree_path" >&2
+                return 1
+            }
+            display="${worktree_path}${padding}${short_head} ${labels[index]}${suffixes[index]}"
+        fi
+        entries+=("${created_at}"$'\t'"${worktree_path}"$'\t'"${display}")
+    done
 
     if [ ${#entries[@]} -gt 0 ]; then
         printf '%s\n' "${entries[@]}" | sort -rn -k1,1
@@ -97,13 +221,10 @@ _gw_worktree_list_with_created_epoch() {
 
 _gw_worktree_list_newest_first() {
     local entries
+    entries=$(_gw_worktree_list_with_created_epoch "$@") || return 1
 
-    if ! entries=$(_gw_worktree_list_with_created_epoch "$@"); then
-        return 1
-    fi
-
-    if [ -n "$entries" ]; then
-        printf '%s\n' "$entries" | cut -f2-
+    if [[ -n "$entries" ]]; then
+        printf '%s\n' "$entries" | cut -f3-
     fi
 }
 
@@ -111,19 +232,10 @@ _gwc_worktree_list_newest_first() {
     local current_root="$1"
     shift
 
-    local entries
-    local created_at
-    local line
-    local worktree_path
-    local formatted_created_at
-
-    if ! entries=$(_gw_worktree_list_with_created_epoch "$@"); then
-        return 1
-    fi
-
-    while IFS=$'\t' read -r created_at line; do
-        [ -n "$line" ] || continue
-        worktree_path="${line%%[[:space:]]*}"
+    local entries created_at worktree_path line formatted_created_at
+    entries=$(_gw_worktree_list_with_created_epoch "$@") || return 1
+    while IFS=$'\t' read -r created_at worktree_path line; do
+        [[ -n "$worktree_path" ]] || continue
         [ "$worktree_path" != "$current_root" ] || continue
 
         if ! formatted_created_at=$(_gw_worktree_format_created_at "$created_at"); then
@@ -280,7 +392,7 @@ _gw_create_worktree() {
 
 # Smart git worktree function for InsightX
 function gw() {
-    local branch_name=$1
+    local branch_name=${1:-}
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
 
     # Check if we're in a git repository
@@ -304,12 +416,11 @@ function gw() {
     local repo_name=$(basename "$git_root")
 
     if [ -z "$branch_name" ]; then
-        local worktree_list
-        if ! worktree_list=$(_gw_worktree_list_newest_first); then
-            return 1
-        fi
-
-        local selected_worktree=$(printf '%s\n' "$worktree_list" | fzf --height=60% --reverse --preview="$(_gw_worktree_fzf_preview_command)" --preview-window='right:55%:wrap' | awk '{print $1}')
+        local entries selected_line selected_worktree
+        entries=$(_gw_worktree_list_with_created_epoch) || return 1
+        selected_line=$(printf '%s\n' "$entries" | cut -f2- | fzf --height=60% --reverse --delimiter=$'\t' --with-nth=2.. --preview="$(_gw_worktree_fzf_preview_command)" --preview-window='right:55%:wrap') || selected_line=""
+        selected_worktree="${selected_line%%$'\t'*}"
+        [[ "$selected_line" == *$'\t'* ]] || selected_worktree=""
         if [ -n "$selected_worktree" ]; then
             echo "Moving to worktree: $selected_worktree"
             cd "$selected_worktree"
@@ -569,13 +680,21 @@ _gwc_remove_worktree() {
 
 _gwc_select_worktrees() {
     local worktrees="$1"
+    local worktree_path visible_path display
 
-    echo "$worktrees" | sed 's/\[//g; s/\]//g' | fzf \
+    printf '%s\n' "$worktrees" | while IFS=$'\t' read -r worktree_path display; do
+        [[ -n "$worktree_path" ]] || continue
+        visible_path=$(printf '%s' "$worktree_path" | tr -d '[]')
+        display=$(printf '%s' "$display" | tr -d '[]')
+        printf '%s\t%s\t%s\n' "$worktree_path" "$visible_path" "$display"
+    done | fzf \
         -m \
         --height=60% \
         --reverse \
         --prompt="削除するworktreeを選択 (Tab: 複数選択): " \
         --header="新しい作成日順 | Tab: 選択/解除, Enter: 確定" \
+        --delimiter=$'\t' \
+        --with-nth=2.. \
         --preview="$(_gw_worktree_fzf_preview_command)" \
         --preview-window='right:55%:wrap'
 }
@@ -590,7 +709,11 @@ _gwc_collect_selected_worktrees() {
     _GWC_BRANCH_NAMES=()
 
     while IFS= read -r line; do
-        selected_path=$(echo "$line" | awk '{print $1}')
+        selected_path="${line%%$'\t'*}"
+        if [[ "$line" != *$'\t'* || -z "$selected_path" ]]; then
+            echo "Error: selected worktree is invalid: $line" >&2
+            return 1
+        fi
 
         if selected_branch=$(git -C "$selected_path" symbolic-ref --short HEAD 2>/dev/null); then
             :
@@ -725,13 +848,8 @@ EOF
     local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     local repo_name=$(basename "$git_root")
     local worktree_base="${git_root}-worktree"
-    local worktree_list
-
-    if ! worktree_list=$(_gwc_worktree_list_newest_first "$git_root" --prune-stale); then
-        return 1
-    fi
-
-    local worktrees="$worktree_list"
+    local worktrees
+    worktrees=$(_gwc_worktree_list_newest_first "$git_root" --prune-stale) || return 1
 
     if [ -z "$worktrees" ]; then
         echo "削除可能なworktreeが見つかりません"
