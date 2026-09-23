@@ -356,22 +356,18 @@ printf '%s' "$(jq -cn '{session_id: "outside", turn_id: "turn-7", prompt: "ç„¡è¦
 [[ ! -s "$codex_calls" ]]
 
 jq -e '
-  [.hooks.UserPromptSubmit[]?.hooks[]?.command] as $commands
-  | ($commands | length) == 2
-    and ($commands[0] | contains("agent-board-state\" working"))
-    and ($commands[1] | contains("agent-board-auto-title"))
+  ([.hooks // {} | .. | strings
+    | select(contains("agent-board-state") or contains("agent-board-auto-title"))]
+    | length) == 0
 ' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
 
-rendered_codex_hooks=$(chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
-jq -e '
-  [.hooks.UserPromptSubmit[]?.hooks[]?.command] as $commands
-  | ([$commands[] | select(contains("agent-board-auto-title"))] | length) == 1
-    and ($commands[-2] | contains("agent-board-state\" working"))
-    and ($commands[-1] | contains("agent-board-auto-title"))
-' <<<"$rendered_codex_hooks" >/dev/null
-
 render_home="$test_dir/render-home"
-mkdir -p "$render_home/.codex"
+template_bin="$test_dir/template-bin"
+mkdir -p "$render_home/.codex" "$template_bin"
+# Keep host tool shims in their own HOME while rendering the fixture's hooks.
+printf '#!/usr/bin/env bash\nexec env HOME=%q %q "$@"\n' \
+  "$HOME" "$(command -v jq)" >"$template_bin/jq"
+chmod +x "$template_bin/jq"
 cat >"$render_home/.codex/hooks.json" <<'JSON'
 {
   "hooks": {
@@ -379,31 +375,37 @@ cat >"$render_home/.codex/hooks.json" <<'JSON'
       {
         "matcher": "mixed",
         "hooks": [
-          {"type": "command", "command": "cmux-agent-board-auto-title old"},
-          {"type": "command", "command": "keep-me"}
+          {
+            "type": "command",
+            "command": "\"$HOME/.local/libexec/cmux/agent-board-state\" working"
+          },
+          {
+            "type": "command",
+            "command": "\"$HOME/.local/libexec/cmux/agent-board-auto-title\""
+          }
         ]
-      },
+      }
+    ],
+    "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "cmux-agent-board-auto-title duplicate"}
+          {"type": "command", "command": "keep-me"}
         ]
       }
     ]
   }
 }
 JSON
-first_render=$(HOME="$render_home" PATH="/opt/homebrew/bin:/usr/bin:/bin" \
-  chezmoi execute-template \
+first_render=$(HOME="$render_home" PATH="$template_bin:$PATH" chezmoi execute-template \
   <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
 jq -e '
-  ([.hooks.UserPromptSubmit[]?.hooks[]?.command
-    | select(contains("agent-board-auto-title"))] | length) == 1
-  and ([.hooks.UserPromptSubmit[]?.hooks[]?.command
-    | select(. == "keep-me")] | length) == 1
+  ([.. | strings | select(contains("cmux"))] | length) == 0
+  and ([.. | strings | select(. == "keep-me")] | length) == 1
+  and ([.hooks.PreToolUse[]?.hooks[]?.command
+    | select(contains("bulk-read-guard"))] | length) == 1
 ' <<<"$first_render" >/dev/null
 printf '%s\n' "$first_render" >"$render_home/.codex/hooks.json"
-second_render=$(HOME="$render_home" PATH="/opt/homebrew/bin:/usr/bin:/bin" \
-  chezmoi execute-template \
+second_render=$(HOME="$render_home" PATH="$template_bin:$PATH" chezmoi execute-template \
   <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl")
 diff -u <(jq -S . <<<"$first_render") <(jq -S . <<<"$second_render")
 

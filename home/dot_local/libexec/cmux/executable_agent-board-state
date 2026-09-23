@@ -66,24 +66,27 @@ title_assignments="$({
 eval "$title_assignments"
 
 workspace_has_marker=false
-if [[ "$current_workspace_title" == *"$working_marker"*
-  || "$current_workspace_title" == *"$stopped_marker"*
-  || "$current_workspace_title" == *"$input_marker"* ]]; then
+# Both titles are assigned by the jq-generated shell assignments above.
+# shellcheck disable=SC2154
+if [[ "$current_workspace_title" == *"$working_marker"* ||
+  "$current_workspace_title" == *"$stopped_marker"* ||
+  "$current_workspace_title" == *"$input_marker"* ]]; then
   workspace_has_marker=true
 fi
 
-if [[ -n "$marker"
-  && "$current_surface_title" == *"$marker"
-  && "$workspace_has_marker" == false ]]; then
+# shellcheck disable=SC2154
+if [[ -n "$marker" &&
+  "$current_surface_title" == *"$marker" &&
+  "$workspace_has_marker" == false ]]; then
   echo '{}'
   exit 0
 fi
 
-if [[ -z "$marker"
-  && "$current_surface_title" != *"$working_marker"
-  && "$current_surface_title" != *"$stopped_marker"
-  && "$current_surface_title" != *"$input_marker"
-  && "$workspace_has_marker" == false ]]; then
+if [[ -z "$marker" &&
+  "$current_surface_title" != *"$working_marker" &&
+  "$current_surface_title" != *"$stopped_marker" &&
+  "$current_surface_title" != *"$input_marker" &&
+  "$workspace_has_marker" == false ]]; then
   echo '{}'
   exit 0
 fi
