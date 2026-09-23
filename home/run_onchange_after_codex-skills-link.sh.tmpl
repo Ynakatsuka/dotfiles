@@ -4,12 +4,14 @@
 # Why this script exists:
 #   Codex honors the same SKILL.md frontmatter format as Claude Code, but reads
 #   user skills from ~/.agents/skills/ instead of ~/.claude/skills/. Maintaining
-#   a duplicate copy in dot_agents/skills/ would drift; instead we
-#   keep dot_claude/skills/ as the single source and link each user skill into
-#   the Codex skills directory.
+#   a duplicate copy in dot_agents/skills/ would drift; dot_claude/skills/
+#   is the single source and each user skill is linked into the Codex skills
+#   directory.
 #
 # Scope:
 #   - Links every directory under dot_claude/skills/ that ships a SKILL.md.
+#   - The run_once_before_migrate-shared-skills.sh script moves the four
+#     formerly agent-owned directories before this script creates links.
 #   - Leaves ~/.claude/skills/ directories untouched unless chezmoi manages
 #     them directly. Unmanaged user skills must not be deleted by this sync.
 #   - Leaves non-symlink entries under ~/.agents/skills/ untouched.
