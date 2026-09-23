@@ -55,7 +55,7 @@ install_chezmoi_standalone() {
     return 0
   fi
   log "Installing chezmoi via curl"
-  run bash -c 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
+  install_chezmoi_official -c
 }
 
 run_dotfiles() {
