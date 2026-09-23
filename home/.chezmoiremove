@@ -16,6 +16,7 @@ mcp.json
 .claude/skills/my-skill-creator/scripts/package_skill.py
 .claude/skills/my-team-share
 .claude/skills/my-bullets
+.claude/skills/my-disk-cleanup
 .claude/skills/my-explain-diff
 .claude/skills/my-japanese-editor/references/examples.md
 .claude/skills/my-japanese-editor/references/phrases.md

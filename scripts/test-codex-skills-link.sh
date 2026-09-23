@@ -26,15 +26,20 @@ mkdir -p \
   "$FAKE_HOME/.claude/skills/stale-managed" \
   "$FAKE_HOME/.claude/skills/my-team-share" \
   "$FAKE_HOME/.agents/skills/local-owned" \
+  "$FAKE_HOME/.agents/skills/my-subagent/references" \
   "$FAKE_HOME/.codex/skills/.system"
 printf 'name: my-pr\n' >"$FAKE_HOME/.claude/skills/my-pr/SKILL.md"
 printf 'local skill\n' >"$FAKE_HOME/.agents/skills/local-owned/SKILL.md"
+printf 'name: my-subagent\n' >"$FAKE_HOME/.agents/skills/my-subagent/SKILL.md"
+printf 'preserved reference\n' >"$FAKE_HOME/.agents/skills/my-subagent/references/prompts.md"
 printf 'stale-managed\n' >"$FAKE_HOME/.agents/skills/.codex-claude-managed-skills"
 
 ln -s "$FAKE_HOME/.claude/skills/custom" \
   "$FAKE_HOME/.agents/skills/custom"
 ln -s "$FAKE_HOME/.claude/skills/stale-managed" \
   "$FAKE_HOME/.agents/skills/stale-managed"
+ln -s ../../.agents/skills/my-subagent \
+  "$FAKE_HOME/.claude/skills/my-subagent"
 ln -s "$FAKE_HOME/.claude/skills/my-pr" \
   "$FAKE_HOME/.codex/skills/my-pr"
 ln -s "$FAKE_HOME/.claude/skills/my-team-share" \
@@ -42,10 +47,38 @@ ln -s "$FAKE_HOME/.claude/skills/my-team-share" \
 ln -s "$TMP_DIR/unrelated-target" \
   "$FAKE_HOME/.codex/skills/unrelated"
 
-"$CHEZMOI_BIN" execute-template \
+"$CHEZMOI_BIN" -S "$REPO_ROOT/home" execute-template \
   <"$REPO_ROOT/home/run_onchange_after_codex-skills-link.sh.tmpl" \
   >"$RENDERED"
 chmod +x "$RENDERED"
+
+HOME="$FAKE_HOME" bash "$REPO_ROOT/home/run_once_before_migrate-shared-skills.sh"
+[ -f "$FAKE_HOME/.claude/skills/my-subagent/references/prompts.md" ] ||
+  fail "agent-owned skill content was not migrated"
+[ ! -L "$FAKE_HOME/.claude/skills/my-subagent" ] ||
+  fail "Claude skill remained a link to the old directory"
+
+CONFLICT_HOME="$TMP_DIR/conflict-home"
+mkdir -p \
+  "$CONFLICT_HOME/.agents/skills/my-bulk-read" \
+  "$CONFLICT_HOME/.agents/skills/my-code-write" \
+  "$CONFLICT_HOME/.claude/skills/my-code-write"
+printf 'bulk read\n' >"$CONFLICT_HOME/.agents/skills/my-bulk-read/SKILL.md"
+printf 'agent version\n' >"$CONFLICT_HOME/.agents/skills/my-code-write/SKILL.md"
+printf 'claude version\n' >"$CONFLICT_HOME/.claude/skills/my-code-write/SKILL.md"
+ln -s ../../.agents/skills/my-bulk-read \
+  "$CONFLICT_HOME/.claude/skills/my-bulk-read"
+if HOME="$CONFLICT_HOME" bash "$REPO_ROOT/home/run_once_before_migrate-shared-skills.sh" >"$TMP_DIR/migration-conflict-output" 2>&1; then
+  fail "migration accepted conflicting skill directories"
+fi
+grep -q 'Cannot migrate my-code-write' "$TMP_DIR/migration-conflict-output" ||
+  fail "migration did not identify the conflicting skill"
+[ -L "$CONFLICT_HOME/.claude/skills/my-bulk-read" ] &&
+  [ -f "$CONFLICT_HOME/.agents/skills/my-bulk-read/SKILL.md" ] ||
+  fail "migration moved an earlier skill before checking every conflict"
+[ "$(sed -n '1p' "$CONFLICT_HOME/.claude/skills/my-code-write/SKILL.md")" = 'claude version' ] &&
+  [ "$(sed -n '1p' "$CONFLICT_HOME/.agents/skills/my-code-write/SKILL.md")" = 'agent version' ] ||
+  fail "migration changed conflicting skill data"
 
 HOME="$FAKE_HOME" "$RENDERED" >"$TMP_DIR/rendered-output" 2>&1
 
@@ -54,6 +87,9 @@ HOME="$FAKE_HOME" "$RENDERED" >"$TMP_DIR/rendered-output" 2>&1
 [ "$(readlink "$FAKE_HOME/.agents/skills/my-pr")" = \
   "$FAKE_HOME/.claude/skills/my-pr" ] ||
   fail "managed Codex skill link points to the wrong path"
+[ "$(readlink "$FAKE_HOME/.agents/skills/my-subagent")" = \
+  "$FAKE_HOME/.claude/skills/my-subagent" ] ||
+  fail "migrated skill was not linked back into agent skills"
 [ -d "$FAKE_HOME/.agents/skills/local-owned" ] &&
   [ ! -L "$FAKE_HOME/.agents/skills/local-owned" ] ||
   fail "local-owned skill directory was modified or removed"

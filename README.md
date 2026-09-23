@@ -124,11 +124,9 @@ or a ghq repository root. Those exact paths remain trusted by the dotfiles
 policy; existing entries for subdirectories are preserved. Run
 `bash scripts/test-codex-config.sh` to verify config preservation and idempotence.
 
-The personal `my-subagent` skill is managed at
-`~/.agents/skills/my-subagent`; `~/.claude/skills/my-subagent` is a
-compatibility symlink to it. No duplicate is generated under
-`~/.codex/skills/`. This design has no CCV, systemd, environment-variable, or
-separate apply-script dependency.
+Personal skills are managed under `~/.claude/skills/` and linked into
+`~/.agents/skills/` for Codex. This includes `my-subagent`; no duplicate is
+generated under `~/.codex/skills/`.
 
 ### RTK Command Rewriting
 
@@ -153,8 +151,8 @@ copies) in place and returns only a path and summary, and
 whole-file reads; it is not a security boundary. It is registered for
 Claude Code in `home/dot_claude/settings.json` and for Codex by
 `home/dot_codex/hooks.json.tmpl`; the shared `my-bulk-read` and
-`my-code-write` skills under `~/.agents/skills/` tell both agents when to
-delegate.
+`my-code-write` skills under `~/.claude/skills/` are linked into
+`~/.agents/skills/` and tell both agents when to delegate.
 
 Codex treats the guard as an unmanaged hook. After `chezmoi apply`, review and
 trust it with `/hooks` in an interactive Codex session; until then Codex skips
