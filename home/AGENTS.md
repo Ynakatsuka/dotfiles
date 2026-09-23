@@ -36,16 +36,27 @@
 - Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
 - Complete every explicitly requested item. If one is genuinely blocked, complete the rest and name the specific blocker.
 - Treat questions as requests for an answer, not authorization to edit files or mutate state. Make changes only when the user asks for action.
-- Investigate autonomously before asking. Read the relevant code, nearest tests, configs, documentation, ADRs, and useful git history.
+- Investigate autonomously before asking. Read the code, tests, configuration, documentation, or history relevant to the task.
 - Ask only when evidence cannot resolve materially different interpretations of behavior, scope, interfaces, data models, error semantics, or technology choices. Do not ask about preferences with no material effect.
 - For low-risk reversible choices, follow project conventions and proceed without confirmation. Examples include temporary names, private helpers, formatting, test fixture values, and the order of equivalent local steps. When the user omits a branch or worktree name, derive a concise task-based name from repository conventions instead of asking.
-- Before editing, read the target and the most relevant adjacent caller, test, type, config, or documentation.
+- For behavior changes, inspect the target and the adjacent caller, test, type, configuration, or documentation that defines its contract.
 - Before implementing similar behavior across multiple clients, SDKs, entrypoints, or platforms, inspect the corresponding implementations and identify the closest reference. Reuse or extend the common path instead of building a parallel one; isolate necessary differences at each boundary.
 - Do not add a client-specific parameter, flag, variable, state, or branch to shared code when the existing caller, adapter, or composition of behavior can express the difference. Add a shared variation point only when the difference belongs to the shared contract.
 - Reuse an existing solution before introducing a helper, dependency, abstraction, or toolchain change.
 - Diagnose bugs before patching. State the root cause in one sentence and prefer a failing test or minimal reproduction. Use an existing diagnostic workflow or available skill for multi-step investigations.
 - Before changing a public function, type, config key, schema, API response, CLI flag, migration, or documented error, search for callers and downstream consumers. Stop and report if the contract would break.
 - After finding a root cause, search for related instances and report them. Fix only instances within the requested scope unless the user approves expansion.
+
+## Code Clarity
+
+Apply these rules to new or materially changed source code, following the project's existing vocabulary and layout. Do not rename or move unrelated code solely to satisfy them.
+
+- Give public names the domain and responsibility they need to be found and understood. Use the same term for one concept across code, paths, tests, schemas, and documentation; avoid unexplained aliases and generic names when they hide the domain. Search for collisions before adding or renaming a public identifier.
+- Put new code in the narrowest existing directory that owns the behavior. Keep related implementation, types, and tests easy to find together; do not make `utils` or `shared` a default destination or split one behavior across files without a real boundary.
+- Make public signatures express inputs, outputs, and failure behavior. Validate untrusted data at boundaries, then use precise internal types; distinguish easily confused values or invalid states when the language's type system can prevent a real defect.
+- Prefer direct imports, named dependencies, and an explicit small registration table where the project allows them. Avoid needless aliases, layers of re-exports, implicit global state, and runtime name lookup that obscure the path from caller to implementation.
+- Make side effects visible at function boundaries. Use straightforward branches and meaningful local names when compact expressions hide domain rules. Reuse the existing source of truth instead of copying logic for locality.
+- Place short comments beside definitions for contracts, invariants, side effects, or surprising constraints that names and types cannot convey. Keep related constants and validation near their owner; make errors identify the failed operation and domain object while preserving the cause.
 
 ## Failures and Fallbacks
 
