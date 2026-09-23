@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # rtk-hook-version: 3
 # RTK Claude Code hook — rewrites commands to use rtk for token savings.
-# Requires: rtk >= 0.23.0, jq
+# Requires: rtk >= 0.49.0, jq
 #
 # This is a thin delegating hook: all rewrite logic lives in `rtk rewrite`,
 # which is the single source of truth (src/discover/registry.rs).
@@ -26,34 +26,25 @@ if ! command -v rtk &>/dev/null; then
   exit 0
 fi
 
-# Version guard: rtk rewrite was added in 0.23.0.
-# Older binaries: warn once and exit cleanly (no silent failure).
+# RTK 0.49.0 handles the compound find expressions that older releases rewrite
+# incorrectly. Keep native commands on older installations.
 RTK_VERSION=$(rtk --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-if [ -n "$RTK_VERSION" ]; then
-  MAJOR=$(echo "$RTK_VERSION" | cut -d. -f1)
-  MINOR=$(echo "$RTK_VERSION" | cut -d. -f2)
-  # Require >= 0.23.0
-  if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 23 ]; then
-    echo "[rtk] WARNING: rtk $RTK_VERSION is too old (need >= 0.23.0). Upgrade: cargo install rtk" >&2
-    exit 0
-  fi
+if [ -z "$RTK_VERSION" ]; then
+  echo "[rtk] WARNING: cannot determine rtk version (need >= 0.49.0). Keeping native command" >&2
+  exit 0
+fi
+MAJOR=$(echo "$RTK_VERSION" | cut -d. -f1)
+MINOR=$(echo "$RTK_VERSION" | cut -d. -f2)
+# Require >= 0.49.0
+if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 49 ]; then
+  echo "[rtk] WARNING: rtk $RTK_VERSION is too old (need >= 0.49.0). Upgrade with mise" >&2
+  exit 0
 fi
 
 INPUT=$(cat)
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 if [ -z "$CMD" ]; then
-  exit 0
-fi
-
-# RTK 0.43.0 rewrites compound find expressions even though `rtk find`
-# rejects predicates and actions such as -o, -exec, and -delete. Preserve the
-# native command until RTK can execute the full find syntax it rewrites.
-if [[ "$CMD" =~ (^|[[:space:];|&])find[[:space:]] ]] && {
-  [[ "$CMD" =~ (^|[[:space:]])(-o|-not|-exec|-execdir|-delete)([[:space:]]|$) ]] ||
-    [[ "$CMD" == *'('* ]] ||
-    [[ "$CMD" == *')'* ]]
-}; then
   exit 0
 fi
 

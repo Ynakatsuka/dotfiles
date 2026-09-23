@@ -80,11 +80,9 @@ bash scripts/test-delegation.sh
 
 - RTK is installed through `home/private_dot_config/mise/config.toml` and updated by maintenance.
 - Claude Bash commands pass through three ordered `PreToolUse` hooks configured in `home/dot_claude/settings.json`: `bulk-read-guard` first, then `ensure-mise-path.sh`, then `rtk-rewrite.sh`.
-- `home/dot_claude/hooks/executable_rtk-rewrite.sh` delegates supported rewrites and permission decisions to `rtk rewrite`. It requires `jq` and RTK 0.23.0 or newer.
+- `home/dot_claude/hooks/executable_rtk-rewrite.sh` delegates supported rewrites and permission decisions to `rtk rewrite`. It requires `jq` and RTK 0.49.0 or newer.
 - Preserve the rewrite protocol: exit 0 rewrites and auto-allows, exit 1 or 2 passes through, exit 3 rewrites without auto-allowing so Claude can ask, and unexpected failures emit a warning before passing through.
-- RTK 0.43.0 cannot execute some compound `find` expressions that it rewrites. Keep native `find` for expressions containing `-o`, `-not`, `-exec`, `-execdir`, `-delete`, or parentheses until upstream behavior is verified compatible.
-- Any change to RTK versions, hook ordering, rewrite handling, or the compound-`find` guard must run `bash scripts/test-rtk-rewrite-hook.sh` and the agent environment check.
-- Do not remove a compatibility guard solely because RTK was upgraded; reproduce the formerly failing command against the installed version first.
+- Changes to RTK versions, hook ordering, or rewrite handling require `bash scripts/test-rtk-rewrite-hook.sh` and the agent environment check. Reproduce a compatibility issue against the installed RTK before adding or removing a guard.
 
 ## Specialized Changes
 

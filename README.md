@@ -70,6 +70,11 @@ Detailed bootstrap behavior lives in [bootstrap/README.md](bootstrap/README.md).
 | `chezmoi update -v` | Pull remote changes and apply them |
 | `chezmoi cd` | Jump to the source directory |
 
+`mise run maintenance` pulls the dotfiles source, applies it with `--force`,
+and verifies the managed target state before updating tools. Managed target
+changes and files listed in `home/.chezmoiremove` are overwritten or removed
+during apply; unmanaged files are outside this cleanup.
+
 ### Reload Config
 
 ```bash
@@ -136,13 +141,13 @@ RTK reduces token-heavy shell output. Codex is instructed to invoke it directly,
 2. `ensure-mise-path.sh` exposes mise-managed tools.
 3. `rtk-rewrite.sh` delegates supported commands to `rtk rewrite`.
 
-The rewrite hook deliberately bypasses compound `find` syntax that RTK 0.43.0 rewrites but cannot execute correctly. Run `bash scripts/test-rtk-rewrite-hook.sh` after changing RTK, either hook, or their ordering.
+Run `bash scripts/test-rtk-rewrite-hook.sh` after changing RTK, either hook, or their ordering.
 
 ### Model Delegation
 
 Reading a whole large file loads it into the agent's context. Following the
 model-routing pattern from Spotify's Portal write-up, `~/.local/bin/bulk-read`
-sends files with a question to a cheaper Codex reader (`gpt-5.6-luna`,
+sends files with a question to a cheaper Codex reader (`gpt-6-luna`,
 reasoning effort `max`) and prints only its answer, `~/.local/bin/code-write`
 has the same model write a predictable file (tests, scaffolding, pattern
 copies) in place and returns only a path and summary, and
