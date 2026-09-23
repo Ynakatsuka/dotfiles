@@ -59,6 +59,10 @@ Mention risks that reviewers should prioritize:
 - migration or config impact
 - intentionally skipped recommendations
 
+## Japanese editing
+
+Build a factual Japanese draft from the PR diff, task context, existing PR body (if any), and verification results. Before writing the body file, read and apply the `my-japanese-editor` skill to the draft. Treat the draft as the source of truth and check the edited text against it and the PR evidence. Preserve Markdown headings, checkboxes, commands, paths, numbers, and the distinction between completed and unverified checks. Correct or revert any edit that changes a claim or removes information reviewers need.
+
 ## Create/update commands
 
 Use a repo-local body file under the my-pr artifact directory. Do not use `/tmp/pr-body.md`.
