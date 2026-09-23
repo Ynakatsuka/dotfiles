@@ -75,6 +75,18 @@ and verifies the managed target state before updating tools. Managed target
 changes and files listed in `home/.chezmoiremove` are overwritten or removed
 during apply; unmanaged files are outside this cleanup.
 
+### Tests
+
+Run every repository test from one command, or list and select cases by name:
+
+```bash
+bash scripts/test.sh
+bash scripts/test.sh --list
+bash scripts/test.sh test-delegation my-handoff
+```
+
+The runner covers `scripts/test-*.sh`, `scripts/test-*.zsh`, the Japanese editor's Python unit tests, and the handoff Node tests. It checks required tools before running selected cases and reports all failures at the end. `test-prune-old-worktrees` uses GNU `date` and `touch`, so the full suite reports it as skipped on macOS; selecting it there is an error. CI runs the full suite on Linux.
+
 ### Reload Config
 
 ```bash

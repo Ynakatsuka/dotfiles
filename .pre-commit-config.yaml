@@ -7,10 +7,8 @@
 #   touch their bytes.
 # - .tmpl files are chezmoi Go templates and are excluded from syntax parsers
 #   (check-yaml/toml/json, shellcheck, shfmt).
-# - Shell hooks match only `*.sh` so extensionless files such as dot_zshrc
-#   (zsh syntax, not well supported by shellcheck) are skipped.
-# - scripts/avgtime_zsh.sh is a zsh script saved with a .sh suffix; excluded
-#   explicitly.
+# - Shell hooks use file types (including shebangs), so extensionless Bash
+#   commands are checked. Zsh files use a separate syntax-only check.
 # - shfmt runs in write mode (`-w`). It rewrites files in place; review the
 #   diff before committing.
 
@@ -21,8 +19,7 @@ exclude: |
       \.git/.*|
       .*\.age$|
       .*\.plist$|
-      .*/encrypted_.*|
-      scripts/avgtime_zsh\.sh
+      .*/encrypted_.*
   )$
 
 repos:
@@ -73,20 +70,28 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-        files: \.sh$
-        exclude: \.tmpl$
+        types: [shell]
+        exclude_types: [zsh]
+        exclude: (\.tmpl$|^scripts/avgtime_zsh\.sh$)
         args: [--severity=warning]
 
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.13.1-1
     hooks:
       - id: shfmt
-        files: \.sh$
-        exclude: \.tmpl$
+        types: [shell]
+        exclude_types: [zsh]
+        exclude: (\.tmpl$|^scripts/avgtime_zsh\.sh$)
         args: [-i, "2", -ci, -w]
 
   - repo: local
     hooks:
+      - id: zsh-syntax
+        name: check zsh syntax
+        entry: zsh -fc 'for file_path in "$@"; do zsh -n "$file_path" || exit; done' --
+        language: system
+        files: ^(home/dot_z[^/]*|home/private_dot_config/zsh/.*\.zsh|scripts/.*\.zsh|scripts/avgtime_zsh\.sh)$
+        exclude: \.tmpl$
       - id: check-stale
         name: detect stale repo content
         entry: bash scripts/check-stale.sh
