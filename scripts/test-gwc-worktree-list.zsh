@@ -23,6 +23,11 @@ assert_equal() {
     fi
 }
 
+without_display_padding() {
+    # Git versions use different column gaps. Preserve spaces inside paths and labels.
+    sed -E 's/ +([[:xdigit:]]+ (\[|\(detached HEAD)|\(bare\))/ | \1/'
+}
+
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gwc-worktree-list-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 mkdir -p "$tmp_dir/bin" "$tmp_dir/common.git" "$tmp_dir/worktrees/current" "$tmp_dir/worktrees/old" "$tmp_dir/worktrees/new"
@@ -257,9 +262,9 @@ git -C "$real_repo" worktree add -q -b test/unicode "$unicode_worktree"
 
 cd "$real_repo"
 export TEST_FZF_SELECT="$space_worktree"
-actual_display=$(_gw_worktree_list_newest_first | sort)
+actual_display=$(_gw_worktree_list_newest_first | without_display_padding | sort)
 # Newer Git quotes non-ASCII paths by default; the chooser displays decoded paths.
-expected_display=$(git -c core.quotePath=false worktree list | sort)
+expected_display=$(git -c core.quotePath=false worktree list | without_display_padding | sort)
 assert_equal "$expected_display" "$actual_display" 'porcelain display should match git worktree list'
 preview_command=$(_gw_worktree_fzf_preview_command)
 escaped_path=${(q)space_worktree}
@@ -284,8 +289,8 @@ grep -Fq -- "パス: $space_worktree" "$tmp_dir/gwc.out" || fail 'gwc confirmati
 bare_repo="$tmp_dir/bare repo.git"
 git init --bare -q "$bare_repo"
 cd "$bare_repo"
-actual_display=$(_gw_worktree_list_newest_first)
-expected_display=$(git -c core.quotePath=false worktree list)
+actual_display=$(_gw_worktree_list_newest_first | without_display_padding)
+expected_display=$(git -c core.quotePath=false worktree list | without_display_padding)
 assert_equal "$expected_display" "$actual_display" 'bare worktree display should match git'
 cd "$real_repo"
 
@@ -298,7 +303,8 @@ git -C "$separate_repo" config user.email 'gwc@example.invalid'
 git -C "$separate_repo" commit -q --allow-empty -m 'test: initialize separate git directory'
 git -C "$separate_repo" worktree add -q -b test/separate "$separate_linked"
 cd "$separate_repo"
-assert_equal "$(git -c core.quotePath=false worktree list | sort)" "$(_gw_worktree_list_newest_first | sort)" \
+assert_equal "$(git -c core.quotePath=false worktree list | without_display_padding | sort)" \
+    "$(_gw_worktree_list_newest_first | without_display_padding | sort)" \
     'separate git directory worktree display should match git'
 
 submodule_source="$tmp_dir/submodule source"
@@ -315,7 +321,8 @@ git -C "$submodule_super" -c protocol.file.allow=always submodule add -q "$submo
 git -C "$submodule_super" commit -qm 'test: add submodule'
 git -C "$submodule_super/child" worktree add -q -b test/submodule "$submodule_linked"
 cd "$submodule_super/child"
-assert_equal "$(git -c core.quotePath=false worktree list | sort)" "$(_gw_worktree_list_newest_first | sort)" \
+assert_equal "$(git -c core.quotePath=false worktree list | without_display_padding | sort)" \
+    "$(_gw_worktree_list_newest_first | without_display_padding | sort)" \
     'submodule worktree display should match git'
 cd "$real_repo"
 
