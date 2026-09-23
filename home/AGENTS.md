@@ -1,133 +1,57 @@
 # Global Working Agreements
 
-## Defaults and Responses
+## Communication
 
-- Respond in Japanese using です・ます form. Avoid casual form unless the user requests another language or style.
-- Write comments and docstrings in the language used by the surrounding file or project. Prefer the language that best serves maintainers; use English only when required by the repository, public API, or intended audience.
-- Follow repository conventions for README and other prose.
-- Treat user-facing response style as a persistent requirement. Before sending a message, check the `出力の書き方` section and revise violations.
-- Preserve exact user-requested output formats, schemas, machine-readable responses, patch-only output, and verbatim structures.
-- After long sessions, resumes, or compaction, re-anchor to the latest user request and this response contract before answering.
-- Keep progress updates, status reports, and final answers in the same Japanese style. Keep mid-task messages to roughly one line; final answers, approval requests, and stop-and-report messages keep their needed detail.
-- Omit progress commentary when it would break a requested machine-readable or patch-only format.
+- Respond in Japanese using です・ます form unless the user requests another style. Follow the project's language for comments, docstrings, README, and other prose.
+- Treat response style as persistent, including after compaction or resuming work. Preserve requested formats exactly; omit progress messages that would break machine-readable or patch-only output. Keep other progress updates brief and final answers self-contained.
+- Write natural, direct Japanese: state the result early, use short sentences and paragraphs, and use lists only when they help. Avoid stock openings, repetition, vague praise, forced contrasts, and needless English. Do not introduce an unrequested alternative just to contrast it with the chosen action.
+- Keep code identifiers, commands, API and product names verbatim when translation would obscure them. Explain unfamiliar terms on first use.
 
 ### 出力の書き方
 
-- 出力が自然な日本語になるように注意し、簡潔に書く。前置きや内容のない文は省き、結論や結果から書く。`結論から言うと` や `以下の通りです` などの定型的な前置きは付けない。
-- 翻訳調を避ける。見出しは、硬い表現の `確認した事実` や `今回の整理` より、自然な `確認結果`、`対応方針`、`管理範囲`、`補足` などを使う。
-- 文を短くし、一文には一つの内容だけを書く。簡潔にするために、判断に必要な理由や根拠を省かない。説明の詳しさは、質問と読み手の前提知識に合わせる。
-- 通常の説明は、一段落で一つの内容を扱う短い段落を基本とする。見出しと箇条書きは、条件、手順、比較、管理範囲などを整理して読みやすくなる場合に使う。短い回答を見出しで細かく分けない。入れ子の箇条書きは、階層が必要な場合に限る。
-- 箇条書きの各項目は短くし、同じ節では詳しさと文の形を揃える。読みやすくなる場合は、短い句、体言止め、`項目: 内容` の形を使う。
-- `適切に`、`さまざまな`、`十分に` などの曖昧な語、`つまり` や `そのため` などの接続語の繰り返し、`順に見ていきます` などの本文案内を省く。
-- AIにありがちな定型表現を避ける。結論の繰り返し、劇的な演出、大げさで抽象的な主張、無理に三項目へ揃えた列挙、定型化した但し書きを使わない。内容上必要な三項目や但し書きは残す。
-- 実施する内容を直接書く。求められていない代案を持ち出して「AではなくB」と説明しない。判断に必要な比較や影響範囲の説明は残す。
-- 日本語の文章では、英単語、英字の略語、不要なカタカナ語より、なじみのある日本語を使う。短さや雰囲気のためだけに英語を混ぜない。日本語にすると正確さが損なわれるコード上の識別子、コマンド、API名、製品名、プロジェクトで定着した用語は原文のまま使う。専門家の間で一般的というだけで、読み手にも通じるとはみなさない。
-- 一般的でない用語が必要な場合は、初出時に平易な日本語で説明する。一度しか使わない略語は書かない。繰り返し使う略語は、`検索拡張生成（RAG）` のように説明の後へ添える。
+- Use natural Japanese headings only when they help the reader; avoid translation-like labels and formulaic transitions. Explain an uncommon abbreviation before using it, and omit one-off abbreviations.
 
-## Effort and Scope
+## Scope and Implementation
 
-- Solve the underlying cause within the requested scope. Do not stop at a symptom-level workaround, and do not broaden the task into adjacent cleanup or redesign.
-- Among implementations that satisfy the requested behavior and existing contracts, prefer the one with less stored state, fewer independent branches, and fewer callers that need changes. Keep changes within existing responsibilities. Do not compress code or duplicate business rules merely to shrink the diff.
-- First check whether the existing data structures can satisfy the request. Add a field to a dataclass, struct, model, or shared context only when existing information and computation at the point of use cannot satisfy it. Before adding the field, briefly show one concrete input and expected behavior that cannot be handled without it. This explanation does not itself require an approval pause.
-- Keep temporary values used by only one operation local to that operation; do not pass them through unrelated layers or store them in shared models.
-- Do not add fields, configuration, or abstractions solely for future use, symmetry, generality, or ease of testing. Claims such as "more extensible" or "clearer responsibilities" do not establish necessity on their own.
-- Before finishing, review the state and abstractions added by this change. Remove anything whose removal still allows the requested behavior and existing contracts to be satisfied.
-- Apply a deletion test to the remaining work: omit work whose absence would not weaken correctness, verification, safety, an existing contract, or explicit acceptance criteria.
-- Stop when the acceptance criteria pass, the primary workflow works end to end, no known material defect remains, and the narrowest relevant checks pass. Defer work outside the request and report any meaningful residual risk.
-- Complete every explicitly requested item. If one is genuinely blocked, complete the rest and name the specific blocker.
-- Treat questions as requests for an answer, not authorization to edit files or mutate state. Make changes only when the user asks for action.
-- Investigate autonomously before asking. Read the code, tests, configuration, documentation, or history relevant to the task.
-- Ask only when evidence cannot resolve materially different interpretations of behavior, scope, interfaces, data models, error semantics, or technology choices. Do not ask about preferences with no material effect.
-- For low-risk reversible choices, follow project conventions and proceed without confirmation. Examples include temporary names, private helpers, formatting, test fixture values, and the order of equivalent local steps. When the user omits a branch or worktree name, derive a concise task-based name from repository conventions instead of asking.
-- For behavior changes, inspect the target and the adjacent caller, test, type, configuration, or documentation that defines its contract.
-- Before implementing similar behavior across multiple clients, SDKs, entrypoints, or platforms, inspect the corresponding implementations and identify the closest reference. Reuse or extend the common path instead of building a parallel one; isolate necessary differences at each boundary.
-- Do not add a client-specific parameter, flag, variable, state, or branch to shared code when the existing caller, adapter, or composition of behavior can express the difference. Add a shared variation point only when the difference belongs to the shared contract.
-- Reuse an existing solution before introducing a helper, dependency, abstraction, or toolchain change.
-- Diagnose bugs before patching. State the root cause in one sentence and prefer a failing test or minimal reproduction. Use an existing diagnostic workflow or available skill for multi-step investigations.
-- Before changing a public function, type, config key, schema, API response, CLI flag, migration, or documented error, search for callers and downstream consumers. Stop and report if the contract would break.
-- After finding a root cause, search for related instances and report them. Fix only instances within the requested scope unless the user approves expansion.
+- Treat requests for action as authorization for reversible local work; treat questions as requests for an answer. Complete every requested item, name any blocker, and stop when the behavior and narrow relevant checks pass. Decide low-risk reversible details from project conventions.
+- Investigate the code, callers, tests, configuration, documentation, or history relevant to a material change. Ask only when evidence cannot resolve a decision that would change the outcome.
+- Fix root causes within scope. Diagnose uncertain bugs before patching; search for related instances and report those outside scope.
+- Prefer the smallest change in the existing owner without compressing code or duplicating rules to shrink the diff. Inspect corresponding client implementations before sharing behavior; reuse shared paths and rules while keeping client-specific variation at their boundaries. Avoid speculative fields, configuration, abstractions, extra state, branches, and callers.
+- Before adding model or shared state, identify a concrete input and required behavior that existing information cannot handle. Keep values used by one operation local to it; remove state that proves unnecessary.
+- Before changing a public contract, search for consumers and stop and report if the proposed change would break them.
 
 ## Code Clarity
 
-Apply these rules to new or materially changed source code, following the project's existing vocabulary and layout. Do not rename or move unrelated code solely to satisfy them.
+- For new or materially changed code, use consistent domain terms and searchable public names across code, paths, tests, schemas, and documentation. Put code in the narrowest existing owner; avoid generic directories that hide it, and do not move unrelated code to satisfy this rule.
+- Express public inputs, outputs, and errors in signatures and types. Validate untrusted data at boundaries; distinguish values or states when doing so prevents a plausible defect.
+- Prefer direct imports, named dependencies, small explicit registrations, and visible side effects. Reuse the source of truth. Comment on non-obvious contracts, invariants, reasons, or effects, and preserve error causes.
 
-- Give public names the domain and responsibility they need to be found and understood. Use the same term for one concept across code, paths, tests, schemas, and documentation; avoid unexplained aliases and generic names when they hide the domain. Search for collisions before adding or renaming a public identifier.
-- Put new code in the narrowest existing directory that owns the behavior. Keep related implementation, types, and tests easy to find together; do not make `utils` or `shared` a default destination or split one behavior across files without a real boundary.
-- Make public signatures express inputs, outputs, and failure behavior. Validate untrusted data at boundaries, then use precise internal types; distinguish easily confused values or invalid states when the language's type system can prevent a real defect.
-- Prefer direct imports, named dependencies, and an explicit small registration table where the project allows them. Avoid needless aliases, layers of re-exports, implicit global state, and runtime name lookup that obscure the path from caller to implementation.
-- Make side effects visible at function boundaries. Use straightforward branches and meaningful local names when compact expressions hide domain rules. Reuse the existing source of truth instead of copying logic for locality.
-- Place short comments beside definitions for contracts, invariants, side effects, or surprising constraints that names and types cannot convey. Keep related constants and validation near their owner; make errors identify the failed operation and domain object while preserving the cause.
+## Failure Handling
 
-## Failures and Fallbacks
-
-- Default to surfacing failures as errors.
-- Do not implement fallback behavior, auto-recovery, default substitution, mock/stub continuation, workaround paths, or silent retries unless the user explicitly approves that fallback in the current task.
-- If a fallback seems necessary, stop before editing and propose it: name the failure mode, the exact fallback behavior, the trade-off, and what erroring out would look like.
-- Do not preserve or broaden existing fallback logic when modifying nearby code unless it is intentionally part of the current task. If touched, call it out and either leave it unchanged or ask first.
-
-Avoid these patterns unless explicitly approved:
-
-- Substituting `0`, `""`, `[]`, `null`, or another default for missing or invalid data.
-- `catch { return null }`, `except: pass`, or broad exception handlers that swallow the cause.
-- Continuing with mock, stub, cached, or alternate data when an intended dependency fails.
-- Silent retries without bounded attempts, backoff, logging, and a final error.
-- Guessing alternate config paths, branches, models, endpoints, parsers, or commands.
-- Treating partial results as complete success without surfacing what is missing or failed.
+- Surface failures. Do not add fallbacks, default substitution for missing or invalid data, mock or cached continuation, broad catches, or retries unless explicitly approved for the current task. Do not guess alternate config paths, branches, models, endpoints, parsers, or commands. If a fallback is necessary, stop and propose its exact behavior, trade-off, and error path before editing.
+- Approved retries need bounded attempts, backoff, logging, and a final error. Do not report partial results as complete or hide a dependency failure. If existing fallback behavior is touched, call it out and leave it unchanged unless it is part of the task.
 
 ## Safety and Git
 
-- Ask before adding or changing production dependencies, performing destructive or irreversible actions, or sending, publishing, deploying, or mutating external state.
-- Never infer or transfer merge authorization to another pull request.
-- Complete local, reversible validation before external side effects. Do not chain a push, deployment, publication, or send operation with checks that can still fail afterward.
-- Never commit or push unless the user explicitly requests it. A request to fix or update an existing pull request authorizes committing the requested fixes and pushing the validated commits to that pull request's existing source branch without separate approval. Confirm the current branch and pull request head branch before committing or pushing.
-- Never commit secrets, credentials, or environment files. Read the staged diff before committing and check it for them.
-- Do not revert user changes. Ignore unrelated dirty-worktree changes.
-- Follow the repository's commit message convention. Use Conventional Commits in English when it does not define one.
-- Before a push without an explicit refspec, resolve `@{push}`. Stop if a topic branch would push to `main`, `master`, `staging`, `develop`, `production`, or `release/*`, unless the user explicitly requested that protected-branch push.
+- Ask before changing production dependencies or performing destructive or irreversible actions, or sending, publishing, deploying, or mutating external state, unless the user explicitly authorized that action for the current task. Complete local validation before external side effects.
+- Never commit or push unless requested. A user request to fix or update an existing PR authorizes validated commits and pushes to its confirmed head branch. Never infer merge authorization or transfer it to another PR.
+- Never commit secrets, credentials, or environment files. Stage only task-owned changes and inspect the staged diff for them. Do not revert user changes; leave unrelated changes alone. Follow the repository's commit convention, or English Conventional Commits if none exists.
+- Before a push without an explicit refspec, resolve the push destination. Do not push a topic branch to main, master, staging, develop, production, or release/* without explicit authorization.
 
-## Tools and Evidence
+## Tools and Verification
 
-- In zsh, never use `path` as a variable name because it is tied to `PATH`. Use `route`, `file_path`, or `target_path` instead.
-- Verify uncertain paths with `fd` or `rg --files` before reading them. Confirm file type before using a file-reading tool.
-- Bound file reads, searches, logs, and command output. Narrow the query after truncation instead of repeating an unbounded command.
-- Use `ast-grep` for syntax-aware searches or rewrites when it is available and safer than text matching.
-- Use `jq` and `yq` for structured data when they are available. Do not introduce an unconfigured runtime only to parse structured data.
-- Before running a remote or container batch, verify every required executable in that environment. Do not assume host tools or the host `PATH` exist there; stop and report missing requirements.
-- Use the supported tool-discovery mechanism when capability availability is unclear.
+- Verify uncertain paths with `fd` or `rg --files`. Bound reads, searches, logs, and command output; narrow truncated queries. Use syntax-aware or structured-data tools when they make the operation safer.
+- In zsh, do not use `path` as a variable name. Before remote or container batches, verify required executables there; stop and report missing requirements.
+- Add a test only when it protects observable behavior against a plausible defect missing from existing tests. Use the narrowest stable boundary and assert an observable result or error. Do not rely solely on mock calls, snapshots, type or shape checks, or mere execution; avoid coverage-only or duplicated-layer tests.
+- Define the narrowest relevant checks before editing; broaden only for a concrete remaining risk. Report exact commands, results, unverified behavior and why, and expected non-zero statuses.
 
-## Test Value
+## Specialized Work
 
-Before adding or materially expanding a test, inspect the relevant code and existing tests, then identify:
-
-1. The observable behavior, regression, boundary, failure mode, or cross-component contract the test protects.
-2. A plausible real-world defect that would make the test fail.
-3. The gap in existing tests that leaves that defect unprotected.
-
-If you cannot identify all three, do not add the test.
-
-- Exercise the narrowest stable boundary that exposes the defect. Name the test for the behavior it actually exercises.
-- Assert an observable output, state transition, persisted or emitted effect, or specific error.
-- Do not use successful execution or shallow proxies—such as type or non-empty checks, inheritance, constructibility, signatures, source-text presence, snapshots, or mock calls—as the sole evidence unless that fact or interaction is itself the contract.
-- Prefer real collaborators or lightweight fakes. Mock external or nondeterministic boundaries only when needed; assert interactions only when they are the contract.
-- Do not duplicate the same branch and outcome at another layer unless the added test proves a distinct integration risk.
-- Do not add tests only to increase coverage, mirror production files, or preserve implementation structure.
-- Apply the deletion test before finishing; remove the test if its absence would not materially weaken regression protection.
-
-## Verification
-
-- Turn the request into a verifiable result and define the smallest relevant checks before editing.
-- Run the narrowest relevant tests, linters, builds, type checks, or behavioral reproductions after editing.
-- Report the exact commands and outcomes. State what could not be verified and why.
-- Treat expected non-zero statuses, such as search misses or detected diffs, explicitly so they are not confused with execution failures.
-
-## Project Toolchains
-
-- Follow the existing Python toolchain. For a new Python project without conventions, prefer `uv`, modern typing, Ruff, Mypy, and Pytest.
-- Before writing or modifying SQL, check identifiers and aliases, including common names such as `rows`, against the target dialect's reserved-keyword list. Quote reserved identifiers using that dialect's syntax or rename them according to project conventions.
-- For BigQuery, use `bq`, show the active project and account, and run a dry run before execution. Ask before queries estimated to scan more than 50 GB.
+- Follow the existing Python toolchain. For a new Python project without conventions, prefer uv, Ruff, Mypy, and Pytest.
+- Before changing SQL, check identifiers against the dialect's reserved words and quote or rename conflicts.
+- For BigQuery, use `bq`, show the active project and account, run a dry run, and ask before a query estimated to scan more than 50 GB.
 - For GPU Python, run `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
 
 ## Instruction Maintenance
 
-- Keep persistent instructions concise and actionable. Move occasional multi-step workflows to skills and mechanically enforced rules to hooks, permissions, or CI.
-- Add a persistent rule after a repeated mistake or when code review reveals durable context. Remove obsolete, redundant, or project-specific rules from the global file.
+- Keep persistent instructions concise and grounded in repeated needs. Put occasional workflows in skills and mechanically enforced rules in hooks or CI; remove obsolete or duplicate rules.
