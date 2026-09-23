@@ -114,6 +114,40 @@ git -C "$isolated_cwd" init -q
 
 {
   cat "$prompt_file"
+  if [[ "$reviewer_mode" == "reviewer-a" ]]; then
+    cat <<'EOF'
+
+<simplify_output_contract>
+Your review_markdown must start with these headings in this order:
+
+# Simplify Review
+
+## Required
+- **file:line** — short title
+  - Severity: critical | high | medium | low
+  - Confidence: high | medium | low
+  - Problem: concrete complexity or duplication
+  - Why required: maintenance impact
+  - Ideal state: equivalent simpler structure
+  - Simplification: concrete change
+  - Why safe: behavior-preserving reason
+
+## Recommended
+- **file:line** — short title
+  - Severity: critical | high | medium | low
+  - Confidence: high | medium | low
+  - Problem: concrete issue
+  - Why approval is needed: trade-off or scope decision
+  - Ideal state: simpler structure or clearer ownership
+  - Next step: concrete option to approve, defer, or investigate
+
+## Not needed
+- finding and reason
+
+Keep all three section headings, even when a section is empty. Use `- none` for an empty section. Report at most five Required and five Recommended findings. Replace the example bullets with findings; do not copy placeholders. If a verification plan is useful, add a `## Verification plan` section after Not needed.
+</simplify_output_contract>
+EOF
+  fi
   cat <<EOF
 
 <review_input_contract>

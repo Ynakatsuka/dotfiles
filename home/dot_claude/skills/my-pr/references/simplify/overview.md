@@ -12,7 +12,7 @@ codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
 
 Use the global Codex default effort only when the user explicitly asks for a full-effort simplify run. Use Claude/local execution only when the user explicitly asks for it.
 
-For `my-pr` review mode, do not invoke Codex directly. Use the exact artifact paths persisted in the current run's explicit `artifact.env`; do not depend on inherited `MY_PR_*` variables. Write this reference's review prompt under that artifact directory and pass it to `scripts/run-codex-reviews.sh` as the Reviewer A prompt; the runner embeds context and diff through stdin, applies medium effort, disables nested delegation, and verifies complete-input receipts.
+For `my-pr` review mode, do not invoke Codex directly. Use the exact artifact paths persisted in the current run's explicit `artifact.env`; do not depend on inherited `MY_PR_*` variables. Write this reference's review prompt under that artifact directory and pass it to `scripts/run-codex-reviews.sh` as the Reviewer A prompt. The runner appends the required `# Simplify Review` output structure to every Reviewer A prompt, embeds context and diff through stdin, applies medium effort, disables nested delegation, and verifies complete-input receipts. Do not copy another output structure into the prompt file.
 
 Do not silently switch from Codex to Claude if Codex fails or rejects the config override. Report the failure and stop.
 
@@ -160,31 +160,7 @@ git diff --stat
 
 ### Review mode
 
-```markdown
-# Simplify Review
-
-## Required
-1. **file:line** — short title
-   - Severity: critical | high | medium | low
-   - Confidence: high | medium | low
-   - Problem: what is duplicated, over-complex, dead, or inefficient
-   - Why required: why this behavior-preserving change is needed before merge
-   - Ideal state: simpler equivalent structure or invariant
-   - Simplification: concrete change
-   - Why safe: behavior-preserving reason
-
-## Recommended
-1. **file:line** — short title
-   - Severity: critical | high | medium | low
-   - Confidence: high | medium | low
-   - Problem: what is suboptimal or uncertain
-   - Why approval is needed: trade-off or scope decision
-   - Ideal state: simpler structure or clearer ownership
-   - Next step: concrete option to approve, defer, or investigate
-
-## Not needed
-- finding and reason
-```
+The review runner supplies and validates the required Markdown structure. The role prompt should focus on review scope and finding criteria.
 
 ### Apply mode
 

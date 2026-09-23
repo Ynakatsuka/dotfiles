@@ -387,6 +387,13 @@ test_runner() {
   assert_file_contains "$tmp_dir/reviewer-a-args.txt" 'model_reasoning_effort="medium"'
   assert_file_contains "$tmp_dir/reviewer-a-input.md" "context line 300 日本語"
   assert_file_contains "$tmp_dir/reviewer-a-input.md" "+diff line 500 abcdefghijklmnopqrstuvwxyz"
+  awk '/^<review_input_contract>/{exit} {print}' "$tmp_dir/reviewer-a-input.md" >"$tmp_dir/reviewer-a-instructions.md"
+  assert_file_contains "$tmp_dir/reviewer-a-instructions.md" '<simplify_output_contract>'
+  assert_file_contains "$tmp_dir/reviewer-a-instructions.md" 'Your review_markdown must start with these headings in this order:'
+  assert_file_contains "$tmp_dir/reviewer-a-instructions.md" '# Simplify Review'
+  assert_file_contains "$tmp_dir/reviewer-a-instructions.md" '## Required'
+  assert_file_contains "$tmp_dir/reviewer-a-instructions.md" '## Recommended'
+  assert_file_contains "$tmp_dir/reviewer-a-instructions.md" '## Not needed'
   assert_file_contains "$artifact_dir/reviewer-results/reviewer-a/full/review.md" "# Simplify Review"
   local reviewer_a_output
   reviewer_a_output=$(cat "$tmp_dir/reviewer-a-output.txt")
@@ -400,6 +407,8 @@ test_runner() {
     >"$tmp_dir/reviewer-c-output.txt"
   assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model="gpt-6-sol"'
   assert_file_contains "$tmp_dir/reviewer-c-args.txt" 'model_reasoning_effort="medium"'
+  awk '/^<review_input_contract>/{exit} {print}' "$tmp_dir/reviewer-c-input.md" >"$tmp_dir/reviewer-c-instructions.md"
+  assert_file_not_contains "$tmp_dir/reviewer-c-instructions.md" '<simplify_output_contract>'
 
   if MY_PR_CODEX_BIN="$fake_codex" \
     MY_PR_CODEX_PROMPT_MAX_BYTES=100 \
