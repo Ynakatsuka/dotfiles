@@ -1,0 +1,60 @@
+{
+  "skill_name": "my-japanese-editor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "次の研究計画の文章を、意味を変えず自然な日本語に直してください。『新しい手法によって診断精度が向上する可能性があります。来年度に120名を対象として有効性を検証する予定です。』",
+      "expected_output": "可能性と将来の計画を断定や実施済みに変えず、自然な日本語へ推敲した文章。",
+      "assertions": [
+        "診断精度の向上を確定事項として書いていない",
+        "対象者数120名を保持している",
+        "検証が来年度の予定であることを保持している"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "AIっぽさを減らし、ブログらしい自然な文章にしてください。『実際に一週間使ってみました。便利な場面は多かったのですが、設定画面だけは最後まで馴染めませんでした。この違和感は、ツール全体を否定するほどではありません。』",
+      "expected_output": "一週間使った経験、便利という評価、設定画面への違和感、全否定ではないという留保を保った自然なブログ文。",
+      "assertions": [
+        "一週間使ったという体験を保持している",
+        "設定画面への否定的評価を削除していない",
+        "ツール全体を否定していないという留保を保持している",
+        "原文にない体験や感情を追加していない"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "社内共有用の箇条書きにしてください。『移行日は10月3日に決まりました。担当は佐藤さんです。旧システムの停止時刻はまだ決まっていないため、9月26日までに確認します。』",
+      "expected_output": "決定、対応、未解決事項を区別し、担当者・日付を保持した装飾のない箇条書き。",
+      "assertions": [
+        "移行日10月3日を決定事項として記載している",
+        "佐藤さんを担当者として記載している",
+        "旧システムの停止時刻を未決定事項として記載している",
+        "確認期限9月26日を保持している",
+        "Markdownの太字や見出しを使っていない"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "不自然なところだけ直してください。『確認したところ、設定値はすでに反映されていました。追加の対応は必要ありません。』",
+      "expected_output": "すでに自然な文章を不要に書き換えず、意味とトーンを維持した文章。",
+      "assertions": [
+        "設定値が反映済みであることを保持している",
+        "追加対応が不要であることを保持している",
+        "原文にない理由や評価を追加していない"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Turn these notes into bullet points for a team update: 'Migration is October 3. Sato owns it. The legacy shutdown time is undecided and must be confirmed by September 26.'",
+      "expected_output": "Plain English bullet points that preserve the decision, owner, open question, and deadline.",
+      "assertions": [
+        "The response remains in English",
+        "October 3 is presented as the migration date",
+        "Sato is presented as the owner",
+        "The shutdown time remains undecided",
+        "September 26 is preserved as the confirmation deadline"
+      ]
+    }
+  ]
+}
