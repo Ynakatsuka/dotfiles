@@ -19,6 +19,9 @@ case "$*" in
   "list --cask stablyai/orca/orca")
     [ "$BREW_TEST_ORCA_INSTALLED" = true ]
     ;;
+  "list --cask orca")
+    [ "$BREW_TEST_ORCA_TOKEN_INSTALLED" = true ]
+    ;;
   "outdated --cask --quiet")
     printf '%s\n' google-chrome docker-desktop
     ;;
@@ -46,6 +49,7 @@ assert_not_called() {
 }
 
 export BREW_TEST_ORCA_INSTALLED=true
+export BREW_TEST_ORCA_TOKEN_INSTALLED=false
 : >"$BREW_TEST_CALLS"
 bash "$SCRIPT"
 
@@ -58,5 +62,18 @@ export BREW_TEST_ORCA_INSTALLED=false
 bash "$SCRIPT"
 
 assert_not_called "upgrade --cask stablyai/orca/orca"
+
+export BREW_TEST_ORCA_TOKEN_INSTALLED=true
+: >"$BREW_TEST_CALLS"
+bash "$SCRIPT"
+assert_not_called "upgrade --cask stablyai/orca/orca"
+
+mkdir -p "$TMP_DIR/Orca.app/Contents/Resources/bin"
+printf '#!/usr/bin/env bash\n' >"$TMP_DIR/Orca.app/Contents/Resources/bin/orca"
+chmod +x "$TMP_DIR/Orca.app/Contents/Resources/bin/orca"
+ln -s "$TMP_DIR/Orca.app/Contents/Resources/bin/orca" "$TMP_DIR/bin/orca"
+: >"$BREW_TEST_CALLS"
+bash "$SCRIPT"
+assert_called "upgrade --cask stablyai/orca/orca"
 
 echo "test-dotfiles-brew-upgrade: OK"
