@@ -54,9 +54,14 @@
   "skipDangerousModePermissionPrompt": true,
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
-  "model": "fable",
+  "model": "opus",
   "language": "japanese",
   "outputStyle": "Concise",
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "cleanupPeriodDays": 180
 }
