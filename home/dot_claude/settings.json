@@ -55,6 +55,7 @@
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
   "model": "fable",
+  "language": "japanese",
   "outputStyle": "Concise",
   "effortLevel": "xhigh",
   "cleanupPeriodDays": 180
