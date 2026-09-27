@@ -5,6 +5,7 @@
 #   <path-pattern>:<config-name>
 #
 # Pattern is a substring match against $PWD, checked in definition order.
+# An empty pattern matches every directory and must be the last rule.
 # Lines starting with # and blank lines are ignored.
 #
 
@@ -47,8 +48,12 @@ gcloud-reauth() {
     fi
     install -m 600 "$adc_source" "$adc_file" || return
 
-    export CLOUDSDK_ACTIVE_CONFIG_NAME="$config_name"
-    export GOOGLE_APPLICATION_CREDENTIALS="$adc_file"
+    if (( ${#_gcloud_config_rules} )); then
+        _auto_gcloud_config
+    else
+        export CLOUDSDK_ACTIVE_CONFIG_NAME="$config_name"
+        export GOOGLE_APPLICATION_CREDENTIALS="$adc_file"
+    fi
     print "Reauthenticated gcloud configuration '$config_name' and refreshed '$adc_file'."
 }
 

@@ -53,12 +53,17 @@ function gcloud-fzf-activate-login() {
     local config
     config=$(gcloud config configurations list --format="value(NAME)" | fzf --prompt="GCloud Config> " --height=40% --reverse)
     if [ -n "$config" ]; then
-        gcloud config configurations activate "$config"
+        gcloud config configurations activate "$config" || return
         local login
         login=$(printf "login\nskip" | fzf --prompt="Login? > " --height=20% --reverse)
+        local result=0
         if [ "$login" = "login" ]; then
-            gcloud-reauth "$config"
+            gcloud-reauth "$config" || result=$?
         fi
+        if (( ${#_gcloud_config_rules} )); then
+            _auto_gcloud_config
+        fi
+        return "$result"
     fi
 }
 zle -N gcloud-fzf-activate-login

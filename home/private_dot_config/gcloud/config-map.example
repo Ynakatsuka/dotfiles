@@ -1,8 +1,9 @@
 # gcloud config auto-switch rules
 # Format: <path-pattern>:<config-name>
 #
-# Pattern is matched as a substring of $PWD.
+# Pattern is matched as a substring of $PWD, in order.
 # Worktrees are covered automatically (e.g. "org/repo" matches "org/repo-worktree/...").
+# An empty pattern matches every directory; place it last for a default config.
 #
 # Copy this file to config-map and edit:
 #   cp ~/.config/gcloud/config-map.example ~/.config/gcloud/config-map
@@ -20,3 +21,4 @@
 #
 # Example:
 # my-org/my-repo:my-config
+# :my-default-config
