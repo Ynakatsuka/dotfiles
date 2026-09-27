@@ -359,7 +359,7 @@ jq -e '
   ([.hooks // {} | .. | strings
     | select(contains("agent-board-state") or contains("agent-board-auto-title"))]
     | length) == 0
-' "$REPO_ROOT/home/dot_claude/settings.json" >/dev/null
+' "$REPO_ROOT/home/.chezmoitemplates/claude-settings.json" >/dev/null
 
 render_home="$test_dir/render-home"
 template_bin="$test_dir/template-bin"

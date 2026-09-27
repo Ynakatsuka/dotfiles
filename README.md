@@ -147,7 +147,7 @@ generated under `~/.codex/skills/`.
 
 ### RTK Command Rewriting
 
-RTK reduces token-heavy shell output. Codex is instructed to invoke it directly, while Claude Code uses the ordered Bash `PreToolUse` hooks in `home/dot_claude/settings.json`:
+RTK reduces token-heavy shell output. Codex is instructed to invoke it directly, while Claude Code uses the ordered Bash `PreToolUse` hooks in `home/.chezmoitemplates/claude-settings.json`:
 
 1. `bulk-read-guard` denies unbounded reads of text files over 350 lines (see Model Delegation).
 2. `ensure-mise-path.sh` exposes mise-managed tools.
@@ -166,7 +166,7 @@ copies) in place and returns only a path and summary, and
 `~/.local/bin/bulk-read-guard` is a `PreToolUse` hook that denies unbounded
 `Read` and `cat` of text files over 350 lines. The guard catches accidental
 whole-file reads; it is not a security boundary. It is registered for
-Claude Code in `home/dot_claude/settings.json` and for Codex by
+Claude Code in `home/.chezmoitemplates/claude-settings.json` and for Codex by
 `home/dot_codex/hooks.json.tmpl`; the shared `my-bulk-read` and
 `my-code-write` skills under `~/.claude/skills/` are linked into
 `~/.agents/skills/` and tell both agents when to delegate.

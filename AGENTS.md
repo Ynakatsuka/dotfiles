@@ -79,7 +79,7 @@ bash scripts/test-delegation.sh
 ## RTK Integration
 
 - RTK is installed through `home/private_dot_config/mise/config.toml` and updated by maintenance.
-- Claude Bash commands pass through three ordered `PreToolUse` hooks configured in `home/dot_claude/settings.json`: `bulk-read-guard` first, then `ensure-mise-path.sh`, then `rtk-rewrite.sh`.
+- Claude Bash commands pass through three ordered `PreToolUse` hooks configured in `home/.chezmoitemplates/claude-settings.json`: `bulk-read-guard` first, then `ensure-mise-path.sh`, then `rtk-rewrite.sh`.
 - `home/dot_claude/hooks/executable_rtk-rewrite.sh` delegates supported rewrites and permission decisions to `rtk rewrite`. It requires `jq` and RTK 0.49.0 or newer.
 - Preserve the rewrite protocol: exit 0 rewrites and auto-allows, exit 1 or 2 passes through, exit 3 rewrites without auto-allowing so Claude can ask, and unexpected failures emit a warning before passing through.
 - Changes to RTK versions, hook ordering, or rewrite handling require `bash scripts/test-rtk-rewrite-hook.sh` and the agent environment check. Reproduce a compatibility issue against the installed RTK before adding or removing a guard.
@@ -87,5 +87,6 @@ bash scripts/test-delegation.sh
 ## Specialized Changes
 
 - When adding a tool to `home/private_dot_config/mise/config.toml`, run `mise install` and ensure shims resolve in a clean shell.
+- `home/dot_claude/modify_settings.json.tmpl` renders `~/.claude/settings.json` from `home/.chezmoitemplates/claude-settings.json` and keeps only the hook groups Orca registers under `~/.orca/agent-hooks/`; edit the template for managed settings.
 - Keep the deployed Claude rule files documented and intact: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.
-- The model delegation scripts `bulk-read`, `code-write`, and the `bulk-read-guard` hook live in `home/dot_local/bin/`. The guard is registered in `home/dot_claude/settings.json` and `home/dot_codex/hooks.json.tmpl`; Codex skips it until it is trusted with `/hooks` after `chezmoi apply`.
+- The model delegation scripts `bulk-read`, `code-write`, and the `bulk-read-guard` hook live in `home/dot_local/bin/`. The guard is registered in `home/.chezmoitemplates/claude-settings.json` and `home/dot_codex/hooks.json.tmpl`; Codex skips it until it is trusted with `/hooks` after `chezmoi apply`.

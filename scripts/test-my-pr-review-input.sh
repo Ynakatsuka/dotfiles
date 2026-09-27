@@ -33,7 +33,7 @@ reviewer_b_runner=$(resolve_skill_script run-claude-review.sh)
 reviewer_b_validator=$(resolve_skill_script validate-reviewer-b-output.sh)
 reviewer_b_schema="$skill_root/assets/claude-review-result.schema.json"
 reviewer_b_agent="$repo_root/home/dot_claude/agents/my-pr-reviewer.md"
-claude_settings="$repo_root/home/dot_claude/settings.json"
+claude_settings="$repo_root/home/.chezmoitemplates/claude-settings.json"
 
 tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/my-pr-review-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
