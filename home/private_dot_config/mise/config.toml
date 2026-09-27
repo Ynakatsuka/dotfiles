@@ -97,6 +97,9 @@ direnv = "latest"
 # k9s - Kubernetes CLI dashboard
 k9s = "latest"
 
+# kubectl - Kubernetes CLI
+kubectl = "latest"
+
 # dotenvx - Environment variable management
 dotenvx = "latest"
 
