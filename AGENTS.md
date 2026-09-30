@@ -87,6 +87,6 @@ bash scripts/test-delegation.sh
 ## Specialized Changes
 
 - When adding a tool to `home/private_dot_config/mise/config.toml`, run `mise install` and ensure shims resolve in a clean shell.
-- `home/dot_claude/modify_settings.json.tmpl` renders `~/.claude/settings.json` from `home/.chezmoitemplates/claude-settings.json` and keeps only the hook groups Orca registers under `~/.orca/agent-hooks/`; edit the template for managed settings.
+- `home/dot_claude/modify_settings.json.tmpl` and `home/dot_gemini/modify_settings.json.tmpl` render `~/.claude/settings.json` and `~/.gemini/settings.json` from `home/.chezmoitemplates/{claude,gemini}-settings.json` through `modify-settings-keep-orca-hooks.sh`, keeping only the hook groups Orca registers under `~/.orca/agent-hooks/`; edit the JSON templates for managed settings and run `bash scripts/test-orca-hook-settings.sh` after changing the merge.
 - Keep the deployed Claude rule files documented and intact: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.
 - The model delegation scripts `bulk-read`, `code-write`, and the `bulk-read-guard` hook live in `home/dot_local/bin/`. The guard is registered in `home/.chezmoitemplates/claude-settings.json` and `home/dot_codex/hooks.json.tmpl`; Codex skips it until it is trusted with `/hooks` after `chezmoi apply`.

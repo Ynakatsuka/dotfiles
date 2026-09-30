@@ -56,7 +56,7 @@ Always edit in the ghq repo, never in `~/`.
 | `home/.chezmoitemplates/claude-settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
 | `home/.chezmoitemplates/claude-settings.json` | `autoUpdatesChannel` | `"latest"` | Native Claude Code update channel. Read it when checking or updating the CLI; do not change it unless requested. |
 | `home/dot_codex/private_config.toml.tmpl` | `model` | `"gpt-6-sol"` | Codex CLI default model (full ID, not an alias). |
-| `home/dot_gemini/settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
+| `home/.chezmoitemplates/gemini-settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
 
 Do NOT modify model IDs that appear inside skill examples
 (e.g., `home/dot_claude/skills/my-agent/SKILL.md`). Those are illustrative only.
