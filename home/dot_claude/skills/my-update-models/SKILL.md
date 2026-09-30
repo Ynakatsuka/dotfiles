@@ -169,9 +169,19 @@ the failure and stop before proposing or applying an update.
    version did not change as expected.
 10. **Apply approved model edits.** Edit the ghq repo with the Edit tool. Change
    one field per edit.
-11. **Scan the invoking repository.** Scan for hardcoded model IDs as described
+11. **Update and run the tests for edited config.** Tests in `scripts/` assert
+   managed defaults, so a model edit is incomplete until they match. For each
+   edited file and old value, list the tests that read the file or pin the
+   value, then update only assertions of the managed default in the same change:
+   ```bash
+   rg -l -F -e '<edited file path>' -e '<old value>' scripts/
+   ```
+   Leave fixtures that deliberately use an older ID. Run each affected test by
+   name with the repository test runner, `(cd scripts && bash test.sh <test-name>)`;
+   if one fails, report its output and stop before deploying.
+12. **Scan the invoking repository.** Scan for hardcoded model IDs as described
    below.
-12. **Deploy model config changes.** Tell the user the deploy steps; only run
+13. **Deploy model config changes.** Tell the user the deploy steps; only run
    them if asked.
    The chezmoi source dir is the ghq clone, so the canonical sequence is:
    ```bash
@@ -180,7 +190,7 @@ the failure and stop before proposing or applying an update.
    chezmoi apply -v
    ```
    Per repo policy, do not commit automatically — wait for explicit approval.
-13. **Verify model config changes.** After `chezmoi apply`, read `~/.codex/config.toml`,
+14. **Verify model config changes.** After `chezmoi apply`, read `~/.codex/config.toml`,
    `~/.claude/settings.json`, and `~/.gemini/settings.json` to confirm the
    change landed.
 
@@ -247,7 +257,9 @@ IDs that also need bumping.
      CLI wrapper, Dockerfile.
    - **Leave alone:**
      - documentation examples, changelog entries, migration notes
-     - test fixtures, recorded cassettes, VCR tapes, golden snapshots
+     - test fixtures, recorded cassettes, VCR tapes, golden snapshots, except
+       assertions of a default that this run changed (handle those as update
+       candidates)
      - lockfiles, vendor dirs (`node_modules/`, `.venv/`, `dist/`, `build/`)
      - files under `.claude/skills/` or `home/dot_claude/skills/` that only
        illustrate a model name
