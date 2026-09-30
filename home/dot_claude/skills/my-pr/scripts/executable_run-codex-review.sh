@@ -266,8 +266,6 @@ if [[ "$reviewer_mode" == "reviewer-a" ]]; then
 else
   require_markdown_marker '## PR understanding'
   require_markdown_marker '## Findings'
-  require_markdown_marker '## Assessment'
-  require_markdown_marker '**Ready to merge?**'
   reject_markdown_marker '## Strengths'
   reject_markdown_marker '## Non-findings'
 fi

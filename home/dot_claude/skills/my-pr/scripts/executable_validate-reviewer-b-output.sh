@@ -25,7 +25,6 @@ done
 markers=(
   '## PR understanding'
   '## Findings'
-  '## Assessment'
 )
 previous_line=0
 for marker in "${markers[@]}"; do
@@ -41,12 +40,10 @@ for marker in "${markers[@]}"; do
   previous_line=$marker_line
 done
 
-if ! grep -Fq '**Ready to merge?**' "$review_file"; then
-  echo "ERROR: Reviewer B output is missing required assessment: **Ready to merge?**" >&2
-  exit 1
-fi
-if ! grep -Fq '**Reasoning:**' "$review_file"; then
-  echo "ERROR: Reviewer B output is missing required assessment: **Reasoning:**" >&2
+# The terminal line proves the saved body was not cut off mid-finding.
+last_line=$(awk 'NF { line = $0 } END { print line }' "$review_file")
+if [[ "$last_line" != '<!-- END OF REVIEW -->' ]]; then
+  echo "ERROR: Reviewer B output does not end with the required terminal line: <!-- END OF REVIEW -->" >&2
   exit 1
 fi
 

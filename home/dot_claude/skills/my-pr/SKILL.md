@@ -66,28 +66,27 @@ test -x "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh"
 
 base 取得では、ローカル `main` / `master` などの protected branch ref を直接進めない。`git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` は禁止する。別 worktree の checked-out branch ref だけが進み、worktree/index に古い内容が逆差分として残ることがある。
 
+artifact、PR context、レビュー用プロンプトの準備は、次の1回の shell call でまとめて行う。`prepare-review-prompts.sh` の行はデフォルト / `review` / `fix` だけで実行し、`create` / `simplify` では削る。
+
 ```bash
-BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
-BASE_REF="origin/$BASE_BRANCH"
-git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-git rev-parse --verify "$BASE_REF^{commit}" >/dev/null
-git diff "$BASE_REF"...HEAD --stat
-git log "$BASE_REF"..HEAD --oneline
-bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF"
+BASE_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name) &&
+BASE_REF="origin/$BASE_BRANCH" &&
+git fetch origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}" &&
+git rev-parse --verify "$BASE_REF^{commit}" >/dev/null &&
+git diff "$BASE_REF"...HEAD --stat &&
+git log "$BASE_REF"..HEAD --oneline &&
+ARTIFACT_ENV=$(bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF") &&
+bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "$ARTIFACT_ENV" &&
+bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-prompts.sh" "$ARTIFACT_ENV" &&
+source "$ARTIFACT_ENV" &&
+cat "$MY_PR_SCOPE_SUMMARY" "$MY_PR_CONTEXT"
 ```
+
+途中のコマンドが失敗したら、その時点で止まる。失敗したコマンドとエラーを報告し、推測で先へ進まない。
 
 PR scope を確認する。未コミット差分だけでなく、base branch との差分量を必ず報告する。
 
-最後に出力された絶対パスを、この run の artifact state file として保持する。以後の例にある `/absolute/path/to/artifact.env` は必ずその実パスへ置き換える。`latest-env.sh` の推測や、前の shell call の環境変数へ依存しない。
-
-既存 PR の有無を確認する。
-
-```bash
-bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "/absolute/path/to/artifact.env"
-source "/absolute/path/to/artifact.env"
-cat "$MY_PR_SCOPE_SUMMARY"
-cat "$MY_PR_CONTEXT"
-```
+出力された `artifact.env` の絶対パスを、この run の artifact state file として保持する。以後の例にある `/absolute/path/to/artifact.env` は必ずその実パスへ置き換える。`latest-env.sh` の推測や、前の shell call の環境変数へ依存しない。
 
 `MY_PR_SCOPE_GATE` が `ok` 以外の場合は停止する。`large` はユーザーがそのブランチ全体を PR 対象として明示済みの場合だけ続行できる。`untracked` は対象ファイルを明示して stage / `git add -N` するか、対象外と確認してから artifact を作り直す。
 
@@ -106,17 +105,17 @@ cat "$MY_PR_CONTEXT"
 
 ### 3-2. デフォルト / `review` / `fix`: read-only quality review
 
-`references/review.md` の Reviewer selection に従い、変更のリスクと規模から構成を決める。小変更は Reviewer C 単独、それ以外の指定条件では A/B/C を使う。選択理由を短く記録し、その構成の実行・入力検証・失敗処理に従う。
+`references/review.md` の Reviewer selection に従い、変更のリスクと規模から構成を決める。小変更は Reviewer C 単独、それ以外の指定条件では A/B/C を使い、A/B/C のときだけ `references/review-multi.md` も読む。選択理由を短く記録し、その構成の実行・入力検証・失敗処理に従う。
 
 最初に simplify apply を実行せず、`prepare-review-artifacts.sh` が作成した repo-local artifact をレビューする。すべての選択済み reviewer が完了してから統合する。
 
 ### 3-3. 統合
 
-`references/review.md` の Integration rules と Integration output に従う。選択した担当の結果を重複排除し、各指摘を Required / Recommended / Not needed のどれか1つに分類する。
+`references/review.md` の Integration rules、Finding verification、Integration output に従う。選択した担当の結果を重複排除し、Required 候補と critical/high の指摘を実コードで確かめてから、各指摘を Required / Recommended / Not needed のどれか1つに分類する。
 
 background 実行した reviewer が残っている間は最終回答しない。やむを得ず待機に入る場合は、再開に必要な artifact path、reviewer output path、次の手順を保存し、CCV の background monitor が利用可能なら監視登録する。
 
-`review` は read-only なのでここで終了する。最終回答は PR の番号・タイトル・URL・状態・base/head と概要から始め、差分から確認できた具体的な良い点もまとめる。ファイル編集、検証、commit、push、PR作成をしない。
+`review` は read-only なのでここで終了する。最終回答は `references/review.md` の判定見出し（`✅ LGTM` など）を1行目に置き、続けて PR の番号・タイトル・URL・状態・base/head と概要を書き、差分から確認できた具体的な良い点もまとめる。ファイル編集、検証、commit、push、PR作成をしない。
 
 ### 3-4. Required fix
 

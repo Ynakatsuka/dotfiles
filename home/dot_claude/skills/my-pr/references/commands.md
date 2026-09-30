@@ -28,14 +28,14 @@ All commands except `verify` must complete these gates before review, simplify, 
 2. Fetch the base branch only into `refs/remotes/origin/$BASE_BRANCH`; never use `git fetch origin "$BASE_BRANCH:$BASE_BRANCH"` because it mutates the local protected branch ref without updating a checked-out worktree/index.
 3. In the same shell call, set `BASE_REF="origin/$BASE_BRANCH"` and run `bash "$HOME/.claude/skills/my-pr/scripts/prepare-review-artifacts.sh" "$BASE_REF"`.
 4. Preserve the single absolute `artifact.env` path printed by the script. Pass that exact path to `prepare-pr-context.sh`; do not rely on exported variables from a previous shell call or discover `latest-env.sh`.
-5. Run `bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "/absolute/path/to/artifact.env"`, then source that exact file in any shell call that reads `MY_PR_SCOPE_SUMMARY` or `MY_PR_CONTEXT`.
+5. Run `bash "$HOME/.claude/skills/my-pr/scripts/prepare-pr-context.sh" "/absolute/path/to/artifact.env"`, then source that exact file in any shell call that reads `MY_PR_SCOPE_SUMMARY` or `MY_PR_CONTEXT`. For default, `review`, and `fix`, also run `prepare-review-prompts.sh` with the same path. `SKILL.md` step 2 chains steps 2-5 in one shell call.
 6. If `MY_PR_SCOPE_GATE` is not `ok`, stop.
    - `large`: continue only when the user already clearly confirmed the whole current branch/diff is the target PR scope.
    - `untracked`: classify the untracked files. Stage or `git add -N` task-created files that belong in the PR, or confirm they are out of scope, then regenerate artifacts.
    - `large+untracked`: resolve both conditions before continuing.
 7. Use the generated repo-local artifacts for review and PR body work. Do not use `/tmp` review patches.
 
-For default, `review`, and `fix`, select the reviewer set using `review.md` before launch. Failure of an artifact read or any selected reviewer means `REVIEW_INCOMPLETE`. Only a selected Reviewer B Markdown structure failure follows the existing bounded correction and skip policy in `review.md`. Unselected reviewers are not skipped or required inputs.
+For default, `review`, and `fix`, select the reviewer set using `review.md` before launch. Failure of an artifact read or any selected reviewer means `REVIEW_INCOMPLETE`. Only a selected Reviewer B Markdown structure failure follows the existing bounded correction and skip policy in `review-multi.md`. Unselected reviewers are not skipped or required inputs.
 
 ## default
 
@@ -46,7 +46,7 @@ Run the full workflow:
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Select and launch the read-only reviewer set using `review.md`: C alone for small, low-risk changes; A/B/C for its listed risk, scope, or explicit-request conditions.
 5. Wait for all reviewers; do not final-answer while background reviewers are running
-6. Integrate findings
+6. Verify Required and critical/high candidates against the working tree, then integrate findings
 7. Fix Required findings
 8. Commit fixes
 9. Create/update draft PR
@@ -77,7 +77,7 @@ Run local quality review in read-only mode.
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Select and launch the read-only reviewer set using `review.md`: C alone for small, low-risk changes; A/B/C for its listed risk, scope, or explicit-request conditions.
 5. Wait for all reviewers
-6. Integrate findings
+6. Verify Required and critical/high candidates against the working tree, then integrate findings
 7. Stop
 
 `review` is read-only. It must not edit files, write notes, run fix verification, commit, push, or create/update a PR.
@@ -91,7 +91,7 @@ Fix only Required findings, verify, and commit without pushing.
 3. Prepare repo-local review and PR context artifacts, then pass the scope gate
 4. Select and launch the read-only reviewer set using `review.md`: C alone for small, low-risk changes; A/B/C for its listed risk, scope, or explicit-request conditions.
 5. Wait for all reviewers
-6. Integrate findings
+6. Verify Required and critical/high candidates against the working tree, then integrate findings
 7. Fix Required findings only
 8. Run the verification plan for the fixes
 9. Commit fixes if any
