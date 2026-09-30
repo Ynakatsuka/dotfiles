@@ -16,6 +16,7 @@
         "Mod+Alt+ArrowLeft",
         "Mod+Alt+ArrowUp"
       ],
+      "terminal.copySelection": [],
       "worktree.history.back": [],
       "worktree.history.forward": []
     },
