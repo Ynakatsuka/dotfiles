@@ -5,7 +5,7 @@ set -euo pipefail
 # instructions cannot guarantee that the orchestrator issues both calls in the
 # same turn, so this wrapper owns the concurrency instead.
 
-usage='Usage: run-codex-reviews.sh <chunk-id> <chunk-count> <reviewer-a-prompt> <reviewer-c-prompt> <context-file> <diff-file>'
+usage='Usage: run-codex-reviews.sh <chunk-id> <chunk-count> <simplify-prompt> <correctness-prompt> <context-file> <diff-file>'
 if (($# != 6)); then
   echo "ERROR: $usage" >&2
   exit 1

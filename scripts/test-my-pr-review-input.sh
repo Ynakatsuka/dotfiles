@@ -29,6 +29,7 @@ runner_script=$(resolve_skill_script run-codex-review.sh)
 prepare_script=$(resolve_skill_script prepare-review-artifacts.sh)
 context_script=$(resolve_skill_script prepare-pr-context.sh)
 reviewer_b_input_builder=$(resolve_skill_script prepare-reviewer-b-input.sh)
+prompts_script=$(resolve_skill_script prepare-review-prompts.sh)
 reviewer_b_runner=$(resolve_skill_script run-claude-review.sh)
 reviewer_b_validator=$(resolve_skill_script validate-reviewer-b-output.sh)
 reviewer_b_schema="$skill_root/assets/claude-review-result.schema.json"
@@ -322,13 +323,7 @@ else
 - complete
 
 ## Findings
-- none
-
-## Assessment
-
-**Ready to merge?** Yes
-
-**Reasoning:** No findings.'
+- none'
 fi
 
 jq -n \
@@ -544,11 +539,7 @@ review_markdown='## PR understanding
 ## Findings
 - none
 
-## Assessment
-
-**Ready to merge?** Yes
-
-**Reasoning:** No findings.'
+<!-- END OF REVIEW -->'
 
 jq -nc '{type:"system", subtype:"init"}'
 jq -nc \
@@ -642,6 +633,7 @@ test_reviewer_b_runner() {
 test_reviewer_b_validator() {
   local valid="$tmp_dir/reviewer-b-valid.md"
   local summary="$tmp_dir/reviewer-b-summary.md"
+  local truncated="$tmp_dir/reviewer-b-truncated.md"
 
   cat >"$valid" <<'EOF'
 ## PR understanding
@@ -650,11 +642,7 @@ test_reviewer_b_validator() {
 ## Findings
 - none
 
-## Assessment
-
-**Ready to merge?** Yes
-
-**Reasoning:** No findings.
+<!-- END OF REVIEW -->
 EOF
   printf '%s\n' 'Reviewer B completed the review and found no blocking issues.' >"$summary"
 
@@ -664,6 +652,84 @@ EOF
     fail "Reviewer B summary unexpectedly passed validation"
   fi
   assert_file_contains "$tmp_dir/reviewer-b-summary-error.txt" "missing required section"
+
+  head -n 5 "$valid" >"$truncated"
+  printf '%s\n' '1. **app.py:3** — truncated' '   - Severity: high' >>"$truncated"
+  if /bin/bash "$reviewer_b_validator" "$truncated" \
+    >"$tmp_dir/reviewer-b-truncated-output.txt" 2>"$tmp_dir/reviewer-b-truncated-error.txt"; then
+    fail "truncated Reviewer B output unexpectedly passed validation"
+  fi
+  assert_file_contains "$tmp_dir/reviewer-b-truncated-error.txt" "required terminal line"
+}
+
+test_review_prompts() {
+  local test_repo="$tmp_dir/prompt repo"
+  local artifact_env
+  local artifact_dir
+  local output
+  local simplify_prompt
+  local correctness_prompt
+  local prompt
+  local focus_file="$tmp_dir/review-focus.md"
+
+  mkdir -p "$test_repo"
+  git -C "$test_repo" init -q -b feat/prompt-test
+  git -C "$test_repo" config user.name "Test User"
+  git -C "$test_repo" config user.email "test@example.com"
+  printf 'base\n' >"$test_repo/base.txt"
+  git -C "$test_repo" add base.txt
+  git -C "$test_repo" commit -qm "chore: add base"
+  printf 'changed\n' >"$test_repo/変更.txt"
+  git -C "$test_repo" add 変更.txt
+  git -C "$test_repo" commit -qm "feat: change"
+
+  artifact_env=$(cd "$test_repo" && /bin/bash "$prepare_script" HEAD~1 2>/dev/null)
+  artifact_dir=$(dirname "$artifact_env")
+  output=$(cd "$test_repo" && /bin/bash "$prompts_script" "$artifact_env")
+  simplify_prompt=$(printf '%s\n' "$output" | awk -F '\t' '$1 == "simplify" { print $2 }')
+  correctness_prompt=$(printf '%s\n' "$output" | awk -F '\t' '$1 == "correctness" { print $2 }')
+  [[ "$simplify_prompt" == "$artifact_dir/simplify-review-prompt.md" ]] ||
+    fail "simplify prompt path mismatch: $simplify_prompt"
+  [[ "$correctness_prompt" == "$artifact_dir/correctness-review-prompt.md" ]] ||
+    fail "correctness prompt path mismatch: $correctness_prompt"
+
+  for prompt in "$simplify_prompt" "$correctness_prompt"; do
+    assert_file_contains "$prompt" "Branch: feat/prompt-test"
+    assert_file_contains "$prompt" "Base ref: HEAD~1"
+    assert_file_contains "$prompt" "変更.txt"
+    assert_file_not_contains "$prompt" "{{"
+    assert_file_not_contains "$prompt" "<additional_focus>"
+  done
+  assert_file_contains "$correctness_prompt" "## Findings"
+  assert_file_not_contains "$correctness_prompt" "Ready to merge"
+  (
+    # shellcheck source=/dev/null
+    source "$artifact_env"
+    [[ "$MY_PR_CORRECTNESS_PROMPT" == "$correctness_prompt" ]] || fail "correctness prompt path was not persisted"
+    [[ "$MY_PR_SIMPLIFY_PROMPT" == "$simplify_prompt" ]] || fail "simplify prompt path was not persisted"
+  )
+
+  printf 'Check Japanese prose for unclear actors.\n' >"$focus_file"
+  (cd "$test_repo" && /bin/bash "$prompts_script" "$artifact_env" "$focus_file" >/dev/null)
+  for prompt in "$simplify_prompt" "$correctness_prompt"; do
+    assert_file_contains "$prompt" "<additional_focus>"
+    assert_file_contains "$prompt" "Check Japanese prose for unclear actors."
+  done
+
+  mkdir -p "$tmp_dir/other repo"
+  git -C "$tmp_dir/other repo" init -q
+  if (cd "$tmp_dir/other repo" && /bin/bash "$prompts_script" "$artifact_env") \
+    >"$tmp_dir/other-repo-output.txt" 2>"$tmp_dir/other-repo-error.txt"; then
+    fail "prompt generation from another repository unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/other-repo-error.txt" "artifact dir is outside the current repository"
+
+  : >"$focus_file"
+  if (cd "$test_repo" && /bin/bash "$prompts_script" "$artifact_env" "$focus_file") \
+    >"$tmp_dir/empty-focus-output.txt" 2>"$tmp_dir/empty-focus-error.txt"; then
+    fail "empty additional focus file unexpectedly succeeded"
+  fi
+  assert_file_contains "$tmp_dir/empty-focus-error.txt" "additional focus file not found or empty"
 }
 
 test_reviewer_b_schema() {
@@ -712,6 +778,7 @@ test_chunking
 test_runner
 test_reviewer_b_runner
 test_reviewer_b_validator
+test_review_prompts
 test_reviewer_b_schema
 test_documented_state_contract
 test_reviewer_model_configuration
