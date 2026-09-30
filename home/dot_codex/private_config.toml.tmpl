@@ -1,3 +1,9 @@
+{{- /* Settings that Codex and the ChatGPT app write into the deployed file. */ -}}
+{{- $codexConfig := joinPath .chezmoi.homeDir ".codex/config.toml" -}}
+{{- $runtimeConfig := dict -}}
+{{- if stat $codexConfig -}}
+{{- $runtimeConfig = include $codexConfig | fromToml -}}
+{{- end -}}
 hide_agent_reasoning = true
 network_access = true
 web_search = "live"
@@ -7,6 +13,10 @@ model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 service_tier = "default"
 suppress_unstable_features_warning = true
+{{- /* Preserve the ChatGPT app's Computer Use turn notifier; top-level keys must precede tables. */}}
+{{- if hasKey $runtimeConfig "notify" }}
+{{ dict "notify" (get $runtimeConfig "notify") | toToml | trim }}
+{{- end }}
 
 [features]
 # Avoid repeated parent-model calls while waiting for subagents.
@@ -52,9 +62,7 @@ trust_level = "trusted"
 {{- end }}
 {{- end }}
 {{/* Preserve Codex's runtime hook trust state across chezmoi applies. */ -}}
-{{- $codexConfig := joinPath .chezmoi.homeDir ".codex/config.toml" }}
 {{- if stat $codexConfig }}
-{{- $runtimeConfig := include $codexConfig | fromToml }}
 {{- $hookState := trim (output "awk" "BEGIN { in_hooks = 0 } /^\\[hooks\\.state\\]$/ { in_hooks = 1; print; next } in_hooks && /^\\[/ && $0 !~ /^\\[hooks\\.state(\\]|\\.)/ { in_hooks = 0 } in_hooks { print }" $codexConfig) }}
 {{- if $hookState }}
 
@@ -63,6 +71,12 @@ trust_level = "trusted"
 {{/* Preserve desktop preferences and trust entries outside managed repositories. */}}
 {{- if hasKey $runtimeConfig "desktop" }}
 {{ dict "desktop" (get $runtimeConfig "desktop") | toToml }}
+{{- end }}
+{{/* Preserve the plugins and MCP servers that the ChatGPT app registers. */}}
+{{- range $table := list "marketplaces" "plugins" "mcp_servers" }}
+{{- if hasKey $runtimeConfig $table }}
+{{ dict $table (get $runtimeConfig $table) | toToml }}
+{{- end }}
 {{- end }}
 {{- if hasKey $runtimeConfig "projects" }}
 {{- range $project, $settings := $runtimeConfig.projects }}

@@ -78,10 +78,10 @@ assert_project_trust() {
 render_config >"$TMP_DIR/missing.toml"
 missing_json="$(parse_toml "$TMP_DIR/missing.toml")"
 assert_jq "missing config defaults" \
-  '.model == "gpt-6-sol"
+  '.model == "gpt-6.1-sol"
     and .model_reasoning_effort == "high"
     and .web_search == "live"
-    and .agents.default_subagent_model == "gpt-6-sol"
+    and .agents.default_subagent_model == "gpt-6.1-sol"
     and .agents.default_subagent_reasoning_effort == "high"
     and .features.multi_agent_v2.enabled == true' \
   "$missing_json"
@@ -96,6 +96,8 @@ desktop_json="$(parse_toml "$TMP_DIR/desktop.toml")"
 assert_jq "desktop preference=false was not preserved" '.desktop.realtimeVoiceScreenContextEnabled == false' "$desktop_json"
 
 cat >"$CONFIG_PATH" <<EOF
+notify = ["/fixture/SkyComputerUseClient", "turn-ended"]
+
 [desktop]
 realtimeVoiceScreenContextEnabled = false
 
@@ -127,6 +129,20 @@ trust_level = "untrusted"
 
 [projects."$SUBDIRECTORY"]
 trust_level = "untrusted"
+
+[marketplaces.openai-bundled]
+source_type = "local"
+source = "/fixture/bundled-marketplaces/openai-bundled"
+
+[plugins."browser@openai-bundled"]
+enabled = true
+
+[mcp_servers.node_repl]
+command = "/fixture/node_repl"
+args = []
+
+[mcp_servers.node_repl.env]
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"/fixture/browser-service.mjs"}'
 EOF
 
 # Parse the complete render so duplicate table emission cannot go unnoticed.
@@ -134,6 +150,14 @@ render_config >"$TMP_DIR/full.toml"
 full_json="$(parse_toml "$TMP_DIR/full.toml")"
 assert_jq "desktop preference=false was not preserved with hook state" '.desktop.realtimeVoiceScreenContextEnabled == false' "$full_json"
 assert_jq "hook hash was not preserved" '.hooks.state["fixture-hook"].trusted_hash == "sha256:fixture"' "$full_json"
+# The ChatGPT app's notifier must stay a top-level key, not land inside a preserved table.
+assert_jq "ChatGPT app notifier was not preserved at the top level" '.notify == ["/fixture/SkyComputerUseClient", "turn-ended"]' "$full_json"
+assert_jq "ChatGPT app plugins were not preserved" \
+  '.marketplaces["openai-bundled"].source == "/fixture/bundled-marketplaces/openai-bundled"
+    and .plugins["browser@openai-bundled"].enabled == true' "$full_json"
+assert_jq "ChatGPT app MCP server was not preserved" \
+  '.mcp_servers.node_repl.command == "/fixture/node_repl"
+    and .mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES == "{\"browser\":\"/fixture/browser-service.mjs\"}"' "$full_json"
 assert_jq "multi-agent v2 was not retained" '.features.multi_agent_v2.enabled == true' "$full_json"
 assert_obsolete_settings_absent "obsolete Codex settings were preserved" "$full_json"
 assert_project_trust "managed home trust changed" "$FIXTURE_HOME" trusted "$full_json"

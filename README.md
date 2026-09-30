@@ -136,7 +136,8 @@ chezmoi apply
 ```
 
 The config template preserves Codex-managed desktop preferences, hook trust
-state, and project entries whose paths do not exactly match the home directory
+state, the ChatGPT app's `notify`, `marketplaces`, `plugins`, and `mcp_servers`
+entries, and project entries whose paths do not exactly match the home directory
 or a ghq repository root. Those exact paths remain trusted by the dotfiles
 policy; existing entries for subdirectories are preserved. Run
 `bash scripts/test-codex-config.sh` to verify config preservation and idempotence.
