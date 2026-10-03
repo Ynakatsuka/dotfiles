@@ -20,7 +20,7 @@
 {{- if isAbs $browserService -}}
 {{- $serviceFile := stat $browserService -}}
 {{- if or (not $serviceFile) (ne $serviceFile.type "file") -}}
-{{- fail "Codex trusted browser service path is not an existing file. Refresh the Browser plugin through the ChatGPT app, verify its service registration, then restart MCP before applying dotfiles. Do not substitute another cached version." -}}
+{{- fail (printf "Codex trusted browser service path is not an existing file: %s. The ChatGPT app installs bundled plugins only at startup, so quit ChatGPT and relaunch it without a terminal CODEX_HOME (Dock, Finder, or `env -u CODEX_HOME open -a ChatGPT`), then apply dotfiles again. If the file is still missing, report the registration and plugin versions; do not substitute another cached version." $browserService) -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

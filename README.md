@@ -150,15 +150,17 @@ with a repair message instead of copying the stale registration forward.
 Other trusted services and MCP servers remain unchanged. Module specifiers
 and file URLs are resolved by the runtime and are not checked by this guard.
 
-After a ChatGPT app or Browser plugin update:
+The ChatGPT app copies its bundled plugins into `~/.codex/plugins/cache/` only
+at startup. If that copy fails, the app can still register the new version's
+path. To repair it:
 
-1. Use the app's plugin management to refresh the Browser plugin and verify
-   that the registered service path exists in the installed plugin version.
-   If it still points to a missing file, stop and report the registration and
-   plugin versions through `/feedback`; do not guess a replacement path.
-2. Restart the MCP server through Settings > MCP servers. In the existing
-   Mac chat, follow the Chrome skill and verify the connection by listing
-   tabs before resuming work.
+1. Quit ChatGPT and relaunch it from the Dock or Finder, or run
+   `env -u CODEX_HOME open -a ChatGPT`. `open` passes the shell environment to
+   the app, so a terminal `CODEX_HOME`, such as the one Orca sets, would make
+   the app start with that Codex home instead of `~/.codex`.
+2. Confirm that the registered service path now exists. If it is still
+   missing, stop and report the registration and plugin versions through
+   `/feedback`; do not guess a replacement path.
 3. Run `chezmoi diff ~/.codex/config.toml` and inspect the change before a
    targeted `chezmoi apply ~/.codex/config.toml`.
 
