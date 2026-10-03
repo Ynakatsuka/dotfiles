@@ -190,7 +190,9 @@ rm "$BROWSER_SERVICE"
 if render_config >"$TMP_DIR/stale.toml" 2>"$TMP_DIR/stale.err"; then
   fail "missing browser service was silently preserved or replaced with another version"
 fi
-grep -q 'Codex trusted browser service path is not an existing file' "$TMP_DIR/stale.err" ||
+grep -qF "Codex trusted browser service path is not an existing file: $BROWSER_SERVICE." "$TMP_DIR/stale.err" ||
+  fail "missing browser service did not report the registered path"
+grep -qF 'env -u CODEX_HOME open -a ChatGPT' "$TMP_DIR/stale.err" ||
   fail "missing browser service did not report its repair procedure"
 if grep -q 'fixture-private-value' "$TMP_DIR/stale.err"; then
   fail "browser service diagnostic exposed another MCP environment value"
