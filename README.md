@@ -142,6 +142,31 @@ or a ghq repository root. Those exact paths remain trusted by the dotfiles
 policy; existing entries for subdirectories are preserved. Run
 `bash scripts/test-codex-config.sh` to verify config preservation and idempotence.
 
+The Browser service registration belongs to the ChatGPT app, not to a pinned
+dotfiles version. Before preserving an enabled `node_repl` registration, the
+template checks that its absolute `browser` service path names an existing
+file. A missing file stops rendering, including `chezmoi diff` and `apply`,
+with a repair message instead of copying the stale registration forward.
+Other trusted services and MCP servers remain unchanged. Module specifiers
+and file URLs are resolved by the runtime and are not checked by this guard.
+
+After a ChatGPT app or Browser plugin update:
+
+1. Use the app's plugin management to refresh the Browser plugin and verify
+   that the registered service path exists in the installed plugin version.
+   If it still points to a missing file, stop and report the registration and
+   plugin versions through `/feedback`; do not guess a replacement path.
+2. Restart the MCP server through Settings > MCP servers. In the existing
+   Mac chat, follow the Chrome skill and verify the connection by listing
+   tabs before resuming work.
+3. Run `chezmoi diff ~/.codex/config.toml` and inspect the change before a
+   targeted `chezmoi apply ~/.codex/config.toml`.
+
+Do not delete `node_repl` or its other service registrations, broaden trusted
+code paths, select the newest cache directory, or create a `latest` symlink.
+This guard detects missing files; it does not prove that existing client and
+service versions are compatible or change the app's trusted executable.
+
 Personal skills are managed under `~/.claude/skills/` and linked into
 `~/.agents/skills/` for Codex. This includes `my-subagent`; no duplicate is
 generated under `~/.codex/skills/`.

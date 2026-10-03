@@ -4,6 +4,27 @@
 {{- if stat $codexConfig -}}
 {{- $runtimeConfig = include $codexConfig | fromToml -}}
 {{- end -}}
+{{- /* Keep app-owned service registrations, but do not deploy a missing browser executable. */ -}}
+{{- $nodeReplEnabled := dig "mcp_servers" "node_repl" "enabled" true $runtimeConfig -}}
+{{- $trustedServicesJson := dig "mcp_servers" "node_repl" "env" "NODE_REPL_TRUSTED_SERVICES" "" $runtimeConfig -}}
+{{- if and $nodeReplEnabled $trustedServicesJson -}}
+{{- $trustedServices := $trustedServicesJson | fromJson -}}
+{{- if not (kindIs "map" $trustedServices) -}}
+{{- fail "Codex NODE_REPL_TRUSTED_SERVICES must be a JSON object; repair the app-owned service registration before applying dotfiles." -}}
+{{- end -}}
+{{- if hasKey $trustedServices "browser" -}}
+{{- $browserService := get $trustedServices "browser" -}}
+{{- if or (not (kindIs "string" $browserService)) (not $browserService) -}}
+{{- fail "Codex trusted browser service must be a non-empty string; repair the app-owned service registration before applying dotfiles." -}}
+{{- end -}}
+{{- if isAbs $browserService -}}
+{{- $serviceFile := stat $browserService -}}
+{{- if or (not $serviceFile) (ne $serviceFile.type "file") -}}
+{{- fail "Codex trusted browser service path is not an existing file. Refresh the Browser plugin through the ChatGPT app, verify its service registration, then restart MCP before applying dotfiles. Do not substitute another cached version." -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 hide_agent_reasoning = true
 network_access = true
 web_search = "live"
