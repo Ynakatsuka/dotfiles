@@ -22,8 +22,10 @@ EXTERNAL_PROJECT="$TMP_DIR/external project"
 SUBDIRECTORY="$GHQ_REPO/subdirectory"
 CONFIG_PATH="$FIXTURE_HOME/.codex/config.toml"
 CHEZMOI_CONFIG="$TMP_DIR/chezmoi.toml"
+BROWSER_SERVICE="$FIXTURE_HOME/browser cache/version-1/browser-service.mjs"
 
-mkdir -p "$TMP_DIR/bin" "$FIXTURE_HOME/.codex" "$SUBDIRECTORY" "$EXTERNAL_PROJECT"
+mkdir -p "$TMP_DIR/bin" "$FIXTURE_HOME/.codex" "$SUBDIRECTORY" "$EXTERNAL_PROJECT" "$(dirname "$BROWSER_SERVICE")"
+: >"$BROWSER_SERVICE"
 : >"$CHEZMOI_CONFIG"
 cat >"$TMP_DIR/bin/ghq" <<EOF
 #!/usr/bin/env bash
@@ -142,7 +144,13 @@ command = "/fixture/node_repl"
 args = []
 
 [mcp_servers.node_repl.env]
-NODE_REPL_TRUSTED_SERVICES = '{"browser":"/fixture/browser-service.mjs"}'
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"$BROWSER_SERVICE","sky":"/fixture/sky.mjs"}'
+
+[mcp_servers.other]
+command = "/fixture/other-mcp"
+
+[mcp_servers.other.env]
+FIXTURE_SECRET = "fixture-private-value"
 EOF
 
 # Parse the complete render so duplicate table emission cannot go unnoticed.
@@ -155,9 +163,12 @@ assert_jq "ChatGPT app notifier was not preserved at the top level" '.notify == 
 assert_jq "ChatGPT app plugins were not preserved" \
   '.marketplaces["openai-bundled"].source == "/fixture/bundled-marketplaces/openai-bundled"
     and .plugins["browser@openai-bundled"].enabled == true' "$full_json"
-assert_jq "ChatGPT app MCP server was not preserved" \
+"$JQ_BIN" -e --arg browser "$BROWSER_SERVICE" \
   '.mcp_servers.node_repl.command == "/fixture/node_repl"
-    and .mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES == "{\"browser\":\"/fixture/browser-service.mjs\"}"' "$full_json"
+    and (.mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES | fromjson) == {browser: $browser, sky: "/fixture/sky.mjs"}
+    and .mcp_servers.other.command == "/fixture/other-mcp"
+    and .mcp_servers.other.env.FIXTURE_SECRET == "fixture-private-value"' <<<"$full_json" >/dev/null ||
+  fail "browser registration, other services, or unrelated MCP settings were changed"
 assert_jq "multi-agent v2 was not retained" '.features.multi_agent_v2.enabled == true' "$full_json"
 assert_obsolete_settings_absent "obsolete Codex settings were preserved" "$full_json"
 assert_project_trust "managed home trust changed" "$FIXTURE_HOME" trusted "$full_json"
@@ -170,6 +181,54 @@ cp "$TMP_DIR/full.toml" "$CONFIG_PATH"
 render_config >"$TMP_DIR/full-second.toml"
 cmp -s "$TMP_DIR/full.toml" "$TMP_DIR/full-second.toml" ||
   fail "config template is not byte-identical on the second render"
+
+# An old registration must fail even when a newer cached executable exists.
+UPDATED_BROWSER_SERVICE="$FIXTURE_HOME/browser cache/version-2/browser-service.mjs"
+mkdir -p "$(dirname "$UPDATED_BROWSER_SERVICE")"
+: >"$UPDATED_BROWSER_SERVICE"
+rm "$BROWSER_SERVICE"
+if render_config >"$TMP_DIR/stale.toml" 2>"$TMP_DIR/stale.err"; then
+  fail "missing browser service was silently preserved or replaced with another version"
+fi
+grep -q 'Codex trusted browser service path is not an existing file' "$TMP_DIR/stale.err" ||
+  fail "missing browser service did not report its repair procedure"
+if grep -q 'fixture-private-value' "$TMP_DIR/stale.err"; then
+  fail "browser service diagnostic exposed another MCP environment value"
+fi
+cmp -s "$TMP_DIR/full.toml" "$CONFIG_PATH" || fail "validation modified the deployed configuration"
+
+# An app-updated registration is preserved without pinning either version.
+"$JQ_BIN" -r --arg browser "$UPDATED_BROWSER_SERVICE" \
+  '.mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES = ({browser: $browser, sky: "/fixture/sky.mjs"} | tojson)' \
+  <<<"$full_json" >"$TMP_DIR/updated.json"
+HOME="$FIXTURE_HOME" "$CHEZMOI_BIN" --config "$CHEZMOI_CONFIG" --source "$REPO_ROOT" \
+  execute-template --with-stdin '{{ .chezmoi.stdin | fromJson | toToml }}' \
+  <"$TMP_DIR/updated.json" >"$CONFIG_PATH"
+render_config >"$TMP_DIR/updated.toml"
+updated_json="$(parse_toml "$TMP_DIR/updated.toml")"
+"$JQ_BIN" -e --arg browser "$UPDATED_BROWSER_SERVICE" \
+  '(.mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES | fromjson).browser == $browser
+    and .mcp_servers.other.env.FIXTURE_SECRET == "fixture-private-value"' <<<"$updated_json" >/dev/null ||
+  fail "updated browser registration or other MCP settings were changed"
+
+# Disabled services and module specifiers remain the runtime's responsibility.
+cat >"$CONFIG_PATH" <<'EOF'
+[mcp_servers.node_repl]
+enabled = false
+[mcp_servers.node_repl.env]
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"/missing/disabled-browser.mjs"}'
+EOF
+render_config >"$TMP_DIR/disabled.toml"
+assert_jq "disabled node_repl registration was changed" '.mcp_servers.node_repl.enabled == false' \
+  "$(parse_toml "$TMP_DIR/disabled.toml")"
+cat >"$CONFIG_PATH" <<'EOF'
+[mcp_servers.node_repl.env]
+NODE_REPL_TRUSTED_SERVICES = '{"browser":"fixture-browser-module"}'
+EOF
+render_config >"$TMP_DIR/module.toml"
+assert_jq "module-based browser registration was changed" \
+  '(.mcp_servers.node_repl.env.NODE_REPL_TRUSTED_SERVICES | fromjson).browser == "fixture-browser-module"' \
+  "$(parse_toml "$TMP_DIR/module.toml")"
 
 printf '%s\n' 'desktop = [' >"$CONFIG_PATH"
 if render_config >"$TMP_DIR/malformed.toml" 2>"$TMP_DIR/malformed.err"; then
