@@ -56,11 +56,12 @@
   "model": "opus",
   "language": "japanese",
   "outputStyle": "Concise",
-  "effortLevel": "high",
+  "effortLevel": "xhigh",
   "modelSettings": {
     "claude-opus-5-5": {
-      "effortLevel": "high"
+      "effortLevel": "xhigh"
     }
   },
+  "switchModelsOnFlag": false,
   "cleanupPeriodDays": 180
 }
