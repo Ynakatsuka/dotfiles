@@ -49,21 +49,19 @@ setopt noflowcontrol
 bindkey '^f' fzf-cdr
 
 # fzf gcloud configuration select and reauthentication
+# Run the selection from the command line: ZLE widgets read stdin from
+# /dev/null, so gcloud could not read the authorization code over SSH.
 function gcloud-fzf-activate-login() {
     local config
     config=$(gcloud config configurations list --format="value(NAME)" | fzf --prompt="GCloud Config> " --height=40% --reverse)
     if [ -n "$config" ]; then
-        gcloud config configurations activate "$config" || return
         local login
         login=$(printf "login\nskip" | fzf --prompt="Login? > " --height=20% --reverse)
-        local result=0
+        BUFFER="gcloud config configurations activate ${(q)config}"
         if [ "$login" = "login" ]; then
-            gcloud-reauth "$config" || result=$?
+            BUFFER+=" && gcloud-reauth ${(q)config}"
         fi
-        if (( ${#_gcloud_config_rules} )); then
-            _auto_gcloud_config
-        fi
-        return "$result"
+        zle accept-line
     fi
 }
 zle -N gcloud-fzf-activate-login
