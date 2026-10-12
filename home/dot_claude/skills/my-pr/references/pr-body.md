@@ -15,6 +15,8 @@ Write the PR body in Japanese.
 ```markdown
 ## 概要
 
+## 確認方法
+
 ## 変更内容
 -
 
@@ -31,6 +33,12 @@ Write the PR body in Japanese.
 ```
 
 Omit sections that do not apply.
+
+## Confirmation
+
+Use `## 確認方法` for the shortest way a reviewer can check the result, chosen as the global evidence rule describes: a URL or path to open, a command to run, or before-and-after screenshots. Omit the section when `## テスト内容` already is that way.
+
+Reference an image or video in the body by the path passed to `--attach`, such as `![修正後](./after.png)`; `gh` rewrites the reference to the uploaded asset.
 
 ## Test content
 
@@ -97,5 +105,7 @@ source "/absolute/path/to/artifact.env"
 PR_BODY_FILE="$MY_PR_ARTIFACT_DIR/pr-body.md"
 gh pr edit --body-file "$PR_BODY_FILE"
 ```
+
+Append `--attach <file>` to either command for each image or video the body references.
 
 Never stage or commit `.tmp/my-pr/`.
