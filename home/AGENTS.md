@@ -45,6 +45,9 @@
 - Use `ast-grep` for syntax-aware code searches or rewrites when available and safer than text matching. Use `jq` or `yq` for structured data when available; do not introduce an unconfigured runtime only to parse it.
 - Before adding a test, identify the observable behavior, a plausible defect, and the gap in existing tests; if any is missing, do not add it. Use the narrowest stable boundary and assert an observable result or error. Prefer real collaborators or lightweight fakes; do not rely solely on mock calls, snapshots, type or shape checks, or mere execution. Avoid coverage-only or duplicated-layer tests.
 - Define the narrowest relevant checks before editing; broaden only for a concrete remaining risk. Report exact commands, results, unverified behavior and why, and expected non-zero statuses.
+- In a final report for a multi-item request, map each requested item to its outcome: done, changed from the request, or not done, with the reason. Do not make the user reconstruct the mapping from a narrative.
+- Make each deliverable easy for the user to check. In final reports and PR descriptions, give the shortest way to confirm the result without redoing the work, chosen for the task, such as where to open or how to run it, a screenshot when appearance is what changed, the test that pins a changed contract or fails without the fix, before-and-after values for data or model changes, or plan output for infrastructure. Use the least that lets the user judge the result, and name any decision left to them.
+- Upload screenshots to a PR with `--attach` on `gh pr create`, `gh pr edit`, or `gh pr comment`.
 
 ## Specialized Work
 
