@@ -32,7 +32,6 @@ User's Codex config (`~/.codex/config.toml`) controls defaults:
 - `model` — Default model
 - `approval_policy = "never"` — fully autonomous
 - `sandbox_mode = "danger-full-access"`
-- `network_access = true`
 
 Codex therefore runs without approval prompts.
 
