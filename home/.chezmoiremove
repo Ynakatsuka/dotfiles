@@ -54,6 +54,8 @@ mcp.json
 CLAUDE.md
 .mise.toml
 mise.lock
+.config/yazi
+.config/zsh/yazi.zsh
 
 {{- if ne .chezmoi.os "darwin" }}
 
