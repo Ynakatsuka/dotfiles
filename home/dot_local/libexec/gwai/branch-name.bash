@@ -1,4 +1,4 @@
-# Shared branch naming for gwai-cmux and gwai-orca.
+# Branch naming for gwai-cmux.
 
 validate_branch_name() {
   local branch_name="$1"

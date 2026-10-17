@@ -238,7 +238,7 @@ limit; values above 100 are capped at 100.
 | `lb` | Select a branch with FZF |
 | `gw` | Create or switch a worktree with FZF, newest first |
 | `gw <branch>` | Open or create a worktree for a branch |
-| `gwai-orca` | Create an AI-named Orca worktree from the selected workspace and start Claude/Codex |
+| `gwai-orca` | Create an AI-named top-level Orca worktree in the selected workspace's repository and start Claude (default) or Codex |
 | `gwc [-j jobs]` | Remove worktrees in parallel with multi-select confirmation |
 | `gwt` | `git worktree` |
 | `gwta` | `git worktree add` |
@@ -309,7 +309,7 @@ Built-in display layout:
 
 ### Orca
 
-Run `aio` in Raycast to create an AI-named worktree from the selected Orca workspace and start a Claude or Codex session.
+Run `aio` in Raycast to create an AI-named top-level worktree in the selected Orca workspace's repository and start a Claude (default) or Codex session.
 
 After installing Orca on a new machine, create the non-secret browser profile managed by these dotfiles:
 

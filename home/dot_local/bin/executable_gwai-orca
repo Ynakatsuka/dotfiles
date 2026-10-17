@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Create an Orca worktree from the workspace selected in the Orca UI and start
-# an agent with the original prompt.
+# Create a top-level Orca worktree in the repository of the workspace selected
+# in the Orca UI and start an agent with the original prompt.
 
 set -euo pipefail
 
 readonly ORCA_BIN="${ORCA_BIN:-/Applications/Orca.app/Contents/Resources/bin/orca}"
-readonly ORCA_DATA_FILE="${ORCA_DATA_FILE:-$HOME/Library/Application Support/orca/profiles/local-default/orca-data.json}"
 readonly BRANCH_NAME_MODEL="${GWAI_BRANCH_MODEL:-haiku}"
 
 usage() {
   cat <<'USAGE'
 Usage: gwai-orca [--provider claude|codex] <prompt>
 
-Creates an Orca worktree from the workspace currently selected in the Orca UI,
-generates a branch name with a lightweight Claude model, and starts the chosen
-agent with <prompt> in the new workspace.
+Creates a new top-level Orca worktree in the repository of the workspace
+currently selected in the Orca UI, names it YYMMDD-<Japanese name of up to 10
+characters> with a lightweight Claude model, and starts the chosen agent with
+<prompt> in the new workspace.
 
-If --provider is omitted, codex is used.
+If --provider is omitted, claude is used.
 USAGE
 }
 
@@ -24,8 +24,6 @@ die() {
   printf 'Error: %s\n' "$*" >&2
   exit 1
 }
-
-source "$(dirname "${BASH_SOURCE[0]}")/../libexec/gwai/branch-name.bash"
 
 require_command() {
   local name="$1"
@@ -47,51 +45,68 @@ validate_provider() {
     die "provider is invalid: $provider"
 }
 
-read_active_workspace_ids() {
-  local workspace_ids_json
+generate_workspace_name() {
+  local prompt="$1"
+  local naming_prompt naming_output workspace_name
 
-  [[ -f "$ORCA_DATA_FILE" ]] ||
-    die "Orca data file does not exist: $ORCA_DATA_FILE"
-  [[ -r "$ORCA_DATA_FILE" ]] ||
-    die "Orca data file is not readable: $ORCA_DATA_FILE"
+  naming_prompt="次のタスクのワークスペース名の候補を日本語で5つ作ってください。
+ルール:
+- 対象と作業が分かる短い名前にする。細部は省く
+- 各候補は4〜8文字。長くても10文字まで
+- 使える文字はひらがな、カタカナ、漢字、英数字、アンダースコアだけ。空白、記号、句読点は使わない
+- 1行に1候補、良い順に出力する。番号、引用符、説明は付けない
+- 例: パスワード再設定修正、BQコスト削減、レビュー指摘対応
 
-  workspace_ids_json=$(jq -ce '
-    if (
-      (.workspaceSession.activeRepoId? | type == "string" and length > 0) and
-      (.workspaceSession.activeWorktreeId? | type == "string" and length > 0)
-    ) then
-      {
-        repoId: .workspaceSession.activeRepoId,
-        worktreeId: .workspaceSession.activeWorktreeId
-      }
-    else
-      error("active Orca workspace is missing")
-    end
-  ' "$ORCA_DATA_FILE") ||
-    die "failed to read the active Orca workspace from: $ORCA_DATA_FILE"
+タスク: ${prompt}"
 
-  active_repo_id=$(jq -er '.repoId' <<<"$workspace_ids_json") ||
-    die "failed to parse the active Orca repository ID"
-  active_worktree_id=$(jq -er '.worktreeId' <<<"$workspace_ids_json") ||
-    die "failed to parse the active Orca worktree ID"
+  # Naming needs one short reply, so skip settings, hooks, MCP servers, skills,
+  # and tools to cut Claude Code startup and prompt size.
+  naming_output=$(claude -p --model "$BRANCH_NAME_MODEL" --effort low \
+    --setting-sources '' --strict-mcp-config --disable-slash-commands \
+    --no-session-persistence --tools '' \
+    --system-prompt 'Follow the user instruction exactly. Output only the requested text.' \
+    "$naming_prompt") ||
+    die "workspace name generation failed"
+
+  # Haiku often miscounts Japanese characters, so it returns several candidates
+  # and the first valid one wins. jq counts characters regardless of locale.
+  workspace_name=$(jq -Rnr '
+    [
+      inputs |
+      gsub("^\\s+|\\s+$"; "") |
+      select(test("^[\\p{Han}\\p{Hiragana}\\p{Katakana}ーA-Za-z0-9_]{1,10}$"))
+    ] | first // empty
+  ' <<<"$naming_output") ||
+    die "failed to read generated workspace names"
+
+  [[ -n "$workspace_name" ]] ||
+    die "no generated workspace name had 10 or fewer allowed characters: $naming_output"
+
+  printf '%s\n' "$workspace_name"
 }
 
-validate_active_worktree() {
-  local show_json
+read_active_repo_id() {
+  local ps_json
 
-  if ! show_json=$("$ORCA_BIN" worktree show --worktree "worktree:${active_worktree_id}" --json); then
-    print_orca_response "$show_json"
-    die "failed to read the active Orca worktree"
+  if ! ps_json=$("$ORCA_BIN" worktree ps --json); then
+    print_orca_response "$ps_json"
+    die "failed to list Orca worktrees"
   fi
 
-  if ! jq -e \
-    --arg active_repo_id "$active_repo_id" \
-    --arg active_worktree_id "$active_worktree_id" \
-    '.ok == true and .result.worktree.repoId == $active_repo_id and .result.worktree.id == $active_worktree_id' \
-    <<<"$show_json" >/dev/null; then
-    print_orca_response "$show_json"
-    die "active Orca worktree is invalid or does not match the selected workspace"
-  fi
+  # The running Orca app marks the workspace selected in its UI as isActive.
+  active_repo_id=$(jq -er '
+    if .ok != true then
+      error("Orca did not list worktrees: \(.error | tojson)")
+    else
+      [.result.worktrees[] | select(.isActive == true) | .repoId] |
+      if length == 1 and (.[0] | type == "string" and length > 0) then
+        .[0]
+      else
+        error("expected exactly one active Orca workspace, found \(length)")
+      end
+    end
+  ' <<<"$ps_json") ||
+    die "failed to read the repository of the active Orca workspace"
 }
 
 create_worktree() {
@@ -100,7 +115,7 @@ create_worktree() {
 
   if ! create_json=$("$ORCA_BIN" worktree create \
     --repo "id:${active_repo_id}" \
-    --parent-worktree "worktree:${active_worktree_id}" \
+    --no-parent \
     --name "$branch_name" \
     --agent "$provider" \
     --prompt "$prompt" \
@@ -116,7 +131,7 @@ create_worktree() {
   fi
 }
 
-provider='codex'
+provider='claude'
 prompt=''
 
 while (($# > 0)); do
@@ -157,10 +172,10 @@ require_command claude
 [[ -x "$ORCA_BIN" ]] || die "Orca executable not found: $ORCA_BIN"
 
 active_repo_id=''
-active_worktree_id=''
-read_active_workspace_ids
-validate_active_worktree
-branch_name=$(generate_branch_name "$prompt" "$BRANCH_NAME_MODEL")
-create_worktree "$branch_name"
+read_active_repo_id
+date_prefix=$(date '+%y%m%d')
+[[ "$date_prefix" =~ ^[0-9]{6}$ ]] || die "date prefix is invalid: $date_prefix"
+workspace_name="${date_prefix}-$(generate_workspace_name "$prompt")"
+create_worktree "$workspace_name"
 
-printf 'Created Orca worktree: %s\n' "$branch_name"
+printf 'Created Orca worktree: %s\n' "$workspace_name"
