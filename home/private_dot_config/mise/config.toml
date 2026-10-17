@@ -81,6 +81,10 @@ aws = "latest"
 # gcloud - Google Cloud CLI
 gcloud = "latest"
 
+# cbt - Cloud Bigtable CLI
+# Installed from Go because `gcloud components install` on macOS asks sudo to install Python.
+"go:cloud.google.com/go/cbt" = "latest"
+
 # fzf - Fuzzy Finder
 fzf = "latest"
 
