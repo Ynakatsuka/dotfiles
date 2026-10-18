@@ -93,8 +93,9 @@ fzf = "latest"
 eza = "0.23.4"
 
 # ghq - Remote repository management
-# The aqua registry still expects unversioned asset names, but ghq 1.11 ships ghq_v<version>_* assets.
-"github:x-motemen/ghq" = "latest"
+# Pinned to 1.10.x: ghq 1.11 renamed release assets to ghq_v<version>_*, which the
+# github backend cannot resolve (latest => missing shim). Unpin once the backend handles it.
+"github:x-motemen/ghq" = "1.10.1"
 
 # direnv - Directory-based environment management
 direnv = "latest"
