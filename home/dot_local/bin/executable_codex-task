@@ -19,6 +19,10 @@ Sends the task to `codex exec` with the user's default Codex model and
 configuration. Name the Codex tool to use (Chrome plugin, Computer Use, or
 Slack app) and the exact target and content in the task.
 
+The caller must name only actions the user has approved. Codex is told that
+the named actions are approved and that it must take no other external or
+irreversible action, because it cannot ask the user during the run.
+
 stdout: Codex's final message, the MCP tools it called with their outcomes,
 the session id, and the run directory. The run directory keeps prompt.md,
 events.jsonl (codex exec --json), result.md, and stderr.log; read a call's
