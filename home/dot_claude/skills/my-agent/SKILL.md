@@ -51,7 +51,7 @@ The remaining arguments form the task prompt. For consultation phrasing such as 
 codex exec "<PROMPT>" </dev/null
 ```
 
-`codex exec` waits for stdin whenever stdin is not a terminal, so always redirect stdin. For Chrome operation, Computer Use, or Slack posts, run `codex-task --prompt-file <file>` instead; it handles stdin and logs and reports the tools Codex called.
+`codex exec` waits for stdin whenever stdin is not a terminal, so always redirect stdin. For Chrome operation, Computer Use, or Slack posts, run `codex-task --use <chrome|computer-use|slack> --prompt-file <file>` instead; it adds the playbook for that task, handles stdin and logs, and reports the tools Codex called.
 
 For image input, model override, resume, configuration details, and more examples, read `references/codex.md`.
 

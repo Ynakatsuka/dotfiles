@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Run one Codex task non-interactively for another agent, for work that needs
 # Codex's own tools: its Chrome plugin, Computer Use, or Slack app. Claude
-# Code routes these tasks here.
+# Code routes these tasks here. Playbooks in ../share/codex-task/playbooks
+# give Codex the tool names and steps for each kind of task, so it can start
+# without searching for them.
 #
 # Calling `codex exec` by hand from an agent shell breaks in two ways that this
 # command avoids: codex exec waits for stdin when stdin is not a terminal, and
@@ -13,11 +15,17 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: codex-task (--prompt "<task>" | --prompt-file <file>) [--resume <session-id>]
+Usage: codex-task [--use <playbook>]... (--prompt "<task>" | --prompt-file <file>)
+                  [--resume <session-id>]
 
 Sends the task to `codex exec` with the user's default Codex model and
-configuration. Name the Codex tool to use (Chrome plugin, Computer Use, or
-Slack app) and the exact target and content in the task.
+configuration. Give the exact target and content in the task, including the
+absolute path of any file to attach.
+
+--use adds a playbook with the tools and steps for one kind of task:
+  slack         drafts, posts, threads, scheduled posts, and file uploads
+  computer-use  macOS desktop apps through Computer Use
+  chrome        the user's Chrome through the Chrome plugin
 
 The caller must name only actions the user has approved. Codex is told that
 the named actions are approved and that it must take no other external or
@@ -29,7 +37,10 @@ events.jsonl (codex exec --json), result.md, and stderr.log; read a call's
 arguments with, for example:
   jq 'select(.item.type == "mcp_tool_call") | .item' <run-dir>/events.jsonl
 
---resume continues an earlier session with a follow-up task.
+Codex stops before sending a message or similar action through Chrome or
+Computer Use, starts its final message with "CONFIRMATION NEEDED:", and this
+command prints how to continue. --resume continues that session with the
+user's answer or any other follow-up task.
 Exit status: codex exec's status, or 1 when Codex returns no final message.
 USAGE
 }
@@ -37,9 +48,10 @@ USAGE
 prompt=""
 prompt_file=""
 resume_id=""
+playbooks=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -p | --prompt | -f | --prompt-file | --resume)
+    -p | --prompt | -f | --prompt-file | --resume | -u | --use)
       [[ $# -ge 2 ]] || {
         echo "codex-task: $1 requires a value" >&2
         usage >&2
@@ -49,6 +61,7 @@ while [[ $# -gt 0 ]]; do
         -p | --prompt) prompt="$2" ;;
         -f | --prompt-file) prompt_file="$2" ;;
         --resume) resume_id="$2" ;;
+        -u | --use) playbooks+=("$2") ;;
       esac
       shift 2
       ;;
@@ -80,6 +93,17 @@ if [[ -z "${prompt//[[:space:]]/}" ]]; then
   usage >&2
   exit 2
 fi
+playbook_dir="$(dirname "${BASH_SOURCE[0]}")/../share/codex-task/playbooks"
+for playbook in ${playbooks[@]+"${playbooks[@]}"}; do
+  if [[ ! "$playbook" =~ ^[a-z][a-z-]*$ || ! -f "$playbook_dir/$playbook.md" ]]; then
+    available=""
+    for playbook_file in "$playbook_dir"/*.md; do
+      [[ -f "$playbook_file" ]] && available+=" $(basename "$playbook_file" .md)"
+    done
+    echo "codex-task: unknown playbook: $playbook (available:${available:- none in $playbook_dir})" >&2
+    exit 2
+  fi
+done
 for command_name in codex jq; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "codex-task: $command_name is not installed or not in PATH" >&2
@@ -95,10 +119,14 @@ stderr_path="$run_dir/stderr.log"
 
 {
   cat <<'PROMPT'
-You are running non-interactively for another agent, and nobody can answer questions during this run. If a missing decision, login, permission, or ambiguous target blocks you, stop and report what is needed. The caller has obtained the user's approval for the actions this task names; take no other external or irreversible action. Do not repeat an external write, such as a message or form submission, after an error; report the error instead. End with a short report of what you did, the tools you used, and the result, including IDs or links when available.
-
-<task>
+You are running non-interactively for another agent, and nobody can answer questions during this run. If a missing decision, login, permission, or ambiguous target blocks you, stop and report what is needed. The caller has obtained the user's approval for the actions this task names; take no other external or irreversible action. Do not repeat an external write, such as a message or form submission, after an error; report the error instead. If you stop because an action needs the user's confirmation right before it happens, start your final message with "CONFIRMATION NEEDED:" and state the exact action, target, and content. End with a short report of what you did, the tools you used, and the result, including IDs or links when available.
 PROMPT
+  for playbook in ${playbooks[@]+"${playbooks[@]}"}; do
+    printf '\n<playbook name="%s">\n' "$playbook"
+    cat "$playbook_dir/$playbook.md"
+    printf '</playbook>\n'
+  done
+  printf '\n<task>\n'
   printf '%s\n' "$prompt"
   printf '</task>\n'
 } >"$prompt_path"
@@ -156,3 +184,8 @@ jq -Rrn '
 session_id="$(jq -Rrn 'first(inputs | fromjson? | objects | select(.type == "thread.started") | .thread_id) // empty' \
   "$events_path")"
 echo "codex-task: session ${session_id:-unknown}; run files in ${run_dir}"
+first_line="$(grep -m 1 -v '^[[:space:]]*$' "$result_path" || true)"
+if [[ "$first_line" == *"CONFIRMATION NEEDED:"* ]]; then
+  echo "codex-task: Codex is waiting for confirmation. Ask the user, then continue with:"
+  echo "  codex-task --resume ${session_id:-<session-id>} --prompt \"<the user's answer>\""
+fi

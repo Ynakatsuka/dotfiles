@@ -10,10 +10,12 @@ GUARD="$REPO_ROOT/home/dot_local/bin/executable_bulk-read-guard"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-mkdir -p "$TMP_DIR/bin" "$TMP_DIR/work" "$TMP_DIR/deployed/.local/bin" "$TMP_DIR/deployed/.local/libexec/delegation"
+mkdir -p "$TMP_DIR/bin" "$TMP_DIR/work" "$TMP_DIR/deployed/.local/bin" "$TMP_DIR/deployed/.local/libexec/delegation" \
+  "$TMP_DIR/deployed/.local/share/codex-task"
 cp "$REPO_ROOT/home/dot_local/bin/executable_bulk-read" "$TMP_DIR/deployed/.local/bin/bulk-read"
 cp "$REPO_ROOT/home/dot_local/bin/executable_code-write" "$TMP_DIR/deployed/.local/bin/code-write"
 cp "$REPO_ROOT/home/dot_local/bin/executable_codex-task" "$TMP_DIR/deployed/.local/bin/codex-task"
+cp -R "$REPO_ROOT/home/dot_local/share/codex-task/playbooks" "$TMP_DIR/deployed/.local/share/codex-task/playbooks"
 cp "$REPO_ROOT/home/dot_local/libexec/delegation/codex-exec.bash" \
   "$TMP_DIR/deployed/.local/libexec/delegation/codex-exec.bash"
 BULK_READ="$TMP_DIR/deployed/.local/bin/bulk-read"
@@ -46,7 +48,9 @@ case " $(cat "$CODEX_TEST_ARGS") " in
     echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"node_repl","tool":"js","status":"completed"}}'
     echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"node_repl","tool":"js","status":"failed"}}'
     echo '{"type":"item.completed","item":{"type":"agent_message","text":"done"}}'
-    if ! grep -q 'SKIP_FINAL_MESSAGE' "$CODEX_TEST_PROMPT"; then
+    if grep -q 'ASK_FOR_CONFIRMATION' "$CODEX_TEST_PROMPT"; then
+      printf '\n**CONFIRMATION NEEDED:** send the message in #general.\n' >"$out"
+    elif ! grep -q 'SKIP_FINAL_MESSAGE' "$CODEX_TEST_PROMPT"; then
       echo "Drafted the Slack reply." >"$out"
     fi
     exit 0
@@ -225,6 +229,16 @@ fi
 if bash "$CODEX_TASK" --prompt-file missing.md 2>/dev/null; then
   fail "codex-task accepted a missing prompt file"
 fi
+set +e
+failure_output="$(bash "$CODEX_TASK" --use nope --prompt "a" 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 2 ] || fail "codex-task accepted an unknown playbook: $failure_status"
+grep -q 'unknown playbook: nope (available: chrome computer-use slack)' <<<"$failure_output" ||
+  fail "codex-task did not list the available playbooks: $failure_output"
+if bash "$CODEX_TASK" --use ../slack --prompt "a" 2>/dev/null; then
+  fail "codex-task accepted a playbook path"
+fi
 [ ! -s "$CODEX_TEST_ARGS" ] || fail "codex-task called codex for invalid arguments"
 
 printf 'Draft a reply in the thread with the Slack app.\n' >task.md
@@ -244,6 +258,8 @@ grep -q 'Draft a reply in the thread with the Slack app.' "$CODEX_TEST_PROMPT" |
   fail "codex exec stdin lacks the task"
 grep -q 'nobody can answer questions' "$CODEX_TEST_PROMPT" ||
   fail "codex exec stdin lacks the non-interactive preamble"
+! grep -q '<playbook' "$CODEX_TEST_PROMPT" || fail "codex-task added a playbook nobody asked for"
+! grep -q 'waiting for confirmation' <<<"$task_output" || fail "codex-task reported a confirmation that was not requested"
 first_run_dir="${task_output##*run files in }"
 [ -s "$first_run_dir/events.jsonl" ] || fail "codex-task did not keep the events in $first_run_dir"
 
@@ -251,6 +267,19 @@ task_output="$(bash "$CODEX_TASK" --resume thread-123 --prompt "Send the draft."
 grep -q -- '^exec resume --skip-git-repo-check --json --output-last-message [^ ]*/result.md thread-123 -$' "$CODEX_TEST_ARGS" ||
   fail "codex-task did not resume the session: $(cat "$CODEX_TEST_ARGS")"
 [ "${task_output##*run files in }" != "$first_run_dir" ] || fail "codex-task reused a run directory"
+
+bash "$CODEX_TASK" --use slack --use chrome --prompt "Attach /tmp/a.png." >/dev/null 2>&1
+grep -q '^<playbook name="slack">$' "$CODEX_TEST_PROMPT" || fail "codex-task did not add the slack playbook"
+grep -q 'slack_complete_file_upload' "$CODEX_TEST_PROMPT" || fail "the slack playbook content is missing"
+grep -q '^<playbook name="chrome">$' "$CODEX_TEST_PROMPT" || fail "codex-task did not add a second playbook"
+[ "$(grep -n '^<playbook name="slack">$' "$CODEX_TEST_PROMPT" | cut -d: -f1)" -lt \
+  "$(grep -n '^<task>$' "$CODEX_TEST_PROMPT" | cut -d: -f1)" ] || fail "codex-task put the playbook after the task"
+
+task_output="$(bash "$CODEX_TASK" --use computer-use --prompt "ASK_FOR_CONFIRMATION" 2>/dev/null)"
+grep -q '^codex-task: Codex is waiting for confirmation' <<<"$task_output" ||
+  fail "codex-task did not flag the confirmation request: $task_output"
+grep -q -- '--resume thread-123 --prompt' <<<"$task_output" ||
+  fail "codex-task did not show how to resume after confirmation: $task_output"
 
 set +e
 failure_output="$(bash "$CODEX_TASK" --prompt "FAIL_THE_TASK" 2>&1)"

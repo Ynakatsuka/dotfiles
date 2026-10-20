@@ -25,7 +25,7 @@ codex exec -i path/to/image.png "<PROMPT>" </dev/null
 codex exec resume --last "<PROMPT>" </dev/null
 ```
 
-For Chrome operation, Computer Use, or Slack posts, use `codex-task --prompt-file <file>`; run `codex-task --help` for its output and resume options.
+For Chrome operation, Computer Use, or Slack posts, use `codex-task --use <chrome|computer-use|slack> --prompt-file <file>`; run `codex-task --help` for its playbooks, output, and resume options.
 
 ## Model Selection
 
