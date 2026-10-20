@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Contract tests for the bulk-read and code-write delegation scripts and the
-# shared bulk-read-guard PreToolUse hook. Uses a fake `codex` so no model is
+# Contract tests for the bulk-read, code-write, and codex-task delegation
+# scripts and the shared bulk-read-guard PreToolUse hook. Uses a fake `codex` so no model is
 # called.
 
 set -euo pipefail
@@ -10,13 +10,17 @@ GUARD="$REPO_ROOT/home/dot_local/bin/executable_bulk-read-guard"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-mkdir -p "$TMP_DIR/bin" "$TMP_DIR/work" "$TMP_DIR/deployed/.local/bin" "$TMP_DIR/deployed/.local/libexec/delegation"
+mkdir -p "$TMP_DIR/bin" "$TMP_DIR/work" "$TMP_DIR/deployed/.local/bin" "$TMP_DIR/deployed/.local/libexec/delegation" \
+  "$TMP_DIR/deployed/.local/share/codex-task"
 cp "$REPO_ROOT/home/dot_local/bin/executable_bulk-read" "$TMP_DIR/deployed/.local/bin/bulk-read"
 cp "$REPO_ROOT/home/dot_local/bin/executable_code-write" "$TMP_DIR/deployed/.local/bin/code-write"
+cp "$REPO_ROOT/home/dot_local/bin/executable_codex-task" "$TMP_DIR/deployed/.local/bin/codex-task"
+cp -R "$REPO_ROOT/home/dot_local/share/codex-task/playbooks" "$TMP_DIR/deployed/.local/share/codex-task/playbooks"
 cp "$REPO_ROOT/home/dot_local/libexec/delegation/codex-exec.bash" \
   "$TMP_DIR/deployed/.local/libexec/delegation/codex-exec.bash"
 BULK_READ="$TMP_DIR/deployed/.local/bin/bulk-read"
 CODE_WRITE="$TMP_DIR/deployed/.local/bin/code-write"
+CODEX_TASK="$TMP_DIR/deployed/.local/bin/codex-task"
 cat >"$TMP_DIR/bin/codex" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -31,6 +35,28 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ -n "$out" ] || exit 64
+case " $(cat "$CODEX_TEST_ARGS") " in
+  *" --json "*)
+    echo '{"type":"thread.started","thread_id":"thread-123"}'
+    if grep -q 'FAIL_THE_TASK' "$CODEX_TEST_PROMPT"; then
+      echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"codex_apps","tool":"slack.slack_send_message","status":"completed"}}'
+      echo '{"type":"turn.failed","error":{"message":"Chrome extension is not connected."}}'
+      echo "stderr noise that must not hide the event error" >&2
+      exit 2
+    fi
+    echo 'progress line that is not JSON'
+    echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"codex_apps","tool":"slack.slack_send_message_draft","status":"completed","error":null}}'
+    echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"node_repl","tool":"js","status":"completed"}}'
+    echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"node_repl","tool":"js","status":"failed"}}'
+    echo '{"type":"item.completed","item":{"type":"agent_message","text":"done"}}'
+    if grep -q 'ASK_FOR_CONFIRMATION' "$CODEX_TEST_PROMPT"; then
+      printf '\n**CONFIRMATION NEEDED:** send the message in #general.\n' >"$out"
+    elif ! grep -q 'SKIP_FINAL_MESSAGE' "$CODEX_TEST_PROMPT"; then
+      echo "Drafted the Slack reply." >"$out"
+    fi
+    exit 0
+    ;;
+esac
 if grep -q 'FAIL_THE_READER' "$CODEX_TEST_PROMPT"; then
   echo "ERROR: You've hit your usage limit." >&2
   exit 3
@@ -72,6 +98,8 @@ CHEZMOI_DIR="$(dirname "$CHEZMOI_BIN")"
 export PATH="$TMP_DIR/bin:$JQ_DIR:$CHEZMOI_DIR:/usr/bin:/bin"
 export CODEX_TEST_ARGS="$TMP_DIR/codex-args"
 export CODEX_TEST_PROMPT="$TMP_DIR/codex-prompt"
+mkdir -p "$TMP_DIR/tmp"
+export TMPDIR="$TMP_DIR/tmp"
 
 cd "$TMP_DIR/work"
 printf 'alpha\nbeta\ngamma\n' >small.txt
@@ -186,6 +214,97 @@ grep -q 'codex exec failed with exit code 5' <<<"$failure_output" ||
 grep -q 'ERROR: writer failed.' <<<"$failure_output" ||
   fail "code-write hid the writer's error: $failure_output"
 [ ! -e failed.py ] || fail "code-write changed the target after a writer failure"
+
+# --- codex-task -----------------------------------------------------------------
+
+: >"$CODEX_TEST_ARGS"
+if bash "$CODEX_TASK" 2>/dev/null; then
+  fail "codex-task accepted a call without a task"
+fi
+if bash "$CODEX_TASK" --prompt "   " 2>/dev/null; then
+  fail "codex-task accepted a blank task"
+fi
+if bash "$CODEX_TASK" --prompt "a" --prompt-file small.txt 2>/dev/null; then
+  fail "codex-task accepted both --prompt and --prompt-file"
+fi
+if bash "$CODEX_TASK" --prompt-file missing.md 2>/dev/null; then
+  fail "codex-task accepted a missing prompt file"
+fi
+set +e
+failure_output="$(bash "$CODEX_TASK" --use nope --prompt "a" 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 2 ] || fail "codex-task accepted an unknown playbook: $failure_status"
+grep -q 'unknown playbook: nope (available: chrome computer-use slack)' <<<"$failure_output" ||
+  fail "codex-task did not list the available playbooks: $failure_output"
+if bash "$CODEX_TASK" --use ../slack --prompt "a" 2>/dev/null; then
+  fail "codex-task accepted a playbook path"
+fi
+[ ! -s "$CODEX_TEST_ARGS" ] || fail "codex-task called codex for invalid arguments"
+
+printf 'Draft a reply in the thread with the Slack app.\n' >task.md
+task_output="$(bash "$CODEX_TASK" --prompt-file task.md 2>/dev/null)"
+grep -q '^Drafted the Slack reply.$' <<<"$task_output" ||
+  fail "codex-task stdout lacks the final message: $task_output"
+grep -q '^  codex_apps/slack.slack_send_message_draft: 1 completed$' <<<"$task_output" ||
+  fail "codex-task did not summarize the Slack call: $task_output"
+grep -q '^  node_repl/js: 1 completed, 1 failed$' <<<"$task_output" ||
+  fail "codex-task did not count call outcomes: $task_output"
+grep -q '^codex-task: session thread-123; run files in ' <<<"$task_output" ||
+  fail "codex-task did not report the session and run directory: $task_output"
+grep -q -- '^exec --skip-git-repo-check --json --output-last-message [^ ]*/result.md -$' "$CODEX_TEST_ARGS" ||
+  fail "codex-task did not read the task from stdin: $(cat "$CODEX_TEST_ARGS")"
+! grep -q -- '--model' "$CODEX_TEST_ARGS" || fail "codex-task overrode the configured model"
+grep -q 'Draft a reply in the thread with the Slack app.' "$CODEX_TEST_PROMPT" ||
+  fail "codex exec stdin lacks the task"
+grep -q 'nobody can answer questions' "$CODEX_TEST_PROMPT" ||
+  fail "codex exec stdin lacks the non-interactive preamble"
+! grep -q '<playbook' "$CODEX_TEST_PROMPT" || fail "codex-task added a playbook nobody asked for"
+! grep -q 'waiting for confirmation' <<<"$task_output" || fail "codex-task reported a confirmation that was not requested"
+first_run_dir="${task_output##*run files in }"
+[ -s "$first_run_dir/events.jsonl" ] || fail "codex-task did not keep the events in $first_run_dir"
+
+task_output="$(bash "$CODEX_TASK" --resume thread-123 --prompt "Send the draft." 2>/dev/null)"
+grep -q -- '^exec resume --skip-git-repo-check --json --output-last-message [^ ]*/result.md thread-123 -$' "$CODEX_TEST_ARGS" ||
+  fail "codex-task did not resume the session: $(cat "$CODEX_TEST_ARGS")"
+[ "${task_output##*run files in }" != "$first_run_dir" ] || fail "codex-task reused a run directory"
+
+bash "$CODEX_TASK" --use slack --use chrome --prompt "Attach /tmp/a.png." >/dev/null 2>&1
+grep -q '^<playbook name="slack">$' "$CODEX_TEST_PROMPT" || fail "codex-task did not add the slack playbook"
+grep -q 'slack_complete_file_upload' "$CODEX_TEST_PROMPT" || fail "the slack playbook content is missing"
+grep -q '^<playbook name="chrome">$' "$CODEX_TEST_PROMPT" || fail "codex-task did not add a second playbook"
+[ "$(grep -n '^<playbook name="slack">$' "$CODEX_TEST_PROMPT" | cut -d: -f1)" -lt \
+  "$(grep -n '^<task>$' "$CODEX_TEST_PROMPT" | cut -d: -f1)" ] || fail "codex-task put the playbook after the task"
+
+task_output="$(bash "$CODEX_TASK" --use computer-use --prompt "ASK_FOR_CONFIRMATION" 2>/dev/null)"
+grep -q '^codex-task: Codex is waiting for confirmation' <<<"$task_output" ||
+  fail "codex-task did not flag the confirmation request: $task_output"
+grep -q -- '--resume thread-123 --prompt' <<<"$task_output" ||
+  fail "codex-task did not show how to resume after confirmation: $task_output"
+
+set +e
+failure_output="$(bash "$CODEX_TASK" --prompt "FAIL_THE_TASK" 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 2 ] || fail "codex-task did not propagate the exit code: $failure_status"
+grep -q 'codex exec failed with exit code 2' <<<"$failure_output" ||
+  fail "codex-task did not report the failure: $failure_output"
+grep -q 'Chrome extension is not connected.' <<<"$failure_output" ||
+  fail "codex-task hid the turn error: $failure_output"
+grep -q '^  codex_apps/slack.slack_send_message: 1 completed$' <<<"$failure_output" ||
+  fail "codex-task hid the calls made before the failure: $failure_output"
+grep -q '^codex-task: session thread-123; run files in ' <<<"$failure_output" ||
+  fail "codex-task did not point to the failed session: $failure_output"
+grep -q -- '--resume thread-123$' <<<"$failure_output" ||
+  fail "codex-task did not offer to resume the failed session: $failure_output"
+
+set +e
+failure_output="$(bash "$CODEX_TASK" --prompt "SKIP_FINAL_MESSAGE" 2>&1)"
+failure_status=$?
+set -e
+[ "$failure_status" -eq 1 ] || fail "codex-task succeeded without a final message: $failure_status"
+grep -q 'Codex returned no final message' <<<"$failure_output" ||
+  fail "codex-task did not report the missing final message: $failure_output"
 
 # --- bulk-read-guard -------------------------------------------------------------
 
