@@ -57,6 +57,7 @@
   "language": "japanese",
   "outputStyle": "Concise",
   "effortLevel": "xhigh",
+  "autoCompactWindow": 500000,
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "xhigh"
