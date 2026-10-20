@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Run one Codex task non-interactively for another agent, for work that needs
+# Codex's own tools: its Chrome plugin, Computer Use, or Slack app. Claude
+# Code routes these tasks here.
+#
+# Calling `codex exec` by hand from an agent shell breaks in two ways that this
+# command avoids: codex exec waits for stdin when stdin is not a terminal, and
+# zsh's noclobber refuses to overwrite a log from an earlier attempt. The
+# prompt therefore reaches Codex through a file on stdin, and every run writes
+# into a new directory.
+
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: codex-task (--prompt "<task>" | --prompt-file <file>) [--resume <session-id>]
+
+Sends the task to `codex exec` with the user's default Codex model and
+configuration. Name the Codex tool to use (Chrome plugin, Computer Use, or
+Slack app) and the exact target and content in the task.
+
+stdout: Codex's final message, the MCP tools it called with their outcomes,
+the session id, and the run directory. The run directory keeps prompt.md,
+events.jsonl (codex exec --json), result.md, and stderr.log; read a call's
+arguments with, for example:
+  jq 'select(.item.type == "mcp_tool_call") | .item' <run-dir>/events.jsonl
+
+--resume continues an earlier session with a follow-up task.
+Exit status: codex exec's status, or 1 when Codex returns no final message.
+USAGE
+}
+
+prompt=""
+prompt_file=""
+resume_id=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p | --prompt | -f | --prompt-file | --resume)
+      [[ $# -ge 2 ]] || {
+        echo "codex-task: $1 requires a value" >&2
+        usage >&2
+        exit 2
+      }
+      case "$1" in
+        -p | --prompt) prompt="$2" ;;
+        -f | --prompt-file) prompt_file="$2" ;;
+        --resume) resume_id="$2" ;;
+      esac
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "codex-task: unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -n "$prompt" && -n "$prompt_file" ]]; then
+  echo "codex-task: pass either --prompt or --prompt-file, not both" >&2
+  exit 2
+fi
+if [[ -n "$prompt_file" ]]; then
+  if [[ ! -f "$prompt_file" || ! -r "$prompt_file" ]]; then
+    echo "codex-task: not a readable prompt file: $prompt_file" >&2
+    exit 2
+  fi
+  prompt="$(cat "$prompt_file")"
+fi
+if [[ -z "${prompt//[[:space:]]/}" ]]; then
+  echo "codex-task: the task is empty; pass --prompt or --prompt-file" >&2
+  usage >&2
+  exit 2
+fi
+for command_name in codex jq; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "codex-task: $command_name is not installed or not in PATH" >&2
+    exit 1
+  fi
+done
+
+run_dir="$(mktemp -d "${TMPDIR:-/tmp}/codex-task.XXXXXX")"
+prompt_path="$run_dir/prompt.md"
+events_path="$run_dir/events.jsonl"
+result_path="$run_dir/result.md"
+stderr_path="$run_dir/stderr.log"
+
+{
+  cat <<'PROMPT'
+You are running non-interactively for another agent, and nobody can answer questions during this run. If a missing decision, login, permission, or ambiguous target blocks you, stop and report what is needed. The caller has obtained the user's approval for the actions this task names; take no other external or irreversible action. Do not repeat an external write, such as a message or form submission, after an error; report the error instead. End with a short report of what you did, the tools you used, and the result, including IDs or links when available.
+
+<task>
+PROMPT
+  printf '%s\n' "$prompt"
+  printf '</task>\n'
+} >"$prompt_path"
+
+codex_args=(exec)
+if [[ -n "$resume_id" ]]; then
+  codex_args+=(resume)
+fi
+codex_args+=(--skip-git-repo-check --json --output-last-message "$result_path")
+if [[ -n "$resume_id" ]]; then
+  codex_args+=("$resume_id")
+fi
+codex_args+=(-)
+
+# Read events line by line so that a stray non-JSON line from codex cannot turn
+# a finished task into a failure the caller might retry.
+event_objects() {
+  jq -Rrn "inputs | fromjson? | objects | $1" "$events_path"
+}
+
+status=0
+codex "${codex_args[@]}" <"$prompt_path" >"$events_path" 2>"$stderr_path" || status=$?
+
+if [[ "$status" -ne 0 ]]; then
+  echo "codex-task: codex exec failed with exit code ${status}" >&2
+  errors="$(event_objects 'select(.type == "turn.failed" or .type == "error")
+    | .error.message? // .message? // empty')"
+  if [[ -n "$errors" ]]; then
+    printf '%s\n' "$errors" >&2
+  else
+    tail -n 20 "$stderr_path" >&2
+  fi
+  echo "codex-task: run files in ${run_dir}" >&2
+  exit "$status"
+fi
+if [[ ! -s "$result_path" ]]; then
+  echo "codex-task: Codex returned no final message" >&2
+  tail -n 20 "$stderr_path" >&2
+  echo "codex-task: run files in ${run_dir}" >&2
+  exit 1
+fi
+
+cat "$result_path"
+printf '\ncodex-task: MCP tool calls:\n'
+jq -Rrn '
+  [inputs | fromjson? | objects
+    | select(.type == "item.completed" and .item.type? == "mcp_tool_call") | .item]
+  | if length == 0 then "  (none)"
+    else group_by("\(.server)/\(.tool)")
+      | map("  \(.[0].server)/\(.[0].tool): "
+          + (group_by(.status) | map("\(length) \(.[0].status)") | join(", ")))
+      | join("\n")
+    end
+' "$events_path"
+session_id="$(jq -Rrn 'first(inputs | fromjson? | objects | select(.type == "thread.started") | .thread_id) // empty' \
+  "$events_path")"
+echo "codex-task: session ${session_id:-unknown}; run files in ${run_dir}"

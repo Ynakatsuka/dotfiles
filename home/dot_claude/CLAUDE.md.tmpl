@@ -6,4 +6,5 @@
 - A `PreToolUse` hook rewrites supported Bash commands through `rtk` to reduce output tokens. Use native commands for exact raw output or syntax that RTK does not support, and surface hook warnings rather than assuming a rewrite succeeded.
 - A `PreToolUse` guard denies unbounded `Read` and `cat` of files over 350 lines. Search for the relevant section, read a bounded range with `offset` and `limit`, or delegate the reading with `bulk-read` as described in the `my-bulk-read` skill.
 - Use a headless browser unless the user explicitly requests a visible browser.
+- Delegate Chrome operation, Computer Use, and Slack posts or drafts to Codex with `codex-task --prompt-file <file>` instead of using Claude in Chrome, Claude's Computer Use, or Slack send and draft tools. In the prompt, name the Codex tool (Chrome plugin, Computer Use, or Slack app) and the exact target and content. Run tasks that may exceed the Bash timeout in the background, and confirm the outcome from the tool calls it reports.
 - When a referenced skill is not in the surfaced skill list, check `~/.claude/skills/` before reporting it missing.
