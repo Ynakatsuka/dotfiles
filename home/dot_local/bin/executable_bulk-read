@@ -89,7 +89,7 @@ PROMPT
   printf '%s\n' "$question"
   printf '</question>\n'
   for file_path in "${files[@]}"; do
-    line_count="$(wc -l <"$file_path")"
+    line_count="$(wc -l <"$file_path" | tr -d ' ')"
     total_lines=$((total_lines + line_count))
     printf '\n<file path="%s" lines="%s">\n' "$file_path" "$line_count"
     cat "$file_path"

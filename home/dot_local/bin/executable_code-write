@@ -115,14 +115,14 @@ PROMPT
   printf '%s\n' "$spec"
   printf '</spec>\n'
   if [[ -f "$target" ]]; then
-    printf '\n<target path="%s" exists="true" lines="%s">\n' "$target" "$(wc -l <"$target")"
+    printf '\n<target path="%s" exists="true" lines="%s">\n' "$target" "$(wc -l <"$target" | tr -d ' ')"
     cat "$target"
     printf '\n</target>\n'
   else
     printf '\n<target path="%s" exists="false" />\n' "$target"
   fi
   for file_path in ${references[@]+"${references[@]}"}; do
-    printf '\n<reference path="%s" lines="%s">\n' "$file_path" "$(wc -l <"$file_path")"
+    printf '\n<reference path="%s" lines="%s">\n' "$file_path" "$(wc -l <"$file_path" | tr -d ' ')"
     cat "$file_path"
     printf '\n</reference>\n'
   done
@@ -152,7 +152,7 @@ if [[ -n "$before_checksum" && "$(cksum <"$target")" == "$before_checksum" ]]; t
   exit 1
 fi
 
-echo "code-write: wrote ${target} ($(wc -l <"$target") lines)"
+echo "code-write: wrote ${target} ($(wc -l <"$target" | tr -d ' ') lines)"
 if [[ -s "$answer_file" ]]; then
   cat "$answer_file"
 fi
