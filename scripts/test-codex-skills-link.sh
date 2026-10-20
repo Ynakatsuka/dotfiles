@@ -26,20 +26,20 @@ mkdir -p \
   "$FAKE_HOME/.claude/skills/stale-managed" \
   "$FAKE_HOME/.claude/skills/my-team-share" \
   "$FAKE_HOME/.agents/skills/local-owned" \
-  "$FAKE_HOME/.agents/skills/my-subagent/references" \
+  "$FAKE_HOME/.agents/skills/orca-cli/references" \
   "$FAKE_HOME/.codex/skills/.system"
 printf 'name: my-pr\n' >"$FAKE_HOME/.claude/skills/my-pr/SKILL.md"
 printf 'local skill\n' >"$FAKE_HOME/.agents/skills/local-owned/SKILL.md"
-printf 'name: my-subagent\n' >"$FAKE_HOME/.agents/skills/my-subagent/SKILL.md"
-printf 'preserved reference\n' >"$FAKE_HOME/.agents/skills/my-subagent/references/prompts.md"
+printf 'name: orca-cli\n' >"$FAKE_HOME/.agents/skills/orca-cli/SKILL.md"
+printf 'preserved reference\n' >"$FAKE_HOME/.agents/skills/orca-cli/references/prompts.md"
 printf 'stale-managed\n' >"$FAKE_HOME/.agents/skills/.codex-claude-managed-skills"
 
 ln -s "$FAKE_HOME/.claude/skills/custom" \
   "$FAKE_HOME/.agents/skills/custom"
 ln -s "$FAKE_HOME/.claude/skills/stale-managed" \
   "$FAKE_HOME/.agents/skills/stale-managed"
-ln -s ../../.agents/skills/my-subagent \
-  "$FAKE_HOME/.claude/skills/my-subagent"
+ln -s ../../.agents/skills/orca-cli \
+  "$FAKE_HOME/.claude/skills/orca-cli"
 ln -s "$FAKE_HOME/.claude/skills/my-pr" \
   "$FAKE_HOME/.codex/skills/my-pr"
 ln -s "$FAKE_HOME/.claude/skills/my-team-share" \
@@ -53,9 +53,9 @@ ln -s "$TMP_DIR/unrelated-target" \
 chmod +x "$RENDERED"
 
 HOME="$FAKE_HOME" bash "$REPO_ROOT/home/run_once_before_migrate-shared-skills.sh"
-[ -f "$FAKE_HOME/.claude/skills/my-subagent/references/prompts.md" ] ||
+[ -f "$FAKE_HOME/.claude/skills/orca-cli/references/prompts.md" ] ||
   fail "agent-owned skill content was not migrated"
-[ ! -L "$FAKE_HOME/.claude/skills/my-subagent" ] ||
+[ ! -L "$FAKE_HOME/.claude/skills/orca-cli" ] ||
   fail "Claude skill remained a link to the old directory"
 
 CONFLICT_HOME="$TMP_DIR/conflict-home"
@@ -87,8 +87,8 @@ HOME="$FAKE_HOME" "$RENDERED" >"$TMP_DIR/rendered-output" 2>&1
 [ "$(readlink "$FAKE_HOME/.agents/skills/my-pr")" = \
   "$FAKE_HOME/.claude/skills/my-pr" ] ||
   fail "managed Codex skill link points to the wrong path"
-[ "$(readlink "$FAKE_HOME/.agents/skills/my-subagent")" = \
-  "$FAKE_HOME/.claude/skills/my-subagent" ] ||
+[ "$(readlink "$FAKE_HOME/.agents/skills/orca-cli")" = \
+  "$FAKE_HOME/.claude/skills/orca-cli" ] ||
   fail "migrated skill was not linked back into agent skills"
 [ -d "$FAKE_HOME/.agents/skills/local-owned" ] &&
   [ ! -L "$FAKE_HOME/.agents/skills/local-owned" ] ||

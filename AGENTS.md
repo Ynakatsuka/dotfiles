@@ -1,69 +1,35 @@
 # Dotfiles Repository Instructions
 
-## Repository Scope
+## Source and Deployment
 
-- This repository manages personal dotfiles for macOS and Ubuntu with chezmoi.
-- `.chezmoiroot` points to `home/`; only files under `home/` are deployed to `$HOME`.
-- Files outside `home/`, including this file, are repository-only.
-- `home/.chezmoiremove` declaratively removes stale deployed targets.
+- This repository manages macOS and Ubuntu dotfiles with chezmoi. `.chezmoiroot` selects `home/`; only that directory deploys to `$HOME`. Root files, `bootstrap/`, and `scripts/` are repository-only.
+- Edit sources under `home/`, not deployed files. Verify target mappings when adding or moving files; declare stale targets in `home/.chezmoiremove`.
+- chezmoi names: `dot_` → `.`, `private_` → restricted permissions, `.tmpl` → Go template, `executable_` → executable permissions.
+- Inspect `chezmoi diff` before applying. Apply and validate managed changes before any requested commit or push; stop if apply requires an unresolved overwrite decision.
 
-## Source Layout
+## Instruction Sources
 
-- `home/`: chezmoi source state
-- `bootstrap/`: platform-specific setup scripts
-- `scripts/`: repository maintenance and validation scripts
-- `home/dot_claude/`: global Claude Code configuration
-- `home/dot_codex/`: global Codex configuration
-- `home/dot_gemini/`: global Gemini CLI configuration
-- `home/private_dot_config/zsh/`: zsh modules loaded by `home/dot_zshrc`
+- `home/AGENTS.md` holds global rules; root `AGENTS.md` holds repository rules. Root `CLAUDE.md` imports this file.
+- Templates in `home/dot_{claude,codex,gemini}/` include `home/AGENTS.md` and add only product-specific tool behavior. Do not duplicate rules across layers.
+- Skills live in `home/dot_claude/skills/` and are linked into Codex. Use `my-skill-creator` before editing a `SKILL.md`.
+- Keep deployed global Claude rules intact and documented: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.
 
-Inside `home/`, follow chezmoi naming conventions:
+## Environment Variables
 
-- `dot_` becomes `.`
-- `private_` requests restricted permissions
-- `.tmpl` is rendered as a Go template
-- `executable_` requests executable permissions
-
-## Editing and Deployment
-
-- Edit the source under `home/`; never edit a deployed file under `$HOME` as the authoritative change.
-- Verify the source-to-target mapping before adding or moving a managed file.
-- Run `chezmoi diff` before `chezmoi apply` and inspect target drift.
-- If non-interactive apply requires a decision, stop and report instead of forcing an overwrite.
-- Apply and validate managed changes before any requested commit or push.
-- Do not create configuration directly in `~/.claude/`, `~/.codex/`, `~/.gemini/`, or `~/.config/`; create the corresponding source under `home/` first.
-
-## 環境変数
-
-- 環境変数を追加できるのは、秘密情報か、実行環境によって値が異なる場合に限る。秘密情報でない場合は、異なる値を必要とする実際の実行環境を少なくとも二つ挙げる。挙げられない場合は環境変数を使わない。
-- 実行ごとの動作には明示的なCLIオプション、バージョン管理する方針にはリポジトリ内の設定、不変値にはコード上の定数を使う。
-- 固定されたプロジェクト識別子やアプリケーション定数、機能や実装の選択、ビルドで確定する値、常に一致させる必要がある重複した選択値には環境変数を使わない。
-- 環境変数を追加、改名、削除する前に、設定元と利用箇所、テスト、テンプレート、配備設定をすべて調べる。管理元を一つに定め、暗黙の既定値を避け、環境変数テンプレートも同じ変更で更新する。
-
-## Agent Instruction Sources
-
-- `home/AGENTS.md` contains global rules for work in every repository. Do not put dotfiles- or chezmoi-specific guidance there.
-- Root `AGENTS.md` contains shared instructions for this repository.
-- Root `CLAUDE.md` imports root `AGENTS.md` and adds only Claude-specific guidance.
-- Product-specific global templates under `home/dot_{claude,codex,gemini}/` include `home/AGENTS.md` and append only product-specific tool behavior.
-- Keep global, repository-specific, and product-specific instructions separate; do not duplicate rule text across layers.
-
-## Common Commands
-
-```bash
-make -C bootstrap full
-make -C bootstrap standard
-make -C bootstrap minimal
-
-chezmoi diff
-chezmoi apply -v
-```
+- Add environment variables only for secrets or values that differ between actual execution environments. For non-secrets, identify at least two environments requiring different values.
+- Use CLI options for per-run behavior, repository configuration for policy, and code constants for fixed values.
+- Before adding, renaming, or removing a variable, inspect its producers, consumers, tests, templates, and deployment settings. Keep one source of truth and update templates together.
 
 ## Verification
 
-- Run the narrowest relevant checks first.
-- For general repository changes, run `prek run --files <changed-files>` and `bash scripts/check-stale.sh`.
-- For agent instructions or shell tool management, also run:
+For repository changes:
+
+```bash
+prek run --files <changed-files>
+bash scripts/check-stale.sh
+```
+
+For agent instructions or shell tool management, also run:
 
 ```bash
 mise run check-agent-environment
@@ -71,22 +37,13 @@ bash scripts/test-rtk-rewrite-hook.sh
 bash scripts/test-delegation.sh
 ```
 
-- After changing managed files, verify both `chezmoi diff` and the deployed behavior.
-- Shell configuration changes require a fresh shell or `source ~/.zshrc` as appropriate.
-- Hammerspoon changes require `hs -c "hs.reload()"` or the documented AppleScript reload path.
-- Bootstrap scripts should use their dry-run mode when available.
+- After managed changes, apply the affected targets and verify `chezmoi diff` plus deployed behavior.
+- Shell changes require a fresh shell or `source ~/.zshrc`. Hammerspoon changes require `hs -c "hs.reload()"` or the documented AppleScript path. Use bootstrap dry-run modes when available.
 
-## RTK Integration
+## Configuration Details
 
-- RTK is installed through `home/private_dot_config/mise/config.toml` and updated by maintenance.
-- Claude Bash commands pass through three ordered `PreToolUse` hooks configured in `home/.chezmoitemplates/claude-settings.json`: `bulk-read-guard` first, then `ensure-mise-path.sh`, then `rtk-rewrite.sh`.
-- `home/dot_claude/hooks/executable_rtk-rewrite.sh` delegates supported rewrites and permission decisions to `rtk rewrite`. It requires `jq` and RTK 0.49.0 or newer.
-- Preserve the rewrite protocol: exit 0 rewrites and auto-allows, exit 1 or 2 passes through, exit 3 rewrites without auto-allowing so Claude can ask, and unexpected failures emit a warning before passing through.
-- Changes to RTK versions, hook ordering, or rewrite handling require `bash scripts/test-rtk-rewrite-hook.sh` and the agent environment check. Reproduce a compatibility issue against the installed RTK before adding or removing a guard.
-
-## Specialized Changes
-
-- When adding a tool to `home/private_dot_config/mise/config.toml`, run `mise install` and ensure shims resolve in a clean shell.
-- `home/dot_claude/modify_settings.json.tmpl` and `home/dot_gemini/modify_settings.json.tmpl` render `~/.claude/settings.json` and `~/.gemini/settings.json` from `home/.chezmoitemplates/{claude,gemini}-settings.json` through `modify-settings-keep-orca-hooks.sh`, keeping only the hook groups Orca registers under `~/.orca/agent-hooks/`; edit the JSON templates for managed settings and run `bash scripts/test-orca-hook-settings.sh` after changing the merge.
-- Keep the deployed Claude rule files documented and intact: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.
-- The model delegation scripts `bulk-read`, `code-write`, and the `bulk-read-guard` hook live in `home/dot_local/bin/`. The guard is registered in `home/.chezmoitemplates/claude-settings.json` and `home/dot_codex/hooks.json.tmpl`; Codex skips it until it is trusted with `/hooks` after `chezmoi apply`.
+- Bootstrap profiles: `make -C bootstrap full`, `standard`, or `minimal`.
+- Tools are managed in `home/private_dot_config/mise/config.toml`. After adding one, run `mise install` and verify its shim in a clean shell.
+- Claude Bash hooks run in this order: `bulk-read-guard`, `ensure-mise-path.sh`, `rtk-rewrite.sh`. The last delegates rewriting and permission decisions to `rtk rewrite`; preserve its exit-code protocol. Reproduce compatibility issues with installed RTK before adding guards.
+- Edit Claude and Gemini settings in `home/.chezmoitemplates/{claude,gemini}-settings.json`. Their `modify_settings.json.tmpl` scripts preserve Orca hook groups through `modify-settings-keep-orca-hooks.sh`; run `bash scripts/test-orca-hook-settings.sh` when changing that merge.
+- Delegation commands and the read guard live in `home/dot_local/bin/`. The guard is registered in the Claude settings template and `home/dot_codex/hooks.json.tmpl`; Codex requires trust through `/hooks` after apply.

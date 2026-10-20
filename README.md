@@ -170,8 +170,7 @@ This guard detects missing files; it does not prove that existing client and
 service versions are compatible or change the app's trusted executable.
 
 Personal skills are managed under `~/.claude/skills/` and linked into
-`~/.agents/skills/` for Codex. This includes `my-subagent`; no duplicate is
-generated under `~/.codex/skills/`.
+`~/.agents/skills/` for Codex; no duplicates are generated under `~/.codex/skills/`.
 
 ### RTK Command Rewriting
 
