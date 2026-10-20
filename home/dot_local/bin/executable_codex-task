@@ -150,6 +150,26 @@ event_objects() {
 status=0
 codex "${codex_args[@]}" <"$prompt_path" >"$events_path" 2>"$stderr_path" || status=$?
 
+# Print the MCP tool calls and the session even when the run fails, because a
+# message may already have been sent and a fresh run would send it again.
+report_calls_and_session() {
+  printf 'codex-task: MCP tool calls:\n'
+  jq -Rrn '
+    [inputs | fromjson? | objects
+      | select(.type == "item.completed" and .item.type? == "mcp_tool_call") | .item]
+    | if length == 0 then "  (none)"
+      else group_by("\(.server)/\(.tool)")
+        | map("  \(.[0].server)/\(.[0].tool): "
+            + (group_by(.status) | map("\(length) \(.[0].status)") | join(", ")))
+        | join("\n")
+      end
+  ' "$events_path"
+  echo "codex-task: session ${session_id:-unknown}; run files in ${run_dir}"
+}
+session_id="$(jq -Rrn 'first(inputs | fromjson? | objects | select(.type == "thread.started") | .thread_id) // empty' \
+  "$events_path")"
+failure_hint="codex-task: check the calls above before running the task again; continue the same session with --resume ${session_id:-<session-id>}"
+
 if [[ "$status" -ne 0 ]]; then
   echo "codex-task: codex exec failed with exit code ${status}" >&2
   errors="$(event_objects 'select(.type == "turn.failed" or .type == "error")
@@ -159,31 +179,21 @@ if [[ "$status" -ne 0 ]]; then
   else
     tail -n 20 "$stderr_path" >&2
   fi
-  echo "codex-task: run files in ${run_dir}" >&2
+  report_calls_and_session >&2
+  echo "$failure_hint" >&2
   exit "$status"
 fi
 if [[ ! -s "$result_path" ]]; then
   echo "codex-task: Codex returned no final message" >&2
   tail -n 20 "$stderr_path" >&2
-  echo "codex-task: run files in ${run_dir}" >&2
+  report_calls_and_session >&2
+  echo "$failure_hint" >&2
   exit 1
 fi
 
 cat "$result_path"
-printf '\ncodex-task: MCP tool calls:\n'
-jq -Rrn '
-  [inputs | fromjson? | objects
-    | select(.type == "item.completed" and .item.type? == "mcp_tool_call") | .item]
-  | if length == 0 then "  (none)"
-    else group_by("\(.server)/\(.tool)")
-      | map("  \(.[0].server)/\(.[0].tool): "
-          + (group_by(.status) | map("\(length) \(.[0].status)") | join(", ")))
-      | join("\n")
-    end
-' "$events_path"
-session_id="$(jq -Rrn 'first(inputs | fromjson? | objects | select(.type == "thread.started") | .thread_id) // empty' \
-  "$events_path")"
-echo "codex-task: session ${session_id:-unknown}; run files in ${run_dir}"
+echo
+report_calls_and_session
 first_line="$(grep -m 1 -v '^[[:space:]]*$' "$result_path" || true)"
 if [[ "$first_line" == *"CONFIRMATION NEEDED:"* ]]; then
   echo "codex-task: Codex is waiting for confirmation. Ask the user, then continue with:"

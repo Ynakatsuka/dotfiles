@@ -20,8 +20,8 @@ The draft tool cannot attach files. Uploading a file and sharing it in a channel
 
 1. Get the byte size: `wc -c < <file> | tr -d ' '`.
 2. Call `slack_get_file_upload_url(filename, content_length, alt_txt?)`.
-3. Upload the bytes with `curl -sS -F file=@<file> '<upload URL>'` and check that it succeeds. Do not print the upload URL in the report.
+3. Upload the bytes with `curl -sS --fail-with-body -F file=@<file> '<upload URL>'`. If curl fails, stop and report; do not call the next step. Do not print the upload URL in the report.
 4. Call `slack_complete_file_upload(file_id, channel_id, thread_ts?, initial_comment?, title?)`. Put the message text in `initial_comment`, so text and image arrive as one post.
-5. Upload several files the same way, one `slack_complete_file_upload` per file, and report each file ID.
+5. The tool shares one file per call, and each call is a separate post. For several files, put the message text only on the first call, share the others in the same channel or thread without `initial_comment`, and report each file ID.
 
 When the task wants an unsent draft that includes a file, use Slack in Chrome with the Chrome plugin: open the channel or thread at `https://app.slack.com/client/<team ID>/<channel ID>`, attach the file through the file chooser flow, paste the text, and stop before sending. Report whether the composer kept the attachment.

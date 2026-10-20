@@ -39,6 +39,7 @@ case " $(cat "$CODEX_TEST_ARGS") " in
   *" --json "*)
     echo '{"type":"thread.started","thread_id":"thread-123"}'
     if grep -q 'FAIL_THE_TASK' "$CODEX_TEST_PROMPT"; then
+      echo '{"type":"item.completed","item":{"type":"mcp_tool_call","server":"codex_apps","tool":"slack.slack_send_message","status":"completed"}}'
       echo '{"type":"turn.failed","error":{"message":"Chrome extension is not connected."}}'
       echo "stderr noise that must not hide the event error" >&2
       exit 2
@@ -290,8 +291,12 @@ grep -q 'codex exec failed with exit code 2' <<<"$failure_output" ||
   fail "codex-task did not report the failure: $failure_output"
 grep -q 'Chrome extension is not connected.' <<<"$failure_output" ||
   fail "codex-task hid the turn error: $failure_output"
-grep -q 'codex-task: run files in ' <<<"$failure_output" ||
-  fail "codex-task did not point to the failed run: $failure_output"
+grep -q '^  codex_apps/slack.slack_send_message: 1 completed$' <<<"$failure_output" ||
+  fail "codex-task hid the calls made before the failure: $failure_output"
+grep -q '^codex-task: session thread-123; run files in ' <<<"$failure_output" ||
+  fail "codex-task did not point to the failed session: $failure_output"
+grep -q -- '--resume thread-123$' <<<"$failure_output" ||
+  fail "codex-task did not offer to resume the failed session: $failure_output"
 
 set +e
 failure_output="$(bash "$CODEX_TASK" --prompt "SKIP_FINAL_MESSAGE" 2>&1)"
