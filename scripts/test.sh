@@ -24,12 +24,6 @@ register() {
 }
 
 # name, runner, source path, external tools, optional supported platform.
-register test-cmux-agent-board-auto-title bash scripts/test-cmux-agent-board-auto-title.sh 'bash chezmoi jq python3'
-register test-cmux-agent-board-diff-open bash scripts/test-cmux-agent-board-diff-open.sh 'bash git python3'
-register test-cmux-agent-board-diff-refresh bash scripts/test-cmux-agent-board-diff-refresh.sh 'bash git jq python3'
-register test-cmux-agent-board-state bash scripts/test-cmux-agent-board-state.sh 'bash chezmoi jq python3 zsh'
-register test-cmux-agent-board-usage bash scripts/test-cmux-agent-board-usage.sh 'bash jq python3'
-register test-cmux-resume-all-codex-sessions bash scripts/test-cmux-resume-all-codex-sessions.sh 'bash jq'
 register test-codex-config bash scripts/test-codex-config.sh 'bash chezmoi jq'
 register test-codex-skills-link bash scripts/test-codex-skills-link.sh 'bash chezmoi'
 register test-delegation bash scripts/test-delegation.sh 'bash chezmoi jq python3'
@@ -37,7 +31,6 @@ register test-disk-tree bash scripts/test-disk-tree.sh 'bash python3'
 register test-dotfiles-brew-upgrade bash scripts/test-dotfiles-brew-upgrade.sh 'bash'
 register test-dotfiles-mise-up bash scripts/test-dotfiles-mise-up.sh 'bash jq'
 register test-gwai-branch-name zsh scripts/test-gwai-branch-name.zsh 'zsh'
-register test-gwai-cmux-worktree-capture bash scripts/test-gwai-cmux-worktree-capture.sh 'bash git'
 register test-gwai-orca bash scripts/test-gwai-orca.sh 'bash git jq'
 register test-gwc-worktree-list zsh scripts/test-gwc-worktree-list.zsh 'zsh git'
 register test-handoff-context bash scripts/test-handoff-context.sh 'bash git'
