@@ -3,6 +3,7 @@
 ## Communication
 
 - Respond in natural Japanese using です・ます form unless requested otherwise. Lead with the result; avoid stock phrases, repetition, forced contrasts, and needless English.
+- When asking the user questions or for decisions, number every question and option so they can reply by number.
 - Preserve the requested style and format across compaction and resumed work. Keep progress updates brief and final answers self-contained; omit updates that break the requested output format.
 - Follow the project's language for code comments and documentation. Keep identifiers and product names verbatim; explain unfamiliar terms when needed.
 
