@@ -1,24 +1,20 @@
 #!/usr/bin/env bash
 # Claude Code hook for sessions that run inside Orca.
 #
-# 1. Keeps a guard in Orca's managed ~/.orca/agent-hooks/claude-hook.sh that drops
-#    a Stop which only waits for background work (see orca-claude-stop-held).
-#    Orca announces such a Stop as "Agent Task Complete" even though Claude
-#    resumes when the work finishes. Orca rewrites the script at every app start,
-#    so SessionStart and UserPromptSubmit reinstall the guard.
-# 2. Mirrors the main agent's state into the workspace board status:
-#    in-progress = Running, in-review = waiting for the user (turn finished,
-#    AskUserQuestion, or session ended), completed = Done. Only a new prompt
-#    reopens a Done workspace. Events from subagents and teammates are ignored.
+# Keeps a guard in Orca's managed ~/.orca/agent-hooks/claude-hook.sh that drops
+# a Stop which only waits for background work (see orca-claude-stop-held).
+# Orca announces such a Stop as "Agent Task Complete" even though Claude
+# resumes when the work finishes. Orca rewrites the script at every app start,
+# so SessionStart and UserPromptSubmit reinstall the guard.
 #
-# Reads the hook payload on stdin and writes nothing to stdout, because Claude adds
-# UserPromptSubmit output to the prompt context.
+# The workspace board status is left to the user: the sidebar groups workspaces
+# by status, so changing it on every turn would move them around.
+#
+# Writes nothing to stdout, because Claude adds UserPromptSubmit output to the
+# prompt context.
 
 set -euo pipefail
 
-readonly RUNNING_STATUS=in-progress
-readonly WAITING_STATUS=in-review
-readonly DONE_STATUS=completed
 readonly GUARD_MARKER='# dotfiles:orca-claude-stop-held'
 readonly PAYLOAD_ANCHOR='payload=$({ command -p cat 2>/dev/null || cat; })'
 
@@ -57,80 +53,6 @@ EOF
   }
 }
 
-# Usage: sync_workspace_status <status> <may-reopen-done: true|false>
-sync_workspace_status() {
-  local target=$1 may_reopen=$2 selector current
-  [[ -n "${ORCA_WORKTREE_ID:-}" ]] || return 0
-  # Nested `claude -p` runs inherit the Orca environment but do not own the workspace.
-  [[ "${CLAUDE_CODE_ENTRYPOINT:-}" == cli ]] || return 0
-  if ! command -v orca >/dev/null 2>&1; then
-    error 'orca CLI not found in PATH; cannot update the workspace status'
-    return 1
-  fi
-
-  selector="id:$ORCA_WORKTREE_ID"
-  if ! current=$(orca worktree show --worktree "$selector" --json | jq -er '.result.worktree.workspaceStatus'); then
-    error "failed to read the workspace status for $selector"
-    return 1
-  fi
-  [[ "$current" != "$target" ]] || return 0
-  [[ "$current" != "$DONE_STATUS" || "$may_reopen" == true ]] || return 0
-
-  if ! orca worktree set --worktree "$selector" --workspace-status "$target" --json >/dev/null; then
-    error "failed to set the workspace status to $target for $selector"
-    return 1
-  fi
-}
-
-if ! command -v jq >/dev/null 2>&1; then
-  error 'jq is required'
-  exit 1
-fi
-
-payload=$(cat)
-# A non-whitespace separator keeps empty fields, such as a missing tool_name, in place.
-if ! fields=$(jq -r '[.hook_event_name // "", .tool_name // "", (has("agent_id") | tostring)] | join("\u001f")' <<<"$payload"); then
-  error 'failed to parse the hook payload'
-  exit 1
-fi
-IFS=$'\x1f' read -r event tool_name from_subagent <<<"$fields"
-
-status=0
-case "$event" in
-  SessionStart)
-    install_stop_guard || status=1
-    ;;
-  UserPromptSubmit)
-    install_stop_guard || status=1
-    sync_workspace_status "$RUNNING_STATUS" true || status=1
-    ;;
-  PreToolUse | PostToolUse)
-    if [[ "$tool_name" == AskUserQuestion && "$from_subagent" == false ]]; then
-      if [[ "$event" == PreToolUse ]]; then
-        sync_workspace_status "$WAITING_STATUS" false || status=1
-      else
-        sync_workspace_status "$RUNNING_STATUS" false || status=1
-      fi
-    fi
-    ;;
-  Stop | StopFailure)
-    if [[ "$from_subagent" == false ]]; then
-      held=0
-      printf '%s' "$payload" | "$HOME/.local/bin/orca-claude-stop-held" || held=$?
-      case "$held" in
-        0) ;; # Claude resumes when its background work finishes; stay Running.
-        1) sync_workspace_status "$WAITING_STATUS" false || status=1 ;;
-        *) status=1 ;;
-      esac
-    fi
-    ;;
-  SessionEnd)
-    # A session that exits while a held Stop waits on background work never sends
-    # its final Stop, so leave Running here.
-    if [[ "$from_subagent" == false ]]; then
-      sync_workspace_status "$WAITING_STATUS" false || status=1
-    fi
-    ;;
-esac
-
-exit "$status"
+# The payload is not needed; drain it so Claude's write does not fail.
+cat >/dev/null
+install_stop_guard

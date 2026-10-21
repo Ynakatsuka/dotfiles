@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regression tests for orca-claude-stop-held and orca-claude-hook.
 # Orca announces a Claude turn as complete when the turn only waits for background
-# work; the guard and the workspace status sync must agree on which Stop is held.
+# work; the guard drops that Stop, and the hook must leave the workspace status alone.
 
 set -euo pipefail
 
@@ -13,7 +13,6 @@ FAKE_HOME="$TMP_DIR/home"
 BIN_DIR="$FAKE_HOME/.local/bin"
 HOOK_SCRIPT="$FAKE_HOME/.orca/agent-hooks/claude-hook.sh"
 ORCA_LOG="$TMP_DIR/orca.log"
-ORCA_STATE="$TMP_DIR/orca-status"
 mkdir -p "$BIN_DIR" "$(dirname "$HOOK_SCRIPT")" "$TMP_DIR/path"
 cp "$REPO_ROOT/home/dot_local/bin/executable_orca-claude-stop-held" "$BIN_DIR/orca-claude-stop-held"
 cp "$REPO_ROOT/home/dot_local/bin/executable_orca-claude-hook" "$BIN_DIR/orca-claude-hook"
@@ -32,21 +31,11 @@ fail() {
   exit 1
 }
 
-# Fake Orca CLI: stores one workspace status and logs every set.
+# Fake Orca CLI: logs every call, because the hook must not change the workspace.
 cat >"$TMP_DIR/path/orca" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
-case "$1 $2" in
-  "worktree show") jq -n --arg s "$(cat "$ORCA_STATE")" '{ok: true, result: {worktree: {workspaceStatus: $s}}}' ;;
-  "worktree set")
-    while [[ $# -gt 0 ]]; do
-      if [[ "$1" == --workspace-status ]]; then printf '%s' "$2" >"$ORCA_STATE"; printf 'set %s\n' "$2" >>"$ORCA_LOG"; fi
-      shift
-    done
-    echo '{"ok":true}'
-    ;;
-  *) echo "unexpected orca call: $*" >&2; exit 1 ;;
-esac
+printf '%s\n' "$*" >>"$ORCA_LOG"
+echo '{"ok":true}'
 EOF
 chmod +x "$TMP_DIR/path/orca"
 
@@ -93,10 +82,9 @@ chmod 755 "$HOOK_SCRIPT"
 
 run_hook() {
   HOME="$FAKE_HOME" ORCA_WORKTREE_ID=repo::/work CLAUDE_CODE_ENTRYPOINT=cli \
-    ORCA_LOG="$ORCA_LOG" ORCA_STATE="$ORCA_STATE" "$BIN_DIR/orca-claude-hook" <<<"$1"
+    ORCA_LOG="$ORCA_LOG" "$BIN_DIR/orca-claude-hook" <<<"$1"
 }
 
-printf 'completed' >"$ORCA_STATE"
 : >"$ORCA_LOG"
 output=$(run_hook '{"hook_event_name":"SessionStart","source":"startup"}')
 [[ -z "$output" ]] || fail "SessionStart wrote to stdout: $output"
@@ -104,7 +92,6 @@ output=$(run_hook '{"hook_event_name":"SessionStart","source":"startup"}')
 [[ "$(sed -n 4p "$HOOK_SCRIPT")" == '# dotfiles:orca-claude-stop-held (installed by ~/.local/bin/orca-claude-hook)' ]] ||
   fail 'guard is not right after the payload read'
 [[ -x "$HOOK_SCRIPT" ]] || fail 'patched Orca script lost its executable bit'
-[[ ! -s "$ORCA_LOG" ]] || fail 'SessionStart changed the workspace status'
 run_hook '{"hook_event_name":"SessionStart","source":"resume"}'
 [[ "$(grep -c 'dotfiles:orca-claude-stop-held' "$HOOK_SCRIPT")" -eq 1 ]] || fail 'guard was installed twice'
 
@@ -127,42 +114,10 @@ if run_hook '{"hook_event_name":"SessionStart"}' 2>"$TMP_DIR/err"; then
 fi
 grep -Fq 'Orca changed how claude-hook.sh reads the payload' "$TMP_DIR/err" || fail 'shape error was not reported'
 
-# Workspace status: a prompt reopens Done; only an unheld Stop or a question waits.
-expect_status() {
-  local label=$1 want=$2
-  [[ "$(cat "$ORCA_STATE")" == "$want" ]] || fail "$label: status is $(cat "$ORCA_STATE"), want $want"
-}
+# The sidebar groups workspaces by status, so a prompt must not move the workspace.
 rm -f "$HOOK_SCRIPT"
-printf 'completed' >"$ORCA_STATE"
-run_hook '{"hook_event_name":"UserPromptSubmit","prompt":"go"}'
-expect_status 'prompt' in-progress
-run_hook "{\"hook_event_name\":\"Stop\",\"background_tasks\":[$running_shell]}"
-expect_status 'held Stop' in-progress
-run_hook '{"hook_event_name":"Stop","background_tasks":[]}'
-expect_status 'final Stop' in-review
-run_hook '{"hook_event_name":"UserPromptSubmit","prompt":"next"}'
-run_hook '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion"}'
-expect_status 'question' in-review
-run_hook '{"hook_event_name":"PostToolUse","tool_name":"AskUserQuestion"}'
-expect_status 'answer' in-progress
-run_hook '{"hook_event_name":"PreToolUse","tool_name":"AskUserQuestion","agent_id":"a1"}'
-expect_status 'subagent question' in-progress
-run_hook '{"hook_event_name":"Stop","agent_id":"t1","background_tasks":[]}'
-expect_status 'teammate Stop' in-progress
-run_hook "{\"hook_event_name\":\"Stop\",\"background_tasks\":[$running_shell]}"
-run_hook '{"hook_event_name":"SessionEnd","reason":"prompt_input_exit"}'
-expect_status 'exit while held' in-review
-printf 'completed' >"$ORCA_STATE"
-run_hook '{"hook_event_name":"SessionEnd","reason":"prompt_input_exit"}'
-expect_status 'exit after Done' completed
-run_hook '{"hook_event_name":"Stop","background_tasks":[]}'
-expect_status 'Stop after Done' completed
-: >"$ORCA_LOG"
-printf 'in-progress' >"$ORCA_STATE"
-run_hook '{"hook_event_name":"UserPromptSubmit","prompt":"again"}'
-[[ ! -s "$ORCA_LOG" ]] || fail 'unchanged status was set again'
-HOME="$FAKE_HOME" ORCA_WORKTREE_ID=repo::/work CLAUDE_CODE_ENTRYPOINT=sdk-cli \
-  ORCA_LOG="$ORCA_LOG" ORCA_STATE="$ORCA_STATE" "$BIN_DIR/orca-claude-hook" <<<'{"hook_event_name":"Stop","background_tasks":[]}'
-expect_status 'nested claude -p Stop' in-progress
+output=$(run_hook '{"hook_event_name":"UserPromptSubmit","prompt":"go"}')
+[[ -z "$output" ]] || fail "UserPromptSubmit wrote to stdout: $output"
+[[ ! -s "$ORCA_LOG" ]] || fail "the hook called the Orca CLI: $(cat "$ORCA_LOG")"
 
 echo 'test-orca-claude-hook: OK'
