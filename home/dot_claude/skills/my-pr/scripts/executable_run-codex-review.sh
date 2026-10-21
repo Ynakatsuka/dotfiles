@@ -184,6 +184,7 @@ codex_args=(
   --skip-git-repo-check
   -C "$isolated_cwd"
   --disable multi_agent
+  --disable multi_agent_v2
   --disable hooks
   --disable apps
   --disable browser_use

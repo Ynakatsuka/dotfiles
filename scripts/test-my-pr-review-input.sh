@@ -375,6 +375,7 @@ test_runner() {
     >"$tmp_dir/reviewer-a-output.txt"
 
   assert_file_contains "$tmp_dir/reviewer-a-args.txt" "multi_agent"
+  assert_file_contains "$tmp_dir/reviewer-a-args.txt" "multi_agent_v2"
   assert_file_contains "$tmp_dir/reviewer-a-args.txt" "hooks"
   assert_file_contains "$tmp_dir/reviewer-a-args.txt" "plugins"
   assert_file_contains "$tmp_dir/reviewer-a-args.txt" "remote_plugin"
