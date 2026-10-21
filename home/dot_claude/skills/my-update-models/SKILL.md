@@ -3,11 +3,11 @@ name: my-update-models
 description: >-
   Check the latest Claude (Anthropic), OpenAI Codex, and Google Gemini model
   releases from official primary sources, update model selections in this
-  dotfiles repo, and update the Claude Code, Codex, and Gemini CLIs through their
-  configured managers. Every run checks both the model settings and CLI for the
+  dotfiles repo, and update the Claude Code, Codex, and Antigravity (agy) CLIs
+  through their configured managers. Every run checks both the model settings and CLI for the
   selected provider, then scans the invoking repository for hardcoded model IDs.
   Use when the user asks to "モデル更新", "モデルを最新に", "最新モデル確認",
-  "Codex/Claude Code/Gemini CLI本体の更新", "model bump", "update models", or
+  "Codex/Claude Code/agy本体の更新", "model bump", "update models", or
   "update agent CLIs". Do NOT use for one-off model selection in a single
   conversation, general model questions, or unrelated package updates.
 argument-hint: "[claude|codex|gemini|all]"
@@ -19,7 +19,7 @@ arguments:
 
 Refresh the default model selections in this dotfiles repo using the latest
 official release information from Anthropic, OpenAI, and Google. Update the
-Claude Code, Codex, and Gemini CLIs through their configured managers, then
+Claude Code, Codex, and Antigravity (`agy`) CLIs through their configured managers, then
 sweep the invoking repository for any hardcoded model IDs that should be bumped
 too.
 
@@ -32,7 +32,7 @@ settings, CLI, and the invoking repository's model-ID scan.
 
 - `claude` — Anthropic model settings and native Claude Code
 - `codex` — OpenAI model settings and mise-managed Codex CLI
-- `gemini` — Google model settings and mise-managed Gemini CLI
+- `gemini` — Gemini model pins used through Antigravity and the natively installed `agy`
 - `all` — all three model settings and CLIs
 
 Reject unknown providers before making network calls.
@@ -42,7 +42,7 @@ Examples:
 ```text
 $my-update-models          # all model settings, CLIs, and the repo scan
 $my-update-models codex    # Codex model settings, CLI, and the repo scan
-$my-update-models gemini   # Gemini model settings, CLI, and the repo scan
+$my-update-models gemini   # Gemini model pins, agy, and the repo scan
 ```
 
 ## Dotfiles Config Files
@@ -56,12 +56,10 @@ Always edit in the ghq repo, never in `~/`.
 | `home/.chezmoitemplates/claude-settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
 | `home/.chezmoitemplates/claude-settings.json` | `autoUpdatesChannel` | `"latest"` | Native Claude Code update channel. Read it when checking or updating the CLI; do not change it unless requested. |
 | `home/dot_codex/private_config.toml.tmpl` | `model`, `[agents].default_subagent_model` | `"gpt-6.1-sol"` | Codex CLI default and subagent models (full IDs, not aliases). |
-| `home/dot_codex/agents/*.toml` | `model` | `"gpt-6-luna"` | Per-role Codex subagents (`reviewer`, `simplifier`, `luna-worker`). |
 | `home/dot_local/bin/executable_{bulk-read,code-write}` | `BULK_READ_MODEL`, `CODE_WRITE_MODEL` | `"gpt-6-luna"` | Cheaper delegated reader and writer models. |
-| `home/dot_claude/skills/my-pr/` | Reviewer C `-c 'model=...'` in `run-codex-review.sh` | `"gpt-6-sol"` | Pinned review model; my-pr's review reference and `test-my-pr-review-input.sh` repeat it. |
+| `home/dot_claude/skills/my-pr/` | Reviewer C `-c 'model=...'` in `run-codex-review.sh` | `"gpt-6.1-sol"` | Pinned review model; my-pr's review reference and `test-my-pr-review-input.sh` repeat it. |
 | `home/dot_claude/agents/my-pr-reviewer.md`, my-pr `run-claude-review.sh` | `model:`, `--model` | `opus` | Claude reviewer alias. |
-| `home/dot_claude/skills/my-japanese-editor/` | `ANTIGRAVITY_MODEL` in `rewrite_with_antigravity.py` and its Antigravity reference | `gemini-3.8-flash-high` | Antigravity model pinned by a tested workflow; it is not the Gemini CLI. |
-| `home/.chezmoitemplates/gemini-settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
+| `home/dot_claude/skills/my-japanese-editor/` | `ANTIGRAVITY_MODEL` in `rewrite_with_antigravity.py` and its Antigravity reference | `gemini-3.8-flash-high` | Antigravity model pinned by a tested workflow. Choose replacements from `agy models`. |
 
 Do NOT modify model IDs that appear inside skill examples
 (e.g., `home/dot_claude/skills/my-agent/SKILL.md`). Those are illustrative only.
@@ -74,22 +72,21 @@ manager as part of this skill.
 | CLI | Expected manager | Current version | Latest/install/update command |
 |---|---|---|---|
 | Codex | mise entry `npm:@openai/codex = "latest"` | `codex --version` | Latest: `mise latest npm:@openai/codex`; install: `mise install npm:@openai/codex@latest`; update: `mise upgrade npm:@openai/codex --yes` |
-| Gemini | mise entry `npm:@google/gemini-cli = "latest"` | `gemini --version` | Latest: `mise latest npm:@google/gemini-cli`; install: `mise install npm:@google/gemini-cli@latest`; update: `mise upgrade npm:@google/gemini-cli --yes` |
+| Antigravity (`agy`) | Native installer (`https://antigravity.google/cli/install.sh`) at `~/.local/bin/agy` | `agy --version` | Latest: `gh release list -R google-antigravity/antigravity-cli --exclude-pre-releases --limit 1`; update: `agy update` |
 | Claude Code | Anthropic native installer under `~/.local/share/claude/versions/` | `claude --version` | Check the configured channel and official releases; update with `claude update` |
 
-For Codex and Gemini, first verify the expected mise entry and inspect the
-installed state:
+For Codex, first verify the expected mise entry and inspect the installed
+state:
 
 ```bash
 mise ls --json npm:@openai/codex
-mise ls --json npm:@google/gemini-cli
 ```
 
 If the selected package is configured but not installed, report its installed
 version as `not installed` and propose the table's `mise install` command. This
 is not an ownership mismatch. For an installed mise package, resolve the
 executable with `command -v`, inspect the symlink with `realpath`, and run its
-version command. Resolve Claude Code the same way before proposing an update.
+version command. Resolve Claude Code and `agy` the same way before proposing an update.
 
 Stop and report an ownership mismatch if the configured manager or resolved
 executable differs from the table. Do not fall back to `npm install -g`,
@@ -120,9 +117,9 @@ the failure and stop before proposing or applying an update.
 - Models reference: https://ai.google.dev/gemini-api/docs/models
 - API pricing: https://ai.google.dev/gemini-api/docs/pricing
 - Context caching: https://ai.google.dev/gemini-api/docs/caching
-- Gemini CLI installation and release channels: https://github.com/google-gemini/gemini-cli/blob/main/docs/get-started/installation.mdx
-- Gemini CLI releases: https://github.com/google-gemini/gemini-cli/releases
-- Gemini CLI default + alias table: https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/config/models.ts
+- Antigravity CLI releases: https://github.com/google-antigravity/antigravity-cli/releases
+- Antigravity CLI changelog: https://antigravity.google/docs/cli/commands/changelog/ (also `agy changelog`)
+- Models available to `agy`: run `agy models`; pin only IDs it lists
 
 ## Workflow
 
@@ -138,18 +135,15 @@ the failure and stop before proposing or applying an update.
    - Newest available model IDs (new Claude family generation, new
      `gpt-*-codex` release, new `gemini-*` generation)
    - Release date and any deprecation notice on the currently configured model
-   - Whether a new alias has been introduced (e.g., a new Claude family, or a
-     new Gemini alias)
+   - Whether a new alias has been introduced (e.g., a new Claude family)
    - When a model update is available, the current and proposed models' API
      prices, including every published cache write, cache read/hit, and cache
      storage rate
    - Latest selected CLI versions. Use `mise latest npm:@openai/codex` for
-     Codex and `mise latest npm:@google/gemini-cli` for Gemini. For Claude Code
+     Codex and the newest non-prerelease GitHub release for `agy`. For Claude Code
      on the `latest` channel, use the official GitHub release and cross-check it
      against the changelog. For another channel, report the channel explicitly
-     and use only a target documented for it. The mise-managed Gemini entry
-     tracks npm's `latest` dist-tag, so compare it with the newest stable,
-     non-prerelease GitHub release and report any mismatch.
+     and use only a target documented for it.
 4. **Compare models.** Build a short table:
    `file | field | current | proposed | reason`. Note trade-offs (capability,
    latency, cost) when relevant.
@@ -196,8 +190,8 @@ the failure and stop before proposing or applying an update.
    ```
    Per repo policy, do not commit automatically — wait for explicit approval.
 14. **Verify model config changes.** After `chezmoi apply`, read `~/.codex/config.toml`,
-   `~/.claude/settings.json`, and `~/.gemini/settings.json` to confirm the
-   change landed.
+   `~/.claude/settings.json`, and the deployed copies under `~/.claude/skills/`
+   to confirm the change landed.
 
 ## Model Price Comparison
 
@@ -291,9 +285,9 @@ IDs that also need bumping.
   when a new family ships.
 - Codex uses full model IDs. Always update to a specific ID announced on
   the OpenAI models page or the Codex CLI release notes.
-- Gemini CLI accepts both aliases (`auto`, `pro`, `flash`, `flash-lite`) and
-  full IDs (`gemini-2.5-pro`, `gemini-3-pro-preview`). Aliases track the CLI
-  default across releases — keep the alias unless the user wants pinning.
+- Antigravity model IDs carry an effort suffix (e.g., `gemini-3.8-flash-high`).
+  Copy IDs exactly as `agy models` prints them; a newer Gemini generation may
+  appear there before the pinned workflow is retested.
 - If the new model has different reasoning controls, also re-evaluate
   `model_reasoning_effort` in `home/dot_codex/private_config.toml.tmpl` and the `[1m]`
   effort suffix on the Claude Code `model` field.
