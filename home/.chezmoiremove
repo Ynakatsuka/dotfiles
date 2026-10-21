@@ -29,6 +29,9 @@ mcp.json
 .claude/skills/my-stop-ai-slop-jp
 .claude/skills/my-worktree
 .codex/agents/simplifier_apply.toml
+.codex/agents/luna-worker.toml
+.codex/agents/reviewer.toml
+.codex/agents/simplifier.toml
 .codex/skills/my-subagent
 .codex/skills/my-team-share
 .config/cmux/settings.json
