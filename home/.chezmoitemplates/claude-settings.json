@@ -68,6 +68,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/check-url-boundaries.py"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
