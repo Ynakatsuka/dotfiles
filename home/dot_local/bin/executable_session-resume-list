@@ -8,7 +8,7 @@ import json
 import mmap
 import os
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from time import localtime, strftime
 from typing import Any
@@ -84,19 +84,65 @@ def prompts(file_path: Path, tool: str) -> tuple[str, str]:
             )
 
 
-def sessions(home: Path, cwd: str, limit: int) -> Iterator[str]:
+def orca_user_data(home: Path, environ: Mapping[str, str]) -> Path:
+    # Orca exports its data directory to its terminals. Elsewhere, use the
+    # Electron userData default for the app name "orca".
+    if user_data := environ.get("ORCA_USER_DATA_PATH"):
+        return Path(user_data)
+    if sys.platform == "darwin":
+        return home / "Library/Application Support/orca"
+    return Path(environ.get("XDG_CONFIG_HOME") or home / ".config") / "orca"
+
+
+def codex_homes(home: Path, environ: Mapping[str, str]) -> list[Path]:
+    """Return the Codex homes to scan, starting with the one `codex resume` uses.
+
+    Orca starts Codex with CODEX_HOME set to a per-account home, so sessions
+    started from Orca are stored under codex-accounts/<id>/home, not ~/.codex.
+    """
+    homes = []
+    if current := environ.get("CODEX_HOME"):
+        homes.append(Path(current))
+    homes.append(home / ".codex")
+    homes.extend(
+        sorted((orca_user_data(home, environ) / "codex-accounts").glob("*/home"))
+    )
+    return homes
+
+
+def sessions(
+    home: Path, cwd: str, limit: int, environ: Mapping[str, str]
+) -> Iterator[str]:
     project = cwd.replace("/", "-").replace(".", "-")
+    claude_home = home / ".claude"
+    # (mtime, home priority, tool, transcript, home that owns the transcript)
     candidates = [
-        (file_path.stat().st_mtime, "claude", file_path)
-        for file_path in (home / ".claude/projects" / project).glob("*.jsonl")
+        (file_path.stat().st_mtime, 0, "claude", file_path, claude_home)
+        for file_path in (claude_home / "projects" / project).glob("*.jsonl")
         if len(file_path.stem) == 36 and not file_path.stem.startswith("agent-")
     ]
-    candidates.extend(
-        (file_path.stat().st_mtime, "codex", file_path)
-        for file_path in (home / ".codex/sessions").rglob("*.jsonl")
-    )
+    # Orca hard-links one rollout into several account homes, and CODEX_HOME
+    # usually names one of the scanned homes. Keep the first home's path for
+    # each file so a session in the current home resumes without CODEX_HOME.
+    # Codex replaces idle rollouts with *.jsonl.zst. They are not listed: the
+    # mise-managed Python 3.12 has no zstd decoder, and starting one zstd
+    # process per file takes seconds. Codex's own `codex resume` picker can.
+    seen_files = set()
+    for priority, codex_home in enumerate(codex_homes(home, environ)):
+        for file_path in (codex_home / "sessions").rglob("*.jsonl"):
+            status = file_path.stat()
+            if (status.st_dev, status.st_ino) in seen_files:
+                continue
+            seen_files.add((status.st_dev, status.st_ino))
+            candidates.append(
+                (status.st_mtime, priority, "codex", file_path, codex_home)
+            )
+
     count = 0
-    for mtime, tool, file_path in sorted(candidates, reverse=True):
+    seen_sessions = set()
+    for mtime, _, tool, file_path, session_home in sorted(
+        candidates, key=lambda candidate: (-candidate[0], candidate[1])
+    ):
         if tool == "codex":
             # cwd and id are in the first record; unrelated session bodies do
             # not need to be searched, even when they contain this cwd as text.
@@ -112,6 +158,10 @@ def sessions(home: Path, cwd: str, limit: int) -> Iterator[str]:
             session_id = meta["payload"]["id"]
         else:
             session_id = file_path.stem
+        # A session copied between homes keeps its id; list its newest copy.
+        if (tool, session_id) in seen_sessions:
+            continue
+        seen_sessions.add((tool, session_id))
 
         first, latest = prompts(file_path, tool)
         yield "\t".join(
@@ -123,6 +173,7 @@ def sessions(home: Path, cwd: str, limit: int) -> Iterator[str]:
                 + (" ".join(latest.split())[:120] if latest else "(no prompt)"),
                 session_id,
                 str(file_path),
+                str(session_home),
             )
         )
         count += 1
@@ -146,7 +197,9 @@ def main() -> None:
     else:
         # Buffer at most 100 rows so a read error never looks like a successful
         # partial list to the calling widget.
-        rows = list(sessions(Path.home(), os.getcwd(), min(args.limit, 100)))
+        rows = list(
+            sessions(Path.home(), os.getcwd(), min(args.limit, 100), os.environ)
+        )
         if rows:
             print("\n".join(rows))
 

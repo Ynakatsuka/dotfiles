@@ -96,9 +96,10 @@ trust_level = "trusted"
 {{ dict $table (get $runtimeConfig $table) | toToml }}
 {{- end }}
 {{- end }}
+{{- /* Drop entries for removed paths, such as deleted worktrees, so trust state does not grow forever. */}}
 {{- if hasKey $runtimeConfig "projects" }}
 {{- range $project, $settings := $runtimeConfig.projects }}
-{{- if not (has $project $managedProjects) }}
+{{- if and (not (has $project $managedProjects)) (stat $project) }}
 [projects.{{ $project | quote }}]
 {{ $settings | toToml | trim }}
 {{- end }}
