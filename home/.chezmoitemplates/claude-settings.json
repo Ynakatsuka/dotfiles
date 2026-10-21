@@ -12,7 +12,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit",
+        "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
@@ -43,28 +43,6 @@
           {
             "type": "command",
             "command": "~/.local/bin/bulk-read-guard"
-          }
-        ]
-      },
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.local/bin/orca-claude-hook",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "AskUserQuestion",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.local/bin/orca-claude-hook",
-            "timeout": 10
           }
         ]
       }
@@ -99,43 +77,12 @@
             "command": "~/.claude/hooks/check-url-boundaries.py"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.local/bin/orca-claude-hook",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "StopFailure": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.local/bin/orca-claude-hook",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.local/bin/orca-claude-hook",
-            "timeout": 10
-          }
-        ]
       }
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/scripts/ccv-statusline-proxy.sh"
+    "command": "~/.claude/scripts/statusline.sh"
   },
   "skipDangerousModePermissionPrompt": true,
   "skillOverrides": {

@@ -34,10 +34,10 @@ claude -p --output-format json "<PROMPT>"
 
 ## Permission Mode
 
-- **Default**: Do not specify `--permission-mode`. Use Claude Code's configured default.
+- **Default**: Do not specify `--permission-mode`. The delegated Claude inherits the configured default mode, which may already allow edits and commands; say so in the prompt when the task must stay read-only.
 - **Planning or read-only review**: Use `--permission-mode plan` when the user asks for planning, analysis, or review only.
-- **Autonomous edits**: Use `--permission-mode auto` only when the user explicitly asks the delegated Claude to modify files.
-- **Bypass permissions**: Do not use `--permission-mode bypassPermissions`, `--dangerously-skip-permissions`, or `--allow-dangerously-skip-permissions` unless the user explicitly requests that risk.
+- **Auto mode**: Do not use `--permission-mode auto`. When settings disable auto mode, it silently falls back to `default`, which cannot approve edits in print mode.
+- **Bypass permissions**: Do not pass `--permission-mode bypassPermissions`, `--dangerously-skip-permissions`, or `--allow-dangerously-skip-permissions` unless the user explicitly requests that risk.
 
 ## Model Selection
 
@@ -55,7 +55,7 @@ claude -p "Explain the architecture of this project and identify the main extens
 claude --permission-mode plan -p "Review the changes in the current branch vs main. Focus on security and performance."
 
 # Delegated implementation
-claude --permission-mode auto -p "Fix the type error in src/utils.ts and run the nearest relevant test."
+claude -p "Fix the type error in src/utils.ts and run the nearest relevant test."
 
 # Explicit Fable model
 claude --model fable -p "Analyze the architecture of this project."

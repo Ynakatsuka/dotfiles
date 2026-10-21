@@ -10,15 +10,11 @@
 #
 # Scope:
 #   - Links every directory under dot_claude/skills/ that ships a SKILL.md.
-#   - The run_once_before_migrate-shared-skills.sh script moves the four
-#     formerly agent-owned directories before this script creates links.
 #   - Leaves ~/.claude/skills/ directories untouched unless chezmoi manages
 #     them directly. Unmanaged user skills must not be deleted by this sync.
 #   - Leaves non-symlink entries under ~/.agents/skills/ untouched.
 #   - Records links created under ~/.agents/skills/ and prunes only stale links
 #     from that ownership manifest.
-#   - Removes links created by the former ~/.codex/skills/ mirror without
-#     touching unrelated entries or ~/.codex/skills/.system/.
 #
 # Trigger:
 #   The run_onchange_ prefix re-runs this script whenever the inlined skill
@@ -39,9 +35,14 @@ fi
 
 # Inlined list of skill names. Adding or removing a skill changes this list,
 # which changes the rendered script and re-triggers run_onchange_.
+# my-ccv deploys only on Linux (see .chezmoiignore); listing it elsewhere would
+# keep a link to the removed skill.
 skills=(
 {{- range $path := glob (joinPath .chezmoi.sourceDir "dot_claude/skills/*/SKILL.md") }}
-  {{ $path | dir | base | quote }}
+{{-   $skill := $path | dir | base }}
+{{-   if or (eq $.chezmoi.os "linux") (ne $skill "my-ccv") }}
+  {{ $skill | quote }}
+{{-   end }}
 {{- end }}
 )
 
@@ -104,41 +105,6 @@ trap 'rm -f "${manifest_tmp}"' EXIT
 printf '%s\n' "${skills[@]}" >"${manifest_tmp}"
 mv "${manifest_tmp}" "${MANAGED_SKILLS_FILE}"
 trap - EXIT
-
-# This explicit migration list is the ownership record for the former mirror.
-# New skills are never written under ~/.codex/skills/.
-legacy_codex_skills=(
-  "my-agent"
-  "my-agent-friendly-code"
-  "my-bullets"
-  "my-ccv"
-  "my-diagnose"
-  "my-disk-cleanup"
-  "my-epic"
-  "my-explain-diff"
-  "my-guided-tour"
-  "my-handoff"
-  "my-pr"
-  "my-pr-briefing"
-  "my-refactor"
-  "my-release-note"
-  "my-sdd"
-  "my-skill-creator"
-  "my-stop-ai-slop-jp"
-  "my-subagent"
-  "my-team-share"
-  "my-update-models"
-  "my-worktree"
-)
-for skill in "${legacy_codex_skills[@]}"; do
-  entry="${HOME}/.codex/skills/${skill}"
-  [[ -L "${entry}" ]] || continue
-  target="$(readlink "${entry}")"
-  if [[ "${target}" == "${CLAUDE_SKILLS}/${skill}" ]]; then
-    echo "Pruning legacy Codex skill symlink: ${entry}"
-    rm -f "${entry}"
-  fi
-done
 
 echo ""
 echo "Codex skills sync complete (${#skills[@]} skill(s) linked)."

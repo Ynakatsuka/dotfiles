@@ -132,6 +132,7 @@ grep -q -- '--model gpt-6-luna' "$CODEX_TEST_ARGS" || fail "bulk-read did not se
 grep -q -- 'model_reasoning_effort="max"' "$CODEX_TEST_ARGS" || fail "bulk-read did not set max reasoning effort"
 grep -q -- '--sandbox read-only' "$CODEX_TEST_ARGS" || fail "bulk-read did not run read-only"
 grep -q -- '--disable hooks' "$CODEX_TEST_ARGS" || fail "bulk-read did not disable hooks in the reader"
+grep -q -- '--disable multi_agent_v2' "$CODEX_TEST_ARGS" || fail "bulk-read did not disable multi-agent v2 in the reader"
 grep -q '<question>' "$CODEX_TEST_PROMPT" || fail "prompt lacks the question block"
 grep -q 'What does small.txt contain?' "$CODEX_TEST_PROMPT" || fail "prompt lacks the question text"
 grep -q '<file path="small.txt" lines="3">' "$CODEX_TEST_PROMPT" || fail "prompt lacks the file wrapper"
@@ -182,6 +183,7 @@ grep -q 'def test_generated' out_test.py || fail "code-write target was not writ
 grep -q -- '--model gpt-6-luna' "$CODEX_TEST_ARGS" || fail "code-write did not select gpt-6-luna"
 grep -q -- '--sandbox workspace-write' "$CODEX_TEST_ARGS" || fail "code-write did not allow workspace writes"
 grep -q -- '--disable hooks' "$CODEX_TEST_ARGS" || fail "code-write did not disable hooks in the writer"
+grep -q -- '--disable multi_agent_v2' "$CODEX_TEST_ARGS" || fail "code-write did not disable multi-agent v2 in the writer"
 grep -q 'Write a test for the greeter.' "$CODEX_TEST_PROMPT" || fail "prompt lacks the spec"
 grep -q '<target path="out_test.py" exists="false" />' "$CODEX_TEST_PROMPT" || fail "prompt lacks the target marker"
 grep -q '<reference path="ref_test.py" lines="2">' "$CODEX_TEST_PROMPT" || fail "prompt lacks the reference wrapper"
@@ -361,13 +363,13 @@ assert_allowed "cat of a missing file" Bash '{"command":"cat nope.txt"}'
 assert_allowed "unrelated tool" Write '{"file_path":"'"$TMP_DIR"'/work/big.txt","content":"x"}'
 
 # --- hooks.json.tmpl ---------------------------------------------------------------
-# The Codex template re-reads the deployed file, so it must drop stale cmux and
-# guard entries and re-add exactly one guard, and rendering its own output
-# must be a fixed point.
+# The Codex template re-reads the deployed file, so it must drop stale guard
+# entries and re-add exactly one guard, and rendering its own output must be a
+# fixed point.
 
 mkdir -p "$TMP_DIR/home/.codex"
 cat >"$TMP_DIR/home/.codex/hooks.json" <<'EOF'
-{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"\"$HOME/.local/libexec/cmux/agent-board-state\" working","timeout":5},{"type":"command","command":"\"$HOME/.local/bin/bulk-read-guard\"","timeout":10}]}],"Stop":[{"hooks":[{"type":"command","command":"keep-me"}]}]}}
+{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"\"$HOME/.local/bin/bulk-read-guard\"","timeout":10}]}],"Stop":[{"hooks":[{"type":"command","command":"keep-me"}]}]}}
 EOF
 render_hooks() {
   HOME="$TMP_DIR/home" chezmoi execute-template <"$REPO_ROOT/home/dot_codex/hooks.json.tmpl"
@@ -375,8 +377,6 @@ render_hooks() {
 first_render="$(render_hooks)"
 [ "$(jq '[.. | strings | select(contains("bulk-read-guard"))] | length' <<<"$first_render")" -eq 1 ] ||
   fail "hooks.json.tmpl did not render exactly one guard: $first_render"
-jq -e '[.. | strings | select(contains("cmux"))] | length == 0' <<<"$first_render" >/dev/null ||
-  fail "hooks.json.tmpl kept a cmux hook: $first_render"
 jq -e '.hooks.Stop[0].hooks[0].command == "keep-me"' <<<"$first_render" >/dev/null ||
   fail "hooks.json.tmpl dropped an unrelated hook: $first_render"
 printf '%s\n' "$first_render" >"$TMP_DIR/home/.codex/hooks.json"

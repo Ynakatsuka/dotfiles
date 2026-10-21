@@ -106,7 +106,7 @@ Use the absolute review Markdown path printed by the runner. Give the execution 
 `scripts/run-codex-review.sh`, used directly for C alone and through `scripts/run-codex-reviews.sh` for A/B/C:
 
 - embeds the complete PR context and assigned diff directly into Codex stdin; never pass artifact paths to Codex and ask it to read them
-- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-6-sol` at `medium` effort
+- pins each reviewer's effort so the global Codex config cannot silently change review depth: Reviewer A runs the configured model at `medium` effort; Reviewer C additionally pins its model to `gpt-6.1-sol` at `medium` effort
 - caps the generated prompt at 393,216 bytes before launch
 - runs from an isolated artifact-local Git repository instead of the review target repository
 - disables nested agents, hooks, shell, web, browser, apps, plugins, and configured MCP servers, and uses a read-only sandbox

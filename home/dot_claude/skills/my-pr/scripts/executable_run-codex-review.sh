@@ -184,6 +184,7 @@ codex_args=(
   --skip-git-repo-check
   -C "$isolated_cwd"
   --disable multi_agent
+  --disable multi_agent_v2
   --disable hooks
   --disable apps
   --disable browser_use
@@ -205,7 +206,7 @@ codex_args=(
 if [[ "$reviewer_mode" == "reviewer-a" ]]; then
   codex_args+=(-c 'model_reasoning_effort="medium"')
 else
-  codex_args+=(-c 'model="gpt-6-sol"' -c 'model_reasoning_effort="medium"')
+  codex_args+=(-c 'model="gpt-6.1-sol"' -c 'model_reasoning_effort="medium"')
 fi
 codex_args+=(-)
 

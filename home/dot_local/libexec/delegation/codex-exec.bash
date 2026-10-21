@@ -16,6 +16,7 @@ delegation_codex_exec() {
     --skip-git-repo-check \
     --disable hooks \
     --disable multi_agent \
+    --disable multi_agent_v2 \
     --color never \
     --output-last-message "$answer_file" \
     - <"$prompt_file" >"$codex_log" 2>&1 || status=$?

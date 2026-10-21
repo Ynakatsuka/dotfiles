@@ -4,11 +4,12 @@ description: >-
   Write or edit Japanese articles, reports, guides, and public-facing drafts so the argument is
   clear and the prose reads naturally. Preserve the author's meaning, evidence, and voice when
   revising. Use for requests to write from a topic or notes, remove AI臭 / AIっぽさ, improve awkward
-  wording or structure, or format notes as 箇条書き, チーム共有, 社内共有, a decision note, handoff,
+  wording or structure, or format notes as 箇条書き, チーム共有, 社内共有, a decision note,
   Slack post, or Teams post. For existing prose, ask Gemini through Antigravity CLI to rewrite
   naturally by default, then audit against the source; use the current model if unavailable.
-  Do NOT use for ordinary Japanese answers, progress updates, technical explanations, code review,
-  English-only prose that is not a bullet-formatting request, or an explicitly incompatible format.
+  Do NOT use for handing work to another session (use my-handoff), ordinary Japanese answers,
+  progress updates, technical explanations, code review, English-only prose that is not a
+  bullet-formatting request, or an explicitly incompatible format.
 license: Complete terms in LICENSE.txt
 metadata:
   language: ja

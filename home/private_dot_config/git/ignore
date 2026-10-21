@@ -1,0 +1,8 @@
+# Global git excludes. Git reads ~/.config/git/ignore while core.excludesFile is unset.
+
+# Claude Code writes plans to ./.plans in every repository (plansDirectory in
+# home/.chezmoitemplates/claude-settings.json).
+.plans/
+
+# Machine-local Claude Code settings.
+**/.claude/settings.local.json

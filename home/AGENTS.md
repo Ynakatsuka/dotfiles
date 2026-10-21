@@ -22,7 +22,7 @@
 - Ask before changing production dependencies, destructive or irreversible actions, or external writes unless already authorized for this task. Complete local validation before external side effects.
 - Commit or push only when requested. Fixing an existing PR authorizes validated commits and pushes to its confirmed head branch; it does not authorize merging.
 - Preserve unrelated user changes. Never commit secrets, credentials, or environment files. Stage only task-owned files and inspect the staged diff. Follow repository commit conventions, or English Conventional Commits if none exist.
-- Before pushing without a refspec, resolve `@{push}`. Do not push a topic branch to main, master, staging, develop, production, or release/* without explicit authorization.
+- Name branches with a type prefix such as `feat/` or `fix/`. Before pushing without a refspec, resolve `@{push}`. Do not push a topic branch to main, master, staging, develop, production, or release/* without explicit authorization.
 
 ## Tools and Verification
 
@@ -38,7 +38,7 @@
 
 - Follow the existing Python toolchain; for a new project, prefer `uv`, modern typing, Ruff, Mypy, and Pytest.
 - Check SQL identifiers against the dialect's reserved words before writing queries.
-- For BigQuery, use `bq`, show the active project and account, run a dry run, and ask before scanning more than 50 GB.
+- For BigQuery, use `bq`, show the active project and account, run a dry run, and ask before scanning more than 50 GB. Use `TABLESAMPLE SYSTEM` for exploratory queries unless a full scan is required.
 - For GPU Python, run `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
 
 Keep persistent instructions concise and grounded in durable needs. Put occasional workflows in skills and mechanical rules in hooks or CI; remove obsolete or duplicate rules.

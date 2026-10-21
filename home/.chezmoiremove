@@ -9,6 +9,10 @@ mcp.json
 
 # Removed managed files (chezmoi does not clean up targets whose source
 # was deleted, so list them here)
+.claude/rules/bigquery.md
+.claude/rules/git.md
+.claude/rules/gpu.md
+.claude/rules/python.md
 .claude/rules/writing.md
 .claude/commands
 .claude/skills/my-guided-tour
@@ -29,9 +33,18 @@ mcp.json
 .claude/skills/my-stop-ai-slop-jp
 .claude/skills/my-worktree
 .codex/agents/simplifier_apply.toml
+.codex/agents/luna-worker.toml
+.codex/agents/reviewer.toml
+.codex/agents/simplifier.toml
 .codex/skills/my-subagent
 .codex/skills/my-team-share
 .config/cmux/settings.json
+.config/zsh/cmux-agent-board.zsh
+.local/bin/gwai-cmux
+.local/libexec/gwai/branch-name.bash
+.raycast/scripts/gwai-cmux.sh
+Library/LaunchAgents/com.cmuxterm.agent-board-diff.plist
+Library/LaunchAgents/com.cmuxterm.agent-board-usage.plist
 .local/bin/cmux-workspace-note
 .local/bin/cmux-agent-board-auto-title
 .local/bin/cmux-agent-board-diff-open
@@ -43,14 +56,10 @@ mcp.json
 .local/bin/difit-cmux
 .raycast/scripts/difit-review.sh
 .config/cmux/sidebars/agent-board.swift
-.local/libexec/cmux/agent-board-auto-title
-.local/libexec/cmux/agent-board-diff-open
-.local/libexec/cmux/agent-board-diff-refresh
-.local/libexec/cmux/agent-board-state
-.local/libexec/cmux/agent-board-usage
-.local/libexec/cmux/resume-all-codex-sessions
-.local/share/cmux/agent-board.swift
-.local/share/licenses/cmux-agent-board-auto-title/LICENSE
+.local/libexec/cmux
+.local/share/cmux
+.local/share/licenses/cmux-agent-board-auto-title
+.local/state/cmux/agent-board.swift
 .config/systemd/user/claude-code-viewer.service.d/codex-subagents.conf
 .local/bin/dotfiles-apply-subagent-policy
 CLAUDE.md
@@ -58,6 +67,9 @@ CLAUDE.md
 mise.lock
 .config/yazi
 .config/zsh/yazi.zsh
+.cursor/mcp.json
+.config/zsh/cursor.zsh
+.local/bin/dotfiles-cursor-agent-upgrade
 
 {{- if ne .chezmoi.os "darwin" }}
 
@@ -67,4 +79,13 @@ mise.lock
 .hammerspoon/**
 .raycast/**
 Library/Application Support/com.mitchellh.ghostty
+{{- end }}
+
+{{- if ne .chezmoi.os "linux" }}
+
+# CCV directories deployed before CCV became Linux-only. As above, contents
+# are matched with /** because the bare names are ignored on these hosts;
+# the empty directories and the ignored files themselves remain.
+.claude/skills/my-ccv/**
+.config/ccv-preview/**
 {{- end }}

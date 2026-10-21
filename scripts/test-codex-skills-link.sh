@@ -24,61 +24,20 @@ mkdir -p \
   "$FAKE_HOME/.claude/skills/my-pr" \
   "$FAKE_HOME/.claude/skills/custom" \
   "$FAKE_HOME/.claude/skills/stale-managed" \
-  "$FAKE_HOME/.claude/skills/my-team-share" \
-  "$FAKE_HOME/.agents/skills/local-owned" \
-  "$FAKE_HOME/.agents/skills/orca-cli/references" \
-  "$FAKE_HOME/.codex/skills/.system"
+  "$FAKE_HOME/.agents/skills/local-owned"
 printf 'name: my-pr\n' >"$FAKE_HOME/.claude/skills/my-pr/SKILL.md"
 printf 'local skill\n' >"$FAKE_HOME/.agents/skills/local-owned/SKILL.md"
-printf 'name: orca-cli\n' >"$FAKE_HOME/.agents/skills/orca-cli/SKILL.md"
-printf 'preserved reference\n' >"$FAKE_HOME/.agents/skills/orca-cli/references/prompts.md"
 printf 'stale-managed\n' >"$FAKE_HOME/.agents/skills/.codex-claude-managed-skills"
 
 ln -s "$FAKE_HOME/.claude/skills/custom" \
   "$FAKE_HOME/.agents/skills/custom"
 ln -s "$FAKE_HOME/.claude/skills/stale-managed" \
   "$FAKE_HOME/.agents/skills/stale-managed"
-ln -s ../../.agents/skills/orca-cli \
-  "$FAKE_HOME/.claude/skills/orca-cli"
-ln -s "$FAKE_HOME/.claude/skills/my-pr" \
-  "$FAKE_HOME/.codex/skills/my-pr"
-ln -s "$FAKE_HOME/.claude/skills/my-team-share" \
-  "$FAKE_HOME/.codex/skills/my-team-share"
-ln -s "$TMP_DIR/unrelated-target" \
-  "$FAKE_HOME/.codex/skills/unrelated"
 
 "$CHEZMOI_BIN" -S "$REPO_ROOT/home" execute-template \
   <"$REPO_ROOT/home/run_onchange_after_codex-skills-link.sh.tmpl" \
   >"$RENDERED"
 chmod +x "$RENDERED"
-
-HOME="$FAKE_HOME" bash "$REPO_ROOT/home/run_once_before_migrate-shared-skills.sh"
-[ -f "$FAKE_HOME/.claude/skills/orca-cli/references/prompts.md" ] ||
-  fail "agent-owned skill content was not migrated"
-[ ! -L "$FAKE_HOME/.claude/skills/orca-cli" ] ||
-  fail "Claude skill remained a link to the old directory"
-
-CONFLICT_HOME="$TMP_DIR/conflict-home"
-mkdir -p \
-  "$CONFLICT_HOME/.agents/skills/my-bulk-read" \
-  "$CONFLICT_HOME/.agents/skills/my-code-write" \
-  "$CONFLICT_HOME/.claude/skills/my-code-write"
-printf 'bulk read\n' >"$CONFLICT_HOME/.agents/skills/my-bulk-read/SKILL.md"
-printf 'agent version\n' >"$CONFLICT_HOME/.agents/skills/my-code-write/SKILL.md"
-printf 'claude version\n' >"$CONFLICT_HOME/.claude/skills/my-code-write/SKILL.md"
-ln -s ../../.agents/skills/my-bulk-read \
-  "$CONFLICT_HOME/.claude/skills/my-bulk-read"
-if HOME="$CONFLICT_HOME" bash "$REPO_ROOT/home/run_once_before_migrate-shared-skills.sh" >"$TMP_DIR/migration-conflict-output" 2>&1; then
-  fail "migration accepted conflicting skill directories"
-fi
-grep -q 'Cannot migrate my-code-write' "$TMP_DIR/migration-conflict-output" ||
-  fail "migration did not identify the conflicting skill"
-[ -L "$CONFLICT_HOME/.claude/skills/my-bulk-read" ] &&
-  [ -f "$CONFLICT_HOME/.agents/skills/my-bulk-read/SKILL.md" ] ||
-  fail "migration moved an earlier skill before checking every conflict"
-[ "$(sed -n '1p' "$CONFLICT_HOME/.claude/skills/my-code-write/SKILL.md")" = 'claude version' ] &&
-  [ "$(sed -n '1p' "$CONFLICT_HOME/.agents/skills/my-code-write/SKILL.md")" = 'agent version' ] ||
-  fail "migration changed conflicting skill data"
 
 HOME="$FAKE_HOME" "$RENDERED" >"$TMP_DIR/rendered-output" 2>&1
 
@@ -87,9 +46,6 @@ HOME="$FAKE_HOME" "$RENDERED" >"$TMP_DIR/rendered-output" 2>&1
 [ "$(readlink "$FAKE_HOME/.agents/skills/my-pr")" = \
   "$FAKE_HOME/.claude/skills/my-pr" ] ||
   fail "managed Codex skill link points to the wrong path"
-[ "$(readlink "$FAKE_HOME/.agents/skills/orca-cli")" = \
-  "$FAKE_HOME/.claude/skills/orca-cli" ] ||
-  fail "migrated skill was not linked back into agent skills"
 [ -d "$FAKE_HOME/.agents/skills/local-owned" ] &&
   [ ! -L "$FAKE_HOME/.agents/skills/local-owned" ] ||
   fail "local-owned skill directory was modified or removed"
@@ -100,6 +56,15 @@ HOME="$FAKE_HOME" "$RENDERED" >"$TMP_DIR/rendered-output" 2>&1
 [ "$(readlink "$FAKE_HOME/.agents/skills/custom")" = \
   "$FAKE_HOME/.claude/skills/custom" ] ||
   fail "user-owned cross-client skill link was changed"
+
+# OS-specific skills are ignored in .chezmoiignore and filtered again in the
+# template; the linked list must match the skills deployed on this OS.
+deployed_skills="$("$CHEZMOI_BIN" -S "$REPO_ROOT/home" managed --include=dirs --exclude=remove |
+  sed -n 's|^\.claude/skills/\([^/]*\)$|\1|p' | sort)"
+linked_skills="$(sed -n '/^skills=(/,/^)/s/^  "\(.*\)"$/\1/p' "$RENDERED" | sort)"
+[ -n "$linked_skills" ] && [ "$linked_skills" = "$deployed_skills" ] ||
+  fail "linked skills differ from deployed skills: linked=[${linked_skills//$'\n'/ }] deployed=[${deployed_skills//$'\n'/ }]"
+
 [ ! -e "$FAKE_HOME/.agents/skills/stale-managed" ] &&
   [ ! -L "$FAKE_HOME/.agents/skills/stale-managed" ] ||
   fail "stale managed agent skill link was not pruned"
@@ -110,19 +75,5 @@ grep -qx 'my-pr' "$FAKE_HOME/.agents/skills/.codex-claude-managed-skills" ||
 if grep -qx 'stale-managed' "$FAKE_HOME/.agents/skills/.codex-claude-managed-skills"; then
   fail "managed skill ownership manifest retained a stale skill"
 fi
-[ ! -e "$FAKE_HOME/.codex/skills/my-pr" ] &&
-  [ ! -L "$FAKE_HOME/.codex/skills/my-pr" ] ||
-  fail "legacy Codex skill link was not pruned"
-[ ! -e "$FAKE_HOME/.codex/skills/my-team-share" ] &&
-  [ ! -L "$FAKE_HOME/.codex/skills/my-team-share" ] ||
-  fail "removed legacy Codex skill link was not pruned"
-[ -L "$FAKE_HOME/.codex/skills/unrelated" ] ||
-  fail "unrelated Codex skill link was removed"
-[ "$(readlink "$FAKE_HOME/.codex/skills/unrelated")" = \
-  "$TMP_DIR/unrelated-target" ] ||
-  fail "unrelated Codex skill link was changed"
-[ -d "$FAKE_HOME/.codex/skills/.system" ] &&
-  [ ! -L "$FAKE_HOME/.codex/skills/.system" ] ||
-  fail "Codex .system directory was modified or removed"
 
 echo "test-codex-skills-link: OK"

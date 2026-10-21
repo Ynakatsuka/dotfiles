@@ -32,21 +32,29 @@ class SessionResumeTest(unittest.TestCase):
     def rows(output):
         return [line.split("\t") for line in output.splitlines() if line]
 
-    def run_cli(self, cwd, home, *args):
+    @staticmethod
+    def hermetic_env(home, **extra):
         env = os.environ.copy()
         env["HOME"] = str(home)
-        env.pop("CLAUDE_CONFIG_DIR", None)
-        env.pop("CODEX_HOME", None)
+        # Orca terminals export these; without removal the helper would scan
+        # the real Orca accounts instead of the fixture home.
+        for name in ("CLAUDE_CONFIG_DIR", "CODEX_HOME", "ORCA_USER_DATA_PATH", "XDG_CONFIG_HOME"):
+            env.pop(name, None)
+        env.update({name: str(value) for name, value in extra.items()})
+        return env
+
+    def run_cli(self, cwd, home, *args, **extra_env):
+        env = self.hermetic_env(home, **extra_env)
         return subprocess.run([sys.executable, str(HELPER), *map(str, args)], cwd=str(cwd), env=env, text=True, capture_output=True)
 
     def assert_rows(self, rows):
         for row in rows:
-            self.assertEqual(len(row), 6, row)
+            self.assertEqual(len(row), 7, row)
             self.assertIn(row[0], ("claude", "codex"), row)
             self.assertTrue(row[1], row)
             self.assertTrue(row[2].startswith("First: "), row)
             self.assertTrue(row[3].startswith("Latest: "), row)
-            self.assertTrue(row[4] and row[5], row)
+            self.assertTrue(row[4] and row[5] and row[6], row)
 
     @staticmethod
     def write_jsonl(path, records, trailing=True):
@@ -64,8 +72,8 @@ class SessionResumeTest(unittest.TestCase):
             os.utime(path, ns=(mtime * 1_000_000_000,) * 2)
         return path
 
-    def write_codex(self, home, cwd, session_id, records, mtime=None, name=None, trailing=True):
-        path = home / ".codex" / "sessions" / "2026" / "09" / "10" / f"{name or session_id}.jsonl"
+    def write_codex(self, home, cwd, session_id, records, mtime=None, name=None, trailing=True, codex_home=None):
+        path = (codex_home or home / ".codex") / "sessions" / "2026" / "09" / "10" / f"{name or session_id}.jsonl"
         self.write_jsonl(path, [self.codex_meta(cwd, session_id), *records], trailing)
         if mtime is not None:
             os.utime(path, ns=(mtime * 1_000_000_000,) * 2)
@@ -188,6 +196,54 @@ class SessionResumeTest(unittest.TestCase):
             self.assertEqual(rows["codex"][2:4], ["First: only prompt", "Latest: only prompt"])
             self.assertEqual(rows["claude"][2:4], ["First: only prompt", "Latest: only prompt"])
 
+    def test_scans_current_codex_home_and_orca_accounts(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, cwd, home = self.dirs(td)
+            orca = root / "orca-data"
+            if sys.platform == "darwin":
+                default_orca = home / "Library" / "Application Support" / "orca"
+            else:
+                default_orca = home / ".config" / "orca"
+            homes = {
+                "dot": home / ".codex",
+                "env": root / "custom codex home",
+                "orca": orca / "codex-accounts" / "account-a" / "home",
+                "default": default_orca / "codex-accounts" / "account-b" / "home",
+            }
+            ids = {}
+            for index, (label, codex_home) in enumerate(homes.items()):
+                ids[label] = str(uuid.uuid5(uuid.NAMESPACE_URL, label))
+                self.write_codex(home, cwd, ids[label], [self.codex_event(label)], 1_700_000_000 + index, codex_home=codex_home)
+            for env, expected in (
+                ({"CODEX_HOME": homes["env"], "ORCA_USER_DATA_PATH": orca}, ("dot", "env", "orca")),
+                ({}, ("dot", "default")),
+            ):
+                result = self.run_cli(cwd, home, **env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                rows = self.rows(result.stdout)
+                self.assert_rows(rows)
+                self.assertEqual(sorted((row[4], row[6]) for row in rows), sorted((ids[label], str(homes[label])) for label in expected))
+
+    def test_duplicate_rollouts_are_listed_once_from_current_home(self):
+        with tempfile.TemporaryDirectory() as td:
+            root, cwd, home = self.dirs(td)
+            orca = root / "orca"
+            account_a, account_b = (orca / "codex-accounts" / name / "home" for name in ("a", "b"))
+            session_id = "12121212-1212-4121-8121-121212121212"
+            linked = self.write_codex(home, cwd, session_id, [self.codex_event("linked")], 1_700_000_005, codex_home=account_a)
+            current = account_b / linked.relative_to(account_a)
+            current.parent.mkdir(parents=True)
+            os.link(linked, current)
+            # An older plain copy in ~/.codex and Codex's compressed rollout.
+            self.write_codex(home, cwd, session_id, [self.codex_event("old copy")], 1_700_000_001)
+            linked.with_name(linked.name + ".zst").write_bytes(b"not zstd")
+            result = self.run_cli(cwd, home, CODEX_HOME=account_b, ORCA_USER_DATA_PATH=orca)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rows = self.rows(result.stdout)
+            self.assert_rows(rows)
+            self.assertEqual([(row[4], row[5], row[6]) for row in rows], [(session_id, str(current), str(account_b))])
+            self.assertEqual(rows[0][2], "First: linked")
+
     def test_invalid_limit_and_malformed_matching_metadata_fail(self):
         with tempfile.TemporaryDirectory() as td:
             _, cwd, home = self.dirs(td)
@@ -207,10 +263,21 @@ class SessionResumeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root, cwd, home = self.dirs(td)
             claude_id, codex_id = "88888888-8888-4888-8888-888888888888", "99999999-9999-4999-8999-999999999999"
+            orca_id = "abababab-abab-4bab-8bab-abababababab"
+            orca = root / "orca's data"
+            account = orca / "codex-accounts" / "account" / "home"
             self.write_claude(home, cwd, claude_id, [self.claude_user("claude")], 1_700_000_001)
             self.write_codex(home, cwd, codex_id, [self.codex_event("codex")], 1_700_000_002)
-            for tool, session_id, expected in (("claude", claude_id, f"cl --resume={claude_id}"), ("codex", codex_id, f"codex resume {codex_id}")):
-                args_log = root / f"fzf-{tool}.args"
+            self.write_codex(home, cwd, orca_id, [self.codex_event("orca")], 1_700_000_003, codex_home=account)
+            quoted_account = "'" + str(account).replace("'", "'\\''") + "'"
+            cases = (
+                ("claude", "claude", {}, f"cl --resume={claude_id}"),
+                ("codex", "codex", {}, f"codex resume {codex_id}"),
+                ("orca", "orca", {}, f"CODEX_HOME={quoted_account} codex resume {orca_id}"),
+                ("orca-current", "orca", {"CODEX_HOME": account}, f"codex resume {orca_id}"),
+            )
+            for case, prompt, extra_env, expected in cases:
+                args_log = root / f"fzf-{case}.args"
                 script = textwrap.dedent(
                     """
                     zle() { return 0; }
@@ -218,11 +285,11 @@ class SessionResumeTest(unittest.TestCase):
                     session-resume-list() { "$TEST_PYTHON" "$TEST_HELPER" "$@"; }
                     fzf() {
                       printf '%s\n' "$@" > "$TEST_FZF_ARGS"
-                      local line tool_name
+                      local line prompt_field
                       while IFS= read -r line; do
                         [[ -z "$line" ]] && continue
-                        tool_name=${line%%$'\t'*}
-                        if [[ "$tool_name" == "$TEST_FZF_TOOL" ]]; then
+                        prompt_field=${${line#*$'\t'*$'\t'}%%$'\t'*}
+                        if [[ "$prompt_field" == "First: $TEST_FZF_PROMPT" ]]; then
                           printf '%s\n' "$line"
                           return 0
                         fi
@@ -234,14 +301,11 @@ class SessionResumeTest(unittest.TestCase):
                     printf '%s' "$BUFFER"
                     """
                 )
-                env = os.environ.copy()
-                env.update({"HOME": str(home), "TEST_CLAUDE_ZSH": str(claude_zsh), "TEST_FZF_ARGS": str(args_log), "TEST_FZF_TOOL": tool, "TEST_HELPER": str(HELPER), "TEST_PYTHON": sys.executable})
+                env = self.hermetic_env(home, ORCA_USER_DATA_PATH=orca, TEST_CLAUDE_ZSH=claude_zsh, TEST_FZF_ARGS=args_log, TEST_FZF_PROMPT=prompt, TEST_HELPER=HELPER, TEST_PYTHON=sys.executable, **extra_env)
                 env.pop("FZF_SESSION_RESUME_LIMIT", None)
-                env.pop("CLAUDE_CONFIG_DIR", None)
-                env.pop("CODEX_HOME", None)
                 result = subprocess.run(["zsh", "-f"], cwd=str(cwd), env=env, input=script, text=True, capture_output=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, expected)
+                self.assertEqual(result.stdout, expected, case)
                 fzf_args = args_log.read_text(encoding="utf-8").splitlines()
                 self.assertIn("--with-nth=1,2,3,4", fzf_args)
                 preview_args = " ".join(fzf_args)
