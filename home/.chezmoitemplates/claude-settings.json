@@ -3,6 +3,8 @@
     "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "permissions": {
+    "defaultMode": "bypassPermissions",
+    "disableAutoMode": "disable",
     "deny": [
       "NotebookEdit"
     ]
@@ -51,6 +53,9 @@
     "command": "~/.claude/scripts/ccv-statusline-proxy.sh"
   },
   "skipDangerousModePermissionPrompt": true,
+  "skillOverrides": {
+    "auto-mode-setup": "off"
+  },
   "plansDirectory": "./.plans",
   "autoUpdatesChannel": "latest",
   "model": "opus",
