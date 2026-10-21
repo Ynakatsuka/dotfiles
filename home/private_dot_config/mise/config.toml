@@ -5,9 +5,6 @@
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
-# Google Gemini CLI
-"npm:@google/gemini-cli" = "latest"
-
 # OpenCode CLI
 # Pinned to the last macos-arm64 release with GitHub attestations.
 "github:anomalyco/opencode" = "1.17.7"
@@ -222,12 +219,11 @@ set -e
 """
 
 [tasks.maintenance]
-description = "Apply and verify dotfiles, then update mise tools, Cursor Agent CLI, and Homebrew packages"
+description = "Apply and verify dotfiles, then update mise tools and Homebrew packages"
 run = """
 set -e
 
 mise run -C / update-dotfiles --verify
-"$(chezmoi source-path ~/.local/bin/dotfiles-cursor-agent-upgrade)"
 if command -v brew >/dev/null 2>&1; then
   "$(chezmoi source-path ~/.local/bin/dotfiles-brew-upgrade)"
 else

@@ -10,7 +10,7 @@ This repository bootstraps a working shell and development environment for macOS
 - Git workflow: aliases, worktree helpers
 - Terminal tools: `tmux`, `mise`, `direnv`, CLI setup
 - Desktop automation: Hammerspoon window layouts
-- AI tooling: Claude Code / Codex / Gemini related config
+- AI tooling: Claude Code / Codex / Antigravity CLI related config
 - Secrets with encryption: SSH and gcloud config via `age`
 
 ## Repository Layout
@@ -111,7 +111,7 @@ Agent instructions are layered by scope. Root files describe only this repositor
 | `home/AGENTS.md` | Global shared rules → `~/AGENTS.md` |
 | `home/dot_claude/CLAUDE.md.tmpl` | Global Claude additions → `~/.claude/CLAUDE.md` |
 | `home/dot_codex/AGENTS.md.tmpl` | Global Codex additions → `~/.codex/AGENTS.md` |
-| `home/dot_gemini/GEMINI.md.tmpl` | Global Gemini additions → `~/.gemini/GEMINI.md` |
+| `home/dot_gemini/GEMINI.md.tmpl` | Global Antigravity CLI (`agy`) rules → `~/.gemini/GEMINI.md` |
 
 Run these checks after changing agent instructions or shell tool management:
 
@@ -123,7 +123,7 @@ codex exec --ephemeral --sandbox read-only -c 'approval_policy="never"' \
   "Summarize the current instructions and list their source files. Do not modify files."
 ```
 
-For interactive clients, use `/memory` in Claude Code and `/memory show` in Gemini CLI to inspect the loaded instruction context. Restart an active session after changing persistent instructions.
+For interactive clients, use `/memory` in Claude Code to inspect the loaded instruction context. Restart an active session after changing persistent instructions.
 
 ### Codex Subagent Policy
 

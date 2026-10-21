@@ -58,6 +58,9 @@ CLAUDE.md
 mise.lock
 .config/yazi
 .config/zsh/yazi.zsh
+.cursor/mcp.json
+.config/zsh/cursor.zsh
+.local/bin/dotfiles-cursor-agent-upgrade
 
 {{- if ne .chezmoi.os "darwin" }}
 

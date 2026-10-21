@@ -60,11 +60,6 @@ mise run -C / updated-marker >/dev/null
 echo mise-up >>"$TEST_CALLS"
 [ "${FAIL_AT:-}" != mise-up ]
 EOF
-cat >"$TEST_DIR/home/.local/bin/dotfiles-cursor-agent-upgrade" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-echo cursor-upgrade >>"$TEST_CALLS"
-EOF
 cat >"$TEST_DIR/bin/brew" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -109,7 +104,7 @@ fi
 [ ! -s "$TEST_CALLS" ]
 
 run_maintenance
-assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up\ncursor-upgrade\nbrew-upgrade'
+assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up\nbrew-upgrade'
 
 export FAIL_AT=pull
 if run_maintenance; then
@@ -142,7 +137,7 @@ unset FAIL_AT
 
 mv "$TEST_DIR/bin/brew" "$TEST_DIR/bin/brew.disabled"
 run_maintenance
-assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up\ncursor-upgrade'
+assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up'
 grep -Fq 'brew not found, skipping Homebrew updates' "$TEST_DIR/output"
 
 installer_output="$(bash -c '. "$1"; enable_dry_run; install_chezmoi_official -c; install_chezmoi_official -lc' _ "$COMMON")"
