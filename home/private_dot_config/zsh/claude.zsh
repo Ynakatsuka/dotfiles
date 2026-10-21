@@ -11,6 +11,7 @@ function cl() {
 }
 
 # fzf session resume: Claude Code + Codex (current directory only)
+# session-resume-list rows: tool, time, first, latest, id, transcript, home.
 function fzf-session-resume() {
     local session_limit="${FZF_SESSION_RESUME_LIMIT:-100}"
     if [[ ! "$session_limit" =~ '^[1-9][0-9]*$' ]]; then
@@ -44,10 +45,15 @@ function fzf-session-resume() {
         fields=("${(@ps:\t:)selected}")
         local tool="${fields[1]}"
         local session_id="${fields[5]}"
+        local session_home="${fields[7]}"
         if [[ "$tool" == "claude" ]]; then
             BUFFER="cl --resume=$session_id"
-        else
+        elif [[ "${session_home:A}" == "${${CODEX_HOME:-$HOME/.codex}:A}" ]]; then
             BUFFER="codex resume $session_id"
+        else
+            # `codex resume` only looks in its own CODEX_HOME, so run it in
+            # the home that holds the session, such as another Orca account.
+            BUFFER="CODEX_HOME=${(qq)session_home} codex resume $session_id"
         fi
         zle accept-line
     fi

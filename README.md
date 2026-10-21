@@ -222,6 +222,14 @@ for the current directory, with the first and latest prompts. The preview shows 
 prompts in full. Set `FZF_SESSION_RESUME_LIMIT` to a positive integer to lower the
 limit; values above 100 are capped at 100.
 
+Codex sessions come from `$CODEX_HOME/sessions`, `~/.codex/sessions`, and each
+Orca account home under `codex-accounts/*/home/sessions` in Orca's data directory
+(`$ORCA_USER_DATA_PATH`, otherwise `~/Library/Application Support/orca` on macOS
+or `${XDG_CONFIG_HOME:-~/.config}/orca` on Linux). A session stored in several
+homes is listed once. When it belongs to a home other than the current one, the
+command line sets `CODEX_HOME` for `codex resume`. Compressed `*.jsonl.zst`
+rollouts are not listed; use `codex resume` for them.
+
 ### Git
 
 | Alias / Command | Action |
