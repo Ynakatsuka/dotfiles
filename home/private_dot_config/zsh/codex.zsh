@@ -2,28 +2,6 @@
 # Codex Integration
 #
 
-_codex_trust_project_path() {
-    local trust_path="$1"
-    local codex_home="${CODEX_HOME:-$HOME/.codex}"
-    local config_file="$codex_home/config.toml"
-    local escaped_project_path
-
-    mkdir -p "$codex_home" || return 1
-    touch "$config_file" || return 1
-
-    escaped_project_path=${trust_path//\\/\\\\}
-    escaped_project_path=${escaped_project_path//\"/\\\"}
-
-    if grep -F -x -q -- "[projects.\"$escaped_project_path\"]" "$config_file"; then
-        return 0
-    fi
-
-    {
-        printf '\n[projects."%s"]\n' "$escaped_project_path"
-        printf 'trust_level = "trusted"\n'
-    } >> "$config_file"
-}
-
 # Codex launcher (mirrors `cl` for claude)
 function cdx() {
     local project_dir="$PWD"
@@ -55,7 +33,7 @@ function cdx() {
     fi
 
     local logical_project_path physical_project_path git_root physical_git_root
-    local -a trust_paths config_args
+    local -a trust_paths
     local -A seen_paths
 
     logical_project_path=$(cd "$project_dir" && pwd -L) || return 1
@@ -67,7 +45,11 @@ function cdx() {
         trust_paths+=("$git_root" "$physical_git_root")
     fi
 
-    local trust_path escaped_project_path
+    # Trust the project for this run only instead of appending to config.toml.
+    # Codex ignores a dotted `projects."<path>".trust_level` override, while an
+    # inline table merges with config.toml. A later `projects=` override would
+    # replace this one, so every path goes into the same table.
+    local trust_path escaped_project_path trusted_projects=""
     for trust_path in "${trust_paths[@]}"; do
         if [[ -n "${seen_paths[$trust_path]}" ]]; then
             continue
@@ -75,14 +57,13 @@ function cdx() {
         seen_paths[$trust_path]=1
         escaped_project_path=${trust_path//\\/\\\\}
         escaped_project_path=${escaped_project_path//\"/\\\"}
-        _codex_trust_project_path "$trust_path" || return 1
-        config_args+=(-c "projects.\"$escaped_project_path\".trust_level=\"trusted\"")
+        trusted_projects+="${trusted_projects:+,}\"$escaped_project_path\"={trust_level=\"trusted\"}"
     done
 
     codex \
         --dangerously-bypass-approvals-and-sandbox \
         --dangerously-bypass-hook-trust \
-        "${config_args[@]}" \
+        -c "projects={$trusted_projects}" \
         "$@"
 }
 

@@ -139,8 +139,12 @@ The config template preserves Codex-managed desktop preferences, hook trust
 state, the ChatGPT app's `notify`, `marketplaces`, `plugins`, and `mcp_servers`
 entries, and project entries whose paths do not exactly match the home directory
 or a ghq repository root. Those exact paths remain trusted by the dotfiles
-policy; existing entries for subdirectories are preserved. Run
-`bash scripts/test-codex-config.sh` to verify config preservation and idempotence.
+policy; existing entries for subdirectories are preserved while their paths
+exist. Entries for paths that no longer exist, such as removed worktrees, are
+dropped when the template renders. `cdx` trusts its project and Git root for
+each run through `-c projects={...}` instead of writing them to `config.toml`.
+Run `bash scripts/test-codex-config.sh` to verify config preservation and
+idempotence, and `bash scripts/test-codex-cdx-trust.sh` to verify `cdx` trust.
 
 The Browser service registration belongs to the ChatGPT app, not to a pinned
 dotfiles version. Before preserving an enabled `node_repl` registration, the

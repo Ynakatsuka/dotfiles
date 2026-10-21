@@ -20,6 +20,7 @@ FIXTURE_HOME="$TMP_DIR/home"
 GHQ_REPO="$FIXTURE_HOME/ghq-repo"
 EXTERNAL_PROJECT="$TMP_DIR/external project"
 SUBDIRECTORY="$GHQ_REPO/subdirectory"
+REMOVED_PROJECT="$TMP_DIR/removed worktree"
 CONFIG_PATH="$FIXTURE_HOME/.codex/config.toml"
 CHEZMOI_CONFIG="$TMP_DIR/chezmoi.toml"
 BROWSER_SERVICE="$FIXTURE_HOME/browser cache/version-1/browser-service.mjs"
@@ -132,6 +133,9 @@ trust_level = "untrusted"
 [projects."$SUBDIRECTORY"]
 trust_level = "untrusted"
 
+[projects."$REMOVED_PROJECT"]
+trust_level = "trusted"
+
 [marketplaces.openai-bundled]
 source_type = "local"
 source = "/fixture/bundled-marketplaces/openai-bundled"
@@ -175,6 +179,8 @@ assert_project_trust "managed home trust changed" "$FIXTURE_HOME" trusted "$full
 assert_project_trust "managed ghq repo trust changed" "$GHQ_REPO" trusted "$full_json"
 assert_project_trust "external project trust was lost" "$EXTERNAL_PROJECT" untrusted "$full_json"
 assert_project_trust "ghq subdirectory trust was lost" "$SUBDIRECTORY" untrusted "$full_json"
+"$JQ_BIN" -e --arg project "$REMOVED_PROJECT" '.projects | has($project) | not' <<<"$full_json" >/dev/null ||
+  fail "trust entry for a removed project path was preserved"
 
 # The rendered file is a fixed point when it is deployed and rendered again.
 cp "$TMP_DIR/full.toml" "$CONFIG_PATH"
