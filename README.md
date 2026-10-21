@@ -328,6 +328,14 @@ Orca fetches remote base refs during worktree creation; this setting also update
 No manual pull is needed for each new workspace. Without a repository-specific base ref, Orca prefers `origin/HEAD`; set a repository override when development uses a different branch, such as `origin/staging`.
 Fetch failures can leave Orca using an older ref, so this does not guarantee the latest remote commit when fetching fails.
 
+Claude sessions run the `orca-claude-hook` hook, which does two things:
+
+- Orca normally announces "Agent Task Complete" when a turn only waits for background work, such as a `run_in_background` shell, a background agent, or a monitor. The hook keeps a guard in Orca's `~/.orca/agent-hooks/claude-hook.sh` that drops that Stop, so the pane stays working and the only banner arrives when Claude finishes after the work completes. Orca rewrites the script at every app start; the hook reinstalls the guard at the next Claude session start or prompt.
+- It mirrors the main agent's state into the workspace board: In progress while Claude works, In review when a turn ends, Claude asks a question, or the session exits (waiting for you), and Done only through `orca-workspace-done`. A new prompt reopens a Done workspace; nested `claude -p` runs, subagents, and teammates do not change the status.
+
+A turn that leaves a never-ending process running, such as a dev server, stays In progress and gets no banner.
+Session crons, such as `/loop`, still produce a banner for each turn unless background work is also running.
+
 | Keybinding | Action |
 |------------|--------|
 | `Cmd+Shift+Right` / `Cmd+Shift+Left` | Move to the next / previous tab |
