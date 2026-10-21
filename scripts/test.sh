@@ -24,6 +24,7 @@ register() {
 }
 
 # name, runner, source path, external tools, optional supported platform.
+register test-ccv-statusline-proxy bash scripts/test-ccv-statusline-proxy.sh 'bash jq'
 register test-codex-config bash scripts/test-codex-config.sh 'bash chezmoi jq'
 register test-codex-skills-link bash scripts/test-codex-skills-link.sh 'bash chezmoi'
 register test-delegation bash scripts/test-delegation.sh 'bash chezmoi jq python3'
