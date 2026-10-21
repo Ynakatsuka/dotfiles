@@ -12,7 +12,7 @@
 - `home/AGENTS.md` holds global rules; root `AGENTS.md` holds repository rules. Root `CLAUDE.md` imports this file.
 - Templates in `home/dot_{claude,codex,gemini}/` include `home/AGENTS.md` and add only product-specific tool behavior. Do not duplicate rules across layers.
 - Skills live in `home/dot_claude/skills/` and are linked into Codex. Use `my-skill-creator` before editing a `SKILL.md`.
-- Keep deployed global Claude rules intact and documented: `rules/bigquery.md`, `rules/git.md`, `rules/gpu.md`, and `rules/python.md`.
+- Put language- and tool-specific rules in `home/AGENTS.md` so every agent shares them; do not add Claude-only `rules/*.md`.
 
 ## Environment Variables
 

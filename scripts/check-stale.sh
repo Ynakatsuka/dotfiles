@@ -9,7 +9,7 @@
 #   5. skill files referenced in docs but missing, and orphan skill files
 #   6. Makefile targets mentioned in docs that do not exist
 #   7. preferred agent CLI tools missing from mise management
-#   8. rules/*.md files not mentioned in repository instructions
+#   8. Claude-only rules/*.md that bypass the shared instructions
 #   9. oversized, duplicated, or conflicting global agent instruction sources
 #
 # Detection only: nothing is deleted here. Stale deployed files are removed
@@ -120,12 +120,10 @@ for pair in rg:ripgrep fd:fd ast-grep:ast-grep jq:jq yq:yq; do
     fail "AGENTS.md relies on '${pair%%:*}' but '${mise_name}' is not in home/private_dot_config/mise/config.toml"
 done
 
-# --- 8. rules/*.md drift against repository instructions --------------------------
-for rule in home/dot_claude/rules/*.md; do
-  base="$(basename "${rule}" .md)"
-  grep -q "${base}" AGENTS.md ||
-    fail "AGENTS.md does not mention rules/${base}.md"
-done
+# --- 8. Claude-only rules ---------------------------------------------------------
+# Shared rules live in home/AGENTS.md so Claude, Codex, and Gemini all load them.
+[ ! -e home/dot_claude/rules ] ||
+  fail "home/dot_claude/rules is Claude-only; move its rules into home/AGENTS.md"
 
 # --- 9. Agent instruction integrity ---------------------------------------------
 agents_lines="$(wc -l <home/AGENTS.md)"
