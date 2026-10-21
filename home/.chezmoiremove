@@ -9,9 +9,6 @@ mcp.json
 
 # Removed managed files (chezmoi does not clean up targets whose source
 # was deleted, so list them here)
-.cursor/mcp.json
-.config/zsh/cursor.zsh
-.local/bin/dotfiles-cursor-agent-upgrade
 .claude/rules/writing.md
 .claude/commands
 .claude/skills/my-guided-tour
@@ -61,6 +58,9 @@ CLAUDE.md
 mise.lock
 .config/yazi
 .config/zsh/yazi.zsh
+.cursor/mcp.json
+.config/zsh/cursor.zsh
+.local/bin/dotfiles-cursor-agent-upgrade
 
 {{- if ne .chezmoi.os "darwin" }}
 
