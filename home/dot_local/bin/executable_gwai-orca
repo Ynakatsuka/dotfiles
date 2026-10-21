@@ -5,16 +5,15 @@
 set -euo pipefail
 
 readonly ORCA_BIN="${ORCA_BIN:-/Applications/Orca.app/Contents/Resources/bin/orca}"
-readonly BRANCH_NAME_MODEL="${GWAI_BRANCH_MODEL:-haiku}"
 
 usage() {
   cat <<'USAGE'
 Usage: gwai-orca [--provider claude|codex] <prompt>
 
 Creates a new top-level Orca worktree in the repository of the workspace
-currently selected in the Orca UI, names it YYMMDD-<Japanese name of up to 10
-characters> with a lightweight Claude model, and starts the chosen agent with
-<prompt> in the new workspace.
+currently selected in the Orca UI, names it with gwai-worktree-name
+(YYMMDD-<Japanese name of up to 10 characters>), and starts the chosen agent
+with <prompt> in the new workspace.
 
 If --provider is omitted, claude is used.
 USAGE
@@ -43,46 +42,6 @@ validate_provider() {
 
   [[ "$provider" == 'claude' || "$provider" == 'codex' ]] ||
     die "provider is invalid: $provider"
-}
-
-generate_workspace_name() {
-  local prompt="$1"
-  local naming_prompt naming_output workspace_name
-
-  naming_prompt="次のタスクのワークスペース名の候補を日本語で5つ作ってください。
-ルール:
-- 対象と作業が分かる短い名前にする。細部は省く
-- 各候補は4〜8文字。長くても10文字まで
-- 使える文字はひらがな、カタカナ、漢字、英数字、アンダースコアだけ。空白、記号、句読点は使わない
-- 1行に1候補、良い順に出力する。番号、引用符、説明は付けない
-- 例: パスワード再設定修正、BQコスト削減、レビュー指摘対応
-
-タスク: ${prompt}"
-
-  # Naming needs one short reply, so skip settings, hooks, MCP servers, skills,
-  # and tools to cut Claude Code startup and prompt size.
-  naming_output=$(claude -p --model "$BRANCH_NAME_MODEL" --effort low \
-    --setting-sources '' --strict-mcp-config --disable-slash-commands \
-    --no-session-persistence --tools '' \
-    --system-prompt 'Follow the user instruction exactly. Output only the requested text.' \
-    "$naming_prompt") ||
-    die "workspace name generation failed"
-
-  # Haiku often miscounts Japanese characters, so it returns several candidates
-  # and the first valid one wins. jq counts characters regardless of locale.
-  workspace_name=$(jq -Rnr '
-    [
-      inputs |
-      gsub("^\\s+|\\s+$"; "") |
-      select(test("^[\\p{Han}\\p{Hiragana}\\p{Katakana}ーA-Za-z0-9_]{1,10}$"))
-    ] | first // empty
-  ' <<<"$naming_output") ||
-    die "failed to read generated workspace names"
-
-  [[ -n "$workspace_name" ]] ||
-    die "no generated workspace name had 10 or fewer allowed characters: $naming_output"
-
-  printf '%s\n' "$workspace_name"
 }
 
 read_active_repo_id() {
@@ -168,14 +127,13 @@ prompt="$1"
 [[ -n "$prompt" ]] || die 'prompt is empty'
 validate_provider "$provider"
 require_command jq
-require_command claude
+require_command gwai-worktree-name
 [[ -x "$ORCA_BIN" ]] || die "Orca executable not found: $ORCA_BIN"
 
 active_repo_id=''
 read_active_repo_id
-date_prefix=$(date '+%y%m%d')
-[[ "$date_prefix" =~ ^[0-9]{6}$ ]] || die "date prefix is invalid: $date_prefix"
-workspace_name="${date_prefix}-$(generate_workspace_name "$prompt")"
+workspace_name=$(gwai-worktree-name -- "$prompt") ||
+  die "failed to name the Orca worktree"
 create_worktree "$workspace_name"
 
 printf 'Created Orca worktree: %s\n' "$workspace_name"

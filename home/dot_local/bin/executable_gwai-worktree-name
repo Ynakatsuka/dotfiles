@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Print the name for a new AI-named worktree. gwai (zsh) and gwai-orca both
+# call this so they share one prompt, model, and validation.
+
+set -euo pipefail
+
+readonly NAMING_MODEL='haiku'
+
+usage() {
+  cat <<'USAGE'
+Usage: gwai-worktree-name [--] <prompt>
+
+Prints YYMMDD-<name>, where <name> is a Japanese name of up to 10 characters
+that Claude Haiku generates for the task in <prompt>. Exits non-zero without
+printing a name when generation fails or no candidate is valid.
+USAGE
+}
+
+die() {
+  printf 'Error: %s\n' "$*" >&2
+  exit 1
+}
+
+require_command() {
+  local name="$1"
+
+  command -v "$name" >/dev/null 2>&1 || die "$name not found in PATH"
+}
+
+generate_name() {
+  local prompt="$1"
+  local naming_prompt naming_output name
+
+  naming_prompt="次のタスクのワークスペース名の候補を日本語で5つ作ってください。
+ルール:
+- 対象と作業が分かる短い名前にする。細部は省く
+- 各候補は4〜8文字。長くても10文字まで
+- 使える文字はひらがな、カタカナ、漢字、英数字、アンダースコアだけ。空白、記号、句読点は使わない
+- 1行に1候補、良い順に出力する。番号、引用符、説明は付けない
+- 例: パスワード再設定修正、BQコスト削減、レビュー指摘対応
+
+タスク: ${prompt}"
+
+  # Naming needs one short reply, so skip settings, hooks, MCP servers, skills,
+  # tools, and session history to cut Claude Code startup and prompt size.
+  # Without tools, Claude cannot open links in the prompt either.
+  naming_output=$(claude -p --model "$NAMING_MODEL" --effort low \
+    --setting-sources '' --strict-mcp-config --disable-slash-commands \
+    --no-session-persistence --tools '' \
+    --system-prompt 'Follow the user instruction exactly. Output only the requested text.' \
+    "$naming_prompt") ||
+    die "worktree name generation failed"
+
+  # Haiku often miscounts Japanese characters, so it returns several candidates
+  # and the first valid one wins. jq counts characters regardless of locale.
+  name=$(jq -Rnr '
+    [
+      inputs |
+      gsub("^\\s+|\\s+$"; "") |
+      select(test("^[\\p{Han}\\p{Hiragana}\\p{Katakana}ーA-Za-z0-9_]{1,10}$"))
+    ] | first // empty
+  ' <<<"$naming_output") ||
+    die "failed to read generated worktree names"
+
+  [[ -n "$name" ]] ||
+    die "no generated worktree name had 10 or fewer allowed characters: $naming_output"
+
+  printf '%s\n' "$name"
+}
+
+case "${1:-}" in
+  --help | -h)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    ;;
+  -*)
+    die "unknown option: $1"
+    ;;
+esac
+
+(($# == 1)) || die 'exactly one prompt is required'
+prompt="$1"
+[[ -n "$prompt" ]] || die 'prompt is empty'
+
+require_command claude
+require_command jq
+
+date_prefix=$(date '+%y%m%d')
+[[ "$date_prefix" =~ ^[0-9]{6}$ ]] || die "date prefix is invalid: $date_prefix"
+name=$(generate_name "$prompt")
+printf '%s-%s\n' "$date_prefix" "$name"

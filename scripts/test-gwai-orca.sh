@@ -46,12 +46,17 @@ orca_create_args="$test_dir/orca-create.args"
 run_output="$test_dir/run-output"
 mkdir -p "$bin_dir"
 
-cat >"$bin_dir/claude" <<'MOCK'
+# scripts/test-gwai-worktree-name.sh covers naming; this fake checks the wiring.
+cat >"$bin_dir/gwai-worktree-name" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The first candidate has 11 characters, so the second one must be chosen.
-printf '%s\n' "${TEST_CLAUDE_OUTPUT:-$'パスワードリセット修正\n パスワード再設定修正 \nBQコスト削減'}"
+printf '%s\0' "$@" >"$TEST_NAMER_ARGS"
+if [[ "${TEST_NAMER_STATUS:-0}" != 0 ]]; then
+  printf 'Error: mocked naming failure\n' >&2
+  exit "$TEST_NAMER_STATUS"
+fi
+printf '261017-パスワード再設定修正\n'
 MOCK
 
 cat >"$bin_dir/orca" <<'MOCK'
@@ -81,18 +86,8 @@ case "$1 $2" in
 esac
 MOCK
 
-cat >"$bin_dir/date" <<'MOCK'
-#!/usr/bin/env bash
-set -euo pipefail
-
-[[ "$*" == '+%y%m%d' ]] || {
-  printf 'unexpected date arguments: %s\n' "$*" >&2
-  exit 1
-}
-printf '261017\n'
-MOCK
-
-chmod +x "$bin_dir/claude" "$bin_dir/date" "$bin_dir/orca"
+chmod +x "$bin_dir/gwai-worktree-name" "$bin_dir/orca"
+export TEST_NAMER_ARGS="$test_dir/namer.args"
 
 set +e
 PATH="$bin_dir:$PATH" \
@@ -106,6 +101,7 @@ set -e
 
 ((failure_status != 0)) || fail 'missing active workspace unexpectedly succeeded'
 [[ ! -e "$orca_create_args" ]] || fail 'worktree create ran without an active workspace'
+[[ ! -e "$TEST_NAMER_ARGS" ]] || fail 'naming ran without an active workspace'
 
 prompt=$'Create an Orca worktree with spaces\nand a second line.'
 PATH="$bin_dir:$PATH" \
@@ -114,6 +110,7 @@ PATH="$bin_dir:$PATH" \
   TEST_ORCA_CREATE_ARGS="$orca_create_args" \
   bash "$gwai_orca_script" -- "$prompt" >"$run_output" 2>&1
 
+assert_args_equal "$TEST_NAMER_ARGS" -- "$prompt"
 assert_args_equal "$orca_create_args" \
   worktree create \
   --repo 'id:repo-123' \
@@ -144,15 +141,16 @@ grep -Fq -- '{"ok":false,"error":{"message":"mocked Orca create failure"}}' "$ru
 set +e
 PATH="$bin_dir:$PATH" \
   ORCA_BIN="$bin_dir/orca" \
-  TEST_CLAUDE_OUTPUT=$'パスワードリセット修正\n再設定・修正\n再設定 修正' \
+  TEST_NAMER_STATUS=1 \
   TEST_ORCA_COMMAND_LOG="$orca_command_log" \
   TEST_ORCA_CREATE_ARGS="$orca_create_args" \
-  bash "$gwai_orca_script" --provider codex 'reject invalid generated workspace names' >"$run_output" 2>&1
-invalid_branch_status=$?
+  bash "$gwai_orca_script" --provider codex 'naming fails' >"$run_output" 2>&1
+naming_failure_status=$?
 set -e
 
-((invalid_branch_status != 0)) || fail 'invalid generated workspace names unexpectedly succeeded'
+((naming_failure_status != 0)) || fail 'naming failure unexpectedly succeeded'
+grep -Fq 'mocked naming failure' "$run_output" || fail 'naming failure was not written to stderr'
 [[ "$(grep -Fxc 'worktree create' "$orca_command_log")" -eq 2 ]] ||
-  fail 'unexpected worktree create count'
+  fail 'worktree create ran after naming failed'
 
 printf 'test-gwai-orca: OK\n'
