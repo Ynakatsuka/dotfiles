@@ -30,7 +30,7 @@ git diff --cached --stat
 - Do not touch unrelated staged, unstaged, or untracked files.
 - Never stage or commit `.tmp/my-pr/` review artifacts.
 - Split commits by purpose: one purpose = one commit.
-- Use English Conventional Commits messages.
+- Follow the repository's commit message convention; use English Conventional Commits when none exists.
 - Inspect `git diff --cached` before every commit.
 
 ## Worktree flow for protected branches

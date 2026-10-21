@@ -156,7 +156,7 @@ background 実行した reviewer が残っている間は最終回答しない�
 - PR 本文は日本語で書く。
 - draft PR を作成する。ready 化は行わない。
 - `--assignee @me` を付ける。
-- commit message は Conventional Commits 形式の英語。
+- commit message はリポジトリの規約に従う。規約がなければ英語の Conventional Commits にする。
 - read-only reviewer は repo 内外を問わずファイルを書かない。`.plans`、`/tmp`、`.tmp/my-pr` への追加メモも禁止する。main orchestrator が作る `.tmp/my-pr/` artifact だけは例外。
 - Simplify は Codex CLI の `model_reasoning_effort="medium"` を使う。model は上書きしない。
 - Simplify は full diff を優先する。`references/review.md` の line/byte chunking 条件を満たす場合だけ file-boundary chunking し、各 run/chunk の Required と Recommended をそれぞれ最大 5 件に制限する。
