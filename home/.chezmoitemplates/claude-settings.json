@@ -96,6 +96,14 @@
         "hooks": [
           {
             "type": "command",
+            "command": "~/.claude/hooks/check-url-boundaries.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "~/.local/bin/orca-claude-hook",
             "timeout": 10
           }

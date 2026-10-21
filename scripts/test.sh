@@ -51,6 +51,7 @@ register test-rtk-rewrite-hook bash scripts/test-rtk-rewrite-hook.sh 'bash jq'
 register test-runner bash scripts/test-runner.sh 'bash'
 register test-session-resume bash scripts/test-session-resume.sh 'bash python3 zsh'
 register test-update-bootstrap bash scripts/test-update-bootstrap.sh 'bash awk mise'
+register test-url-boundary-hook bash scripts/test-url-boundary-hook.sh 'bash python3'
 register my-japanese-editor unittest home/dot_claude/skills/my-japanese-editor/tests 'python3'
 register my-handoff node-handoff home/dot_claude/skills/my-handoff/scripts/launch-orca-handoff.test.mjs 'node bash git jq'
 
