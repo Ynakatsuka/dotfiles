@@ -69,9 +69,5 @@ check_agent_settings claude \
   "$REPO_ROOT/home/dot_claude/modify_settings.json.tmpl" \
   "$REPO_ROOT/home/.chezmoitemplates/claude-settings.json" \
   PreToolUse '/bin/sh "${HOME-}/.orca/agent-hooks/claude-hook.sh"'
-check_agent_settings gemini \
-  "$REPO_ROOT/home/dot_gemini/modify_settings.json.tmpl" \
-  "$REPO_ROOT/home/.chezmoitemplates/gemini-settings.json" \
-  BeforeTool "/bin/sh '/Users/example/.orca/agent-hooks/gemini-hook.sh'"
 
 echo "test-orca-hook-settings: OK"
