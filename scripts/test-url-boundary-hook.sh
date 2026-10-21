@@ -42,6 +42,12 @@ https://example.com/end
 output=$(run_hook "$separated" false)
 [[ -z "$output" ]] || fail "URL followed by whitespace was blocked: $output"
 
+delimited='[PR #69](https://github.com/Ynakatsuka/dotfiles/pull/69)（base）
+[https://example.com/a](https://example.com/a)です
+<https://example.com/b>です'
+output=$(run_hook "$delimited" false)
+[[ -z "$output" ]] || fail "Markdown or angle-bracket link was blocked: $output"
+
 output=$(run_hook "$glued" true)
 [[ -z "$output" ]] || fail "hook blocked again while stop_hook_active was true: $output"
 
