@@ -19,12 +19,7 @@
 
   $base
   | .hooks = (.hooks // {})
-  | .hooks |= with_entries(
-      .value |= (
-        without_commands("(^|[[:space:]/])cmux([[:space:]/]|$)")
-        | without_commands("bulk-read-guard")
-      )
-    )
+  | .hooks |= with_entries(.value |= without_commands("bulk-read-guard"))
   | .hooks.PreToolUse = (
       (.hooks.PreToolUse // [])
       + [{"matcher": "Bash", "hooks": [{"command": $bulkReadGuard, "timeout": 10, "type": "command"}]}]
