@@ -44,6 +44,7 @@ register test-handoff-context bash scripts/test-handoff-context.sh 'bash git'
 register test-my-pr-review-input bash scripts/test-my-pr-review-input.sh 'bash git jq'
 register test-my-pr-worktree-move bash scripts/test-my-pr-worktree-move.sh 'bash git'
 register test-my-skill-creator bash scripts/test-my-skill-creator.sh 'bash python3 uv'
+register test-orca-claude-hook bash scripts/test-orca-claude-hook.sh 'bash jq'
 register test-orca-hook-settings bash scripts/test-orca-hook-settings.sh 'bash chezmoi jq'
 register test-prune-old-worktrees bash scripts/test-prune-old-worktrees.sh 'bash git python3' Linux
 register test-rtk-rewrite-hook bash scripts/test-rtk-rewrite-hook.sh 'bash jq'

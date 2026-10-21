@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Decide whether a Claude hook payload is a main-agent Stop that only waits for
+# background work, such as a run_in_background shell, a background agent, or a
+# monitor. Claude resumes when that work finishes, so the turn is not complete.
+#
+# Reads the hook payload on stdin.
+# Exit 0: held Stop. Exit 1: any other payload. Exit 2: the payload is unreadable.
+#
+# Orca's claude-hook.sh calls this through the guard installed by orca-claude-hook.
+# Terminal statuses mirror Orca's claude-background-task-inventory, and teammates
+# are skipped because Claude reports idle teammates as running.
+
+set -euo pipefail
+
+if ! command -v jq >/dev/null 2>&1; then
+  printf 'orca-claude-stop-held: jq is required\n' >&2
+  exit 2
+fi
+
+status=0
+jq -e '
+  def terminal_statuses: [
+    "idle", "done", "success", "succeeded", "complete", "completed", "finished",
+    "failed", "error", "terminated", "exited", "aborted", "expired", "skipped",
+    "crashed", "killed", "cancelled", "canceled", "timed_out"
+  ];
+  .hook_event_name == "Stop"
+  and (has("agent_id") | not)
+  and (.is_interrupt != true)
+  and any(.background_tasks[]?;
+    type == "object"
+    and ((.type // "") | ascii_downcase) != "teammate"
+    and (((.status // "") | ascii_downcase) | IN(terminal_statuses[]) | not))
+' >/dev/null || status=$?
+
+case "$status" in
+  0 | 1) exit "$status" ;;
+  *)
+    printf 'orca-claude-stop-held: failed to read the hook payload (jq exit %s)\n' "$status" >&2
+    exit 2
+    ;;
+esac
