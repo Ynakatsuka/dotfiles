@@ -37,7 +37,7 @@ For analysis that should not edit files, add plan mode:
 agy --mode plan --sandbox -p "<PROMPT>"
 ```
 
-Antigravity CLI 1.2.5 ignores plan mode when `--disable-slash-commands` is present, so do not
+Antigravity CLI (confirmed through 1.4.x) ignores plan mode when `--disable-slash-commands` is present, so do not
 combine those options. Keep untrusted document contents out of the command prompt in this mode.
 
 For an explicitly requested implementation task, use accept-edits inside the sandbox:
@@ -81,8 +81,7 @@ Also inspect tool events when the workflow forbids tool use.
 - `agy: command not found`: install Antigravity CLI with the repository bootstrap script.
 - Unknown model: run `agy models`; do not choose a replacement without an explicit workflow rule.
 - Authentication error: run `agy` interactively and complete sign-in.
-- Plan-mode warning: remove `--disable-slash-commands`; Antigravity 1.2.5 otherwise ignores plan
-  mode.
+- Plan-mode warning: remove `--disable-slash-commands`; Antigravity otherwise ignores plan mode.
 - Permission denial: keep the sandbox and permission policy; change only the scoped task or report
   the blocked operation.
 - Invalid or incomplete structured output: treat the delegation as failed. Do not accept partial

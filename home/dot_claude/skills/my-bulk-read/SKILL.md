@@ -37,8 +37,8 @@ bulk-read --question "<one precise question>" <file>...
 ## Collecting completion
 
 - This command is a shell process, not a `spawn_agent` task. Do not use `wait_agent`,
-  `clock.sleep`, or shell `sleep` to wait for its result, and do not rely on a completion notification.
-- In Codex, when `exec_command` returns a `session_id`, collect output with `write_stdin`
+  `clock.sleep`, or shell `sleep` to wait for its result.
+- In Codex, no completion notification arrives. When `exec_command` returns a `session_id`, collect output with `write_stdin`
   using that ID and empty `chars`. Use `yield_time_ms: 1000` while waiting for this result;
   repeat while a `session_id` remains, until an `exit_code` and the final output arrive.
   The tool may enforce a longer minimum wait, but returns early when the process finishes.
@@ -48,8 +48,8 @@ bulk-read --question "<one precise question>" <file>...
 - Do independent work while the reader runs, but check its result at the next tool boundary.
   When its answer is the only remaining dependency, keep collecting directly without an
   extra delay. Once the exit code and answer arrive, consume them and stop waiting.
-- In Claude Code, collect a background Bash task with `TaskOutput` using its returned task ID;
-  a finished task's output should be read immediately rather than waiting for another notification.
+- In Claude Code, a background Bash task sends a completion notification when it exits. Read
+  its output file once after that notification instead of polling it.
 
 ## Working with the answer
 

@@ -13,17 +13,13 @@ argument-hint: "[patch|minor|major|<version>]"
 
 マージ済み PR とコミット履歴からリリースノートを生成する。
 
-## リリース状態(呼び出し時点のスナップショット)
-
-- 最後の公開リリースタグ: !`gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName'`
-- 直近のタグ: !`git tag --sort=-creatordate | head -n 5`
-
 ## 手順1: 情報収集
 
-上記スナップショットの「最後の公開リリースタグ」を `LAST_TAG` として使う。注入値がエラー出力(gh 未認証、リポジトリ外など)の場合は、そのエラーを報告して停止する。
+最後の公開リリースタグを `LAST_TAG` として取得する。コマンドが失敗した場合(gh 未認証、リポジトリ外など)は、そのエラーを報告して停止する。
 
 ```bash
-LAST_TAG=vX.Y.Z  # Set to the injected tag value above
+LAST_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName')
+git tag --sort=-creatordate | head -n 5
 ```
 
 `LAST_TAG` が空（公開済みリリースが存在しない）の場合は**ここで停止し、初回リリースの対象範囲（開始 commit / tag、または「全履歴」）をユーザーに確認する**。空の `LAST_TAG` のまま `git log ${LAST_TAG}..HEAD` を実行してはならない（`..HEAD` が空 range に化けて変更ゼロと誤認する）。
@@ -34,23 +30,19 @@ LAST_TAG=vX.Y.Z  # Set to the injected tag value above
 # Cutoff = commit date of the last release tag
 LAST_TAG_DATE=$(git log -1 --format=%cI "$LAST_TAG")
 
-# Get merged PRs since last release (filtered by merge date)
+# Get merged PRs and their merge commits since last release (filtered by merge date)
 gh pr list --state merged --search "merged:>$LAST_TAG_DATE" --limit 200 \
-  --json number,title,body,mergedAt,author,labels,url
+  --json number,title,body,mergedAt,author,labels,url,mergeCommit
 
 # Get commit history since last release
 git log ${LAST_TAG}..HEAD --oneline --pretty=format:"%h %s (%an, %ad)" --date=short
-
-# Get PR-commit associations
-gh pr list --state merged --search "merged:>$LAST_TAG_DATE" --limit 200 \
-  --json number,title,mergeCommit
 ```
 
 取得件数がちょうど `--limit` と同数の場合は打ち切りの可能性があるため、limit を上げて再実行し、全件取得できたことを確認する。
 
 ## 手順2: バージョン番号の決定
 
-引数 (`$1`) によって挙動が変わる:
+ユーザーが指定した引数によって挙動が変わる:
 
 | 引数 | 挙動 |
 |---|---|
@@ -62,8 +54,9 @@ gh pr list --state merged --search "merged:>$LAST_TAG_DATE" --limit 200 \
 
 ```bash
 # patch → v1.2.4 / minor → v1.3.0 / major → v2.0.0
+BUMP=patch  # Set to the requested component
 IFS='.' read -r MAJ MIN PAT <<< "${LAST_TAG#v}"
-case "$1" in
+case "$BUMP" in
   patch) NEW_TAG="v${MAJ}.${MIN}.$((PAT + 1))" ;;
   minor) NEW_TAG="v${MAJ}.$((MIN + 1)).0" ;;
   major) NEW_TAG="v$((MAJ + 1)).0.0" ;;
@@ -122,6 +115,9 @@ PR タイトル・説明・コミットメッセージを分析し、以下の�
 
 ### ♻️ Refactoring
 - [リファクタ内容] ([PR #N](URL))
+
+### ⚡ Performance
+- [改善内容] ([PR #N](URL))
 
 ### 🔧 Maintenance
 - [メンテ内容] ([PR #N](URL))

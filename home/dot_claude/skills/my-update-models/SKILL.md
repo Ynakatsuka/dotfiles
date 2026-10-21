@@ -47,7 +47,7 @@ $my-update-models gemini   # Gemini model settings, CLI, and the repo scan
 
 ## Dotfiles Config Files
 
-All paths are relative to `/home/yuki/ghq/github.com/Ynakatsuka/dotfiles/`.
+All paths are relative to the dotfiles repository root (`~/ghq/github.com/Ynakatsuka/dotfiles/`).
 Always edit in the ghq repo, never in `~/`.
 
 | File | Field | Example value | Notes |
@@ -55,7 +55,12 @@ Always edit in the ghq repo, never in `~/`.
 | `home/.chezmoitemplates/claude-settings.json` | top-level `model` | `"opus"` | Default Claude Code model alias. Effort is managed separately via the top-level `effortLevel`. |
 | `home/.chezmoitemplates/claude-settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
 | `home/.chezmoitemplates/claude-settings.json` | `autoUpdatesChannel` | `"latest"` | Native Claude Code update channel. Read it when checking or updating the CLI; do not change it unless requested. |
-| `home/dot_codex/private_config.toml.tmpl` | `model` | `"gpt-6-sol"` | Codex CLI default model (full ID, not an alias). |
+| `home/dot_codex/private_config.toml.tmpl` | `model`, `[agents].default_subagent_model` | `"gpt-6.1-sol"` | Codex CLI default and subagent models (full IDs, not aliases). |
+| `home/dot_codex/agents/*.toml` | `model` | `"gpt-6-luna"` | Per-role Codex subagents (`reviewer`, `simplifier`, `luna-worker`). |
+| `home/dot_local/bin/executable_{bulk-read,code-write}` | `BULK_READ_MODEL`, `CODE_WRITE_MODEL` | `"gpt-6-luna"` | Cheaper delegated reader and writer models. |
+| `home/dot_claude/skills/my-pr/` | Reviewer C `-c 'model=...'` in `run-codex-review.sh` | `"gpt-6-sol"` | Pinned review model; my-pr's review reference and `test-my-pr-review-input.sh` repeat it. |
+| `home/dot_claude/agents/my-pr-reviewer.md`, my-pr `run-claude-review.sh` | `model:`, `--model` | `opus` | Claude reviewer alias. |
+| `home/dot_claude/skills/my-japanese-editor/` | `ANTIGRAVITY_MODEL` in `rewrite_with_antigravity.py` and its Antigravity reference | `gemini-3.8-flash-high` | Antigravity model pinned by a tested workflow; it is not the Gemini CLI. |
 | `home/.chezmoitemplates/gemini-settings.json` | `model.name` | `"pro"` | Accepts aliases (`auto`, `pro`, `flash`, `flash-lite`) or full IDs (e.g. `gemini-2.5-pro`). Aliases auto-track the CLI default across releases — keep the alias unless the user wants a pinned version. |
 
 Do NOT modify model IDs that appear inside skill examples
@@ -240,7 +245,7 @@ IDs that also need bumping.
    ```
    If the command fails (not a git repo), skip the scan and tell the user.
 
-2. **Grep for model-ID patterns.** Run the Grep tool at the repo root with
+2. **Search for model-ID patterns.** Run `rg` at the repo root with
    this regex (ripgrep syntax, respects `.gitignore` by default):
    ```
    claude-(fable|opus|sonnet|haiku)-[0-9]|gpt-[0-9]|gemini-[0-9]|\bo[134](-mini|-preview)?\b
