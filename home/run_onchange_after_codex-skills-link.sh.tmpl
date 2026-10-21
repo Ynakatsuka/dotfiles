@@ -39,9 +39,14 @@ fi
 
 # Inlined list of skill names. Adding or removing a skill changes this list,
 # which changes the rendered script and re-triggers run_onchange_.
+# my-ccv deploys only on Linux (see .chezmoiignore); listing it elsewhere would
+# keep a link to the removed skill.
 skills=(
 {{- range $path := glob (joinPath .chezmoi.sourceDir "dot_claude/skills/*/SKILL.md") }}
-  {{ $path | dir | base | quote }}
+{{-   $skill := $path | dir | base }}
+{{-   if or (eq $.chezmoi.os "linux") (ne $skill "my-ccv") }}
+  {{ $skill | quote }}
+{{-   end }}
 {{- end }}
 )
 

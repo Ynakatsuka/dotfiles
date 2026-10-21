@@ -176,6 +176,11 @@ service versions are compatible or change the app's trusted executable.
 Personal skills are managed under `~/.claude/skills/` and linked into
 `~/.agents/skills/` for Codex; no duplicates are generated under `~/.codex/skills/`.
 
+CCV (Claude Code Viewer) runs only on Linux hosts, so the `my-ccv` skill,
+`~/.config/ccv-preview/`, `prune-old-worktrees`, and the CCV status line proxy
+deploy only there. `~/.claude/scripts/statusline.sh` routes the Claude Code
+status line through that proxy on Linux and runs `ccusage` directly elsewhere.
+
 ### RTK Command Rewriting
 
 RTK reduces token-heavy shell output. Codex is instructed to invoke it directly, while Claude Code uses the ordered Bash `PreToolUse` hooks in `home/.chezmoitemplates/claude-settings.json`:
