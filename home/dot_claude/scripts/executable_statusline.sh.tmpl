@@ -1,0 +1,11 @@
+#!/bin/bash
+# Claude Code statusLine entry point, rendered per OS by chezmoi.
+#
+# CCV (Claude Code Viewer) runs only on Linux hosts, so only they route the
+# status line through the CCV proxy, which forwards rate limits to CCV and then
+# runs ccusage. Other hosts run the ccusage status line directly.
+{{ if eq .chezmoi.os "linux" -}}
+exec "$HOME/.claude/scripts/ccv-statusline-proxy.sh"
+{{- else -}}
+exec npx -y ccusage statusline
+{{- end }}

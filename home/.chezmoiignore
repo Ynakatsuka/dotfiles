@@ -8,6 +8,11 @@ Library
 {{- if ne .chezmoi.os "linux" }}
 # Linux-only user services
 .config/systemd
+# CCV (Claude Code Viewer) runs only on Linux hosts
+.claude/scripts/ccv-statusline-proxy.sh
+.claude/skills/my-ccv
+.config/ccv-preview
+.local/bin/prune-old-worktrees
 {{- end }}
 
 # Python bytecode cache — never deploy

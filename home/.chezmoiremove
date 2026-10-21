@@ -68,3 +68,12 @@ mise.lock
 .raycast/**
 Library/Application Support/com.mitchellh.ghostty
 {{- end }}
+
+{{- if ne .chezmoi.os "linux" }}
+
+# CCV directories deployed before CCV became Linux-only. As above, contents
+# are matched with /** because the bare names are ignored on these hosts;
+# the empty directories and the ignored files themselves remain.
+.claude/skills/my-ccv/**
+.config/ccv-preview/**
+{{- end }}

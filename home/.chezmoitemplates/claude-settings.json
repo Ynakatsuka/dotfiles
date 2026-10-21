@@ -127,7 +127,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/scripts/ccv-statusline-proxy.sh"
+    "command": "~/.claude/scripts/statusline.sh"
   },
   "skipDangerousModePermissionPrompt": true,
   "skillOverrides": {

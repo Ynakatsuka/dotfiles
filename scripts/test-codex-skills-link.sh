@@ -52,6 +52,14 @@ ln -s "$TMP_DIR/unrelated-target" \
   >"$RENDERED"
 chmod +x "$RENDERED"
 
+# OS-specific skills are ignored in .chezmoiignore and filtered again in the
+# template; the linked list must match the skills deployed on this OS.
+deployed_skills="$("$CHEZMOI_BIN" -S "$REPO_ROOT/home" managed --include=dirs --exclude=remove |
+  sed -n 's|^\.claude/skills/\([^/]*\)$|\1|p' | sort)"
+linked_skills="$(sed -n '/^skills=(/,/^)/s/^  "\(.*\)"$/\1/p' "$RENDERED" | sort)"
+[ -n "$linked_skills" ] && [ "$linked_skills" = "$deployed_skills" ] ||
+  fail "linked skills differ from deployed skills: linked=[${linked_skills//$'\n'/ }] deployed=[${deployed_skills//$'\n'/ }]"
+
 HOME="$FAKE_HOME" bash "$REPO_ROOT/home/run_once_before_migrate-shared-skills.sh"
 [ -f "$FAKE_HOME/.claude/skills/orca-cli/references/prompts.md" ] ||
   fail "agent-owned skill content was not migrated"
