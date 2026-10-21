@@ -133,10 +133,8 @@ lockfile = false
 always_keep_download = false
 always_keep_install = false
 legacy_version_file = true
-plugin_autoupdate_last_check_duration = "7 days"
 minimum_release_age_excludes = [
     "npm:@openai/codex",
-    "npm:@anthropic-ai/claude-code",
 ]
 
 [env]
