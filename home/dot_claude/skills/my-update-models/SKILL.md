@@ -245,8 +245,8 @@ IDs that also need bumping.
    ```
    If the command fails (not a git repo), skip the scan and tell the user.
 
-2. **Search for model-ID patterns.** Run `rg` at the repo root with
-   this regex (ripgrep syntax, respects `.gitignore` by default):
+2. **Search for model-ID patterns.** Run `rg --hidden` at the repo root with
+   this regex (`--hidden` keeps `.github/` in scope; `.gitignore` still applies):
    ```
    claude-(fable|opus|sonnet|haiku)-[0-9]|gpt-[0-9]|gemini-[0-9]|\bo[134](-mini|-preview)?\b
    ```

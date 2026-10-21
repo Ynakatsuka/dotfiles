@@ -18,8 +18,9 @@ argument-hint: "[patch|minor|major|<version>]"
 最後の公開リリースタグを `LAST_TAG` として取得する。コマンドが失敗した場合(gh 未認証、リポジトリ外など)は、そのエラーを報告して停止する。
 
 ```bash
-LAST_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName')
-git tag --sort=-creatordate | head -n 5
+LAST_TAG=$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName') &&
+  echo "LAST_TAG=${LAST_TAG}" &&
+  git tag --sort=-creatordate | head -n 5
 ```
 
 `LAST_TAG` が空（公開済みリリースが存在しない）の場合は**ここで停止し、初回リリースの対象範囲（開始 commit / tag、または「全履歴」）をユーザーに確認する**。空の `LAST_TAG` のまま `git log ${LAST_TAG}..HEAD` を実行してはならない（`..HEAD` が空 range に化けて変更ゼロと誤認する）。
