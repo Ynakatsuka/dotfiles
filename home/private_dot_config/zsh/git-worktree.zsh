@@ -467,6 +467,7 @@ Usage: gwai [-c|-x] <prompt>
   -x   start codex session via `cdx`
 
 Names the branch and worktree YYMMDD-<Japanese name of up to 10 characters>
+(YYMMDD-<client>-<name> when <prompt> names a client company)
 with gwai-worktree-name (shared with gwai-orca), creates the worktree via `gw`,
 then launches the chosen session with <prompt> as the first message.
 

@@ -88,7 +88,14 @@ done
 [[ "${actual_args[${#actual_args[@]} - 1]}" == *"タスク: ${prompt}" ]] ||
   fail "naming prompt does not end with the task: ${actual_args[${#actual_args[@]} - 1]}"
 
-TEST_CLAUDE_OUTPUT=$'パスワードリセット修正\n再設定・修正\n再設定 修正' \
+# A client prefix has its own 10-character limit, so the name part keeps its
+# full limit.
+TEST_CLAUDE_OUTPUT=$'トヨタ-需要予測モデルレビュー\nトヨタ-需要予測レビュー' run_helper -- 'client task' ||
+  fail "helper failed for a client task: $(<"$run_error")"
+[[ "$(<"$run_output")" == '261017-トヨタ-需要予測レビュー' ]] ||
+  fail "unexpected client name: $(<"$run_output")"
+
+TEST_CLAUDE_OUTPUT=$'パスワードリセット修正\n再設定・修正\n再設定 修正\nサイバーエージェント社-修正\n-需要予測\nA社-B社-修正\nトヨタ - 修正' \
   expect_failure 'no generated worktree name had 10 or fewer allowed characters' 'reject invalid names'
 
 TEST_CLAUDE_OUTPUT='' TEST_CLAUDE_STATUS=1 \

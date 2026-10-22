@@ -10,9 +10,11 @@ usage() {
   cat <<'USAGE'
 Usage: gwai-worktree-name [--] <prompt>
 
-Prints YYMMDD-<name>, where <name> is a Japanese name of up to 10 characters
-that Claude Haiku generates for the task in <prompt>. Exits non-zero without
-printing a name when generation fails or no candidate is valid.
+Prints YYMMDD-<name>, or YYMMDD-<client>-<name> when <prompt> names a client
+company, where <name> is a Japanese name of up to 10 characters and <client> is
+a client name of up to 10 characters that Claude Haiku generates for the task
+in <prompt>. Exits non-zero without printing a name when generation fails or no
+candidate is valid.
 USAGE
 }
 
@@ -36,8 +38,10 @@ generate_name() {
 - 対象と作業が分かる短い名前にする。細部は省く
 - 各候補は4〜8文字。長くても10文字まで
 - 使える文字はひらがな、カタカナ、漢字、英数字、アンダースコアだけ。空白、記号、句読点は使わない
+- タスクに顧客企業(クライアント)の名前が書かれている場合だけ、全候補の先頭に「クライアント名-」を付ける。半角ハイフンはこの区切りにだけ使い、文字数の制限はハイフンより後ろに適用する
+- クライアント名は通称で10文字まで。「株式会社」や「様」は省く。製品名やサービス名はクライアント名にしない
 - 1行に1候補、良い順に出力する。番号、引用符、説明は付けない
-- 例: パスワード再設定修正、BQコスト削減、レビュー指摘対応
+- 例: パスワード再設定修正、BQコスト削減、レビュー指摘対応、トヨタ-需要予測レビュー
 
 タスク: ${prompt}"
 
@@ -53,11 +57,13 @@ generate_name() {
 
   # Haiku often miscounts Japanese characters, so it returns several candidates
   # and the first valid one wins. jq counts characters regardless of locale.
+  # A candidate is <name> or <client>-<name>, and each part has its own limit.
   name=$(jq -Rnr '
+    "[\\p{Han}\\p{Hiragana}\\p{Katakana}ーA-Za-z0-9_]{1,10}" as $part |
     [
       inputs |
       gsub("^\\s+|\\s+$"; "") |
-      select(test("^[\\p{Han}\\p{Hiragana}\\p{Katakana}ーA-Za-z0-9_]{1,10}$"))
+      select(test("^(?:\($part)-)?\($part)$"))
     ] | first // empty
   ' <<<"$naming_output") ||
     die "failed to read generated worktree names"

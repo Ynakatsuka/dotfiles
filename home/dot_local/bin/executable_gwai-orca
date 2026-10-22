@@ -12,8 +12,9 @@ Usage: gwai-orca [--provider claude|codex] <prompt>
 
 Creates a new top-level Orca worktree in the repository of the workspace
 currently selected in the Orca UI, names it with gwai-worktree-name
-(YYMMDD-<Japanese name of up to 10 characters>), and starts the chosen agent
-with <prompt> in the new workspace.
+(YYMMDD-<Japanese name of up to 10 characters>, or YYMMDD-<client>-<name>
+when <prompt> names a client company), and starts the chosen agent with
+<prompt> in the new workspace.
 
 If --provider is omitted, claude is used.
 USAGE
