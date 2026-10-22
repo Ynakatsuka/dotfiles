@@ -40,7 +40,7 @@ typos = "latest"
 prek = "latest"
 
 # Node.js - JavaScript runtime
-node = "24.9"
+node = "24.22"
 
 # Volta - JavaScript tool manager
 "aqua:volta-cli/volta" = "latest"
