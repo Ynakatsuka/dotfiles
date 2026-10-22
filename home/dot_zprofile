@@ -1,3 +1,10 @@
 if [[ -d /opt/homebrew/bin ]]; then
   eval $(/opt/homebrew/bin/brew shellenv)
+
+  # Temporary: gcloud 590.0.0 bundles a Python CA bundle (2026.02.25) that
+  # still trusts emSign ECC Root CA - G3. Use Homebrew's CA bundle until a
+  # gcloud release drops that root, then remove this block.
+  if [[ -r "$HOMEBREW_PREFIX/etc/ca-certificates/cert.pem" ]]; then
+    export CLOUDSDK_CORE_CUSTOM_CA_CERTS_FILE="$HOMEBREW_PREFIX/etc/ca-certificates/cert.pem"
+  fi
 fi
