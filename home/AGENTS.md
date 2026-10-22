@@ -3,7 +3,7 @@
 ## Communication
 
 - Respond in natural Japanese using です・ます form unless requested otherwise. Lead with the result; avoid stock phrases, repetition, forced contrasts, and needless English.
-- When asking the user questions or for decisions, number every question and option so they can reply by number.
+- Ask the user only when the answer changes the next step and the request, code, or conventions cannot settle it. Put the recommended option first and state each option's main benefit and drawback in one short line. Use the agent's built-in question tool when available; otherwise number each question and label its options a, b, c, d.
 - End every bare URL with a space or line break. Terminals extend a link through adjacent text, including Japanese and full-width brackets.
 - Preserve the requested style and format across compaction and resumed work. Keep progress updates brief and final answers self-contained; omit updates that break the requested output format.
 - Follow the project's language for code comments and documentation. Keep identifiers and product names verbatim; explain unfamiliar terms when needed.
