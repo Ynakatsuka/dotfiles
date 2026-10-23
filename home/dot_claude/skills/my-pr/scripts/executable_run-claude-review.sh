@@ -55,6 +55,7 @@ git -C "$isolated_cwd" init -q
 claude_bin=${MY_PR_CLAUDE_BIN:-claude}
 claude_args=(
   -p
+  --no-session-persistence
   --model opus
   --effort high
   --permission-mode plan

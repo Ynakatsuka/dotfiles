@@ -608,6 +608,7 @@ test_reviewer_b_runner() {
   assert_file_contains "$tmp_dir/claude-args.txt" "<EMPTY>"
   assert_file_contains "$tmp_dir/claude-args.txt" "--safe-mode"
   assert_file_contains "$tmp_dir/claude-args.txt" "--strict-mcp-config"
+  assert_file_contains "$tmp_dir/claude-args.txt" "--no-session-persistence"
   [[ "$(cat "$tmp_dir/claude-effort.txt")" == "high" ]] || fail "Claude effort environment was not fixed to high"
   [[ "$(cat "$tmp_dir/claude-cwd.txt")" == "$canonical_artifact_dir/reviewer-results/reviewer-b/full/claude-cwd" ]] ||
     fail "Claude did not run from the isolated artifact directory"
