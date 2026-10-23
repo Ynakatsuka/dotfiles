@@ -20,8 +20,8 @@ metadata:
 > The prose-review guidance is adapted from iKora128/stop-ai-slop-jp
 > (https://github.com/iKora128/stop-ai-slop-jp), commit e09d327. Licensed under MIT,
 > Copyright (c) 2026 Daichi Nagashima.
-> The writing and structural-review approach draws on coji/natural-japanese
-> (https://github.com/coji/natural-japanese), commit 9a78a429. Licensed under MIT,
+> The writing, structural-review, and unclear-wording guidance draws on coji/natural-japanese
+> (https://github.com/coji/natural-japanese), v1.6.1 (commit 83fd5437). Licensed under MIT,
 > Copyright (c) 2026 coji.
 
 ## 必要環境
@@ -64,7 +64,7 @@ Python 3を使う。Antigravity CLIは任意とし、利用できない場合は
 8. 再照合しても意味またはトーンのずれが残る場合は、その最小範囲を原文へ戻す。未達や判断不能を
    完了として扱わない。
 9. 修正文だけを求められた場合は本文だけを返す。ただし、外部処理の失敗、原文へ戻した箇所、
-   判断不能な箇所がある場合は隠さず短く示す。
+   読み方を推定して直した比喩、判断不能な箇所がある場合は隠さず短く示す。
 
 ## 外部送信の境界
 
