@@ -40,5 +40,6 @@
 - Check SQL identifiers against the dialect's reserved words before writing queries.
 - For BigQuery, use `bq`, show the active project and account, run a dry run, and ask before scanning more than 50 GB. Use `TABLESAMPLE SYSTEM` for exploratory queries unless a full scan is required.
 - For GPU Python, run `nvidia-smi` first and set `CUDA_VISIBLE_DEVICES` explicitly.
+- In UIs and documents, avoid unnecessary secondary labels and descriptions; let the layout explain.
 
 Keep persistent instructions concise and grounded in durable needs. Put occasional workflows in skills and mechanical rules in hooks or CI; remove obsolete or duplicate rules.
