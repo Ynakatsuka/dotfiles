@@ -8,6 +8,7 @@ ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../.." &>/dev/null && pwd)
 
 WITH_GPU=0
 WITH_EXPRESSVPN=0
+WITH_1PASSWORD=0
 WITH_DOCKER=0
 WITH_NVIDIA_CONTAINER=0
 WITH_CLIS=0
@@ -30,6 +31,7 @@ Options:
   --plan <full|standard|minimal>  Deploy plan (auto-sets flags).
   --with-gpu                 Install NVIDIA driver/toolkit (guarded).
   --with-expressvpn          Install ExpressVPN (guarded).
+  --with-1password           Install 1Password and its APT update repository (amd64).
   --with-docker              Install Docker CE + plugins.
   --with-nvidia-container    Install NVIDIA Container Toolkit.
   --with-clis                Install age/uv/mise/tailscale/claude/antigravity (non mise-managed CLIs).
@@ -41,7 +43,7 @@ Options:
   -h, --help                 Show help.
 
 Plans:
-  full      Base packages (sudo) + Docker + CLIs (with age) + dotfiles + mise install
+  full      Base packages (sudo) + 1Password + Docker + CLIs (with age) + dotfiles + mise install
   standard  CLIs (no age, no sudo) + dotfiles + mise install
   minimal   Dotfiles only (chezmoi apply)
 USAGE
@@ -55,6 +57,7 @@ while [ $# -gt 0 ]; do
       ;;
     --with-gpu) WITH_GPU=1 ;;
     --with-expressvpn) WITH_EXPRESSVPN=1 ;;
+    --with-1password) WITH_1PASSWORD=1 ;;
     --with-docker) WITH_DOCKER=1 ;;
     --with-nvidia-container) WITH_NVIDIA_CONTAINER=1 ;;
     --with-clis) WITH_CLIS=1 ;;
@@ -83,6 +86,7 @@ done
 # Apply plan presets (override individual flags)
 case "$PLAN" in
   full)
+    WITH_1PASSWORD=1
     WITH_DOCKER=1
     WITH_CLIS=1
     WITH_DOTFILES=1
@@ -108,6 +112,11 @@ case "$PLAN" in
     exit 1
     ;;
 esac
+
+if [ "$USER_ONLY" -eq 1 ] && [ "$WITH_1PASSWORD" -eq 1 ]; then
+  warn "1Password requires sudo; use --with-1password without --user-only or a user-only plan."
+  exit 1
+fi
 
 if [ "$USER_ONLY" -eq 0 ]; then
   require_ubuntu_2204
@@ -135,6 +144,11 @@ fi
 if [ "$WITH_EXPRESSVPN" -eq 1 ]; then
   log "Running 05_expressvpn.sh"
   "${SCRIPT_DIR}/modules/05_expressvpn.sh" "${DRY_RUN_ARGS[@]}"
+fi
+
+if [ "$WITH_1PASSWORD" -eq 1 ]; then
+  log "Running 15_1password.sh"
+  "${SCRIPT_DIR}/modules/15_1password.sh" "${DRY_RUN_ARGS[@]}"
 fi
 
 if [ "$WITH_DOCKER" -eq 1 ]; then

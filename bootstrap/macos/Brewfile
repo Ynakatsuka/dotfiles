@@ -19,6 +19,7 @@ tap "johanhaleby/kubetail"
 brew "johanhaleby/kubetail/kubetail"
 tap "stablyai/orca"
 
+cask "1password"
 cask "docker-desktop"
 cask "dropbox"
 cask "google-chrome"

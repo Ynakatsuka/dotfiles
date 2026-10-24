@@ -24,6 +24,7 @@ register() {
 }
 
 # name, runner, source path, external tools, optional supported platform.
+register test-1password-bootstrap bash scripts/test-1password-bootstrap.sh 'bash'
 register test-ccv-statusline-proxy bash scripts/test-ccv-statusline-proxy.sh 'bash jq'
 register test-codex-config bash scripts/test-codex-config.sh 'bash chezmoi jq'
 register test-codex-cdx-trust bash scripts/test-codex-cdx-trust.sh 'bash chezmoi git jq zsh'

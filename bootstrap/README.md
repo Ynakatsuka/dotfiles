@@ -17,7 +17,7 @@ Minimal, reproducible setup for new machines. Destructive actions always ask for
 ### Make Targets
 
 ```bash
-# Full setup: system packages/apps + CLIs (with age) + dotfiles + mise install
+# Full setup: system packages/apps (including 1Password) + CLIs (with age) + dotfiles + mise install
 make -C bootstrap full
 
 # Standard: CLIs (no age) + dotfiles + mise install (no sudo on Linux)
@@ -72,7 +72,8 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 
 - Ubuntu 22.04 (full)
   - Validates OS version, installs base packages
-  - Installs Docker + CLIs, cleans up
+  - Installs 1Password (amd64), Docker + CLIs, cleans up
+  - Uses the official 1Password `.deb`, which configures its signing key and APT repository for updates
   - Detects NVIDIA GPU and offers driver/CUDA install with confirmation
 
 - Ubuntu (user-only, `--user-only`)
@@ -82,7 +83,8 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 
 ### Customize
 
-- Apps: edit `bootstrap/macos/Brewfile`
+- macOS apps: edit `bootstrap/macos/Brewfile`
+- Ubuntu system apps: edit `bootstrap/linux/modules/` and `bootstrap/linux/main.sh`
 - macOS defaults: edit `home/private_dot_config/mise/config.toml`
 
 ### Manual Steps
@@ -102,6 +104,21 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 
 - If a Brew cask name changes (e.g., third-party apps), update `bootstrap/macos/Brewfile` and re-run `brew bundle`.
 - Use `--dry-run` with Linux bootstrap to preview planned actions without executing.
+
+### 1Password on Ubuntu
+
+The `full` plan installs the desktop app on amd64 Ubuntu. The `standard` and `minimal` plans do not install it because they run without sudo. ARM installations are not managed by this bootstrap.
+
+To install only 1Password (without running the rest of the full setup):
+
+```bash
+bash bootstrap/linux/modules/15_1password.sh --dry-run
+bash bootstrap/linux/modules/15_1password.sh
+```
+
+The orchestrator also accepts `--with-1password` alongside other system modules. After installation, update it with `sudo apt-get update && sudo apt-get install --only-upgrade 1password`.
+
+Installation follows the [official 1Password Linux instructions](https://support.1password.com/install-linux/#debian-or-ubuntu). Open the app and sign in manually after installation.
 
 ## SSH Setup (Client vs Server)
 
