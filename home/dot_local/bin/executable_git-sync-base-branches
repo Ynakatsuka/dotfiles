@@ -72,7 +72,9 @@ sync_repo() {
     fail "$label: no origin remote"
     return
   fi
-  if ! git -C "$repo" fetch --quiet origin; then
+  # Prune so a branch deleted on origin is skipped instead of following its
+  # stale tracking ref.
+  if ! git -C "$repo" fetch --quiet --prune origin; then
     fail "$label: git fetch origin failed"
     return
   fi

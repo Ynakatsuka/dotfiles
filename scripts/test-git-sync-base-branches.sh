@@ -82,8 +82,13 @@ if grep -Fq "Acme/app-prod" "$TMP_DIR/out"; then
 fi
 
 git -C "$REPO" branch --quiet -D develop
+git -C "$REPO" branch --quiet -f staging staging~1
+STAGING_BEFORE=$(git -C "$REPO" rev-parse staging)
+git -C "$SEED" push --quiet origin --delete staging
 bash "$SCRIPT" Acme >"$TMP_DIR/out" 2>&1 || fail "up-to-date run failed: $(cat "$TMP_DIR/out")"
 grep -Fq "Acme/app main: up to date" "$TMP_DIR/out" || fail "up-to-date main was not reported"
+[ "$(git -C "$REPO" rev-parse staging)" = "$STAGING_BEFORE" ] || fail "staging followed a branch deleted on origin"
+grep -Fq "origin/staging not found" "$TMP_DIR/out" || fail "deleted origin/staging was not reported"
 
 if bash "$SCRIPT" missing-owner >"$TMP_DIR/out" 2>&1; then
   fail "unknown owner did not fail"
