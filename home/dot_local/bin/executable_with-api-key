@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Resolve a shared API key from 1Password for the requested command.
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: with-api-key <openai|gemini|claude|deepseek|notion> <command> [args...]"
+}
+
+if [[ $# -eq 1 && ("$1" == "--help" || "$1" == "-h") ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 2 ]]; then
+  usage >&2
+  exit 2
+fi
+
+case "$1" in
+  openai)
+    variable=OPENAI_API_KEY
+    reference='op://Personal/OpenAI API/credential'
+    ;;
+  gemini)
+    variable=GEMINI_API_KEY
+    reference='op://Personal/Gemini API/credential'
+    ;;
+  claude)
+    variable=CLAUDE_API_KEY
+    reference='op://Personal/Claude API/credential'
+    ;;
+  deepseek)
+    variable=DEEPSEEK_API_KEY
+    reference='op://Personal/DeepSeek API/credential'
+    ;;
+  notion)
+    variable=NOTION_API_KEY
+    reference='op://Personal/Notion API/credential'
+    ;;
+  *)
+    echo "with-api-key: unsupported provider: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
+shift
+
+exec env "$variable=$reference" op run -- "$@"

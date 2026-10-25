@@ -378,6 +378,14 @@ Sensitive files are managed with [`age`](https://github.com/FiloSottile/age) enc
 
 The repository stores the `age` private key itself as a passphrase-protected file (`.age-key.age`). On the first `chezmoi apply`, that key is decrypted and cached at `~/.config/chezmoi/key.txt`. After that, the passphrase is not required again on the same machine.
 
+The same cached identity can be backed up to the **Personal / chezmoi age key** Document in 1Password:
+
+```bash
+bash bootstrap/age-key.sh backup
+```
+
+The backup command downloads the saved document again, compares it with the original identity, and verifies that it decrypts this repository's encrypted SSH configuration. An existing document with different contents is not overwritten.
+
 ### Encrypted Paths
 
 | Source | Deployed To |
@@ -405,6 +413,18 @@ sudo apt-get install -y age
 Bootstrap on Linux also installs `age`.
 
 ### First-Time Setup on a New Machine
+
+With 1Password, restore the identity from a repository checkout before initializing chezmoi:
+
+```bash
+bash bootstrap/age-key.sh restore
+chezmoi -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init https://github.com/Ynakatsuka/dotfiles.git
+chezmoi apply -v
+```
+
+This requires `op`, `age`, `jq`, and `python3`, plus a signed-in 1Password account. See the [bootstrap recovery instructions](bootstrap/README.md#age-key-backup-and-restoration) to install the tools before chezmoi is initialized. Restoration validates the downloaded key before installing it with mode `600`, and refuses to overwrite an existing file or symlink at `~/.config/chezmoi/key.txt`.
+
+To initialize with the repository key's passphrase:
 
 ```bash
 chezmoi -S "$HOME/ghq/github.com/Ynakatsuka/dotfiles" init https://github.com/Ynakatsuka/dotfiles.git
