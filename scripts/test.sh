@@ -35,6 +35,7 @@ register test-delegation bash scripts/test-delegation.sh 'bash chezmoi jq python
 register test-disk-tree bash scripts/test-disk-tree.sh 'bash python3'
 register test-dotfiles-brew-upgrade bash scripts/test-dotfiles-brew-upgrade.sh 'bash'
 register test-dotfiles-mise-up bash scripts/test-dotfiles-mise-up.sh 'bash jq'
+register test-git-sync-base-branches bash scripts/test-git-sync-base-branches.sh 'bash git'
 register test-gwai-branch-name zsh scripts/test-gwai-branch-name.zsh 'zsh'
 register test-gwai-orca bash scripts/test-gwai-orca.sh 'bash git jq'
 register test-gwai-worktree-name bash scripts/test-gwai-worktree-name.sh 'bash jq'
