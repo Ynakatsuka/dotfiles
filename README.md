@@ -262,6 +262,7 @@ rollouts are not listed; use `codex resume` for them.
 | `gwta` | `git worktree add` |
 | `gwtl` | `git worktree list` |
 | `gwtr` | `git worktree remove` |
+| `mise run sync-base-branches <owner>...` | Fetch origin and fast-forward local `main`, `master`, `develop`, `staging`, and `production` in ghq repositories under each owner; branches with local-only commits stay unchanged |
 
 On Linux, `worktree-prune.timer` checks `~/ghq` every day. CCV's web UI controls
 whether cleanup is enabled, the 1–365 day retention period, and whether merged

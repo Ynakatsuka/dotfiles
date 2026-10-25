@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Fast-forward local base branches of ghq repositories to origin.
+#
+# For each primary clone directly under <host>/OWNER/ (linked worktrees are
+# skipped), fetch origin and fast-forward every existing local base branch to
+# origin/<branch>. A branch checked out in a worktree is merged with --ff-only
+# there so the files follow. A branch with commits missing from origin is left
+# unchanged and reported.
+
+set -euo pipefail
+
+BASE_BRANCHES="main master develop staging production"
+FAILURES=0
+
+usage() {
+  echo "Usage: git-sync-base-branches OWNER..."
+}
+
+fail() {
+  echo "[ERROR] $*" >&2
+  FAILURES=$((FAILURES + 1))
+}
+
+lowercase() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+# Print the path of the worktree that has refs/heads/<branch> checked out.
+checked_out_worktree() {
+  local repo=$1 branch=$2
+  git -C "$repo" worktree list --porcelain | awk -v ref="branch refs/heads/$branch" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == ref && !found { print path; found = 1 }
+  '
+}
+
+sync_branch() {
+  local repo=$1 label=$2 branch=$3 local_sha remote_sha worktree count
+  local_sha=$(git -C "$repo" rev-parse "refs/heads/$branch")
+  if ! remote_sha=$(git -C "$repo" rev-parse --verify --quiet "refs/remotes/origin/$branch"); then
+    echo "[WARN] $label $branch: origin/$branch not found; skipped" >&2
+    return
+  fi
+  if [ "$local_sha" = "$remote_sha" ]; then
+    echo "$label $branch: up to date"
+    return
+  fi
+  if ! git -C "$repo" merge-base --is-ancestor "$local_sha" "$remote_sha"; then
+    fail "$label $branch: has commits not on origin/$branch; left unchanged"
+    return
+  fi
+
+  count=$(git -C "$repo" rev-list --count "$local_sha..$remote_sha")
+  worktree=$(checked_out_worktree "$repo" "$branch")
+  if [ -n "$worktree" ]; then
+    if ! git -C "$worktree" merge --ff-only --quiet "refs/remotes/origin/$branch"; then
+      fail "$label $branch: fast-forward failed in $worktree"
+      return
+    fi
+  # Fetching into the local ref refuses non-fast-forward updates and branches
+  # that a worktree is rebasing or bisecting.
+  elif ! git -C "$repo" fetch --quiet . "refs/remotes/origin/$branch:refs/heads/$branch"; then
+    fail "$label $branch: fast-forward failed"
+    return
+  fi
+  echo "$label $branch: ${local_sha:0:7}..${remote_sha:0:7} ($count commits)"
+}
+
+sync_repo() {
+  local repo=$1 label=$2 branch
+  if ! git -C "$repo" remote get-url origin >/dev/null 2>&1; then
+    fail "$label: no origin remote"
+    return
+  fi
+  if ! git -C "$repo" fetch --quiet origin; then
+    fail "$label: git fetch origin failed"
+    return
+  fi
+  for branch in $BASE_BRANCHES; do
+    if git -C "$repo" show-ref --verify --quiet "refs/heads/$branch"; then
+      sync_branch "$repo" "$label" "$branch"
+    fi
+  done
+}
+
+main() {
+  local owner owner_key ghq_repos repo parent matched
+  if [ "$#" -eq 0 ]; then
+    usage >&2
+    return 2
+  fi
+  case $1 in
+    -h | --help)
+      usage
+      return 0
+      ;;
+  esac
+
+  ghq_repos=$(ghq list --full-path)
+  for owner in "$@"; do
+    # GitHub owner names are case-insensitive.
+    owner_key=$(lowercase "$owner")
+    matched=0
+    while IFS= read -r repo; do
+      [ -d "$repo/.git" ] || continue
+      parent=${repo%/*}
+      [ "$(lowercase "${parent##*/}")" = "$owner_key" ] || continue
+      matched=1
+      # Keep git subprocesses from reading the repository list on stdin.
+      sync_repo "$repo" "${parent##*/}/${repo##*/}" </dev/null
+    done <<<"$ghq_repos"
+    if [ "$matched" -eq 0 ]; then
+      fail "no ghq repositories found for owner: $owner"
+    fi
+  done
+
+  if [ "$FAILURES" -gt 0 ]; then
+    echo "[ERROR] git-sync-base-branches: $FAILURES problem(s) reported above" >&2
+    return 1
+  fi
+}
+
+main "$@"

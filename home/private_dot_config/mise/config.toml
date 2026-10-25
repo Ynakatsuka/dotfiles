@@ -232,6 +232,11 @@ else
 fi
 """
 
+[tasks.sync-base-branches]
+description = "Fast-forward local main/master/develop/staging/production to origin in ghq repositories of the given owners"
+# mise appends task arguments (owner names) to this command.
+run = "git-sync-base-branches"
+
 [tasks.clean-mise-cache]
 description = "Clean mise cache files manually"
 run = "mise cache clean"
