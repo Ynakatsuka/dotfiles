@@ -28,7 +28,7 @@ jobs:
       - name: Install test tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq zsh
+          sudo apt-get install -y age jq ripgrep zsh
           mkdir -p "$HOME/.local/bin"
           curl -fsLS https://get.chezmoi.io -o "$RUNNER_TEMP/chezmoi-install.sh"
           sh "$RUNNER_TEMP/chezmoi-install.sh" -b "$HOME/.local/bin"
