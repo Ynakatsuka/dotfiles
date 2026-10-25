@@ -5,6 +5,10 @@
 set -euo pipefail
 
 readonly ORCA_BIN="${ORCA_BIN:-/Applications/Orca.app/Contents/Resources/bin/orca}"
+# Orca writes the config directory of the Claude account selected for new
+# launches here. It removes the file when it manages no Claude accounts and
+# leaves it empty when the system default account is selected.
+readonly ORCA_CLAUDE_PROFILE_POINTER="${ORCA_CLAUDE_PROFILE_POINTER:-$HOME/Library/Application Support/orca/claude-profiles/selected-host}"
 
 usage() {
   cat <<'USAGE'
@@ -67,6 +71,20 @@ read_active_repo_id() {
     end
   ' <<<"$ps_json") ||
     die "failed to read the repository of the active Orca workspace"
+}
+
+# Name the worktree with the Claude account Orca launches agents with, not the
+# system default account that Raycast would otherwise use.
+use_orca_claude_account() {
+  local config_dir
+
+  [[ -f "$ORCA_CLAUDE_PROFILE_POINTER" ]] || return 0
+  config_dir=$(<"$ORCA_CLAUDE_PROFILE_POINTER") ||
+    die "failed to read the Orca Claude account: $ORCA_CLAUDE_PROFILE_POINTER"
+  [[ -n "$config_dir" ]] || return 0
+  [[ -d "$config_dir" ]] ||
+    die "Orca Claude account directory not found: $config_dir"
+  export CLAUDE_CONFIG_DIR="$config_dir"
 }
 
 create_worktree() {
@@ -133,6 +151,7 @@ require_command gwai-worktree-name
 
 active_repo_id=''
 read_active_repo_id
+use_orca_claude_account
 workspace_name=$(gwai-worktree-name -- "$prompt") ||
   die "failed to name the Orca worktree"
 create_worktree "$workspace_name"
