@@ -35,6 +35,12 @@ require_command() {
   command -v "$name" >/dev/null 2>&1 || die "$name not found in PATH"
 }
 
+# The Raycast aio command shows each stdout line as the current step, and its
+# final HUD shows the last line, so the result stays last.
+report_step() {
+  printf '%s\n' "$1"
+}
+
 print_orca_response() {
   local response="$1"
 
@@ -150,10 +156,13 @@ require_command gwai-worktree-name
 [[ -x "$ORCA_BIN" ]] || die "Orca executable not found: $ORCA_BIN"
 
 active_repo_id=''
+report_step 'Reading the selected Orca workspace...'
 read_active_repo_id
 use_orca_claude_account
+report_step 'Naming the worktree...'
 workspace_name=$(gwai-worktree-name -- "$prompt") ||
   die "failed to name the Orca worktree"
+report_step "Creating Orca worktree: ${workspace_name}..."
 create_worktree "$workspace_name"
 
 printf 'Created Orca worktree: %s\n' "$workspace_name"
