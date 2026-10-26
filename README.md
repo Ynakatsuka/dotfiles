@@ -329,6 +329,7 @@ Built-in display layout:
 ### Orca
 
 Run `aio` in Raycast to create an AI-named top-level worktree in the selected Orca workspace's repository and start a Claude (default) or Codex session.
+While it runs, a Hammerspoon alert shows the current step.
 
 After installing Orca on a new machine, create the non-secret browser profile managed by these dotfiles:
 

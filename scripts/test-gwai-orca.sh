@@ -124,6 +124,14 @@ assert_args_equal "$orca_create_args" \
 [[ "$(grep -Fxc 'worktree create' "$orca_command_log")" -eq 1 ]] ||
   fail 'successful worktree create did not run exactly once'
 
+# Raycast aio shows each line as the current step and the last line as the result.
+expected_output='Reading the selected Orca workspace...
+Naming the worktree...
+Creating Orca worktree: 261017-パスワード再設定修正...
+Created Orca worktree: 261017-パスワード再設定修正'
+[[ "$(<"$run_output")" == "$expected_output" ]] ||
+  fail 'successful run did not report its steps before the result'
+
 set +e
 PATH="$bin_dir:$PATH" \
   ORCA_BIN="$bin_dir/orca" \
