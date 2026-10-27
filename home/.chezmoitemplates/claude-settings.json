@@ -93,11 +93,11 @@
   "model": "opus",
   "language": "japanese",
   "outputStyle": "Concise",
-  "effortLevel": "xhigh",
+  "effortLevel": "high",
   "autoCompactWindow": 500000,
   "modelSettings": {
     "claude-opus-5-5": {
-      "effortLevel": "xhigh"
+      "effortLevel": "high"
     }
   },
   "switchModelsOnFlag": false,
