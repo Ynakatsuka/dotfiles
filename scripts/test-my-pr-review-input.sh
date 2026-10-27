@@ -763,11 +763,11 @@ test_documented_state_contract() {
 test_reviewer_model_configuration() {
   jq -e '
     .model == "opus" and
-    .effortLevel == "xhigh" and
-    .modelSettings."claude-opus-5-5".effortLevel == "xhigh" and
+    .effortLevel == "high" and
+    .modelSettings."claude-opus-5-5".effortLevel == "high" and
     (.env | has("CLAUDE_CODE_EFFORT_LEVEL") | not)
   ' "$claude_settings" >/dev/null ||
-    fail "Claude settings must use Opus 5.5 at xhigh effort without a global effort environment variable"
+    fail "Claude settings must use Opus 5.5 at high effort without a global effort environment variable"
 
   assert_file_contains "$reviewer_b_agent" 'name: my-pr-reviewer'
   assert_file_contains "$reviewer_b_agent" 'tools: []'
