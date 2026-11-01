@@ -38,6 +38,20 @@ Omit sections that do not apply.
 
 Use `## 確認方法` for the shortest way a reviewer can check the result, chosen as the global evidence rule describes: a URL or path to open, a command to run, or before-and-after screenshots. Omit the section when `## テスト内容` already is that way.
 
+When the diff changes rendered UI, such as components, styles, templates, or copy, `## 確認方法` must show before-and-after screenshots:
+
+- Capture the before image from the merge base in a temporary `git worktree` and the after image from the PR head, using the same page, state, data, and viewport. Use a headless browser and save the images under `$MY_PR_ARTIFACT_DIR`.
+- Crop to the changed area when the full page hides the difference; add a full-page or mobile pair only when layout or responsiveness changed.
+- Lay them out side by side:
+
+```markdown
+| 変更前 | 変更後 |
+| --- | --- |
+| ![変更前](./before.png) | ![変更後](./after.png) |
+```
+
+If the app cannot run locally, state the reason under `## テスト内容` instead of omitting the screenshots silently.
+
 Reference an image or video in the body by the path passed to `--attach`, such as `![修正後](./after.png)`; `gh` rewrites the reference to the uploaded asset.
 
 ## Test content

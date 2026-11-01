@@ -32,7 +32,7 @@
 - The main agent owns decisions, integration, and final verification of delegated work.
 - Run the narrowest relevant checks and broaden only for a concrete remaining risk. Add tests only for observable behavior with a plausible defect and a gap in existing coverage.
 - Report what changed, exact check commands and results, and remaining limitations. For multiple requested items, account for each outcome and give the shortest way to inspect the result.
-- Upload PR screenshots with `--attach` on `gh pr create`, `gh pr edit`, or `gh pr comment`.
+- When a PR changes what users see, show before-and-after screenshots of the same view in its description. Upload them with `--attach` on `gh pr create`, `gh pr edit`, or `gh pr comment`.
 
 ## Specialized Work
 
