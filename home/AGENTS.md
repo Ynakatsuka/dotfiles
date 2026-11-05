@@ -28,6 +28,9 @@
 
 - Find uncertain paths with `rg --files` or `fd`. Bound reads and command output. Use `ast-grep` for syntax-aware changes when safer, and `jq` or `yq` for structured data.
 - In zsh, do not use `path` as a variable. Verify required executables before remote or container batches; report missing dependencies.
+- In zsh, a glob that matches nothing aborts the whole command line with `no matches found`. Quote patterns the tool itself expands, and list files that may not exist with `fd` or `find`.
+- Do not put a command after `sleep N` to wait. Run the slow command in the background, or poll its condition in an until-loop.
+- `pkill -f` and `pgrep -f` also match the shell that runs them, because its command line contains the pattern. Bracket one character, as in `pkill -f '[m]y-server'`, or signal a PID.
 - Use skills for occasional workflows. Delegate independent work when parallel execution saves time after coordination overhead; prevent conflicts in edits, tests, and generated output.
 - The main agent owns decisions, integration, and final verification of delegated work.
 - Run the narrowest relevant checks and broaden only for a concrete remaining risk. Add tests only for observable behavior with a plausible defect and a gap in existing coverage.
