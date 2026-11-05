@@ -75,6 +75,10 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/check-url-boundaries.py"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/check-reply-language.py"
           }
         ]
       }

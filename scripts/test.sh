@@ -47,6 +47,7 @@ register test-my-skill-creator bash scripts/test-my-skill-creator.sh 'bash pytho
 register test-orca-claude-hook bash scripts/test-orca-claude-hook.sh 'bash jq'
 register test-orca-hook-settings bash scripts/test-orca-hook-settings.sh 'bash chezmoi jq'
 register test-prune-old-worktrees bash scripts/test-prune-old-worktrees.sh 'bash git python3' Linux
+register test-reply-language-hook bash scripts/test-reply-language-hook.sh 'bash python3'
 register test-rtk-rewrite-hook bash scripts/test-rtk-rewrite-hook.sh 'bash jq'
 register test-runner bash scripts/test-runner.sh 'bash'
 register test-session-resume bash scripts/test-session-resume.sh 'bash python3 zsh'
