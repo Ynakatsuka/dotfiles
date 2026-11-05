@@ -5,6 +5,15 @@
 # Source Prezto.
 if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
   source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
+
+  # Claude Code sources this file in a non-interactive shell and replays the
+  # resulting options and aliases in every Bash tool call. Nobody can answer a
+  # prompt there, so drop Prezto's overwrite guard and `-i` aliases. Interactive
+  # shells keep both, even when started under Claude Code.
+  if [[ -n "$CLAUDECODE" && ! -o interactive ]]; then
+    setopt CLOBBER
+    unalias cp ln mv rm
+  fi
 fi
 
 # Source modular zsh configuration files
