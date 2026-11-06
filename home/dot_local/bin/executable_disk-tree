@@ -69,14 +69,11 @@ def scan_directory(root: Path, jobs: int) -> DirectoryNode:
             current_stat = os.stat(current, follow_symlinks=False)
             with os.scandir(current) as scanner:
                 entries = sorted(scanner, key=lambda entry: os.fsencode(entry.name))
-        except PermissionError as error:
+        except OSError as error:
+            # Below the scan root, skip directories that are unreadable or
+            # vanish mid-scan (e.g. caches rewritten by running tools).
             if current != root:
                 return None
-            target = Path(error.filename) if error.filename else current
-            raise DiskTreeError(
-                f"容量を取得できません: {target}: {error.strerror}"
-            ) from error
-        except OSError as error:
             target = Path(error.filename) if error.filename else current
             raise DiskTreeError(
                 f"容量を取得できません: {target}: {error.strerror}"
@@ -90,13 +87,8 @@ def scan_directory(root: Path, jobs: int) -> DirectoryNode:
             entry_path = Path(entry.path)
             try:
                 entry_stat = entry.stat(follow_symlinks=False)
-            except PermissionError:
+            except OSError:
                 continue
-            except OSError as error:
-                target = Path(error.filename) if error.filename else entry_path
-                raise DiskTreeError(
-                    f"容量を取得できません: {target}: {error.strerror}"
-                ) from error
 
             if stat.S_ISDIR(entry_stat.st_mode):
                 child_paths.append(entry_path)
