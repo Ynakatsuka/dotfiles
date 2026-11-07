@@ -5,16 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
 . "${SCRIPT_DIR}/../lib/common.sh"
 
-# Ensure brew is available in PATH
-if ! activate_brew; then
-  warn "Homebrew not found. Please install Homebrew first."
-  exit 1
-fi
+# The minimal plan runs without Homebrew; use it only when present.
+activate_brew || true
 
 log "Dotfiles setup (prezto/tpm/chezmoi/mise)"
 
 if ! command -v git >/dev/null 2>&1; then
-  warn "git is required. Install via Homebrew first."
+  warn "git is required. Run 'xcode-select --install' first."
   exit 1
 fi
 
@@ -40,10 +37,10 @@ else
   log "tpm already exists"
 fi
 
-# Ensure chezmoi via Homebrew
 if ! command -v chezmoi >/dev/null 2>&1; then
-  log "Installing chezmoi via Homebrew"
-  brew install chezmoi
+  log "Installing chezmoi via the official installer"
+  install_chezmoi_official -c
+  export PATH="$HOME/.local/bin:$PATH"
 fi
 
 # Choose remote protocol for chezmoi init
@@ -70,9 +67,9 @@ else
 fi
 
 # Optional: change login shell to zsh (macOS default is zsh, keep optional)
-if [ "$(dscl . -read /Users/"$USER" UserShell 2>/dev/null | awk '{print $2}')" != "$(which zsh)" ]; then
+if [ "$(dscl . -read /Users/"$USER" UserShell 2>/dev/null | awk '{print $2}')" != "$(command -v zsh)" ]; then
   if confirm "Change your login shell to zsh?"; then
-    chsh -s "$(which zsh)"
+    chsh -s "$(command -v zsh)"
   else
     log "Keeping current login shell"
   fi

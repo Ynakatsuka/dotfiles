@@ -38,10 +38,10 @@ elif confirm "Install chezmoi and apply this dotfiles repo?"; then
   run bash -lc 'source "$HOME/.zshrc" || true'
 fi
 
-if [ "$(getent passwd "$USER" | cut -d: -f7)" = "$(which zsh 2>/dev/null)" ]; then
+if [ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh 2>/dev/null)" ]; then
   log "Login shell already zsh, skipping"
 elif confirm "Change login shell to zsh?"; then
-  run chsh -s "$(which zsh)" || warn "chsh failed (try manually: chsh -s $(which zsh))"
+  run chsh -s "$(command -v zsh)" || warn "chsh failed (try manually: chsh -s $(command -v zsh))"
 fi
 
 log "Dotfiles module completed"

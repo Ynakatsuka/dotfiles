@@ -34,7 +34,7 @@ Options:
   --with-1password           Install 1Password and its APT update repository (amd64).
   --with-docker              Install Docker CE + plugins.
   --with-nvidia-container    Install NVIDIA Container Toolkit.
-  --with-clis                Install age/uv/mise/tailscale/claude/antigravity (non mise-managed CLIs).
+  --with-clis                Install age/mise/tailscale/claude/antigravity (non mise-managed CLIs).
   --with-dotfiles            Setup prezto/tpm/chezmoi (guarded).
   --with-cleanup             Run apt autoremove at the end.
   --xdg-english-dirs         Convert XDG user dirs to English (guarded).
@@ -195,23 +195,7 @@ fi
 
 # Post-mise tasks (need tools provided by `mise install`).
 if [ "$WITH_CLIS" -eq 1 ]; then
-  GH_BIN=""
-  if command -v gh >/dev/null 2>&1; then
-    GH_BIN="gh"
-  elif [ -x "$HOME/.local/share/mise/shims/gh" ]; then
-    GH_BIN="$HOME/.local/share/mise/shims/gh"
-  fi
-
-  if [ -n "$GH_BIN" ]; then
-    if "$GH_BIN" extension list 2>/dev/null | grep -q dlvhdr/gh-dash; then
-      log "gh-dash already installed, skipping"
-    elif confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
-      run "$GH_BIN" extension install dlvhdr/gh-dash
-    fi
-    warn "Run 'gh auth login' manually if you have not authenticated yet."
-  else
-    warn "gh not found (expected mise-managed); skipping gh-dash installation."
-  fi
+  install_gh_dash
 fi
 
 if [ "$WITH_CLEANUP" -eq 1 ]; then

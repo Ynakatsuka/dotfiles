@@ -112,6 +112,28 @@ install_chezmoi_official() {
   run bash "$1" 'sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'
 }
 
+# gh is mise-managed, so call this after run_mise_install.
+install_gh_dash() {
+  local gh_bin=""
+  if command -v gh >/dev/null 2>&1; then
+    gh_bin="gh"
+  elif [ -x "$HOME/.local/share/mise/shims/gh" ]; then
+    gh_bin="$HOME/.local/share/mise/shims/gh"
+  fi
+
+  if [ -z "$gh_bin" ]; then
+    warn "gh not found (expected mise-managed); skipping gh-dash installation."
+    return 0
+  fi
+
+  if "$gh_bin" extension list 2>/dev/null | grep -q dlvhdr/gh-dash; then
+    log "gh-dash already installed, skipping"
+  elif confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
+    run "$gh_bin" extension install dlvhdr/gh-dash
+  fi
+  warn "Run 'gh auth login' manually if you have not authenticated yet."
+}
+
 run_mise_install() {
   local mise_cmd
   if mise_cmd="$(resolve_mise)"; then

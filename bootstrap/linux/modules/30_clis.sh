@@ -33,16 +33,6 @@ fi
 # gh is managed by mise (see private_dot_config/mise/config.toml). gh-dash extension is installed
 # from main.sh after `mise install` completes.
 
-if command -v uv >/dev/null 2>&1; then
-  log "uv already installed, skipping"
-elif confirm "Install uv (via installer script)?"; then
-  run bash -lc '_s=$(mktemp) && curl --fail -LsS https://astral.sh/uv/install.sh -o "$_s" && sh "$_s" && rm -f "$_s"'
-  run bash -lc 'source "$HOME/.cargo/env" || true'
-  run bash -lc 'uvx ruff || true'
-  run bash -lc 'uvx mypy || true'
-  run bash -lc 'uvx sqlfluff || true'
-fi
-
 if resolve_mise >/dev/null 2>&1; then
   log "mise already installed, skipping"
 elif confirm "Install mise (via official installer)?"; then
@@ -50,7 +40,7 @@ elif confirm "Install mise (via official installer)?"; then
   warn "Restart your shell or source the activation in your rc to use mise."
 fi
 
-# rye, direnv, and gcloud are managed by mise (see private_dot_config/mise/config.toml).
+# uv, direnv, and gcloud are managed by mise (see private_dot_config/mise/config.toml).
 
 if command -v tailscale >/dev/null 2>&1; then
   log "tailscale already installed, skipping"
