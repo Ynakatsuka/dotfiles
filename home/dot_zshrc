@@ -6,13 +6,16 @@
 if [[ -s "${ZDOTDIR:-$HOME}/.zprezto/init.zsh" ]]; then
   source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
 
-  # Claude Code sources this file in a non-interactive shell and replays the
-  # resulting options and aliases in every Bash tool call. Nobody can answer a
-  # prompt there, so drop Prezto's overwrite guard and `-i` aliases. Interactive
-  # shells keep both, even when started under Claude Code.
-  if [[ -n "$CLAUDECODE" && ! -o interactive ]]; then
+  # Claude Code replays this file's options, aliases, and functions in every
+  # Bash tool call, and agents also run `zsh -ic`. Nobody can answer a prompt
+  # there, so drop Prezto's overwrite guard and `-i` aliases, and drop its
+  # autoloaded `diff` wrapper, whose definition file is not found once fpath
+  # differs (the external /usr/bin/diff is used instead). Shells without
+  # CLAUDECODE keep all of it. NOMATCH/EQUALS are handled in .zshenv.
+  if [[ -n "$CLAUDECODE" ]]; then
     setopt CLOBBER
     unalias cp ln mv rm
+    (( $+functions[diff] )) && unfunction diff
   fi
 fi
 
