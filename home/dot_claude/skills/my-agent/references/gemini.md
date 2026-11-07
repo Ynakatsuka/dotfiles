@@ -5,8 +5,8 @@ a session.
 
 ## Preflight
 
-1. Confirm `command -v agy` succeeds. If it fails, install Antigravity CLI with the repository
-   bootstrap script.
+1. Confirm `command -v agy` succeeds. If it fails, stop and tell the user to install Antigravity CLI
+   with the dotfiles bootstrap.
 2. When the user names a model, confirm its ID with `agy models` before invoking it.
 3. Authentication is managed by Antigravity. If a headless call reports missing or expired
    authentication, stop and ask the user to run `agy` interactively. Do not inspect or print

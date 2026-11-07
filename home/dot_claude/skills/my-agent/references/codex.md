@@ -18,4 +18,4 @@ codex exec --model <MODEL> "<PROMPT>" </dev/null          # only when the user n
 
 ## Configuration
 
-Defaults such as the model, approval policy, and sandbox come from `~/.codex/config.toml`, managed in this repository as `home/dot_codex/private_config.toml.tmpl`. Read that file instead of assuming values. Check its approval and sandbox settings before relying on either, and state any read-only constraint in the prompt.
+Defaults such as the model, approval policy, and sandbox come from `~/.codex/config.toml`, deployed from the dotfiles template `home/dot_codex/private_config.toml.tmpl`. Read `~/.codex/config.toml` instead of assuming values. Check its approval and sandbox settings before relying on either, and state any read-only constraint in the prompt.

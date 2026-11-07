@@ -70,7 +70,7 @@ mise.lock
 .cursor/mcp.json
 .config/zsh/cursor.zsh
 .local/bin/dotfiles-cursor-agent-upgrade
-.config/code-server
+.config/code-server/config.yaml
 .zlogout
 Library/Application Support/com.mitchellh.ghostty/config
 .config/zsh/copy-last-output.zsh

@@ -126,12 +126,16 @@ install_gh_dash() {
     return 0
   fi
 
+  if ! "$gh_bin" auth status >/dev/null 2>&1; then
+    warn "gh is not authenticated; run 'gh auth login', then 'gh extension install dlvhdr/gh-dash'."
+    return 0
+  fi
+
   if "$gh_bin" extension list 2>/dev/null | grep -q dlvhdr/gh-dash; then
     log "gh-dash already installed, skipping"
   elif confirm "Install gh-dash (GitHub CLI extension for PR/issue dashboard)?"; then
     run "$gh_bin" extension install dlvhdr/gh-dash
   fi
-  warn "Run 'gh auth login' manually if you have not authenticated yet."
 }
 
 run_mise_install() {

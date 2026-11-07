@@ -23,12 +23,13 @@ gh release list --exclude-drafts --exclude-pre-releases --limit 1 --json tagName
 
 `LAST_TAG` が空（公開済みリリースがない）なら停止し、初回リリースの対象範囲（開始 commit / tag、または全履歴）をユーザーに確認する。空のまま `git log ${LAST_TAG}..HEAD` を実行すると空 range になり、変更ゼロと誤認する。
 
-前回リリース以降のマージ済み PR とコミットを集める。PR はタグのコミット日時以降のマージ日で絞る:
+前回リリース以降のマージ済み PR とコミットを集める。PR はタグのコミット日時以降のマージ日で絞る。タグ日時の取得が失敗するか空なら（ローカルにタグがないなど）停止する:
 
 ```bash
-gh pr list --state merged --search "merged:>$(git log -1 --format=%cI "$LAST_TAG")" --limit 200 \
-  --json number,title,body,mergedAt,author,labels,url,mergeCommit
-git log "${LAST_TAG}..HEAD" --pretty=format:"%h %s (%an, %ad)" --date=short
+LAST_TAG_DATE=$(git log -1 --format=%cI "$LAST_TAG") && [ -n "$LAST_TAG_DATE" ] &&
+  gh pr list --state merged --search "merged:>$LAST_TAG_DATE" --limit 200 \
+    --json number,title,body,mergedAt,author,labels,url,mergeCommit &&
+  git log "${LAST_TAG}..HEAD" --pretty=format:"%h %s (%an, %ad)" --date=short
 ```
 
 取得件数が `--limit` と同数なら打ち切りの可能性があるため、limit を上げて全件取得を確認する。

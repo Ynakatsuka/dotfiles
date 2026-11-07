@@ -3,6 +3,8 @@ brew "trash"
 brew "tmux"
 brew "age"
 brew "chezmoi"
+# chezmoi modify scripts need jq during the first apply, before mise install.
+brew "jq"
 brew "mise"
 brew "pandoc"
 tap "olets/tap"
