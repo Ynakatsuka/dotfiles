@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # Verify that zsh gwai takes its branch name from gwai-worktree-name and hands
-# it to gw and the launcher. scripts/test-gwai-worktree-name.sh covers naming.
+# it to gw and the launcher. tests/test-gwai-worktree-name.sh covers naming.
 
 set -eu
 
@@ -38,7 +38,7 @@ assert_args_equal() {
     assert_equal "${(j:|:)${(@qqq)expected}}" "${(j:|:)${(@qqq)actual}}" "unexpected arguments in $args_file"
 }
 
-tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gwai-branch-name-test.XXXXXX")
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/gwai-zsh-test.XXXXXX")
 trap 'rm -rf "$tmp_dir"' EXIT
 bin_dir="$tmp_dir/bin"
 mkdir -p "$bin_dir"
@@ -103,4 +103,4 @@ grep -Fq 'mocked naming failure' "$tmp_dir/out" || fail "naming failure was not 
 [[ ! -e "$tmp_dir/gw.args" ]] || fail "gwai ran gw after naming failed"
 [[ ! -e "$tmp_dir/cl.args" ]] || fail "gwai started cl after naming failed"
 
-print 'test-gwai-branch-name: OK'
+print 'test-gwai-zsh: OK'

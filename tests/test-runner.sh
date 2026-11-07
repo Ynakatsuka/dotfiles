@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd "${BASH_SOURCE[0]%/*}/.." && pwd -P)
-runner="$repo_root/scripts/test.sh"
+runner="$repo_root/tests/test.sh"
 test_dir=$(mktemp -d "${TMPDIR:-/tmp}/test-runner.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT
 

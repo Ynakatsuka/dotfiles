@@ -46,7 +46,7 @@ orca_create_args="$test_dir/orca-create.args"
 run_output="$test_dir/run-output"
 mkdir -p "$bin_dir"
 
-# scripts/test-gwai-worktree-name.sh covers naming; this fake checks the wiring.
+# tests/test-gwai-worktree-name.sh covers naming; this fake checks the wiring.
 cat >"$bin_dir/gwai-worktree-name" <<'MOCK'
 #!/usr/bin/env bash
 set -euo pipefail
