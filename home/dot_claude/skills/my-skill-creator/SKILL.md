@@ -2,7 +2,7 @@
 name: my-skill-creator
 description: >-
   Interactive guide for creating and improving portable Agent Skills (SKILL.md files)
-  shared by Claude Code, Codex, and Cursor. Use when the user asks to create, update,
+  shared by Claude Code and Codex. Use when the user asks to create, update,
   validate, or fix a skill definition or says a skill does not trigger. Do NOT use for
   general coding tasks or requests that merely contain the word "create".
 license: Complete terms in LICENSE.txt
@@ -10,7 +10,7 @@ license: Complete terms in LICENSE.txt
 
 # Portable Skill Creator
 
-Create one skill directory that Claude Code, Codex, and Cursor can load. Keep shared behavior in
+Create one skill directory that Claude Code and Codex can load. Keep shared behavior in
 `SKILL.md`; add product-specific adapter files only where the clients have no common field.
 
 ## References
@@ -72,14 +72,14 @@ description: >-
 | `metadata` | Optional. String-to-string metadata for external tooling. |
 | `allowed-tools` | Optional and experimental. Do not assume every client enforces it. |
 
-### Shared Claude Code and Cursor extensions
+### Claude Code extensions with a Codex sidecar
 
-These fields are not part of the open specification, but both Claude Code and Cursor document them:
+These fields are not part of the open specification. Claude Code documents them, and Codex covers the first through `agents/openai.yaml`:
 
 | Field | Behavior and portability requirement |
 |---|---|
-| `disable-model-invocation` | `true` makes the skill explicit-only in Claude Code and Cursor. Add the matching Codex policy shown below. |
-| `paths` | Limits automatic discovery to matching file globs in Claude Code and Cursor. Codex has no documented equivalent. |
+| `disable-model-invocation` | `true` makes the skill explicit-only in Claude Code. Add the matching Codex policy shown below. |
+| `paths` | Limits automatic discovery to matching file globs in Claude Code. Codex has no documented equivalent. |
 
 For a manual-only skill, keep both declarations in the same directory:
 
@@ -94,7 +94,7 @@ policy:
   allow_implicit_invocation: false
 ```
 
-Treat `paths` as a deliberate two-client enhancement. Put essential scope in `description` as well,
+Treat `paths` as a Claude Code-only enhancement. Put essential scope in `description` as well,
 because Codex ignores the field.
 
 ### Claude Code extensions
@@ -114,8 +114,8 @@ in `metadata` to disguise them as portable fields.
 - Refer to bundled files with paths relative to the skill root.
 - Read arguments from the user's current request. Do not rely on client-specific argument variables.
 - Do not use Claude Code dynamic command injection or `CLAUDE_*` environment substitutions by default.
-- Keep client invocation syntax out of workflow instructions. Claude Code and Cursor use `/name`;
-  Codex uses `$name`.
+- Keep client invocation syntax out of workflow instructions. Claude Code uses `/name`; Codex uses
+  `$name`.
 - State required executables, network access, and platform assumptions in `compatibility` or the body.
 - Separate network operations from local writes so a failed dependency stops with a clear error.
 
@@ -141,9 +141,9 @@ Avoid duplicating the same instruction in `SKILL.md` and a reference.
 Follow the repository's existing convention first. Do not create a second copy of a skill.
 
 - In this dotfiles repository, create under `home/dot_claude/skills/`; the existing deployment
-  links the same directory into Codex, and Cursor reads Claude skill directories directly.
+  links the same directory into Codex.
 - In a repository without an established convention, prefer `.agents/skills/` as the canonical
-  directory for Codex and Cursor, then symlink the same skill directory under `.claude/skills/`
+  directory for Codex, then symlink the same skill directory under `.claude/skills/`
   for Claude Code.
 - For global skills, apply the same arrangement under the user's home directory.
 
@@ -183,7 +183,7 @@ Run the portable profile by default:
 uv run <skill-root>/scripts/quick_validate.py <skill-directory>
 ```
 
-It accepts the open fields plus the two shared Claude Code and Cursor extensions. It also checks
+It accepts the open fields plus the two Claude Code extensions above. It also checks
 that a manual-only skill has the matching Codex policy. Use `--profile standard` for the strict open
 specification or `--profile claude` only for an intentionally Claude Code-specific skill.
 
@@ -200,7 +200,7 @@ Test at least:
 - the workflow's main success path and material failure path.
 
 For manual-only skills, verify explicit invocation in each installed client. For automatic skills,
-test description matching separately in Claude Code, Codex, and Cursor because routing behavior is
+test description matching separately in Claude Code and Codex because routing behavior is
 client-specific.
 
 For complex skills, compare representative tasks with and without the skill. Read

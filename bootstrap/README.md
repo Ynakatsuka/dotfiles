@@ -68,7 +68,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 - macOS
   - Installs Homebrew apps from `macos/Brewfile` (VS Code, Docker, Claude, ChatGPT, Discord, Zoom, etc.)
   - Applies system, pointer, trackpad, and Hot Corner settings declared in `home/private_dot_config/mise/config.toml`
-  - Sets Git identity, SSH, dotfiles (prezto/tpm/chezmoi/mise), then cleanup
+  - Sets up dotfiles (prezto/tpm/chezmoi), runs `mise install`, installs gh-dash, then cleanup
 
 - Ubuntu 22.04 (full)
   - Validates OS version, installs base packages
@@ -76,10 +76,9 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
   - Uses the official 1Password `.deb`, which configures its signing key and APT repository for updates
   - Detects NVIDIA GPU and offers driver/CUDA install with confirmation
 
-- Ubuntu (user-only, `--user-only`)
-  - Skips base packages and system-level setup (no sudo required)
-  - Installs user-local CLIs (uv, mise, Claude Code, etc.); gh/gcloud/direnv/rye come from `mise install`
-  - Sets up dotfiles (prezto, tpm, chezmoi)
+- Ubuntu (standard, no sudo)
+  - Skips base packages and system-level setup
+  - Installs user-local CLIs (mise, Claude Code, Antigravity CLI, etc.), sets up dotfiles (prezto, tpm, chezmoi), then runs `mise install` for uv, gh, gcloud, direnv, and the rest
 
 ### Customize
 
@@ -161,7 +160,6 @@ For API keys shared across projects, `with-api-key` supplies the selected key to
 
 ```bash
 with-api-key openai python app.py
-with-api-key gemini gemini
 with-api-key claude python app.py
 with-api-key deepseek python app.py
 with-api-key notion python sync.py
@@ -197,59 +195,3 @@ mise -C home/private_dot_config/mise exec op age jq python -- bash "$PWD/bootstr
 The downloaded identity must decrypt this repository's encrypted SSH configuration before it is installed with mode `600`. Existing destination files and symlinks are refused, including files created while the download is in progress. An optional second argument selects another key-file path for backup or restoration. The key contents are never printed.
 
 The repository's passphrase-protected `.age-key.age` and initial decryption script also remain available for passphrase-based setup. Daily chezmoi operations use the cached local identity.
-
-## SSH Setup (Client vs Server)
-
-This section documents a simple and repeatable SSH setup flow. Adjust hostnames and usernames for your environment.
-
-### Client Side (macOS/Linux)
-
-Generate a key and add it to your agent.
-
-```bash
-# Generate an ed25519 key (recommended for new setups)
-ssh-keygen -t ed25519
-
-# Add the key to your agent (macOS: adds to Keychain when supported)
-ssh-add -A ~/.ssh/id_ed25519 || ssh-add ~/.ssh/id_ed25519
-```
-
-Install `ssh-copy-id` and register your public key on servers.
-
-```bash
-brew install ssh-copy-id   # macOS; on Linux use your distro package manager
-
-# Register your key on target servers
-ssh-copy-id <user>@<server-ip>
-```
-
-Maintain a user SSH config (example guidance):
-
-- Reference: ssh-agent article (Japanese): https://zenn.dev/naoki_mochizuki/articles/ce381be617cd312ffe7f
-
-### Server Side (Linux)
-
-Verify SSH server is running and, if desired, tighten authentication.
-
-```bash
-sudo systemctl status sshd.service            # should be active (running)
-sudo sudoedit /etc/ssh/sshd_config           # optionally set: PasswordAuthentication no
-sudo systemctl reload sshd                   # apply config changes
-```
-
-After running `ssh-copy-id` from the client, confirm the key landed:
-
-```bash
-sudo ls -l /home/<user>/.ssh/authorized_keys
-```
-
-Connectivity test from client:
-
-```bash
-ssh -T git@github.com        # validates agent forwarding to GitHub if configured
-ssh <user>@<server-ip>       # verify interactive shell login
-```
-
-Notes:
-- If you use Tailscale, prefer the Tailscale IP/hostname when available.
-- Disable password auth only after confirming key-based login works, to avoid lockout.

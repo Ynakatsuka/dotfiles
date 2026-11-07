@@ -24,35 +24,35 @@ register() {
 }
 
 # name, runner, source path, external tools, optional supported platform.
-register test-1password-bootstrap bash scripts/test-1password-bootstrap.sh 'bash'
-register test-1password-ssh bash scripts/test-1password-ssh.sh 'bash chezmoi python3 ssh'
-register test-age-key bash scripts/test-age-key.sh 'bash age age-keygen jq python3 rg'
-register test-ccv-statusline-proxy bash scripts/test-ccv-statusline-proxy.sh 'bash jq'
-register test-codex-config bash scripts/test-codex-config.sh 'bash chezmoi jq'
-register test-codex-cdx-trust bash scripts/test-codex-cdx-trust.sh 'bash chezmoi git jq zsh'
-register test-codex-skills-link bash scripts/test-codex-skills-link.sh 'bash chezmoi'
-register test-delegation bash scripts/test-delegation.sh 'bash chezmoi jq python3'
-register test-disk-tree bash scripts/test-disk-tree.sh 'bash python3'
-register test-dotfiles-brew-upgrade bash scripts/test-dotfiles-brew-upgrade.sh 'bash'
-register test-dotfiles-mise-up bash scripts/test-dotfiles-mise-up.sh 'bash jq'
-register test-git-sync-base-branches bash scripts/test-git-sync-base-branches.sh 'bash git'
-register test-gwai-branch-name zsh scripts/test-gwai-branch-name.zsh 'zsh'
-register test-gwai-orca bash scripts/test-gwai-orca.sh 'bash git jq'
-register test-gwai-worktree-name bash scripts/test-gwai-worktree-name.sh 'bash jq'
-register test-gwc-worktree-list zsh scripts/test-gwc-worktree-list.zsh 'zsh git'
-register test-handoff-context bash scripts/test-handoff-context.sh 'bash git'
-register test-my-pr-review-input bash scripts/test-my-pr-review-input.sh 'bash git jq'
-register test-my-pr-worktree-move bash scripts/test-my-pr-worktree-move.sh 'bash git'
-register test-my-skill-creator bash scripts/test-my-skill-creator.sh 'bash python3 uv'
-register test-orca-claude-hook bash scripts/test-orca-claude-hook.sh 'bash jq'
-register test-orca-hook-settings bash scripts/test-orca-hook-settings.sh 'bash chezmoi jq'
-register test-prune-old-worktrees bash scripts/test-prune-old-worktrees.sh 'bash git python3' Linux
-register test-reply-language-hook bash scripts/test-reply-language-hook.sh 'bash python3'
-register test-rtk-rewrite-hook bash scripts/test-rtk-rewrite-hook.sh 'bash jq'
-register test-runner bash scripts/test-runner.sh 'bash'
-register test-session-resume bash scripts/test-session-resume.sh 'bash python3 zsh'
-register test-update-bootstrap bash scripts/test-update-bootstrap.sh 'bash awk mise'
-register test-url-boundary-hook bash scripts/test-url-boundary-hook.sh 'bash python3'
+register test-1password-bootstrap bash tests/test-1password-bootstrap.sh 'bash'
+register test-1password-ssh bash tests/test-1password-ssh.sh 'bash chezmoi python3 ssh'
+register test-age-key bash tests/test-age-key.sh 'bash age age-keygen jq python3 rg'
+register test-ccv-statusline-proxy bash tests/test-ccv-statusline-proxy.sh 'bash jq'
+register test-codex-config bash tests/test-codex-config.sh 'bash chezmoi jq'
+register test-codex-cdx-trust bash tests/test-codex-cdx-trust.sh 'bash chezmoi git jq zsh'
+register test-codex-skills-link bash tests/test-codex-skills-link.sh 'bash chezmoi'
+register test-delegation bash tests/test-delegation.sh 'bash chezmoi jq python3'
+register test-disk-tree bash tests/test-disk-tree.sh 'bash python3'
+register test-dotfiles-brew-upgrade bash tests/test-dotfiles-brew-upgrade.sh 'bash'
+register test-dotfiles-mise-up bash tests/test-dotfiles-mise-up.sh 'bash jq'
+register test-git-sync-base-branches bash tests/test-git-sync-base-branches.sh 'bash git'
+register test-gwai-zsh zsh tests/test-gwai-zsh.zsh 'zsh'
+register test-gwai-orca bash tests/test-gwai-orca.sh 'bash git jq'
+register test-gwai-worktree-name bash tests/test-gwai-worktree-name.sh 'bash jq'
+register test-gwc-worktree-list zsh tests/test-gwc-worktree-list.zsh 'zsh git'
+register test-handoff-context bash tests/test-handoff-context.sh 'bash git'
+register test-my-pr-review-input bash tests/test-my-pr-review-input.sh 'bash git jq'
+register test-my-pr-worktree-move bash tests/test-my-pr-worktree-move.sh 'bash git'
+register test-my-skill-creator bash tests/test-my-skill-creator.sh 'bash python3 uv'
+register test-orca-claude-hook bash tests/test-orca-claude-hook.sh 'bash jq'
+register test-orca-hook-settings bash tests/test-orca-hook-settings.sh 'bash chezmoi jq'
+register test-prune-old-worktrees bash tests/test-prune-old-worktrees.sh 'bash git python3' Linux
+register test-reply-language-hook bash tests/test-reply-language-hook.sh 'bash python3'
+register test-rtk-rewrite-hook bash tests/test-rtk-rewrite-hook.sh 'bash jq'
+register test-runner bash tests/test-runner.sh 'bash'
+register test-session-resume bash tests/test-session-resume.sh 'bash python3 zsh'
+register test-update-bootstrap bash tests/test-update-bootstrap.sh 'bash awk mise'
+register test-url-boundary-hook bash tests/test-url-boundary-hook.sh 'bash python3'
 register my-japanese-editor unittest home/dot_claude/skills/my-japanese-editor/tests 'python3'
 register my-handoff node-handoff home/dot_claude/skills/my-handoff/scripts/launch-orca-handoff.test.mjs 'node bash git jq'
 
@@ -82,12 +82,12 @@ validate_registry() {
         ;;
     esac
   done
-  for candidate in "$repo_root"/scripts/test-*.sh "$repo_root"/scripts/test-*.zsh; do
+  for candidate in "$repo_root"/tests/test-*.sh "$repo_root"/tests/test-*.zsh; do
     [[ -f "$candidate" ]] || continue
     name=${candidate##*/}
     name=${name%.*}
     if ! find_name "$name" >/dev/null; then
-      printf 'test.sh: unregistered test: scripts/%s\n' "${candidate##*/}" >&2
+      printf 'test.sh: unregistered test: tests/%s\n' "${candidate##*/}" >&2
       return 1
     fi
   done
@@ -110,7 +110,7 @@ run_case() {
 }
 
 usage() {
-  printf 'Usage: bash scripts/test.sh [--list | TEST_NAME...]\n' >&2
+  printf 'Usage: bash tests/test.sh [--list | TEST_NAME...]\n' >&2
 }
 
 case "$OSTYPE" in

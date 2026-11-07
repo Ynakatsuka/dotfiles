@@ -14,66 +14,47 @@ description: >-
 
 # CLI Agent Runner
 
-Delegate tasks to an external CLI agent from within Claude Code. Supports three providers plus Claude's explicit `fable` model alias:
+Delegate a task to an external CLI agent:
 
-- **codex** — OpenAI Codex CLI (`codex exec ...`)
-- **gemini** — Google Antigravity CLI (`agy -p ...`)
-- **claude** — Claude Code CLI (`claude -p ...`)
-- **fable** — Claude Code CLI with explicit model alias (`claude --model fable -p ...`)
+- **codex** — OpenAI Codex CLI (`codex exec`)
+- **gemini** — Google Antigravity CLI (`agy -p`)
+- **claude** — Claude Code CLI (`claude -p`)
 
 ## Provider Selection
 
-Pick the provider in this order:
+1. "fable" / "Fable" / asks to consult Claude Fable → `claude --model fable -p`. Pass the alias `fable` verbatim; do not expand it to a dated model ID.
+2. "gemini" / "ジェミニ" → `gemini`
+3. "claude" / "クロード" → `claude`
+4. "codex" / "コーデックス", or no provider named → `codex`. Do not ask which provider to use.
 
-1. User says "fable" / "Fable" / "fableに相談" / "Fableに聞いて" / asks to delegate or consult Claude Fable → `claude` with `--model fable`
-2. User says "gemini" / "ジェミニ" / asks to delegate to Gemini → `gemini`
-3. User says "claude" / "クロード" / asks to delegate to Claude → `claude`
-4. User says "codex" / "コーデックス" → `codex`
-5. **No explicit provider mentioned (default) → `codex`**
+Treat the first argument as a provider only when it is exactly `codex`, `gemini`, `claude`, or `fable`; otherwise the whole argument string is the task prompt. Strip consultation phrasing such as "fableに相談して X" down to `X`. Turn the request into a self-contained prompt with the relevant file paths and context; pass a literal prompt through unchanged.
 
-The first argument is treated as a provider only if it is exactly `codex`, `gemini`, or `claude`. If the first argument is exactly `fable`, use the `claude` provider with `--model fable` and treat the remaining arguments as the task prompt. Otherwise the entire argument string is the task prompt and `codex` is used. Do NOT ask the user which provider to use — pick `codex` and proceed.
+## Common Notes
 
-The remaining arguments form the task prompt. For consultation phrasing such as "fableに相談して X" or "Fableに聞いて X", remove the consultation phrase and use `X` as the task prompt. Convert the user's request into a clear, self-contained prompt and include relevant file paths/context. If the user provides a literal prompt, pass it through directly.
+- Run delegates with a 10-minute shell timeout.
+- Do not hardcode default models; omit `--model` so each CLI's own default stays current. Add it only when the user names a model.
+- If the delegate fails, report the error and suggest the user run it interactively (`codex` / `agy` / `claude`).
 
-## Common Notes (all providers)
-
-- Always use the shell command tool with a 10-minute timeout; delegated tasks can take time.
-- Do NOT hardcode model names as defaults — let each CLI's own default handle it so it stays current. Pass `--model fable` only when the user explicitly requests Fable.
-- Output streams to stdout; capture or display results directly.
-- For long-running tasks, warn the user that the delegate may take time.
-- If the delegate fails, report the error and suggest the user run it interactively (`codex` / `gemini` / `claude`).
-
-## Quick Reference
-
-### Codex
+## Codex
 
 ```bash
 codex exec "<PROMPT>" </dev/null
 ```
 
-`codex exec` waits for stdin whenever stdin is not a terminal, so always redirect stdin. For Chrome operation, Computer Use, or Slack posts, run `codex-task --use <chrome|computer-use|slack> --prompt-file <file>` instead; it adds the playbook for that task, handles stdin and logs, and reports the tools Codex called.
+`codex exec` reads stdin whenever stdin is not a terminal, so always redirect it. For Chrome operation, Computer Use, or Slack posts, use `codex-task` as the Claude instructions require instead. For long prompts, image input, resume, and model override, read `references/codex.md`.
 
-For image input, model override, resume, configuration details, and more examples, read `references/codex.md`.
+## Gemini
 
-### Gemini
-
-**Before the first `agy -p` of the session, read `references/gemini.md`.** It contains the mandatory preflight, sandbox, and headless-mode requirements.
+Before the first `agy -p` of the session, read `references/gemini.md` for preflight, sandbox, and plan-mode rules.
 
 ```bash
 agy --sandbox --disable-slash-commands -p "<PROMPT>"
 ```
 
-For execution modes, structured output, model override, troubleshooting, and more examples, read `references/gemini.md`.
+## Claude
 
-### Claude
-
-**Before the first `claude -p` of the session, read `references/claude.md`.** It contains the non-interactive invocation rules and permission-mode guidance.
+Before the first `claude -p` of the session, read `references/claude.md` for permission-mode rules.
 
 ```bash
 claude -p "<PROMPT>"
-
-# With explicit Fable model alias
-claude --model fable -p "<PROMPT>"
 ```
-
-For permission modes, model override, structured output, troubleshooting, and more examples, read `references/claude.md`.

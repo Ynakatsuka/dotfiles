@@ -2,7 +2,7 @@
 # Claude Code
 #
 function cl() {
-    git_root=$(git rev-parse --show-toplevel 2>/dev/null)
+    local git_root=$(git rev-parse --show-toplevel 2>/dev/null)
     if [ -f "$git_root/.claude/mcp.json" ]; then
         claude --mcp-config="$git_root/.claude/mcp.json" "$@" --dangerously-skip-permissions
     else
@@ -60,6 +60,4 @@ function fzf-session-resume() {
     zle reset-prompt
 }
 zle -N fzf-session-resume
-# Bind to Ctrl-K and restore Ctrl-L to clear-screen.
 bindkey '^K' fzf-session-resume
-bindkey '^L' clear-screen

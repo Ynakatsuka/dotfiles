@@ -16,7 +16,7 @@ Usage:
   main.sh --plan <full|standard|minimal> [--dry-run]
 
 Plans:
-  full      Xcode + Homebrew + Brewfile + system defaults + SSH + dotfiles (with age) + mise install
+  full      Xcode + Homebrew + Brewfile + system defaults + dotfiles (with age) + mise install
   standard  Xcode + Homebrew + Brewfile + dotfiles (no age) + mise install
   minimal   Dotfiles only (chezmoi apply)
 USAGE
@@ -88,11 +88,10 @@ case "$PLAN" in
     run "$BREW" bundle --file "${SCRIPT_DIR}/Brewfile"
 
     apply_macos_defaults
-    run bash "${SCRIPT_DIR}/10_git.sh"
-    run bash "${SCRIPT_DIR}/40_ssh.sh"
 
     run_dotfiles
     run_mise_install
+    install_gh_dash
 
     run "$BREW" cleanup
     ;;
@@ -109,6 +108,7 @@ case "$PLAN" in
 
     run_dotfiles
     run_mise_install
+    install_gh_dash
 
     run "$BREW" cleanup
     ;;

@@ -1,25 +1,6 @@
 # Epic Templates
 
-`docs/epics/{epic}/` 配下に作成するファイルのテンプレートです。
-epic ドキュメントは日本語で書きます。コマンド、コード識別子、API 名、schema 名、外部固有名詞は英語を維持します。
-
-## ドキュメント区分
-
-人間向けと AI 用をディレクトリで分ける。
-
-```text
-docs/epics/{epic}/
-├── README.md            # 人間向け: 目的、実装・実行・確認の Phase 計画、成功基準、判断ダイジェスト
-└── ai/                  # AI 用: 作業詳細と実行記録
-    ├── program.md       # ゴール契約と判断表
-    ├── tree.md          # delivery tree と node 状態の single source of truth
-    ├── decisions.md     # 技術選定の判断記録
-    ├── leaves/          # PR leaf の承認部と実行部
-    └── operations/      # operation node の承認部と実行部
-```
-
-- 同じ情報は 1 ファイルにだけ書く。`README.md` は `ai/` 配下の要約であり、矛盾したら `ai/` 配下を正とする。
-- node 状態は `ai/tree.md` の node 表だけで管理する。leaf / operation ファイルには状態を持たせない。
+`docs/epics/{epic}/` 配下に作成するファイルのテンプレート。ドキュメント区分と記述言語は `SKILL.md` に従う。
 
 ## README.md（人間向け）
 
@@ -219,7 +200,6 @@ Root Initiative
 ## ai/leaves/{id}-{slug}.md
 
 承認部と実行部に分ける。人間向けダイジェストは承認部から作る。
-該当しない gate は `n/a — 理由` と一行で書き、空欄のまま残さない。
 
 ````markdown
 # {ID}: {Leaf title}
@@ -287,6 +267,7 @@ Root Initiative
 - [ ] 余分な機能や scope creep がない
 - [ ] out-of-scope file を変更していない
 - [ ] Contract impact が承認済み内容と一致している
+- [ ] Test / Data / Smoke gate が実行済み、または明示的な blocking reason がある
 
 #### Code quality review
 - [ ] 既存 pattern に従っている
@@ -294,6 +275,7 @@ Root Initiative
 - [ ] Error semantics を維持している
 - [ ] テストが実挙動を検証している
 - [ ] fallback behavior、silent retry、broad catch、mock continuation、default substitution を追加していない
+- [ ] 1 PR として review 可能な大きさに収まっている
 
 ## 実行部
 
@@ -303,7 +285,13 @@ Root Initiative
 
 ### Implementation prompt
 ```text
-You are implementing PR leaf {ID}: {title}.
+Implement PR leaf {ID}: {title} in {repo_path} on {branch_or_worktree}.
+
+Read first:
+- docs/epics/{epic}/ai/program.md
+- docs/epics/{epic}/ai/tree.md
+- docs/epics/{epic}/ai/leaves/{id}-{slug}.md
+- {existing implementation anchors}
 
 Goal:
 - ...
@@ -317,20 +305,26 @@ File touch map:
 Acceptance criteria:
 - ...
 
-Verification gates to satisfy:
-- ...
+Verification gates:
+- Test:
+- Data:
+- Smoke:
 
-Constraints:
+Rules:
+- Do not edit outside the file touch map; stop and report why if it is required.
 - Do not add fallback behavior, silent retries, broad exception swallowing, mock continuation, or default substitution.
 - Stop and report if a public contract, schema, CLI/config key, migration semantics, or documented error behavior must change beyond this leaf.
+- If a required dependency, fixture, environment variable, or external service is missing, stop and report the exact blocker.
+- Do not delegate this task to another agent.
 - Keep comments, docstrings, commit messages, and README text in English.
 
 Return:
-- Summary
-- Files changed
-- Tests run and results
-- Review gate results
-- Any unresolved blockers
+1. Summary
+2. Files changed
+3. Tests run
+4. Gate results
+5. Review gate results
+6. Blockers or follow-up
 ```
 
 ### 実装記録

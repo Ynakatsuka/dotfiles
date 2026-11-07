@@ -31,7 +31,7 @@ fail() {
 # --- 1. Top-level layout -----------------------------------------------------
 # .chezmoiroot narrows the chezmoi source to home/; anything else at the top
 # level is repo-only. New entries must be added here deliberately.
-ALLOWED_TOP_LEVEL=".chezmoiroot .github .gitignore .pre-commit-config.yaml AGENTS.md CLAUDE.md README.md bootstrap home scripts"
+ALLOWED_TOP_LEVEL=".chezmoiroot .github .gitignore .pre-commit-config.yaml AGENTS.md CLAUDE.md README.md bootstrap home scripts tests"
 while IFS= read -r entry; do
   case " ${ALLOWED_TOP_LEVEL} " in
     *" ${entry} "*) ;;

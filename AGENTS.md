@@ -33,8 +33,8 @@ For agent instructions or shell tool management, also run:
 
 ```bash
 mise run check-agent-environment
-bash scripts/test-rtk-rewrite-hook.sh
-bash scripts/test-delegation.sh
+bash tests/test-rtk-rewrite-hook.sh
+bash tests/test-delegation.sh
 ```
 
 - After managed changes, apply the affected targets and verify `chezmoi diff` plus deployed behavior.
@@ -45,5 +45,5 @@ bash scripts/test-delegation.sh
 - Bootstrap profiles: `make -C bootstrap full`, `standard`, or `minimal`.
 - Tools are managed in `home/private_dot_config/mise/config.toml`. After adding one, run `mise install` and verify its shim in a clean shell.
 - Claude Bash hooks run in this order: `bulk-read-guard`, `ensure-mise-path.sh`, `rtk-rewrite.sh`. The last delegates rewriting and permission decisions to `rtk rewrite`; preserve its exit-code protocol. Reproduce compatibility issues with installed RTK before adding guards.
-- Edit Claude settings in `home/.chezmoitemplates/claude-settings.json`. Its `modify_settings.json.tmpl` script preserves Orca hook groups through `modify-settings-keep-orca-hooks.sh`; run `bash scripts/test-orca-hook-settings.sh` when changing that merge.
+- Edit Claude settings in `home/.chezmoitemplates/claude-settings.json`. Its `modify_settings.json.tmpl` script preserves Orca hook groups through `modify-settings-keep-orca-hooks.sh`; run `bash tests/test-orca-hook-settings.sh` when changing that merge.
 - Delegation commands and the read guard live in `home/dot_local/bin/`. The guard is registered in the Claude settings template and `home/dot_codex/hooks.json.tmpl`; Codex requires trust through `/hooks` after apply.

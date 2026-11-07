@@ -1,68 +1,27 @@
 # Claude Reference
 
-Detailed usage for the `claude` provider in `my-agent`. Read this **before** running `claude -p` for the first time in a session.
+Usage for the `claude` provider in `my-agent`.
 
 ## Preflight
 
-1. Confirm the Claude Code CLI exists:
-
-   ```bash
-   command -v claude
-   ```
-
-   If this fails, do not continue with the `claude` provider. Report that Claude Code CLI is unavailable and suggest installing or authenticating it before retrying.
-
-2. Do not invoke `/my-agent claude` from inside the delegated Claude session unless the user explicitly requests nested delegation. This avoids accidental recursion.
+- Confirm `command -v claude` succeeds. If it fails, stop and ask the user to install or authenticate Claude Code CLI.
+- Do not invoke `/my-agent claude` from inside the delegated Claude session unless the user explicitly requests nested delegation.
 
 ## Invocation
 
-Always use print mode (`-p`/`--print`) for non-interactive execution; Claude cannot interact with a nested TUI.
+Always use print mode (`-p`); a bare `claude` opens a TUI that cannot be driven from here.
 
 ```bash
-# Default
 claude -p "<PROMPT>"
-
-# With explicit Fable model alias
-claude --model fable -p "<PROMPT>"
-
-# With explicit model override
-claude --model <MODEL> -p "<PROMPT>"
-
-# With JSON output
-claude -p --output-format json "<PROMPT>"
+claude --model <MODEL> -p "<PROMPT>"          # only when the user names a model
+claude -p --output-format json "<PROMPT>"     # when the caller must parse the result
 ```
 
 ## Permission Mode
 
-- **Default**: Do not specify `--permission-mode`. The delegated Claude inherits the configured default mode, which may already allow edits and commands; say so in the prompt when the task must stay read-only.
-- **Planning or read-only review**: Use `--permission-mode plan` when the user asks for planning, analysis, or review only.
-- **Auto mode**: Do not use `--permission-mode auto`. When settings disable auto mode, it silently falls back to `default`, which cannot approve edits in print mode.
-- **Bypass permissions**: Do not pass `--permission-mode bypassPermissions`, `--dangerously-skip-permissions`, or `--allow-dangerously-skip-permissions` unless the user explicitly requests that risk.
+- **Default**: omit `--permission-mode`. The delegate inherits the configured default, which may already allow edits and commands; say so in the prompt when the task must stay read-only.
+- **Planning or read-only review**: use `--permission-mode plan`.
+- **Auto mode**: do not use `--permission-mode auto`. When settings disable it, it silently falls back to `default`, which cannot approve edits in print mode.
+- **Bypass**: do not pass `--permission-mode bypassPermissions`, `--dangerously-skip-permissions`, or `--allow-dangerously-skip-permissions` unless the user explicitly accepts that risk.
 
-## Model Selection
-
-- **Default**: Do NOT specify `--model`. Claude Code's configured default is used.
-- **User-specified model**: Add `--model <MODEL>` only when the user explicitly requests one (e.g., "fableに相談して", "fableで実行して", "opusで実行して", "use sonnet").
-- **Fable alias**: If the user says "fable" as the provider, asks to use Claude Fable, or uses consultation phrasing such as "fableに相談" / "Fableに聞いて", use `claude --model fable -p "<PROMPT>"`. Do not expand `fable` to a dated model ID.
-
-## Examples
-
-```bash
-# Simple analysis
-claude -p "Explain the architecture of this project and identify the main extension points."
-
-# Read-only code review
-claude --permission-mode plan -p "Review the changes in the current branch vs main. Focus on security and performance."
-
-# Delegated implementation
-claude -p "Fix the type error in src/utils.ts and run the nearest relevant test."
-
-# Explicit Fable model
-claude --model fable -p "Analyze the architecture of this project."
-```
-
-## Troubleshooting
-
-- **Interactive prompt or no output**: Ensure `-p`/`--print` is present. Do not run bare `claude` from this skill.
-- **Tool permission failure**: Re-run only after choosing an explicit permission mode that matches the user's intent. Do not escalate to bypass permissions without user approval.
-- **Unavailable command**: `command -v claude` failed. Ask the user to install or authenticate Claude Code CLI, then retry.
+If a tool permission fails, rerun only with an explicit mode that matches the user's intent; do not escalate to bypass without approval.

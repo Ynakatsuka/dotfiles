@@ -131,19 +131,10 @@ dce() {
 alias dcl='docker compose logs'
 alias dcd='docker compose down'
 
-# gcloud
-alias gca='gcloud config configurations activate'
-alias gcl='gcloud config configurations list'
-alias gal='gcloud auth application-default login'
-alias gcsp='gcloud config set project'
-
 # claude code
-# Intentional divergence from zsh: zsh cl() injects MCP config and --dangerously-skip-permissions;
+# Intentional divergence from zsh: zsh cl() injects the repo MCP config and --dangerously-skip-permissions;
 # bash gets a plain alias because the helper function depends on zsh-only syntax.
 alias cl='claude'
-
-# codex
-alias co='codex'
 
 # reload current bash session with a fresh process
 alias reload='exec bash'

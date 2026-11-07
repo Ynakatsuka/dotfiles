@@ -5,10 +5,6 @@
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
-# OpenCode CLI
-# Pinned to the last macos-arm64 release with GitHub attestations.
-"github:anomalyco/opencode" = "1.17.7"
-
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
@@ -24,9 +20,6 @@ python = "3.12"
 # uv - Fast Python package installer and resolver
 uv = "latest"
 
-# rye - Python package manager
-rye = "latest"
-
 # ruff - Python code formatter and linter
 ruff = "latest"
 
@@ -41,9 +34,6 @@ prek = "latest"
 
 # Node.js - JavaScript runtime
 node = "24.22"
-
-# Volta - JavaScript tool manager
-"aqua:volta-cli/volta" = "latest"
 
 # Go - The Go programming language
 go = "latest"
@@ -93,9 +83,7 @@ fzf = "latest"
 eza = "0.23.4"
 
 # ghq - Remote repository management
-# Pinned to 1.10.x: ghq 1.11 renamed release assets to ghq_v<version>_*, which the
-# github backend cannot resolve (latest => missing shim). Unpin once the backend handles it.
-"github:x-motemen/ghq" = "1.10.1"
+"github:x-motemen/ghq" = "latest"
 
 # direnv - Directory-based environment management
 direnv = "latest"
@@ -115,8 +103,6 @@ dotenvx = "latest"
 # agent-browser - Browser automation CLI for AI agents
 "github:vercel-labs/agent-browser" = "latest"
 
-# sdf - SDF CLI
-"github:sdf-labs/sdf-cli" = { version = "latest", matching = "sdf-*.tar.gz", exe = "sdf" }
 
 [settings]
 # Trust user-owned workspaces to avoid blocking non-interactive agents.
@@ -129,10 +115,6 @@ github.credential_command = "sh -lc 'for gh in \"$HOME\"/.local/share/mise/insta
 
 experimental = true
 lockfile = false
-# Always use the latest version when running `mise up`
-always_keep_download = false
-always_keep_install = false
-legacy_version_file = true
 minimum_release_age_excludes = [
     "npm:@openai/codex",
 ]

@@ -11,9 +11,8 @@
 ## Implementation
 
 - Action requests authorize reversible local work; questions request an answer. Resolve routine choices from project conventions and continue until the requested workflow works and relevant checks pass. Report blockers and incomplete work.
-- Inspect relevant code, callers, tests, and configuration before material changes. Diagnose uncertain bugs before patching; fix root causes within scope.
-- Keep changes in the existing owner and reuse the source of truth. Avoid speculative abstractions, state, configuration, and unrelated cleanup.
-- Use clear domain names, explicit interfaces, and boundary validation. Explain non-obvious contracts; make errors identify the failed operation and preserve the cause.
+- Fix root causes within scope. Keep changes in the existing owner and reuse the source of truth; avoid speculative abstractions, state, configuration, and unrelated cleanup.
+- Comment only non-obvious contracts and reasons. Make errors identify the failed operation and preserve the cause.
 - Before changing a public contract, find consumers and report any required breaking change before proceeding.
 - Surface failures. Do not introduce fallbacks, silent defaults for invalid data, or broad catches without approval. Leave existing fallbacks unchanged unless they are part of the task.
 
@@ -31,8 +30,7 @@
 - In zsh, a glob that matches nothing aborts the whole command line with `no matches found`. Quote patterns the tool itself expands, and list files that may not exist with `fd` or `find`.
 - Do not put a command after `sleep N` to wait. Run the slow command in the background, or poll its condition in an until-loop.
 - `pkill -f` and `pgrep -f` also match the shell that runs them, because its command line contains the pattern. Bracket one character, as in `pkill -f '[m]y-server'`, or signal a PID.
-- Use skills for occasional workflows. Delegate independent work when parallel execution saves time after coordination overhead; prevent conflicts in edits, tests, and generated output.
-- The main agent owns decisions, integration, and final verification of delegated work.
+- Delegate independent work when parallelism outweighs coordination overhead; keep delegated edits, tests, and generated output from conflicting. The main agent owns decisions, integration, and final verification.
 - Run the narrowest relevant checks and broaden only for a concrete remaining risk. Add tests only for observable behavior with a plausible defect and a gap in existing coverage.
 - Report what changed, exact check commands and results, and remaining limitations. For multiple requested items, account for each outcome and give the shortest way to inspect the result.
 - When a PR changes what users see, show before-and-after screenshots of the same view in its description. Upload them with `--attach` on `gh pr create`, `gh pr edit`, or `gh pr comment`.
