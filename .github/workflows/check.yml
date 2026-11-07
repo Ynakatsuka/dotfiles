@@ -13,18 +13,17 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: astral-sh/setup-uv@v10.2.0
-      - uses: jdx/mise-action@v4
+      - uses: astral-sh/setup-uv@v10.3.3
+      - uses: jdx/mise-action@v5
         with:
           install: false
-          export_path: false
       - name: Install test tools
         run: |
           sudo apt-get update
@@ -36,15 +35,14 @@ jobs:
       - name: Detect stale repo content
         run: bash scripts/check-stale.sh
       - name: Run repository tests
-        run: bash scripts/test.sh
+        run: bash tests/test.sh
 
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install zsh for syntax hooks
         run: |
           sudo apt-get update
           sudo apt-get install -y zsh
-      - name: Run pre-commit hooks on all files
-        run: pipx run pre-commit run --all-files --show-diff-on-failure
+      - uses: j178/prek-action@v3

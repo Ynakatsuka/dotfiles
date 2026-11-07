@@ -62,26 +62,26 @@ repos:
           )$
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.45.0
+    rev: v1.52.0
     hooks:
       - id: typos
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: v0.11.0.1
+    rev: v0.11.0.1-1
     hooks:
       - id: shellcheck
         types: [shell]
         exclude_types: [zsh]
-        exclude: (\.tmpl$|^scripts/avgtime_zsh\.sh$)
+        exclude: \.tmpl$
         args: [--severity=warning]
 
   - repo: https://github.com/scop/pre-commit-shfmt
-    rev: v3.13.1-1
+    rev: v3.14.1-1
     hooks:
       - id: shfmt
         types: [shell]
         exclude_types: [zsh]
-        exclude: (\.tmpl$|^scripts/avgtime_zsh\.sh$)
+        exclude: \.tmpl$
         args: [-i, "2", -ci, -w]
 
   - repo: local
@@ -90,7 +90,7 @@ repos:
         name: check zsh syntax
         entry: zsh -fc 'for file_path in "$@"; do zsh -n "$file_path" || exit; done' --
         language: system
-        files: ^(home/dot_z[^/]*|home/private_dot_config/zsh/.*\.zsh|scripts/.*\.zsh|scripts/avgtime_zsh\.sh)$
+        files: ^(home/dot_z[^/]*|home/private_dot_config/zsh/.*\.zsh|(scripts|tests)/.*\.zsh)$
         exclude: \.tmpl$
       - id: check-stale
         name: detect stale repo content
