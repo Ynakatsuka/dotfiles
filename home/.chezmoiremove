@@ -75,6 +75,7 @@ mise.lock
 Library/Application Support/com.mitchellh.ghostty/config
 .config/zsh/copy-last-output.zsh
 .raycast/.rayconfig
+.claude/skills/my-ccv
 
 {{- if ne .chezmoi.os "darwin" }}
 
@@ -88,9 +89,8 @@ Library/Application Support/com.mitchellh.ghostty
 
 {{- if ne .chezmoi.os "linux" }}
 
-# CCV directories deployed before CCV became Linux-only. As above, contents
-# are matched with /** because the bare names are ignored on these hosts;
-# the empty directories and the ignored files themselves remain.
-.claude/skills/my-ccv/**
+# CCV preview config deployed before CCV became Linux-only. As above, contents
+# are matched with /** because the bare name is ignored on these hosts;
+# the empty directory and the ignored files themselves remain.
 .config/ccv-preview/**
 {{- end }}
