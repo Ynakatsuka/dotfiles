@@ -22,6 +22,7 @@ This repository bootstraps a working shell and development environment for macOS
 | `home/` | Chezmoi source state (deployed to `$HOME`) |
 | `bootstrap/` | Machine setup scripts (repo-only) |
 | `scripts/` | Repo maintenance utilities (repo-only) |
+| `tests/` | Repository test suite (repo-only) |
 
 ## Quick Start
 
@@ -58,17 +59,7 @@ Detailed bootstrap behavior lives in [bootstrap/README.md](bootstrap/README.md).
 | `make -C bootstrap minimal` | Dotfiles only (chezmoi apply) |
 | `make -C bootstrap verify` | Verify the full declared chezmoi and mise bootstrap state |
 
-### Chezmoi
-
-| Command | Purpose |
-|---------|---------|
-| `chezmoi managed` | List managed files |
-| `chezmoi add <file>` | Add a file to management |
-| `chezmoi forget <file>` | Stop managing a file |
-| `chezmoi edit <file>` | Edit a managed file |
-| `chezmoi apply -v` | Apply local source changes |
-| `chezmoi update -v` | Pull remote changes and apply them |
-| `chezmoi cd` | Jump to the source directory |
+### Maintenance
 
 `mise run maintenance` pulls the dotfiles source, applies it with `--force`,
 and verifies the managed target state before updating tools. Managed target
@@ -80,12 +71,12 @@ during apply; unmanaged files are outside this cleanup.
 Run every repository test from one command, or list and select cases by name:
 
 ```bash
-bash scripts/test.sh
-bash scripts/test.sh --list
-bash scripts/test.sh test-delegation my-handoff
+bash tests/test.sh
+bash tests/test.sh --list
+bash tests/test.sh test-delegation my-handoff
 ```
 
-The runner covers `scripts/test-*.sh`, `scripts/test-*.zsh`, the Japanese editor's Python unit tests, and the handoff Node tests. It checks required tools before running selected cases and reports all failures at the end. `test-prune-old-worktrees` uses GNU `date` and `touch`, so the full suite reports it as skipped on macOS; selecting it there is an error. CI runs the full suite on Linux.
+The runner covers `tests/test-*.sh`, `tests/test-*.zsh`, the Japanese editor's Python unit tests, and the handoff Node tests. It checks required tools before running selected cases and reports all failures at the end. `test-prune-old-worktrees` uses GNU `date` and `touch`, so the full suite reports it as skipped on macOS; selecting it there is an error. CI runs the full suite on Linux.
 
 ### Reload Config
 
@@ -107,7 +98,7 @@ Agent instructions are layered by scope. Root files describe only this repositor
 | Source | Scope / Destination |
 |--------|---------------------|
 | `AGENTS.md` | This repository, shared across compatible agents |
-| `CLAUDE.md` | This repository, Claude-specific additions |
+| `CLAUDE.md` | This repository, imports `AGENTS.md` for Claude Code |
 | `home/AGENTS.md` | Global shared rules → `~/AGENTS.md` |
 | `home/dot_claude/CLAUDE.md.tmpl` | Global Claude additions → `~/.claude/CLAUDE.md` |
 | `home/dot_codex/AGENTS.md.tmpl` | Global Codex additions → `~/.codex/AGENTS.md` |
@@ -117,8 +108,8 @@ Run these checks after changing agent instructions or shell tool management:
 
 ```bash
 mise run check-agent-environment
-bash scripts/test-rtk-rewrite-hook.sh
-bash scripts/test-delegation.sh
+bash tests/test-rtk-rewrite-hook.sh
+bash tests/test-delegation.sh
 codex exec --ephemeral --sandbox read-only -c 'approval_policy="never"' \
   "Summarize the current instructions and list their source files. Do not modify files."
 ```
@@ -143,8 +134,8 @@ policy; existing entries for subdirectories are preserved while their paths
 exist. Entries for paths that no longer exist, such as removed worktrees, are
 dropped when the template renders. `cdx` trusts its project and Git root for
 each run through `-c projects={...}` instead of writing them to `config.toml`.
-Run `bash scripts/test-codex-config.sh` to verify config preservation and
-idempotence, and `bash scripts/test-codex-cdx-trust.sh` to verify `cdx` trust.
+Run `bash tests/test-codex-config.sh` to verify config preservation and
+idempotence, and `bash tests/test-codex-cdx-trust.sh` to verify `cdx` trust.
 
 The Browser service registration belongs to the ChatGPT app, not to a pinned
 dotfiles version. Before preserving an enabled `node_repl` registration, the
@@ -189,14 +180,14 @@ RTK reduces token-heavy shell output. Codex is instructed to invoke it directly,
 2. `ensure-mise-path.sh` exposes mise-managed tools.
 3. `rtk-rewrite.sh` delegates supported commands to `rtk rewrite`.
 
-Run `bash scripts/test-rtk-rewrite-hook.sh` after changing RTK, either hook, or their ordering.
+Run `bash tests/test-rtk-rewrite-hook.sh` after changing RTK, either hook, or their ordering.
 
 ### Model Delegation
 
 Reading a whole large file loads it into the agent's context. Following the
 model-routing pattern from Spotify's Portal write-up, `~/.local/bin/bulk-read`
-sends files with a question to a cheaper Codex reader (`gpt-6-luna`,
-reasoning effort `max`) and prints only its answer, `~/.local/bin/code-write`
+sends files with a question to a cheaper Codex reader (model set at the top of
+the script) and prints only its answer, `~/.local/bin/code-write`
 has the same model write a predictable file (tests, scaffolding, pattern
 copies) in place and returns only a path and summary, and
 `~/.local/bin/bulk-read-guard` is a `PreToolUse` hook that denies unbounded
@@ -209,7 +200,7 @@ Claude Code in `home/.chezmoitemplates/claude-settings.json` and for Codex by
 
 Codex treats the guard as an unmanaged hook. After `chezmoi apply`, review and
 trust it with `/hooks` in an interactive Codex session; until then Codex skips
-it. Run `bash scripts/test-delegation.sh` after changing any of the scripts,
+it. Run `bash tests/test-delegation.sh` after changing any of the scripts,
 the threshold, or the hook registration.
 
 ## Shortcuts
@@ -223,7 +214,6 @@ the threshold, or the hook registration.
 | `Ctrl+F` | FZF recent directory navigation (`cdr`) |
 | `Ctrl+G` | GCloud configuration selector with login |
 | `Ctrl+R` | FZF `ghq` repository search |
-| `Ctrl+O` | Copy the last command output to the clipboard |
 | `Ctrl+K` | Resume a recent Claude Code or Codex session for the current directory |
 
 `Ctrl+K` lists the 100 most recently updated Claude Code and Codex sessions in total
@@ -241,27 +231,17 @@ rollouts are not listed; use `codex resume` for them.
 
 ### Git
 
-| Alias / Command | Action |
-|-----------------|--------|
-| `st` | `git status` |
-| `ch` | `git checkout` |
-| `chb` | `git checkout -b` |
-| `ps` | `git push` |
-| `pl` | `git pull` |
-| `ft` | `git fetch` |
-| `cm` | `git commit` |
-| `br` | `git branch` |
-| `lb` | Select a branch with FZF |
+Git aliases (`git st`, `git ch`, `git chb`, `git ps`, `git pl`, `git ft`, `git cm`, `git br`) are defined in `home/dot_gitconfig.tmpl`.
+
+| Command | Action |
+|---------|--------|
+| `lb` | Global alias that expands to a branch selected with FZF, as in `git checkout lb` |
 | `gw` | Create or switch a worktree with FZF, newest first |
 | `gw <branch>` | Open or create a worktree for a branch |
 | `gwai [-c\|-x] <prompt>` | Create an AI-named worktree via `gw` and start Claude (`-c`, default) or Codex (`-x`) with the prompt |
 | `gwai-orca` | Create an AI-named top-level Orca worktree in the selected workspace's repository and start Claude (default) or Codex |
 | `gwai-worktree-name <prompt>` | Print the `YYMMDD-<Japanese name>` that `gwai` and `gwai-orca` use, generated by Claude Haiku; `YYMMDD-<client>-<Japanese name>` when the prompt names a client company |
 | `gwc [-j jobs]` | Remove worktrees in parallel with multi-select confirmation |
-| `gwt` | `git worktree` |
-| `gwta` | `git worktree add` |
-| `gwtl` | `git worktree list` |
-| `gwtr` | `git worktree remove` |
 | `mise run sync-base-branches <owner>...` | Fetch origin and fast-forward local `main`, `master`, `develop`, `staging`, and `production` in ghq repositories under each owner; branches with local-only commits stay unchanged |
 
 On Linux, `worktree-prune.timer` checks `~/ghq` every day. CCV's web UI controls
@@ -278,6 +258,8 @@ deleted. Run `prune-old-worktrees` without `--apply` to preview candidates.
 
 ### Docker
 
+The `dc*` abbreviations require zsh-abbr, which only the macOS Brewfile installs.
+
 | Alias | Action |
 |-------|--------|
 | `dc` | `docker compose` |
@@ -290,15 +272,6 @@ deleted. Run `prune-old-worktrees` without `--apply` to preview candidates.
 | `dcd` | `docker compose down` |
 | `de` | Interactive `docker exec` with FZF |
 
-### GCloud
-
-| Alias | Action |
-|-------|--------|
-| `gca` | `gcloud config configurations activate` |
-| `gcl` | `gcloud config configurations list` |
-| `gal` | `gcloud auth application-default login` |
-| `gcsp` | `gcloud config set project` |
-
 ### Claude Code
 
 | Command | Action |
@@ -309,7 +282,7 @@ deleted. Run `prune-old-worktrees` without `--apply` to preview candidates.
 
 | Keybinding | Action |
 |------------|--------|
-| `Cmd+Space` | Launch or focus Orca |
+| `Cmd+Space` | Launch, focus, or hide Orca |
 | `Alt+Ctrl+H` | Apply the smart layout for the current display setup |
 | `Alt+Ctrl+E` | Force the external display layout |
 | `Alt+Ctrl+I` | Force the built-in display layout |
@@ -373,6 +346,7 @@ Installed plugins:
 
 - `tmux-plugins/tpm`
 - `tmux-plugins/tmux-sensible`
+- `nhdaly/tmux-better-mouse-mode`
 
 ## Encrypted Files
 
@@ -394,6 +368,8 @@ The backup command downloads the saved document again, compares it with the orig
 |--------|-------------|
 | `home/private_dot_ssh/encrypted_private_config.age` | `~/.ssh/config` |
 | `home/private_dot_config/gcloud/configurations/encrypted_config_*.age` | `~/.config/gcloud/configurations/` |
+| `home/private_dot_config/gcloud/encrypted_private_config-map.age` | `~/.config/gcloud/config-map` |
+| `home/private_dot_config/private_ccv-preview/encrypted_private_local.env.age` | `~/.config/ccv-preview/local.env` (Linux only) |
 | `home/.age-key.age` | `~/.config/chezmoi/key.txt` |
 
 ### Add a New Encrypted File
@@ -404,15 +380,7 @@ chezmoi add --encrypt <file>
 
 ### Install `age`
 
-```bash
-# macOS
-brew install age
-
-# Ubuntu
-sudo apt-get install -y age
-```
-
-Bootstrap on Linux also installs `age`.
+chezmoi needs `age` before `mise install` runs, so bootstrap installs it first: the macOS Brewfile and the Linux full plan (`apt-get install age`). mise also manages it afterward.
 
 ### First-Time Setup on a New Machine
 
@@ -434,20 +402,6 @@ chezmoi apply -v
 ```
 
 You will be asked for the passphrase once to decrypt the repository key.
-
-## Notes
-
-### bash-completion on Ubuntu
-
-```bash
-sudo apt-get update && sudo apt-get install -y bash-completion
-```
-
-### Change the Default Shell
-
-```bash
-chsh -s "$(which zsh)"
-```
 
 ## References
 
