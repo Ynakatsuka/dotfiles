@@ -313,7 +313,7 @@ The command starts Orca when needed and idempotently creates an imported-session
 It exits successfully without changing anything when the platform-specific Orca CLI is not installed.
 Then open **Settings > Browser > Session & Cookies** and import the required Chrome work profile into `Work`.
 Cookies, passwords, profile IDs, and browser storage remain machine-local and are never stored in this repository.
-The shared `orca-cli` skill loads the guide bundled with the installed Orca version, so agents use the matching CLI contract.
+Orca installs and updates the shared `orca-cli` skill itself, so agents use the CLI contract of the installed Orca version. On a new machine, run `orca skills install --skill orca-cli`; these dotfiles do not manage that skill.
 
 Dotfiles sets Claude as Orca's default agent and enables `refreshLocalBaseRefOnWorktreeCreate` through `chezmoi apply`.
 `mise run maintenance` updates the Orca IDE through its Homebrew Cask.
