@@ -158,7 +158,7 @@ def main():
     parser.add_argument(
         "--manual-only",
         action="store_true",
-        help="Disable automatic invocation in Claude Code, Cursor, and Codex",
+        help="Disable automatic invocation in Claude Code and Codex",
     )
     args = parser.parse_args()
 

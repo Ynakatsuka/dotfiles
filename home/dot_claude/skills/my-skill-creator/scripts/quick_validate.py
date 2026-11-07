@@ -169,7 +169,7 @@ def validate_openai_policy(skill_path, frontmatter, profile):
         )
     if not manual_only and allow_implicit is False:
         raise ValueError(
-            "Invocation policies differ: Codex is manual-only but Claude Code and Cursor are not"
+            "Invocation policies differ: Codex is manual-only but Claude Code is not"
         )
 
 
@@ -194,7 +194,7 @@ def validate_skill(skill_path, profile="portable"):
         )
     if profile == "portable" and "paths" in frontmatter:
         warnings.append(
-            "paths is used by Claude Code and Cursor but has no documented Codex equivalent"
+            "paths is used by Claude Code but has no documented Codex equivalent"
         )
 
     message = f"Skill is valid for profile '{profile}'."
