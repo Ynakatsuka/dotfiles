@@ -33,7 +33,7 @@
 - Delegate independent work when parallelism outweighs coordination overhead; keep delegated edits, tests, and generated output from conflicting. The main agent owns decisions, integration, and final verification.
 - Run the narrowest relevant checks and broaden only for a concrete remaining risk. Add tests only for observable behavior with a plausible defect and a gap in existing coverage.
 - Report what changed, exact check commands and results, and remaining limitations. For multiple requested items, account for each outcome and give the shortest way to inspect the result.
-- When a PR changes what users see, show before-and-after screenshots of the same view in its description. Upload them with `--attach` on `gh pr create`, `gh pr edit`, or `gh pr comment`.
+- When a change alters what users see, capture before-and-after screenshots of the same view, state, and viewport, and show both in the final report; if the app cannot run, state why. In a PR, put them in its description with `--attach` on `gh pr create`, `gh pr edit`, or `gh pr comment`.
 
 ## Specialized Work
 
