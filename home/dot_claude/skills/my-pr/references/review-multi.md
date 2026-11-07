@@ -24,7 +24,7 @@ Each Reviewer A run or chunk reports at most 5 Required and at most 5 Recommende
 
 ## Launch
 
-Verify these executors before launch: `scripts/run-codex-reviews.sh`, `scripts/prepare-reviewer-b-input.sh`, `scripts/validate-reviewer-b-output.sh`, plus the configured `my-pr-reviewer` Agent in Claude Code or `scripts/run-claude-review.sh` and its Claude CLI prerequisites on other hosts.
+Verify these executors before launch: `scripts/run-codex-reviews.sh`, `scripts/prepare-reviewer-b-input.sh`, `scripts/validate-reviewer-b-output.sh`, plus `scripts/run-claude-review.sh` and its Claude CLI prerequisites (`claude`, `jq`, `git`) on every host.
 
 Launch Reviewer A, Reviewer B, and Reviewer C concurrently. All three reviewers must use the same full-diff input or the same chunk manifest. Process each reviewer's assigned chunks without nested delegation. Do not run the three reviewer families sequentially unless the environment cannot execute concurrent tasks; if concurrency is unavailable, report that limitation before starting review. Wait for all launched reviewer and chunk results before integration.
 
@@ -51,53 +51,49 @@ In A/B/C mode, run `run-codex-review.sh` directly only for a single-reviewer rel
 
 Reviewer A runs the configured Codex model at `medium` effort; the runner appends the required `# Simplify Review` output structure. It must not propose simplifications that conflict with the PR's stated problem, constraints, or resolved discussion. If Codex fails, times out, lacks quota, rejects the config override, or cannot read the artifact, return `REVIEW_INCOMPLETE` and stop. Do not silently switch to Claude/local execution.
 
-### Reviewer B input
+### Reviewer B
 
-Build one self-contained input per chunk:
+Reviewer B always runs through `scripts/run-claude-review.sh`, on every host including Claude Code. Do not launch the `my-pr-reviewer` Agent: its prompt would have to carry the whole `input.md` (900-3,400 lines), and the global read guard denies unbounded `Read` and `cat` of files over 350 lines. Never `Read`, `cat`, or retype `input.md`, hashes, or any other value the scripts already print.
+
+The wrapper builds the self-contained input itself (it calls `prepare-reviewer-b-input.sh`, which embeds the complete PR context and diff and applies the same 393,216-byte prompt ceiling as the Codex runners), runs Claude, and prints the absolute review Markdown path. Pass literal artifact paths:
 
 ```bash
-bash "$HOME/.claude/skills/my-pr/scripts/prepare-reviewer-b-input.sh" \
+bash "$HOME/.claude/skills/my-pr/scripts/run-claude-review.sh" \
   "full" "1" \
   "/absolute/artifact/path/correctness-review-prompt.md" \
   "/absolute/artifact/path/pr-context.md" \
   "/absolute/artifact/path/review.diff"
 ```
 
-The script embeds the complete PR context and diff, applies the same 393,216-byte prompt ceiling as the Codex runners, and prints the absolute `input.md` path. Use that file as the only Reviewer B task input. Do not replace it with artifact paths or current repository state.
+To inspect the prompt without running Reviewer B, run `prepare-reviewer-b-input.sh` with the same arguments and look at its head or specific ranges with bounded reads (`offset`/`limit`) or `rg`.
 
-### Launch mechanics by host
+### Launch mechanics
 
 Concurrency across A and C is enforced by `scripts/run-codex-reviews.sh`. Concurrency with Reviewer B is not enforced, so order the launch deliberately.
 
-In a Claude Code session with the Agent tool:
+In a Claude Code session with the Bash tool, issue every call in one response:
 
-- Read the complete generated Reviewer B `input.md`, then launch the configured `my-pr-reviewer` Agent with that content as its prompt. Do not invoke a generic Agent and do not add artifact paths, repository-reading instructions, or tools.
-- `my-pr-reviewer` fixes the model to Opus, effort to `high`, available tools to none, and background execution to true. Launch every Reviewer B chunk in the same response so chunked reviews overlap.
-- Then call `run-codex-reviews.sh` once per chunk. Issue every chunk call in the same response; never await one chunk before issuing the next.
-- Give each `run-codex-reviews.sh` call an explicit `timeout` of `600000` ms. The default Bash timeout is 120,000 ms and can kill a healthy Codex review mid-run. Because the wrapper runs A and C concurrently, its wall clock is the slower reviewer, not their sum.
+- One `run-claude-review.sh` call per chunk with `run_in_background: true`. Its completion notification re-invokes you; do not poll on a short interval.
+- One `run-codex-reviews.sh` call per chunk, each with an explicit `timeout` of `600000` ms. The default Bash timeout is 120,000 ms and can kill a healthy Codex review mid-run. Because the wrapper runs A and C concurrently, its wall clock is the slower reviewer, not their sum.
 - A timeout kill is an execution failure, not a format failure. It produces `REVIEW_INCOMPLETE` and cannot be retried without explicit user approval, so set the timeout before launching rather than recovering afterward.
-- If a chunked run needs more than the 600,000 ms ceiling, launch the wrapper with `run_in_background` and wait for its completion notification. Do not poll on a short interval.
+- If a chunked A/C run needs more than the 600,000 ms ceiling, also use `run_in_background` and wait for its completion notification.
+- Read the printed review path only after every notification has arrived.
 
-In a Codex or other non-Claude host, Reviewer B runs through the bundled Claude CLI wrapper:
+In a Codex or other non-Claude host:
 
 - Start `run-codex-reviews.sh` in the background first, capturing its PID and redirecting stdout/stderr to files under the artifact directory.
-- Run `scripts/run-claude-review.sh` with the same chunk id, count, correctness prompt, context, and diff. The wrapper builds the embedded input itself and blocks until Reviewer B returns.
-- For multiple chunks, background every A/C wrapper and Reviewer B wrapper before waiting. Keep each process's stdout/stderr under the artifact directory.
-- After Reviewer B returns, wait on the backgrounded wrappers and read their captured output before integration.
+- Run `run-claude-review.sh` for each chunk, also in the background with output under the artifact directory, then wait on all of them and read their captured output before integration.
 - If this host cannot execute concurrent tasks at all, report that limitation before starting review instead of silently serializing.
 
 ## Reviewer B executor and output
 
-- In a Claude Code session with the Agent tool available, use only the configured `my-pr-reviewer` Agent and pass the complete generated `input.md` as its prompt.
-- In a Codex or other non-Claude host session, use `scripts/run-claude-review.sh`. It launches `claude -p` with `--model opus`, `--effort high`, `--tools ""`, safe mode, an empty MCP configuration, an isolated artifact-local Git repository, and the complete generated input on stdin. Do not invoke Claude CLI directly.
-- For Agent output, have the main orchestrator save the final response verbatim to the exact `<artifact-dir>/reviewer-results/reviewer-b/<chunk-id>/review.md` path. For CLI output, use the review path printed by `run-claude-review.sh`; the wrapper extracts only `structured_output.review_markdown` from the final `stream-json` result event. Do not make Reviewer B inherit `MY_PR_ARTIFACT_DIR`, and do not use an interim message, handoff summary, or shortened recap as the reviewer body.
+- Use only `scripts/run-claude-review.sh`. It launches `claude -p` with `--model opus`, `--effort high`, `--tools ""`, safe mode, an empty MCP configuration, an isolated artifact-local Git repository, and the complete generated input on stdin. Do not invoke the Claude CLI directly and do not substitute the `my-pr-reviewer` Agent.
+- Use the review path printed by the wrapper (`<artifact-dir>/reviewer-results/reviewer-b/<chunk-id>/review.md`); it extracts only `structured_output.review_markdown` from the final `stream-json` result event. Do not make Reviewer B inherit `MY_PR_ARTIFACT_DIR`, and do not use an interim message, handoff summary, or shortened recap as the reviewer body.
 - Validate every Reviewer B Markdown file with `bash "$HOME/.claude/skills/my-pr/scripts/validate-reviewer-b-output.sh" "/absolute/path/to/reviewer-b-review.md"` before integration.
-- If the final result event is missing, `permission_denials` is non-empty, the command is unavailable, authentication is missing, permissions fail, the command times out, or Reviewer B reports that the diff/context was inaccessible, return `REVIEW_INCOMPLETE` and stop before integration.
+- The wrapper exits non-zero when the final result event is missing or `permission_denials` is non-empty. Return `REVIEW_INCOMPLETE` and stop before integration if that happens, the command is unavailable, authentication is missing, permissions fail, the command times out, or Reviewer B reports that the diff/context was inaccessible.
 - Do not invoke `/my-agent claude` from inside a delegated Claude session unless the user explicitly requested nested delegation.
 - Pin Reviewer B to Claude Opus at `high` effort. Do not inherit the configured default model or effort and do not allow the global session effort to override this profile.
 
-If Reviewer B completes its review but `validate-reviewer-b-output.sh` rejects the final Markdown, request one format-only correction in the same Agent conversation or CLI session. Tell Reviewer B to re-emit its already completed review using the exact output format, without rereading files, calling tools, changing findings, or returning a summary. Validate the corrected body once.
+If Reviewer B completes its review but `validate-reviewer-b-output.sh` rejects the Markdown, skip the entire Reviewer B family, record the exact validation failure, and integrate Reviewer A/C. The wrapper runs with `--no-session-persistence`, so a format-only correction in the same session is impossible; do not rerun the wrapper and do not replace Claude review with Codex or local review. This format-only skip is an explicitly approved degraded path and does not produce `REVIEW_INCOMPLETE`.
 
-If the corrected body is still invalid, skip the entire Reviewer B family, record the exact validation failure, and integrate Reviewer A/C. Do not retry again and do not replace Claude review with Codex or local review. This format-only skip is an explicitly approved degraded path and does not produce `REVIEW_INCOMPLETE`.
-
-If the Claude Agent or CLI exits non-zero, lacks quota or authentication, times out, cannot read the diff/context artifact, or explicitly reports incomplete input, stop before integration. These execution and input failures are not format-only failures.
+If the wrapper exits non-zero, lacks quota or authentication, times out, cannot read the diff/context artifact, or explicitly reports incomplete input, stop before integration. These execution and input failures are not format-only failures.
