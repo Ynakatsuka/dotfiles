@@ -25,15 +25,11 @@ zle -N fzf-git-checkout
 bindkey '^b' fzf-git-checkout
 
 # cdr
-autoload -Uz is-at-least
-if is-at-least 4.3.11
-then
-  autoload -Uz chpwd_recent_dirs cdr add-zsh-hook
-  add-zsh-hook chpwd chpwd_recent_dirs
-  zstyle ':chpwd:*'      recent-dirs-max 500
-  zstyle ':chpwd:*'      recent-dirs-default yes
-  zstyle ':completion:*' recent-dirs-insert both
-fi
+autoload -Uz chpwd_recent_dirs cdr add-zsh-hook
+add-zsh-hook chpwd chpwd_recent_dirs
+zstyle ':chpwd:*'      recent-dirs-max 500
+zstyle ':chpwd:*'      recent-dirs-default yes
+zstyle ':completion:*' recent-dirs-insert both
 
 # fzf cdr
 function fzf-cdr() {
@@ -45,7 +41,6 @@ function fzf-cdr() {
     zle clear-screen
 }
 zle -N fzf-cdr
-setopt noflowcontrol
 bindkey '^f' fzf-cdr
 
 # fzf gcloud configuration select and reauthentication

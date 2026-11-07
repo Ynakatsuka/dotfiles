@@ -27,23 +27,12 @@ zstyle ':prezto:load' pmodule \
   'utility' \
   'completion' \
   'history-substring-search' \
-  'autosuggestions' \
-  'prompt'
-  # NOTE: private_dot_config/zsh/prompt.zsh overrides $PROMPT after Prezto sets it.
-
-#
-# Autosuggestions
-#
-
-typeset -g ZSH_AUTOSUGGEST_USE_ASYNC=1
+  'autosuggestions'
 
 #
 # Completions
 #
 
-zstyle ':completion:*' use-cache 'yes'
-zstyle ':completion:*' cache-path "$HOME/.zsh/cache"
-zstyle ':completion:*' rehash 'no'
 
 #
 # Editor

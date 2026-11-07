@@ -70,6 +70,11 @@ mise.lock
 .cursor/mcp.json
 .config/zsh/cursor.zsh
 .local/bin/dotfiles-cursor-agent-upgrade
+.config/code-server
+.zlogout
+Library/Application Support/com.mitchellh.ghostty/config
+.config/zsh/copy-last-output.zsh
+.raycast/.rayconfig
 
 {{- if ne .chezmoi.os "darwin" }}
 

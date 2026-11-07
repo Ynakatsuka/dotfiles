@@ -24,7 +24,6 @@ bind-key -n DoubleClick1Pane select-pane \; copy-mode -M \; send-keys -X select-
 # Linux: use tmux's built-in OSC 52 clipboard support (set-clipboard on, above).
 # copy-selection-and-cancel exits copy mode and lets the terminal forward the
 # selection via OSC 52 without requiring xclip/xsel/pbcopy.
-set -s set-clipboard on
 unbind -T copy-mode-vi MouseDragEnd1Pane
 bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel
 

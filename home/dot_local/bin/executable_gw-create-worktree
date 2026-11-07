@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared git worktree creation helper for interactive shell helpers and skills.
+# Git worktree creation helper behind the zsh `gw` function (git-worktree.zsh).
 
 set -euo pipefail
 
