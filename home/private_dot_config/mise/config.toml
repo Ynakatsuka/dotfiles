@@ -5,6 +5,10 @@
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
+# OpenCode CLI (Homeport opencode provider)
+# Pinned to the last macos-arm64 release with GitHub attestations.
+"github:anomalyco/opencode" = "1.17.7"
+
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
