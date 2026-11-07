@@ -31,3 +31,12 @@ fi
 if [[ -d "$HOME/.local/share/mise/shims" ]]; then
   export PATH="$HOME/.local/share/mise/shims:$PATH"
 fi
+
+# Agent shells (Claude Code Bash tool): a failed glob or `=word` must not abort
+# the whole command line. Keep bash-like behavior: an unmatched glob is passed
+# through literally (NULL_GLOB would turn `ls nope*` into `ls` and `grep x *.ts`
+# into a stdin read), and `echo ====` is not a `=cmd` lookup. Set here so that
+# `zsh -c` also gets it; human shells have no CLAUDECODE and are unchanged.
+if [[ -n "$CLAUDECODE" ]]; then
+  unsetopt NOMATCH EQUALS
+fi
