@@ -309,8 +309,7 @@ local function smartLayout()
     end
 end
 
--- Bind hotkeys
-hs.hotkey.bind({"cmd"}, "space", function()
+local function toggleOrca()
     local app = hs.application.get(apps.orca)
     if app and app:isFrontmost() then
         app:hide()
@@ -318,7 +317,22 @@ hs.hotkey.bind({"cmd"}, "space", function()
     end
 
     hs.application.launchOrFocus(apps.orca)
-end)
+end
+
+-- Bind hotkeys
+-- Another process can hold Cmd+Space even with the Spotlight shortcut disabled,
+-- which makes hs.hotkey fail to register it, so intercept the key event instead.
+-- Keep the tap global so it is not garbage-collected.
+orcaHotkeyTap = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
+    if event:getKeyCode() ~= hs.keycodes.map.space or not event:getFlags():containExactly({"cmd"}) then
+        return false
+    end
+    if event:getProperty(hs.eventtap.event.properties.keyboardEventAutorepeat) == 0 then
+        -- Return quickly; macOS disables taps whose callbacks block.
+        hs.timer.doAfter(0, toggleOrca)
+    end
+    return true
+end):start()
 
 hs.hotkey.bind(hyper, "H", function()
     smartLayout()
