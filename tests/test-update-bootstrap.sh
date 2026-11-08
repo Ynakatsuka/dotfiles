@@ -70,7 +70,19 @@ cat >"$TEST_DIR/home/.local/bin/dotfiles-brew-upgrade" <<'EOF'
 set -euo pipefail
 echo brew-upgrade >>"$TEST_CALLS"
 EOF
-chmod +x "$TEST_DIR/bin/chezmoi" "$TEST_DIR/home/.local/bin/"* "$TEST_DIR/bin/brew"
+cat >"$TEST_DIR/bin/claude" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[ "$*" = update ]
+echo claude-update >>"$TEST_CALLS"
+EOF
+cat >"$TEST_DIR/home/.local/bin/git-sync-base-branches" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[ "$#" -eq 0 ]
+echo sync-base-branches >>"$TEST_CALLS"
+EOF
+chmod +x "$TEST_DIR/bin/chezmoi" "$TEST_DIR/home/.local/bin/"* "$TEST_DIR/bin/brew" "$TEST_DIR/bin/claude"
 
 export HOME="$TEST_DIR/home"
 export PATH="$TEST_DIR/bin:/usr/bin:/bin"
@@ -104,7 +116,7 @@ fi
 [ ! -s "$TEST_CALLS" ]
 
 run_maintenance
-assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up\nbrew-upgrade'
+assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up\nbrew-upgrade\nclaude-update\nsync-base-branches'
 
 export FAIL_AT=pull
 if run_maintenance; then
@@ -136,9 +148,11 @@ assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up'
 unset FAIL_AT
 
 mv "$TEST_DIR/bin/brew" "$TEST_DIR/bin/brew.disabled"
+mv "$TEST_DIR/bin/claude" "$TEST_DIR/bin/claude.disabled"
 run_maintenance
-assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up'
+assert_calls $'pull\napply-force\nverify\nupdated-config\nmise-up\nsync-base-branches'
 grep -Fq 'brew not found, skipping Homebrew updates' "$TEST_DIR/output"
+grep -Fq 'claude not found, skipping Claude Code update' "$TEST_DIR/output"
 
 installer_output="$(bash -c '. "$1"; enable_dry_run; install_chezmoi_official -c; install_chezmoi_official -lc' _ "$COMMON")"
 [[ "$installer_output" == *'[DRY-RUN] bash -c sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"'* ]]

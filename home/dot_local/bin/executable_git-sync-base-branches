@@ -5,15 +5,21 @@
 # skipped), fetch origin and fast-forward every existing local base branch to
 # origin/<branch>. A branch checked out in a worktree is merged with --ff-only
 # there so the files follow. A branch with commits missing from origin is left
-# unchanged and reported.
+# unchanged and reported. Repositories are synced in parallel, and each
+# repository's output is printed as one block in ghq list order.
 
 set -euo pipefail
 
 BASE_BRANCHES="main master develop staging production"
+# Keep concurrent SSH connections to one host under common server limits.
+MAX_JOBS=8
 FAILURES=0
+REPOS=()
+LABELS=()
 
 usage() {
-  echo "Usage: git-sync-base-branches OWNER..."
+  echo "Usage: git-sync-base-branches [OWNER...]"
+  echo "Without OWNER, sync every ghq repository."
 }
 
 fail() {
@@ -85,36 +91,73 @@ sync_repo() {
   done
 }
 
+# Queue primary clones whose owner matches OWNER_KEY, or all of them when it is empty.
+queue_owner() {
+  local owner_key=$1 repo parent matched=0
+  while IFS= read -r repo; do
+    [ -d "$repo/.git" ] || continue
+    # Skip clones nested deeper than <root>/<host>/<owner>/<repo>.
+    grep -Fxq -- "${repo%/*/*/*}" <<<"$GHQ_ROOTS" || continue
+    parent=${repo%/*}
+    if [ -n "$owner_key" ] && [ "$(lowercase "${parent##*/}")" != "$owner_key" ]; then
+      continue
+    fi
+    matched=1
+    REPOS+=("$repo")
+    LABELS+=("${parent##*/}/${repo##*/}")
+  done <<<"$GHQ_REPOS"
+  [ "$matched" -eq 1 ]
+}
+
+# Sync one queued repository, buffering its output and failure count in OUT_DIR.
+sync_job() {
+  local index=$1
+  FAILURES=0
+  # Keep git subprocesses from reading the terminal on stdin.
+  sync_repo "${REPOS[$index]}" "${LABELS[$index]}" \
+    >"$OUT_DIR/$index.out" 2>"$OUT_DIR/$index.err" </dev/null
+  echo "$FAILURES" >"$OUT_DIR/$index.failures"
+}
+
+sync_queued() {
+  local index
+  [ "${#REPOS[@]}" -gt 0 ] || return 0
+  OUT_DIR=$(mktemp -d)
+  trap 'rm -rf "$OUT_DIR"' EXIT
+  # Run fixed batches with plain wait; macOS /bin/bash 3.2 has no wait -n.
+  for index in "${!REPOS[@]}"; do
+    sync_job "$index" &
+    if [ $(((index + 1) % MAX_JOBS)) -eq 0 ]; then
+      wait
+    fi
+  done
+  wait
+  for index in "${!REPOS[@]}"; do
+    cat "$OUT_DIR/$index.out"
+    cat "$OUT_DIR/$index.err" >&2
+    FAILURES=$((FAILURES + $(cat "$OUT_DIR/$index.failures")))
+  done
+}
+
 main() {
-  local owner owner_key ghq_repos repo parent matched
-  if [ "$#" -eq 0 ]; then
-    usage >&2
-    return 2
-  fi
-  case $1 in
+  local owner
+  case ${1:-} in
     -h | --help)
       usage
       return 0
       ;;
   esac
 
-  ghq_repos=$(ghq list --full-path)
+  GHQ_ROOTS=$(ghq root --all)
+  GHQ_REPOS=$(ghq list --full-path)
+  if [ "$#" -eq 0 ]; then
+    queue_owner "" || fail "no ghq repositories found"
+  fi
   for owner in "$@"; do
     # GitHub owner names are case-insensitive.
-    owner_key=$(lowercase "$owner")
-    matched=0
-    while IFS= read -r repo; do
-      [ -d "$repo/.git" ] || continue
-      parent=${repo%/*}
-      [ "$(lowercase "${parent##*/}")" = "$owner_key" ] || continue
-      matched=1
-      # Keep git subprocesses from reading the repository list on stdin.
-      sync_repo "$repo" "${parent##*/}/${repo##*/}" </dev/null
-    done <<<"$ghq_repos"
-    if [ "$matched" -eq 0 ]; then
-      fail "no ghq repositories found for owner: $owner"
-    fi
+    queue_owner "$(lowercase "$owner")" || fail "no ghq repositories found for owner: $owner"
   done
+  sync_queued
 
   if [ "$FAILURES" -gt 0 ]; then
     echo "[ERROR] git-sync-base-branches: $FAILURES problem(s) reported above" >&2
