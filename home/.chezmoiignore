@@ -17,10 +17,20 @@ Library
 # Python bytecode cache — never deploy
 **/__pycache__
 
+{{- $orcaData := "Library/Application Support/orca/profiles/local-default/orca-data.json" }}
+{{- if not (stat (joinPath .chezmoi.homeDir $orcaData)) }}
+# Newer Orca keeps settings in profile-state.db and never writes this JSON file.
+{{ $orcaData }}
+{{- end }}
+
 {{- $ageCmd := includeTemplate "age-command.tmpl" . -}}
 {{- if not (and (eq .chezmoi.config.encryption "age") $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt"))) }}
 .ssh/config
 .ssh/config.age
+.config/gcloud/config-map
+.config/gcloud/config-map.age
 .config/gcloud/configurations/config_*
 .config/gcloud/configurations/config_*.age
+.config/ccv-preview/local.env
+.config/ccv-preview/local.env.age
 {{- end }}
