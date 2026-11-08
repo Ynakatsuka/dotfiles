@@ -12,22 +12,29 @@ fi
 # Older mise versions do not support settings.task.run_auto_install.
 if command -v mise > /dev/null 2>&1; then
   mise() {
-    local arg skip_auto_install=0
+    local arg task=""
     if [[ "$1" == "maintenance" || "$1" == "update-dotfiles" ]]; then
-      skip_auto_install=1
+      task=$1
     elif [[ "$1" == "run" || "$1" == "r" ]]; then
       for arg in "$@"; do
         if [[ "$arg" == "maintenance" || "$arg" == "update-dotfiles" ]]; then
-          skip_auto_install=1
+          task=$arg
           break
         fi
       done
     fi
 
-    if (( skip_auto_install )); then
-      MISE_TASK_RUN_AUTO_INSTALL=false command mise "$@"
-    else
+    if [[ -z "$task" ]]; then
       command mise "$@"
+      return
+    fi
+    MISE_TASK_RUN_AUTO_INSTALL=false command mise "$@" || return
+    # maintenance replaces shell config and tools, so restart into them. Help
+    # output runs nothing, and agent shells replay this function and must keep
+    # their process.
+    local help_args="${(M)@:#(-h|--help)}"
+    if [[ "$task" == "maintenance" && -z "$help_args" && -o interactive && -t 0 && -t 1 && -z "$CLAUDECODE" ]]; then
+      exec zsh
     fi
   }
 fi

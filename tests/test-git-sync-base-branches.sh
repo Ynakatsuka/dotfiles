@@ -35,6 +35,7 @@ OWNER_DIR="$ROOT/example.com/Acme"
 REPO="$OWNER_DIR/app"
 WORKTREE="$OWNER_DIR/app-prod"
 SEED="$TMP_DIR/seed"
+NESTED="$OWNER_DIR/group/nested"
 
 git init --quiet --bare -b main "$TMP_DIR/origin.git"
 git init --quiet -b main "$SEED"
@@ -56,11 +57,17 @@ commit_file "$SEED" remote-update
 git -C "$SEED" push --quiet origin main main:staging main:develop main:production
 DEVELOP_BEFORE=$(git -C "$REPO" rev-parse develop)
 
+# A clone below <owner>/<group>/ is not a primary clone and has no origin.
+git init --quiet "$NESTED"
+
 mkdir -p "$TMP_DIR/bin"
 cat >"$TMP_DIR/bin/ghq" <<EOF
 #!/usr/bin/env bash
-[ "\$*" = "list --full-path" ] || exit 64
-printf '%s\n' "$REPO" "$WORKTREE"
+case "\$*" in
+  "root --all") printf '%s\n' "$ROOT" ;;
+  "list --full-path") printf '%s\n' "$REPO" "$WORKTREE" "$NESTED" ;;
+  *) exit 64 ;;
+esac
 EOF
 chmod +x "$TMP_DIR/bin/ghq"
 export PATH="$TMP_DIR/bin:$PATH"
@@ -95,8 +102,7 @@ if bash "$SCRIPT" missing-owner >"$TMP_DIR/out" 2>&1; then
 fi
 grep -Fq "no ghq repositories found for owner: missing-owner" "$TMP_DIR/out" || fail "unknown owner was not reported"
 
-status=0
-bash "$SCRIPT" >/dev/null 2>&1 || status=$?
-[ "$status" -eq 2 ] || fail "missing owner argument exited with $status, expected 2"
+bash "$SCRIPT" >"$TMP_DIR/out" 2>&1 || fail "run without owners failed: $(cat "$TMP_DIR/out")"
+grep -Fq "Acme/app main: up to date" "$TMP_DIR/out" || fail "run without owners skipped Acme/app"
 
 echo "test-git-sync-base-branches: OK"

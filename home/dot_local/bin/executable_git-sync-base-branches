@@ -13,7 +13,8 @@ BASE_BRANCHES="main master develop staging production"
 FAILURES=0
 
 usage() {
-  echo "Usage: git-sync-base-branches OWNER..."
+  echo "Usage: git-sync-base-branches [OWNER...]"
+  echo "Without OWNER, sync every ghq repository."
 }
 
 fail() {
@@ -85,35 +86,41 @@ sync_repo() {
   done
 }
 
+# Sync primary clones whose owner matches OWNER_KEY, or all of them when it is empty.
+sync_owner() {
+  local owner_key=$1 repo parent matched=0
+  while IFS= read -r repo; do
+    [ -d "$repo/.git" ] || continue
+    # Skip clones nested deeper than <root>/<host>/<owner>/<repo>.
+    grep -Fxq -- "${repo%/*/*/*}" <<<"$GHQ_ROOTS" || continue
+    parent=${repo%/*}
+    if [ -n "$owner_key" ] && [ "$(lowercase "${parent##*/}")" != "$owner_key" ]; then
+      continue
+    fi
+    matched=1
+    # Keep git subprocesses from reading the repository list on stdin.
+    sync_repo "$repo" "${parent##*/}/${repo##*/}" </dev/null
+  done <<<"$GHQ_REPOS"
+  [ "$matched" -eq 1 ]
+}
+
 main() {
-  local owner owner_key ghq_repos repo parent matched
-  if [ "$#" -eq 0 ]; then
-    usage >&2
-    return 2
-  fi
-  case $1 in
+  local owner
+  case ${1:-} in
     -h | --help)
       usage
       return 0
       ;;
   esac
 
-  ghq_repos=$(ghq list --full-path)
+  GHQ_ROOTS=$(ghq root --all)
+  GHQ_REPOS=$(ghq list --full-path)
+  if [ "$#" -eq 0 ]; then
+    sync_owner "" || fail "no ghq repositories found"
+  fi
   for owner in "$@"; do
     # GitHub owner names are case-insensitive.
-    owner_key=$(lowercase "$owner")
-    matched=0
-    while IFS= read -r repo; do
-      [ -d "$repo/.git" ] || continue
-      parent=${repo%/*}
-      [ "$(lowercase "${parent##*/}")" = "$owner_key" ] || continue
-      matched=1
-      # Keep git subprocesses from reading the repository list on stdin.
-      sync_repo "$repo" "${parent##*/}/${repo##*/}" </dev/null
-    done <<<"$ghq_repos"
-    if [ "$matched" -eq 0 ]; then
-      fail "no ghq repositories found for owner: $owner"
-    fi
+    sync_owner "$(lowercase "$owner")" || fail "no ghq repositories found for owner: $owner"
   done
 
   if [ "$FAILURES" -gt 0 ]; then
