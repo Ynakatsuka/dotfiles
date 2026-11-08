@@ -36,6 +36,7 @@ REPO="$OWNER_DIR/app"
 WORKTREE="$OWNER_DIR/app-prod"
 SEED="$TMP_DIR/seed"
 NESTED="$OWNER_DIR/group/nested"
+LIB="$OWNER_DIR/lib"
 
 git init --quiet --bare -b main "$TMP_DIR/origin.git"
 git init --quiet -b main "$SEED"
@@ -49,6 +50,7 @@ git -C "$REPO" branch --quiet staging origin/staging
 git -C "$REPO" branch --quiet develop origin/develop
 git -C "$REPO" branch --quiet master main
 git -C "$REPO" worktree add --quiet "$WORKTREE" production
+git clone --quiet "$TMP_DIR/origin.git" "$LIB"
 git -C "$REPO" checkout --quiet develop
 commit_file "$REPO" develop-local
 git -C "$REPO" checkout --quiet main
@@ -65,7 +67,7 @@ cat >"$TMP_DIR/bin/ghq" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   "root --all") printf '%s\n' "$ROOT" ;;
-  "list --full-path") printf '%s\n' "$REPO" "$WORKTREE" "$NESTED" ;;
+  "list --full-path") printf '%s\n' "$REPO" "$WORKTREE" "$NESTED" "$LIB" ;;
   *) exit 64 ;;
 esac
 EOF
@@ -77,6 +79,10 @@ if bash "$SCRIPT" acme >"$TMP_DIR/out" 2>&1; then
 fi
 
 assert_ref "$REPO" main origin/main
+assert_ref "$LIB" main origin/main
+# Parallel jobs still print each repository's block in ghq list order.
+grep -o '^Acme/[a-z]* main' "$TMP_DIR/out" | paste -sd, - | grep -Fxq 'Acme/app main,Acme/lib main' ||
+  fail "repository output was not in ghq list order"
 [ -f "$REPO/remote-update" ] || fail "checked-out main did not update its files"
 assert_ref "$REPO" staging origin/staging
 assert_ref "$REPO" production origin/production
