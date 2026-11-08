@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# Apply the Orca settings owned by dotfiles to the active profile's profile-state.db:
+# Claude as the default agent, local base-ref refresh, a shared shell history,
+# manual workspace order, and the `Mark workspace Done` Quick Command.
+#
+# Orca keeps settings in memory and writes whole documents against an expected
+# store revision, so the database can only change while Orca is not running.
+# A write bumps the store revision the way Orca does and stores the payload's
+# SHA-256 as content_hash.
+#
+#   orca-apply-settings            # apply; exit 3 if Orca is running and changes are pending
+#   orca-apply-settings --restart  # quit Orca when changes are pending, apply, and relaunch it
+
+set -euo pipefail
+
+name=${0##*/}
+restart=false
+case "$#:${1:-}" in
+  0:) ;;
+  1:--restart) restart=true ;;
+  *)
+    printf 'usage: %s [--restart]\n' "$name" >&2
+    exit 2
+    ;;
+esac
+
+for cmd in jq sqlite3 shasum; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    printf '%s: %s is required\n' "$name" "$cmd" >&2
+    exit 1
+  fi
+done
+
+orca_dir=${ORCA_USER_DATA_PATH:-"$HOME/Library/Application Support/orca"}
+index="$orca_dir/orca-profile-index.json"
+if [[ ! -f "$index" ]]; then
+  printf '%s: Orca profile index not found: %s\n' "$name" "$index" >&2
+  exit 1
+fi
+profile_id=$(jq -er '.activeProfileId | strings' "$index") || {
+  printf '%s: activeProfileId is missing in %s\n' "$name" "$index" >&2
+  exit 1
+}
+db="$orca_dir/profiles/$profile_id/profile-state.db"
+if [[ ! -f "$db" ]]; then
+  printf '%s: Orca profile database not found: %s\n' "$name" "$db" >&2
+  exit 1
+fi
+
+settings_filter='
+  if type != "object" then
+    error("Orca settings must be an object")
+  elif (.terminalQuickCommands | type) != "array" then
+    error("Orca terminalQuickCommands must be an array")
+  else
+    .defaultTuiAgent = "claude"
+    | .refreshLocalBaseRefOnWorktreeCreate = true
+    | .terminalScopeHistoryByWorktree = false
+    | .terminalQuickCommands = (
+        [.terminalQuickCommands[]
+          | select(.id != "dotfiles-workspace-done" and .command != "orca-workspace-done")]
+        + [
+            ([.terminalQuickCommands[]
+              | select(.id == "dotfiles-workspace-done" or .command == "orca-workspace-done")][0]
+              // {"id": "dotfiles-workspace-done"})
+            + {
+                "label": "Mark workspace Done",
+                "action": "terminal-command",
+                "command": "orca-workspace-done",
+                "appendEnter": true,
+                "scope": {"type": "global"}
+              }
+          ]
+      )
+  end'
+ui_filter='
+  if type != "object" then
+    error("Orca ui settings must be an object")
+  else
+    .sortBy = "manual"
+  end'
+
+read_payload() {
+  local payload
+  payload=$(sqlite3 -readonly "$db" "SELECT payload FROM profile_state_documents WHERE domain = '$1'") || return 1
+  if [[ -z "$payload" ]]; then
+    printf '%s: Orca %s document not found in %s\n' "$name" "$1" "$db" >&2
+    return 1
+  fi
+  printf '%s' "$payload"
+}
+
+# Print the desired payload when it differs from the current one.
+pending_payload() {
+  local domain=$1 filter=$2 current desired
+  current=$(read_payload "$domain") || return 1
+  desired=$(jq -cj "$filter" <<<"$current") || {
+    printf '%s: cannot update the Orca %s document\n' "$name" "$domain" >&2
+    return 1
+  }
+  if ! jq -e --argjson desired "$desired" '. == $desired' <<<"$current" >/dev/null; then
+    printf '%s' "$desired"
+  fi
+}
+
+new_settings=$(pending_payload settings "$settings_filter")
+new_ui=$(pending_payload ui "$ui_filter")
+if [[ -z "$new_settings" && -z "$new_ui" ]]; then
+  printf '%s: Orca settings are up to date\n' "$name"
+  exit 0
+fi
+
+# pgrep does not list the Orca main process, so match its executable path.
+orca_running() {
+  local procs
+  procs=$(ps -axo comm=) || {
+    printf '%s: cannot list processes\n' "$name" >&2
+    exit 1
+  }
+  grep -q '/Orca\.app/Contents/MacOS/Orca$' <<<"$procs"
+}
+was_running=false
+if orca_running; then
+  was_running=true
+  if ! $restart; then
+    printf '%s: Orca is running; quit Orca and run %s, or run %s --restart\n' "$name" "$name" "$name" >&2
+    exit 3
+  fi
+  osascript -e 'quit app "Orca"'
+  for _ in $(seq 60); do
+    orca_running || break
+    sleep 1
+  done
+  if orca_running; then
+    printf '%s: Orca did not quit within 60 seconds\n' "$name" >&2
+    exit 1
+  fi
+fi
+
+backup="$db.dotfiles-backup-$(date +%Y%m%d%H%M%S)"
+sqlite3 "$db" ".backup '$backup'"
+printf '%s: backup: %s\n' "$name" "$backup"
+
+update_sql() {
+  local domain=$1 payload=$2 hash
+  [[ -n "$payload" ]] || return 0
+  hash=$(printf '%s' "$payload" | shasum -a 256 | cut -d' ' -f1)
+  printf "UPDATE profile_state_documents SET payload = '%s', content_hash = '%s', updated_at = %s, revision = (SELECT CAST(value AS INTEGER) FROM profile_state_meta WHERE key = 'revision') WHERE domain = '%s';\n" \
+    "${payload//\'/\'\'}" "$hash" "$now_ms" "$domain"
+}
+now_ms=$(($(date +%s) * 1000))
+{
+  printf 'BEGIN IMMEDIATE;\n'
+  printf "UPDATE profile_state_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'revision';\n"
+  update_sql settings "$new_settings"
+  update_sql ui "$new_ui"
+  printf 'COMMIT;\n'
+} | sqlite3 -bail "$db"
+
+if [[ -n "$(pending_payload settings "$settings_filter")$(pending_payload ui "$ui_filter")" ]]; then
+  printf '%s: Orca settings did not persist; restore %s if Orca fails to start\n' "$name" "$backup" >&2
+  exit 1
+fi
+printf '%s: applied Orca settings\n' "$name"
+
+if $was_running; then
+  open -a Orca
+fi

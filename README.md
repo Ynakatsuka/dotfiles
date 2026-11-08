@@ -317,7 +317,8 @@ Then open **Settings > Browser > Session & Cookies** and import the required Chr
 Cookies, passwords, profile IDs, and browser storage remain machine-local and are never stored in this repository.
 Orca installs and updates the shared `orca-cli` skill itself, so agents use the CLI contract of the installed Orca version. On a new machine, run `orca skills install --skill orca-cli`; these dotfiles do not manage that skill.
 
-Dotfiles sets Claude as Orca's default agent and enables `refreshLocalBaseRefOnWorktreeCreate` through `chezmoi apply`.
+Dotfiles sets Claude as Orca's default agent, enables `refreshLocalBaseRefOnWorktreeCreate`, shares `~/.zsh_history` across worktrees, keeps the manual workspace order, and adds the `Mark workspace Done` Quick Command.
+`chezmoi apply` writes these settings to Orca's `profile-state.db` with `orca-apply-settings`. Orca overwrites that database while it runs, so the apply defers the change while Orca is open; run `orca-apply-settings --restart` to quit Orca, apply, and relaunch it.
 `mise run maintenance` updates the Orca IDE through its Homebrew Cask.
 Orca fetches remote base refs during worktree creation; this setting also updates the corresponding local branch when it can safely fast-forward.
 No manual pull is needed for each new workspace. Without a repository-specific base ref, Orca prefers `origin/HEAD`; set a repository override when development uses a different branch, such as `origin/staging`.

@@ -1,0 +1,20 @@
+{{ if eq .chezmoi.os "darwin" -}}
+#!/usr/bin/env bash
+# Apply dotfiles-owned Orca settings on every apply. orca-apply-settings exits 3
+# while Orca is running with changes pending; that defers the change to a later
+# apply or a manual `orca-apply-settings --restart` instead of failing the apply.
+set -euo pipefail
+
+orca_dir=${ORCA_USER_DATA_PATH:-"$HOME/Library/Application Support/orca"}
+if [[ ! -f "$orca_dir/orca-profile-index.json" ]]; then
+  echo "orca-apply-settings: Orca has not created a profile yet; skipping" >&2
+  exit 0
+fi
+
+status=0
+"$HOME/.local/bin/orca-apply-settings" || status=$?
+if [[ $status -eq 3 ]]; then
+  exit 0
+fi
+exit "$status"
+{{ end -}}
