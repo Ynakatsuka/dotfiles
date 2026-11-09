@@ -5,6 +5,10 @@
 # OpenAI Codex CLI
 "npm:@openai/codex" = "latest"
 
+# OpenCode CLI (Homeport opencode provider)
+# Pinned to the last macos-arm64 release with GitHub attestations.
+"github:anomalyco/opencode" = "1.17.7"
+
 # vsce - Visual Studio Code Extension CLI
 "npm:@vscode/vsce" = "latest"
 
@@ -202,7 +206,7 @@ set -e
 """
 
 [tasks.maintenance]
-description = "Apply and verify dotfiles, then update mise tools and Homebrew packages"
+description = "Apply and verify dotfiles, update mise tools, Homebrew packages, and Claude Code, then sync base branches of every ghq repository"
 run = """
 set -e
 
@@ -212,10 +216,16 @@ if command -v brew >/dev/null 2>&1; then
 else
   echo "[INFO] brew not found, skipping Homebrew updates"
 fi
+if command -v claude >/dev/null 2>&1; then
+  claude update
+else
+  echo "[INFO] claude not found, skipping Claude Code update"
+fi
+"$(chezmoi source-path ~/.local/bin/git-sync-base-branches)"
 """
 
 [tasks.sync-base-branches]
-description = "Fast-forward local main/master/develop/staging/production to origin in ghq repositories of the given owners"
+description = "Fast-forward local main/master/develop/staging/production to origin in ghq repositories of the given owners, or of all owners"
 # mise appends task arguments (owner names) to this command.
 run = "git-sync-base-branches"
 

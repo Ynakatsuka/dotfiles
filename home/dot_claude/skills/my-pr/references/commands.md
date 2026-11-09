@@ -35,7 +35,7 @@ All commands except `verify` must complete these gates before review, simplify, 
    - `large+untracked`: resolve both conditions before continuing.
 7. Use the generated repo-local artifacts for review and PR body work. Do not use `/tmp` review patches.
 
-For default, `review`, and `fix`, select the reviewer set using `review.md` before launch. Failure of an artifact read or any selected reviewer means `REVIEW_INCOMPLETE`. Only a selected Reviewer B Markdown structure failure follows the existing bounded correction and skip policy in `review-multi.md`. Unselected reviewers are not skipped or required inputs.
+For default, `review`, and `fix`, select the reviewer set using `review.md` before launch. Failure of an artifact read or any selected reviewer means `REVIEW_INCOMPLETE`. Only a selected Reviewer B Markdown structure failure follows the skip policy in `review-multi.md`. Unselected reviewers are not skipped or required inputs.
 
 ## default
 

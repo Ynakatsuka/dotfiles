@@ -35,6 +35,8 @@ OWNER_DIR="$ROOT/example.com/Acme"
 REPO="$OWNER_DIR/app"
 WORKTREE="$OWNER_DIR/app-prod"
 SEED="$TMP_DIR/seed"
+NESTED="$OWNER_DIR/group/nested"
+LIB="$OWNER_DIR/lib"
 
 git init --quiet --bare -b main "$TMP_DIR/origin.git"
 git init --quiet -b main "$SEED"
@@ -48,6 +50,7 @@ git -C "$REPO" branch --quiet staging origin/staging
 git -C "$REPO" branch --quiet develop origin/develop
 git -C "$REPO" branch --quiet master main
 git -C "$REPO" worktree add --quiet "$WORKTREE" production
+git clone --quiet "$TMP_DIR/origin.git" "$LIB"
 git -C "$REPO" checkout --quiet develop
 commit_file "$REPO" develop-local
 git -C "$REPO" checkout --quiet main
@@ -56,11 +59,17 @@ commit_file "$SEED" remote-update
 git -C "$SEED" push --quiet origin main main:staging main:develop main:production
 DEVELOP_BEFORE=$(git -C "$REPO" rev-parse develop)
 
+# A clone below <owner>/<group>/ is not a primary clone and has no origin.
+git init --quiet "$NESTED"
+
 mkdir -p "$TMP_DIR/bin"
 cat >"$TMP_DIR/bin/ghq" <<EOF
 #!/usr/bin/env bash
-[ "\$*" = "list --full-path" ] || exit 64
-printf '%s\n' "$REPO" "$WORKTREE"
+case "\$*" in
+  "root --all") printf '%s\n' "$ROOT" ;;
+  "list --full-path") printf '%s\n' "$REPO" "$WORKTREE" "$NESTED" "$LIB" ;;
+  *) exit 64 ;;
+esac
 EOF
 chmod +x "$TMP_DIR/bin/ghq"
 export PATH="$TMP_DIR/bin:$PATH"
@@ -70,6 +79,10 @@ if bash "$SCRIPT" acme >"$TMP_DIR/out" 2>&1; then
 fi
 
 assert_ref "$REPO" main origin/main
+assert_ref "$LIB" main origin/main
+# Parallel jobs still print each repository's block in ghq list order.
+grep -o '^Acme/[a-z]* main' "$TMP_DIR/out" | paste -sd, - | grep -Fxq 'Acme/app main,Acme/lib main' ||
+  fail "repository output was not in ghq list order"
 [ -f "$REPO/remote-update" ] || fail "checked-out main did not update its files"
 assert_ref "$REPO" staging origin/staging
 assert_ref "$REPO" production origin/production
@@ -95,8 +108,7 @@ if bash "$SCRIPT" missing-owner >"$TMP_DIR/out" 2>&1; then
 fi
 grep -Fq "no ghq repositories found for owner: missing-owner" "$TMP_DIR/out" || fail "unknown owner was not reported"
 
-status=0
-bash "$SCRIPT" >/dev/null 2>&1 || status=$?
-[ "$status" -eq 2 ] || fail "missing owner argument exited with $status, expected 2"
+bash "$SCRIPT" >"$TMP_DIR/out" 2>&1 || fail "run without owners failed: $(cat "$TMP_DIR/out")"
+grep -Fq "Acme/app main: up to date" "$TMP_DIR/out" || fail "run without owners skipped Acme/app"
 
 echo "test-git-sync-base-branches: OK"

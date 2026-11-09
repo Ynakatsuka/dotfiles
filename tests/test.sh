@@ -44,6 +44,7 @@ register test-handoff-context bash tests/test-handoff-context.sh 'bash git'
 register test-my-pr-review-input bash tests/test-my-pr-review-input.sh 'bash git jq'
 register test-my-pr-worktree-move bash tests/test-my-pr-worktree-move.sh 'bash git'
 register test-my-skill-creator bash tests/test-my-skill-creator.sh 'bash python3 uv'
+register test-orca-apply-settings bash tests/test-orca-apply-settings.sh 'bash jq shasum sqlite3'
 register test-orca-claude-hook bash tests/test-orca-claude-hook.sh 'bash jq'
 register test-orca-hook-settings bash tests/test-orca-hook-settings.sh 'bash chezmoi jq'
 register test-prune-old-worktrees bash tests/test-prune-old-worktrees.sh 'bash git python3' Linux

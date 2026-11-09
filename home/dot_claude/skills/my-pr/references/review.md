@@ -15,7 +15,7 @@ This reference is read-only for repository behavior. It collects and integrates 
 - Treat AI review as assistive. Verify findings before changing code, and run targeted tests after fixes.
 - Check cross-client and downstream impact when the repository has multiple clients, SDKs, entrypoints, or pipelines. Do not assume one client is the only consumer.
 - Check approach fit against the PR problem: whether the chosen solution actually solves the stated issue, and whether a simpler, safer, or existing path would solve it better. Report alternatives only when there is concrete evidence, such as an existing extension point, duplicated implementation, violated constraint, or avoidable operational/maintenance risk.
-- Do not continue with degraded evidence. If a diff artifact or any selected reviewer run or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path. The only standing exception is a structurally invalid Reviewer B result after the bounded format-correction step in `references/review-multi.md`: skip Reviewer B, disclose the skip, and integrate Reviewer A/C.
+- Do not continue with degraded evidence. If a diff artifact or any selected reviewer run or background task fails, stop before fixing or creating a PR unless the user explicitly approves the degraded path. The only standing exception is a structurally invalid Reviewer B result (see `references/review-multi.md`): skip Reviewer B, disclose the skip, and integrate Reviewer A/C.
 
 ## Artifact and scope gate
 
@@ -134,7 +134,7 @@ If the environment provides a background monitor, register the task before the f
 
 Deduplicate findings from the selected reviewers. Put each finding in exactly one category.
 
-Before classifying, confirm that every selected reviewer and assigned chunk completed. For C alone, require its result only. For A/B/C, missing or failed A/C chunks mean `REVIEW_INCOMPLETE`; B is also required unless its completed result failed only Markdown structure validation after one format-correction attempt. In that existing exception, omit all B results, disclose the skip, and classify A/C. Never treat an execution or input failure as a format-only skip.
+Before classifying, confirm that every selected reviewer and assigned chunk completed. For C alone, require its result only. For A/B/C, missing or failed A/C chunks mean `REVIEW_INCOMPLETE`; B is also required unless its completed result failed only Markdown structure validation. In that existing exception, omit all B results, disclose the skip, and classify A/C. Never treat an execution or input failure as a format-only skip.
 
 Every integrated finding must include a severity: `critical`, `high`, `medium`, or `low`. Do not output a Required, Recommended, or Not needed item without severity. If a reviewer omits severity, assign severity from the impact and evidence, include it in the output, and set `Severity source: integration-inferred`.
 
@@ -279,7 +279,7 @@ For a complete review, use this structure:
 - Commands or tests to run after Required fixes
 
 ## Excluded / reference
-- Skipped reviewer: Reviewer B — <exact structural validation failure after one correction attempt>
+- Skipped reviewer: Reviewer B — <exact structural validation failure>
 - Skipped file: <file> — <bytes> bytes; single-file review limit exceeded
 - Not needed: <count> findings (<count> refuted during verification)
 ```

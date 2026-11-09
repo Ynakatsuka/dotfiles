@@ -27,6 +27,8 @@ main() {
   trap cleanup EXIT
 
   brew update
+  # Orphaned dependencies can be disabled formulae that make the upgrade fail.
+  brew autoremove
   brew upgrade --formula
 
   # Homebrew omits auto-updating casks such as Orca from the default outdated list.

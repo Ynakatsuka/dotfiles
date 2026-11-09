@@ -21,6 +21,10 @@ Library
 {{- if not (and (eq .chezmoi.config.encryption "age") $ageCmd (stat (joinPath .chezmoi.homeDir ".config/chezmoi/key.txt"))) }}
 .ssh/config
 .ssh/config.age
+.config/gcloud/config-map
+.config/gcloud/config-map.age
 .config/gcloud/configurations/config_*
 .config/gcloud/configurations/config_*.age
+.config/ccv-preview/local.env
+.config/ccv-preview/local.env.age
 {{- end }}
