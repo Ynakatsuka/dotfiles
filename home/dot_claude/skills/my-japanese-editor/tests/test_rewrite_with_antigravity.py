@@ -42,6 +42,13 @@ def result_event(response: str) -> dict[str, object]:
     }
 
 
+PRINT_TIMEOUT_STDERR = (
+    "[agy] print timeout after 2m0s with turn in progress; returning partial output\n"
+)
+SINGLE_BLOCK_JOB = {"blocks": [{"id": "p001", "original": "一"}]}
+SINGLE_BLOCK_RESPONSE = '{"blocks":[{"id":"p001","text":"一つ"}]}'
+
+
 class ParseAntigravityEventsTest(unittest.TestCase):
     def test_accepts_success_without_tool_attempt(self) -> None:
         output = stream_output(init_event(), result_event('{"blocks":[]}'))
@@ -92,10 +99,46 @@ class ValidateResponseTest(unittest.TestCase):
         ):
             rewrite_with_antigravity.validate_response(response, job)
 
+    def test_accepts_response_in_json_code_fence(self) -> None:
+        response = f"```json\n{SINGLE_BLOCK_RESPONSE}\n```\n"
 
+        self.assertEqual(
+            rewrite_with_antigravity.validate_response(response, SINGLE_BLOCK_JOB),
+            {"blocks": [{"id": "p001", "text": "一つ"}]},
+        )
+
+    def test_accepts_trailing_text_after_valid_object(self) -> None:
+        response = SINGLE_BLOCK_RESPONSE + "'"
+
+        self.assertEqual(
+            rewrite_with_antigravity.validate_response(response, SINGLE_BLOCK_JOB),
+            {"blocks": [{"id": "p001", "text": "一つ"}]},
+        )
+
+    def test_validates_object_before_trailing_text(self) -> None:
+        response = '{"blocks":[]}' + "'"
+
+        with self.assertRaisesRegex(
+            rewrite_with_antigravity.AntigravityRewriteError,
+            "block ids differ",
+        ):
+            rewrite_with_antigravity.validate_response(response, SINGLE_BLOCK_JOB)
+
+    def test_rejects_text_before_json(self) -> None:
+        response = "結果です。\n" + SINGLE_BLOCK_RESPONSE
+
+        with self.assertRaisesRegex(
+            rewrite_with_antigravity.AntigravityRewriteError,
+            "not valid JSON",
+        ):
+            rewrite_with_antigravity.validate_response(response, SINGLE_BLOCK_JOB)
+
+
+@mock.patch.object(
+    rewrite_with_antigravity.shutil, "which", return_value="/usr/bin/agy"
+)
+@mock.patch.object(rewrite_with_antigravity.subprocess, "run")
 class RunAntigravityTest(unittest.TestCase):
-    @mock.patch.object(rewrite_with_antigravity.shutil, "which", return_value="/usr/bin/agy")
-    @mock.patch.object(rewrite_with_antigravity.subprocess, "run")
     def test_runs_in_sandbox_and_disables_slash_commands(
         self, run: mock.Mock, _which: mock.Mock
     ) -> None:
@@ -116,6 +159,56 @@ class RunAntigravityTest(unittest.TestCase):
         self.assertTrue(
             Path(run.call_args.kwargs["cwd"]).name.startswith("japanese-editor-")
         )
+
+    def test_uses_medium_effort_matching_model(
+        self, run: mock.Mock, _which: mock.Mock
+    ) -> None:
+        run.return_value = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=stream_output(init_event(), result_event('{"blocks":[]}')),
+            stderr="",
+        )
+
+        rewrite_with_antigravity.run_antigravity("{}\n")
+
+        command = run.call_args.args[0]
+        model = command[command.index("--model") + 1]
+        effort = command[command.index("--effort") + 1]
+        self.assertEqual(effort, "medium")
+        self.assertEqual(model.rsplit("-", 1)[1], effort)
+
+    def test_reports_print_timeout_with_empty_response(
+        self, run: mock.Mock, _which: mock.Mock
+    ) -> None:
+        run.return_value = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=stream_output(init_event(), result_event("")),
+            stderr=PRINT_TIMEOUT_STDERR,
+        )
+
+        with self.assertRaisesRegex(
+            rewrite_with_antigravity.AntigravityRewriteError,
+            "timed out after 120s",
+        ):
+            rewrite_with_antigravity.run_antigravity("{}\n")
+
+    def test_rejects_partial_response_after_print_timeout(
+        self, run: mock.Mock, _which: mock.Mock
+    ) -> None:
+        run.return_value = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=stream_output(init_event(), result_event(SINGLE_BLOCK_RESPONSE)),
+            stderr=PRINT_TIMEOUT_STDERR,
+        )
+
+        with self.assertRaisesRegex(
+            rewrite_with_antigravity.AntigravityRewriteError,
+            "timed out after 120s",
+        ):
+            rewrite_with_antigravity.run_antigravity("{}\n")
 
 
 if __name__ == "__main__":

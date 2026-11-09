@@ -3,12 +3,13 @@ name: my-japanese-editor
 description: >-
   Write or edit Japanese articles, reports, guides, and public-facing drafts so the argument is
   clear and the prose reads naturally. Preserve the author's meaning, evidence, and voice when
-  revising. Use for requests to write from a topic or notes, remove AI臭 / AIっぽさ, improve awkward
-  wording or structure, or format notes as 箇条書き, チーム共有, 社内共有, a decision note,
-  Slack post, or Teams post. For existing prose, ask Gemini through Antigravity CLI to rewrite
-  naturally by default, then audit against the source; use the current model if unavailable.
-  Do NOT use for handing work to another session (use my-handoff), ordinary Japanese answers,
-  progress updates, technical explanations, code review, English-only prose that is not a
+  revising. Use for requests to write from a topic or notes, make existing text 読みやすく or
+  自然な日本語 (natural japanese), remove AI臭 / AIっぽさ, improve awkward wording or structure,
+  or format notes as 箇条書き, チーム共有, 社内共有, a decision note, Slack post, or Teams post.
+  For existing prose, ask Gemini through Antigravity CLI to rewrite naturally by default, then
+  audit against the source; use the current model if unavailable. Do NOT use for handing work
+  to another session (use my-handoff), ordinary Japanese answers, the agent's own progress
+  updates, technical explanations, code review, English-only prose that is not a
   bullet-formatting request, or an explicitly incompatible format.
 license: Complete terms in LICENSE.txt
 metadata:
@@ -41,18 +42,19 @@ Python 3を使う。Antigravity CLIは任意とし、利用できない場合は
 
 1. 原稿、メモ、または新規執筆のお題を特定する。いずれもない場合は入力を求めて停止する。
 2. 作業を判定する。
-   - 箇条書き指定、またはチーム共有・引き継ぎ・決定メモ・Slack・Teams投稿の要点整理:
-     `references/bullets.md` に従い、現在のモデルで編集して完了する。文章形式の指定があればそちらを優先する。
    - 原稿のない記事・報告書・ガイド・案内文などの新規執筆: `references/writing.md` に従い、
      現在のモデルで執筆して完了する。既存原稿の書き直し用CLIへお題を原稿として渡さない。
-   - 既存の記事、公開原稿、AIっぽさの除去、通常の文章推敲: 以降の文章推敲手順に従う。
-   - 推敲と箇条書きの両方: 手順3〜8で文章を推敲してから、`references/bullets.md` に従って
-     箇条書き形式にする。
+   - 既存の文章を読みやすく、自然にする依頼（AIっぽさの除去、通常の文章推敲を含む）: 原稿が
+     箇条書きでも、以降の文章推敲手順に従う。箇条書きでの出力も求められている場合は、手順3〜8で
+     推敲してから `references/bullets.md` に従って箇条書き形式にする。
+   - 言い回しの改善を求めない箇条書き化、またはチーム共有・引き継ぎ・決定メモ・Slack・Teams投稿の
+     要点整理: `references/bullets.md` に従い、現在のモデルで編集して完了する。文章形式の指定が
+     あればそちらを優先する。
    以下の手順3〜9は既存原稿の文章推敲専用とする。
 3. 原文を読み取り専用の比較基準として保持する。用途、読み手、敬体・常体、ユーザーが指定した
    条件だけを短く記録する。原文から新しい編集規則を作らない。
 4. `references/antigravity.md` を読み、Geminiへ初回の書き直しを依頼する。原稿全体を一つの
-   `original`として渡すのを基本とし、長文だけを意味のまとまりで分ける。
+   `original`として渡すのを基本とし、長文だけを同ファイルの分量の目安に従って意味のまとまりで分ける。
 5. Antigravity CLIを利用できない、指定モデルを利用できない、呼び出しに失敗した、または応答を
    検証できない場合は、失敗理由を短く示し、現在のモデルが同じ原稿を自由に書き直す。別の外部
    モデルへ切り替えず、Antigravityを無制限に再試行しない。

@@ -11,9 +11,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-ANTIGRAVITY_MODEL = "gemini-3.8-flash-high"
+# High effort re-drafted long inputs in thinking until the print timeout.
+ANTIGRAVITY_MODEL = "gemini-3.8-flash-medium"
+ANTIGRAVITY_EFFORT = "medium"
 ANTIGRAVITY_TIMEOUT_SECONDS = 150
 ANTIGRAVITY_PRINT_TIMEOUT = "120s"
+# On a print timeout, agy exits 0 with a SUCCESS result holding a partial or
+# empty response; this stderr line is the only reliable signal.
+ANTIGRAVITY_PRINT_TIMEOUT_MARKER = "print timeout after"
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 PROMPT_PATHS = {
     "rewrite": SKILL_ROOT / "prompts" / "gemini-rewrite.md",
@@ -120,7 +125,7 @@ def run_antigravity(stream_input: str) -> str:
         "--model",
         ANTIGRAVITY_MODEL,
         "--effort",
-        "high",
+        ANTIGRAVITY_EFFORT,
         "--sandbox",
         "--disable-slash-commands",
         "--input-format",
@@ -148,6 +153,10 @@ def run_antigravity(stream_input: str) -> str:
             f"agy timed out after {ANTIGRAVITY_TIMEOUT_SECONDS} seconds"
         ) from error
 
+    if ANTIGRAVITY_PRINT_TIMEOUT_MARKER in result.stderr:
+        raise AntigravityRewriteError(
+            f"agy timed out after {ANTIGRAVITY_PRINT_TIMEOUT} before Gemini finished"
+        )
     if result.returncode != 0:
         detail = result.stderr.strip() or "no diagnostic output"
         raise AntigravityRewriteError(
@@ -213,11 +222,25 @@ def parse_antigravity_events(stdout: str) -> str:
     return response
 
 
-def validate_response(response: str, job: dict[str, Any]) -> dict[str, Any]:
+def decode_response_json(response: str) -> Any:
+    """Decode the leading JSON value, tolerating one outer code fence and trailing text.
+
+    Callers must validate the decoded value; trailing text is ignored only because
+    the value before it is complete.
+    """
+    text = response.strip()
+    if text.startswith("```"):
+        _, _, text = text.partition("\n")
+        text = text.rstrip().removesuffix("```").strip()
     try:
-        candidate = json.loads(response)
+        candidate, _ = json.JSONDecoder().raw_decode(text)
     except json.JSONDecodeError as error:
         raise AntigravityRewriteError("Gemini response is not valid JSON") from error
+    return candidate
+
+
+def validate_response(response: str, job: dict[str, Any]) -> dict[str, Any]:
+    candidate = decode_response_json(response)
 
     if not isinstance(candidate, dict):
         raise AntigravityRewriteError("Gemini response must be a JSON object")
