@@ -5,6 +5,10 @@
 
 ## 初回の書き直し
 
+1回の呼び出しで送る`original`は合計で約2,500字までにする。長いほどGeminiの思考が長引き、
+120秒の制限内に応答が終わらなくなる。超える原稿は見出しや段落の切れ目で分け、塊ごとに別の
+呼び出しとして実行する。並列に実行してよいが、入出力ファイルは塊ごとに分ける。
+
 原稿を次のJSONとして組み立て、標準入力からスクリプトへ渡す。
 
 ```json
@@ -19,15 +23,31 @@
 }
 ```
 
-実行する。
+実行する。1回の呼び出しに最大で約150秒かかるため、コマンド実行のタイムアウトを180秒
+（180000ミリ秒）以上にする。
 
 ```bash
-python3 <skill-root>/scripts/rewrite_with_antigravity.py rewrite < job.json
+python3 <skill-root>/scripts/rewrite_with_antigravity.py rewrite < job.json >| result.json
 ```
 
 `<skill-root>`はこのスキルの`SKILL.md`があるディレクトリの絶対パスへ置き換える。実際には一時
 ファイルを使うか、JSONエンコーダーで生成した内容を標準入力へ渡す。原稿をシェル引数や手書きの
-エスケープへ埋め込まない。
+エスケープへ埋め込まない。出力をファイルへ保存するときは、zshの`noclobber`で既存ファイルへの
+書き込みが失敗しないよう`>|`でリダイレクトする。
+
+出力は入力と同じ`id`順の次のJSONで、書き直した本文は`blocks[].text`から読む。`candidate`キーは
+出力に存在しない。
+
+```json
+{
+  "blocks": [
+    {
+      "id": "p001",
+      "text": "書き直された本文"
+    }
+  ]
+}
+```
 
 ## 問題箇所の修復
 
@@ -49,7 +69,22 @@ python3 <skill-root>/scripts/rewrite_with_antigravity.py rewrite < job.json
 ```
 
 ```bash
-python3 <skill-root>/scripts/rewrite_with_antigravity.py repair < job.json
+python3 <skill-root>/scripts/rewrite_with_antigravity.py repair < job.json >| result.json
+```
+
+入力の`candidate`は、直前のrewrite出力の`blocks[].text`を入れるキーである。
+
+出力の形式はrewriteと同じで、修復後の本文は`blocks[].text`から読む。
+
+```json
+{
+  "blocks": [
+    {
+      "id": "p001",
+      "text": "修復された本文"
+    }
+  ]
+}
 ```
 
 修復は一度だけ行い、最初の原文と再照合する。
@@ -60,11 +95,11 @@ python3 <skill-root>/scripts/rewrite_with_antigravity.py repair < job.json
 対象には次を含む。
 
 - `agy`が見つからない。
-- 指定モデル`gemini-3.8-flash-high`を利用できない、または認証に失敗した。
-- タイムアウト、拒否、CLIエラーが発生した。
+- 指定モデル`gemini-3.8-flash-medium`を利用できない、または認証に失敗した。
+- タイムアウト（`timed out after 120s`など）、拒否、CLIエラーが発生した。
 - Geminiがツールを呼び出した。
 - 応答がJSONでない、IDが欠落・重複する、本文が空である。
 - 実際に使われたモデルを指定値として確認できない。
 
-失敗理由を短く示し、現在のモデルが同じ原稿を自由に書き直す。別の外部モデルへ切り替えず、同じ
-Antigravity呼び出しを再試行しない。
+失敗理由を短く示し、現在のモデルが同じ原稿を自由に書き直す。原稿を分けた場合は、失敗した塊だけを
+書き直す。別の外部モデルへ切り替えず、同じAntigravity呼び出しを再試行しない。
