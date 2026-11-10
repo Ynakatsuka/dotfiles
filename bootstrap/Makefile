@@ -34,5 +34,5 @@ else
 endif
 
 verify:
-	chezmoi verify || { chezmoi status; exit 1; }
+	chezmoi verify --exclude=scripts || { chezmoi status --exclude=scripts; exit 1; }
 	MISE_GLOBAL_CONFIG_FILE="$(MISE_CONFIG)" mise bootstrap status -C / --missing

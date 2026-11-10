@@ -42,7 +42,7 @@ case "$1" in
     cp "$TEST_CONFIG_UPDATED" "$MISE_GLOBAL_CONFIG_FILE"
     ;;
   verify)
-    [ "$*" = verify ]
+    [ "$*" = 'verify --exclude=scripts' ]
     echo verify >>"$TEST_CALLS"
     [ "${FAIL_AT:-}" != verify ]
     ;;

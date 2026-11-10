@@ -189,7 +189,8 @@ update_dotfiles() {
   chezmoi git pull -- --ff-only
   chezmoi apply --force -v
   if [ "${1:-}" = "--verify" ]; then
-    chezmoi verify
+    # run_ scripts always count as pending, so verify only file state.
+    chezmoi verify --exclude=scripts
   fi
   "$(chezmoi source-path ~/.local/bin/dotfiles-mise-up)"
 }
