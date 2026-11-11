@@ -7,7 +7,7 @@ Use this reference from `my-pr` when running the `simplify` subcommand, `create`
 Default apply-mode executor is Codex CLI with the simplify performance profile. Do not override the model; only lower reasoning effort for simplify:
 
 ```bash
-codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
+codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>" </dev/null
 ```
 
 Use the global Codex default effort only when the user explicitly asks for a full-effort simplify run. Use Claude/local execution only when the user explicitly asks for it.
@@ -118,9 +118,7 @@ Stop and request approval before changing APIs, schemas, CLI/config contracts, p
 
 Use this prompt for apply mode with the simplify performance profile. Review mode uses `assets/review-prompts/simplify.md` instead.
 
-```bash
-codex exec -c 'model_reasoning_effort="medium"' "<PROMPT>"
-```
+Launch it with the command in Executor.
 
 ```text
 Run the integrated my-pr simplify workflow in apply mode for the current repository changes.
