@@ -41,7 +41,7 @@ Use `## 確認方法` for the shortest way a reviewer can check the result, chos
 When the diff changes rendered UI, such as components, styles, templates, or copy, `## 確認方法` must show before-and-after screenshots:
 
 - Capture the before image from the merge base in a temporary `git worktree` and the after image from the PR head, using the same page, state, data, and viewport. Use a headless browser and save the images under `$MY_PR_ARTIFACT_DIR`.
-- Crop to the changed area when the full page hides the difference; add a full-page or mobile pair only when layout or responsiveness changed.
+- Crop to the changed area when the full page hides the difference; add a full-page or mobile pair only when layout or responsiveness changed. Pillow is not installed and ImageMagick is not available: crop or combine images with `uv run --with pillow python <script>`, never a bare `python -c "from PIL import Image"`.
 - Lay them out side by side:
 
 ```markdown
