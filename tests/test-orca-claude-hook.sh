@@ -72,7 +72,7 @@ held 'not json' 2>/dev/null || status=$?
 cat >"$HOOK_SCRIPT" <<'EOF'
 #!/bin/sh
 printf "{}\n"
-payload=$({ command -p cat 2>/dev/null || cat; })
+payload=$(if [ -x /bin/cat ]; then exec /bin/cat 2>/dev/null; fi; { command -p cat 2>/dev/null || cat; })
 if [ -z "$payload" ]; then
   exit 0
 fi
@@ -107,7 +107,7 @@ forward "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Bash\",\"backgroun
   fail 'Orca did not receive a tool event'
 
 # An Orca build that reads the payload differently must fail loudly, not run unguarded.
-sed -i.bak 's/^payload=.*/payload=$(cat)/' "$HOOK_SCRIPT" && rm -f "$HOOK_SCRIPT.bak"
+sed -i.bak 's/^payload=.*/IFS= read -r payload/' "$HOOK_SCRIPT" && rm -f "$HOOK_SCRIPT.bak"
 sed -i.bak '/dotfiles:orca-claude-stop-held/,+1d' "$HOOK_SCRIPT" && rm -f "$HOOK_SCRIPT.bak"
 if run_hook '{"hook_event_name":"SessionStart"}' 2>"$TMP_DIR/err"; then
   fail 'unexpected Orca script shape was accepted'
