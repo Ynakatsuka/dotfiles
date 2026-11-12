@@ -16,7 +16,9 @@
 set -euo pipefail
 
 readonly GUARD_MARKER='# dotfiles:orca-claude-stop-held'
-readonly PAYLOAD_ANCHOR='payload=$({ command -p cat 2>/dev/null || cat; })'
+# Any one-line command substitution that fills $payload: Orca tweaks how it finds
+# cat between releases, and the guard only needs the payload fully read.
+readonly PAYLOAD_ANCHOR='^payload=[$][(].*[)]$'
 
 error() {
   printf 'orca-claude-hook: %s\n' "$*" >&2
@@ -28,7 +30,7 @@ install_stop_guard() {
   if grep -Fq "$GUARD_MARKER" "$script"; then
     return 0
   fi
-  if ! grep -Fxq "$PAYLOAD_ANCHOR" "$script"; then
+  if [[ "$(grep -Ec "$PAYLOAD_ANCHOR" "$script")" -ne 1 ]]; then
     error "Orca changed how claude-hook.sh reads the payload; update the guard in orca-claude-hook: $script"
     return 1
   fi
@@ -44,7 +46,7 @@ EOF
     cp -p "$script" "$tmp" &&
     GUARD=$guard ANCHOR=$PAYLOAD_ANCHOR awk '
       { print }
-      $0 == ENVIRON["ANCHOR"] && !inserted { print ENVIRON["GUARD"]; inserted = 1 }
+      $0 ~ ENVIRON["ANCHOR"] && !inserted { print ENVIRON["GUARD"]; inserted = 1 }
     ' "$script" >"$tmp" &&
     mv -f "$tmp" "$script" || {
     [[ -z "${tmp:-}" ]] || rm -f "$tmp"
