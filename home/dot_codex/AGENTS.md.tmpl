@@ -8,10 +8,8 @@
 
 ## Codex Browser Routing
 
-- Use web search or a purpose-built connector for public, read-only research that does not require rendered or interactive page state.
-- For browser UI automation, follow `orca-cli` routing and executable selection: use Orca's embedded browser in an Orca-managed session with a safe CLI; otherwise use `agent-browser` when available.
-- Use `Work` only for approved work sites requiring its session. Resolve its current profile ID and treat session data as credentials. Stop on missing profiles, expired authentication, or Orca failure; do not silently switch browsers.
-- Use Chrome or Computer Use only when the user explicitly requests it or the task requires a live Chrome tab, extension, password manager, passkey, or other state unavailable in Orca's browser.
+- For browser work, follow the `my-browser` skill.
+- Use Computer Use only when the user explicitly requests it or the task needs a desktop app outside the browser.
 
 ## Codex Subagent Routing
 

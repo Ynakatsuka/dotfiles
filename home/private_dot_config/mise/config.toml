@@ -107,6 +107,9 @@ dotenvx = "latest"
 # agent-browser - Browser automation CLI for AI agents
 "github:vercel-labs/agent-browser" = "latest"
 
+# playwright-cli - Fallback browser CLI for pages agent-browser cannot drive
+"npm:@playwright/cli" = "latest"
+
 
 [settings]
 # Trust user-owned workspaces to avoid blocking non-interactive agents.
