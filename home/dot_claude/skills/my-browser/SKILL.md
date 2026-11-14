@@ -65,12 +65,13 @@ print their contents.
 ## 4. Credentials with 1Password
 
 - Never print, echo, or write a secret, and never ask the user to paste one into the chat.
-- Pipe the secret into the browser's stdin, for example:
+- Pipe the secret into the browser's stdin, and log in only when both steps succeed, for example:
 
   ```bash
+  set -o pipefail
   op read "op://<vault>/<item>/password" \
-    | agent-browser auth save <name> --url <login-url> --username <user> --password-stdin
-  agent-browser auth login <name>
+    | agent-browser auth save <name> --url <login-url> --username <user> --password-stdin \
+    && agent-browser auth login <name>
   ```
 
   `auth save` keeps the password in agent-browser's encrypted vault; run
