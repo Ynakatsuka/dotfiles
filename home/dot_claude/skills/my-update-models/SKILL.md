@@ -59,7 +59,7 @@ Always edit in the ghq repo, never in `~/`.
 | `home/dot_local/bin/executable_{bulk-read,code-write}` | `BULK_READ_MODEL`, `CODE_WRITE_MODEL` | `"gpt-6-luna"` | Cheaper delegated reader and writer models. |
 | `home/dot_claude/skills/my-pr/` | Reviewer C `-c 'model=...'` in `run-codex-review.sh` | `"gpt-6.1-sol"` | Pinned review model; my-pr's review reference and `test-my-pr-review-input.sh` repeat it. |
 | `home/dot_claude/agents/my-pr-reviewer.md`, my-pr `run-claude-review.sh` | `model:`, `--model` | `opus` | Claude reviewer alias. |
-| `home/dot_claude/skills/my-japanese-editor/` | `ANTIGRAVITY_MODEL` in `rewrite_with_antigravity.py` and its Antigravity reference | `gemini-3.8-flash-high` | Antigravity model pinned by a tested workflow. Choose replacements from `agy models`. |
+| `home/dot_claude/skills/my-japanese-editor/` | `ANTIGRAVITY_MODEL` and `ANTIGRAVITY_EFFORT` in `rewrite_with_antigravity.py` and its Antigravity reference | `gemini-3.8-flash-medium` | Antigravity model pinned by a tested workflow. Choose replacements from `agy models`; keep the effort matching the model suffix. |
 
 Do NOT modify model IDs that appear inside skill examples
 (e.g., `home/dot_claude/skills/my-agent/SKILL.md`). Those are illustrative only.
