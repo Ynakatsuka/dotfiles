@@ -306,49 +306,6 @@ git -C "$worktree_path" log --oneline --decorate -5
 EOF
 }
 
-_gw_write_vscode_workspace() {
-    local worktree_dir="$1"
-    local repo_name="$2"
-    local branch_name="$3"
-
-    local colors=(
-        "#e74c3c" "#3498db" "#2ecc71" "#f39c12" "#9b59b6"
-        "#1abc9c" "#e91e63" "#ff5722" "#607d8b" "#795548"
-        "#ff9800" "#4caf50" "#00bcd4" "#673ab7" "#009688"
-        "#8bc34a" "#ffc107" "#03a9f4" "#ff6f00" "#7b1fa2"
-        "#00695c" "#c2185b" "#1976d2" "#388e3c"
-    )
-    local color_index=$(( $(echo "$branch_name" | cksum | cut -d' ' -f1) % ${#colors[@]} ))
-    local color="${colors[$color_index]}"
-
-    local workspace_file="${worktree_dir}/worktree.code-workspace"
-    cat > "$workspace_file" << EOF
-{
-  "folders": [
-    {
-      "path": "."
-    }
-  ],
-  "settings": {
-    "window.title": "${repo_name}:${branch_name}",
-    "workbench.colorCustomizations": {
-      "titleBar.activeBackground": "$color",
-      "titleBar.activeForeground": "#fff"
-    }
-  }
-}
-EOF
-
-    local exclude_file=".git/info/exclude"
-    if [ -f "$exclude_file" ]; then
-        if ! grep -q "^worktree\.code-workspace$" "$exclude_file"; then
-            echo "worktree.code-workspace" >> "$exclude_file"
-        fi
-    fi
-
-    echo "🎨 Branch: $branch_name | Color: $color"
-}
-
 _gw_create_worktree() {
     local branch_name="$1"
     local creation_output output_file helper_status tee_status
@@ -382,7 +339,6 @@ _gw_create_worktree() {
     fi
 
     _GW_CREATED_PATH=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_PATH" {print substr($0, index($0, "=") + 1)}' | tail -1)
-    _GW_CREATED_FLAG=$(printf '%s\n' "$creation_output" | awk -F= '$1 == "WORKTREE_CREATED" {print $2}' | tail -1)
 
     if [ -z "$_GW_CREATED_PATH" ]; then
         echo "Error: gw-create-worktree did not output WORKTREE_PATH" >&2
@@ -413,8 +369,6 @@ function gw() {
         git_root="$original_root"
     fi
 
-    local repo_name=$(basename "$git_root")
-
     if [ -z "$branch_name" ]; then
         local entries selected_line selected_worktree
         entries=$(_gw_worktree_list_with_created_epoch) || return 1
@@ -443,10 +397,6 @@ function gw() {
     cd "$_GW_CREATED_PATH" || return 1
     _gw_copy_env "$git_root"
     _gw_setup_direnv
-
-    if [ "$_GW_CREATED_FLAG" = "1" ]; then
-        _gw_write_vscode_workspace "$_GW_CREATED_PATH" "$repo_name" "$branch_name"
-    fi
 }
 
 # AI-assisted worktree creation: prompt -> branch name -> gw -> session

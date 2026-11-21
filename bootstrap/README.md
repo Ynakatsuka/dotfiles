@@ -66,7 +66,7 @@ If the machine does not have Git yet, use one of these minimal flows to obtain t
 ### What It Does
 
 - macOS
-  - Installs Homebrew apps from `macos/Brewfile` (VS Code, Docker, Claude, ChatGPT, Discord, Zoom, etc.)
+  - Installs Homebrew apps from `macos/Brewfile` (Colima + Docker CLI, Claude, ChatGPT, Slack, etc.)
   - Applies system, pointer, trackpad, and Hot Corner settings declared in `home/private_dot_config/mise/config.toml`
   - Sets up dotfiles (prezto/tpm/chezmoi), runs `mise install`, installs gh-dash, then cleanup
 
