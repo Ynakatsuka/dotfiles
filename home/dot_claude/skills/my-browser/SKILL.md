@@ -2,7 +2,8 @@
 name: my-browser
 description: >-
   Choose and drive the browser for a web task: the user's Chrome with their sign-ins on the local
-  machine, or a token-efficient headless CLI (agent-browser, Playwright CLI as fallback). Use before any browser work: opening or operating a
+  machine, or a token-efficient headless CLI (agent-browser, Playwright CLI as fallback); Claude
+  hands the work to Codex. Use before any browser work: opening or operating a
   website, signing in, filling forms, scraping rendered pages, taking screenshots, or checking a
   web app in a browser, and when the user says "ブラウザで", "サイトを開いて", "ログインして",
   "スクショ", "browser", or "headless". Do NOT use for public read-only research that web search or
@@ -13,6 +14,23 @@ compatibility: >-
 ---
 
 # Browser Routing
+
+## 0. Claude delegates browser work to Codex
+
+When running as Claude, do not drive a browser yourself. Write the task to a file and run
+`codex-task --prompt-file <file>`; Codex then follows this skill from section 1.
+
+- Add `--use chrome` when the work needs the user's Chrome state (section 2).
+- Give the exact URLs, steps, data to enter, approved actions, and absolute paths of files to
+  attach or of where to save screenshots and extracted data.
+- Run tasks that may exceed the Bash timeout in the background. Confirm the outcome from the tool
+  calls it reports; when Codex asks for confirmation, ask the user and continue with the printed
+  `--resume` command.
+- Run a project's own Playwright test suite directly; it is a test command, not browser work.
+- When `codex-task` fails, report the failure, then follow sections 1–4 yourself, using Claude in
+  Chrome through the `chrome-browser` skill where section 2 names Codex's Chrome plugin. First
+  check the tool calls it reported and the page itself, and continue only the steps not yet done;
+  ask the user before repeating a send, post, or submit whose outcome is unknown.
 
 ## 1. Identify the environment
 
@@ -28,8 +46,7 @@ Local machine:
 
 | Need | Browser |
 |---|---|
-| Default, and anything that needs the user's Chrome state: sign-ins, passkeys, password manager, extensions, open tabs, or the user watching | Claude: Claude in Chrome, following the `chrome-browser` skill. Codex: its Chrome plugin |
-| Claude in Chrome is not connected or keeps failing | Claude: `codex-task --use chrome --prompt-file <file>`, following its playbook |
+| Default, and anything that needs the user's Chrome state: sign-ins, passkeys, password manager, extensions, open tabs, or the user watching | Codex's Chrome plugin |
 | No user state is needed: scripted checks, rendered-page extraction, or a login whose credentials are in 1Password | Headless (section 3), with `op` for credentials (section 4) |
 
 Server:
