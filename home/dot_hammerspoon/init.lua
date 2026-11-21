@@ -15,24 +15,21 @@ local hyper = {"alt", "ctrl"}
 -- LAYOUT CONFIGURATION
 -- ============================================================================
 
--- External Display Layout (4-split configuration)
+-- External Display Layout (3-pane configuration)
 -- Left: 50% | Right: 50%
 -- Left side: Top 20% | Bottom 80%
--- Right side: Top 25% | Bottom 75%
+-- Right side: Orca full height
 local externalLayout = {
     -- Split ratios
     leftWidth = 0.5,   -- Left side: 50%
     rightWidth = 0.5,  -- Right side: 50%
     leftTopHeight = 0.2,     -- Left top area: 20%
     leftBottomHeight = 0.8,  -- Left bottom area: 80%
-    rightTopHeight = 1.0,    -- Right top area: 100% (Orca full height)
-    rightBottomHeight = 0.55, -- Right bottom area: 55%
 
     -- Application assignments
     leftTop = "Sublime Text",    -- Left top (45% x 20%)
     leftBottom = "Google Chrome", -- Left bottom (45% x 80%)
-    rightTop = "Orca",            -- Right full height
-    rightBottom = "Cursor"        -- Right bottom (overlaps Orca)
+    right = "Orca"                -- Right full height
 }
 
 -- Built-in Display Layout
@@ -46,7 +43,6 @@ local builtInLayout = {
 
     fullscreenApps = {
         "Google Chrome",
-        "Cursor",
         "Orca"
     }
 }
@@ -59,7 +55,6 @@ local builtInLayout = {
 local apps = {
     chrome = "Google Chrome",
     sublime = "Sublime Text",
-    cursor = "Cursor",
     orca = "Orca"
 }
 
@@ -177,7 +172,7 @@ local function getAppWindows(app)
     return usableWindows
 end
 
--- Layout configuration for external display (4-split)
+-- Layout configuration for external display (3-pane)
 -- Only affects windows currently on the external display
 local function layoutExternalDisplay()
     local externalScreen = getExternalScreen()
@@ -192,8 +187,6 @@ local function layoutExternalDisplay()
     local rightWidth = frame.w * externalLayout.rightWidth
     local leftTopHeight = frame.h * externalLayout.leftTopHeight
     local leftBottomHeight = frame.h * externalLayout.leftBottomHeight
-    local rightTopHeight = frame.h * externalLayout.rightTopHeight
-    local rightBottomHeight = frame.h * externalLayout.rightBottomHeight
 
     -- Define layout positions for external display
     local layouts = {
@@ -212,18 +205,11 @@ local function layoutExternalDisplay()
             h = leftBottomHeight
         },
         -- Right: Orca (full height)
-        [externalLayout.rightTop] = {
+        [externalLayout.right] = {
             x = frame.x + leftWidth,
             y = frame.y,
             w = rightWidth,
-            h = rightTopHeight
-        },
-        -- Right bottom: Cursor (overlaps Orca)
-        [externalLayout.rightBottom] = {
-            x = frame.x + leftWidth,
-            y = frame.y + frame.h - rightBottomHeight,
-            w = rightWidth,
-            h = rightBottomHeight
+            h = frame.h
         }
     }
 
@@ -263,7 +249,7 @@ local function layoutBuiltInDisplay()
         end
     end
 
-    -- Position apps that use fullscreen (Chrome, Cursor, Orca)
+    -- Position apps that use fullscreen (Chrome, Orca)
     for _, appName in ipairs(builtInLayout.fullscreenApps) do
         local app = hs.application.get(appName)
         if app then

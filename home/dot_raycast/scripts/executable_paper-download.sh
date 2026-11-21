@@ -318,11 +318,7 @@ save_and_open_summary() {
   cp "$output_file" "$summary_path"
   log INFO "Summary saved to: $summary_path"
 
-  if command -v cursor &>/dev/null; then
-    cursor "$summary_path"
-  elif [ -d "/Applications/Cursor.app" ]; then
-    open -a "Cursor" "$summary_path"
-  fi
+  open -a "Sublime Text" "$summary_path"
 }
 
 # Process with Claude Code

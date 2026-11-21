@@ -293,12 +293,12 @@ The `dc*` abbreviations require zsh-abbr, which only the macOS Brewfile installs
 External display layout:
 
 - Left 50%: Sublime Text (top 20%), Google Chrome (bottom 80%)
-- Right 50%: Orca (full height), Cursor (bottom 55%, overlapping Orca)
+- Right 50%: Orca (full height)
 
 Built-in display layout:
 
-- Top 80%: Sublime Text, Orca
-- Fullscreen: Google Chrome, Cursor
+- Top 80%: Sublime Text
+- Full display area: Google Chrome, Orca
 
 ### Orca
 
