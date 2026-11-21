@@ -55,9 +55,9 @@ Always edit in the ghq repo, never in `~/`.
 | `home/.chezmoitemplates/claude-settings.json` | top-level `model` | `"opus"` | Default Claude Code model alias. Effort is managed separately via the top-level `effortLevel`. |
 | `home/.chezmoitemplates/claude-settings.json` | `env.CLAUDE_CODE_SUBAGENT_MODEL` | `"opus"` | Subagent model alias. Only present on some setups — skip if the key is absent. |
 | `home/.chezmoitemplates/claude-settings.json` | `autoUpdatesChannel` | `"latest"` | Native Claude Code update channel. Read it when checking or updating the CLI; do not change it unless requested. |
-| `home/dot_codex/private_config.toml.tmpl` | `model`, `[agents].default_subagent_model` | `"gpt-6.1-sol"` | Codex CLI default and subagent models (full IDs, not aliases). |
+| `home/dot_codex/private_config.toml.tmpl` | `model`, `[agents].default_subagent_model` | `"gpt-6.2-sol"` | Codex CLI default and subagent models (full IDs, not aliases). |
 | `home/dot_local/bin/executable_{bulk-read,code-write}` | `BULK_READ_MODEL`, `CODE_WRITE_MODEL` | `"gpt-6-luna"` | Cheaper delegated reader and writer models. |
-| `home/dot_claude/skills/my-pr/` | Reviewer C `-c 'model=...'` in `run-codex-review.sh` | `"gpt-6.1-sol"` | Pinned review model; my-pr's review reference and `test-my-pr-review-input.sh` repeat it. |
+| `home/dot_claude/skills/my-pr/` | Reviewer C `-c 'model=...'` in `run-codex-review.sh` | `"gpt-6.2-sol"` | Pinned review model; my-pr's review reference and `test-my-pr-review-input.sh` repeat it. |
 | `home/dot_claude/agents/my-pr-reviewer.md`, my-pr `run-claude-review.sh` | `model:`, `--model` | `opus` | Claude reviewer alias. |
 | `home/dot_claude/skills/my-japanese-editor/` | `ANTIGRAVITY_MODEL` and `ANTIGRAVITY_EFFORT` in `rewrite_with_antigravity.py` and its Antigravity reference | `gemini-3.8-flash-medium` | Antigravity model pinned by a tested workflow. Choose replacements from `agy models`; keep the effort matching the model suffix. |
 

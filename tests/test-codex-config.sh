@@ -81,10 +81,10 @@ assert_project_trust() {
 render_config >"$TMP_DIR/missing.toml"
 missing_json="$(parse_toml "$TMP_DIR/missing.toml")"
 assert_jq "missing config defaults" \
-  '.model == "gpt-6.1-sol"
+  '.model == "gpt-6.2-sol"
     and .model_reasoning_effort == "high"
     and .web_search == "live"
-    and .agents.default_subagent_model == "gpt-6.1-sol"
+    and .agents.default_subagent_model == "gpt-6.2-sol"
     and .agents.default_subagent_reasoning_effort == "high"
     and .features.multi_agent_v2.enabled == true' \
   "$missing_json"
