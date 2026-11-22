@@ -12,7 +12,9 @@ compatibility: Requires the official google-colab-cli on macOS or Linux, network
 
 ## 実行前
 
-1. ジョブの入力、回収する成果物、GPU 要件を確認し、必要なファイルをローカルでそろえる。
+1. ジョブの入力、回収する成果物、GPU 要件を確認する。データの置き場所と容量を見積もり、
+   取得元とチェックポイントの保存先を決めてからランタイムを確保する。
+   [データ転送と保存](references/data-transfer.md) を参照する。
    `colab` が PATH 上になければ `"$HOME/.local/bin/colab"` を確認する。
    コマンド例は v0.7.4 の `colab --help` と `colab <command> --help` に準拠する。
 2. `colab sessions` でサインインと既存ランタイムを確認する。`colab usage` の
@@ -24,6 +26,19 @@ compatibility: Requires the official google-colab-cli on macOS or Linux, network
    CLI は `G4` も受け付ける。GPU の空き、契約、残高によって割り当ては変わる。
    `--high-mem` は VM のシステム RAM を増やすオプション。VRAM は実機の `nvidia-smi` で確認する。
    割り当てが拒否されたらエラーを報告し、GPU 指定や利用枠の条件が変わる場合はユーザーに確認する。
+
+### 選べるアクセラレータと消費量を調べる
+
+- `colab new --help` で CLI が受け付ける種類を確認する。v0.7.4 は GPU が
+  `T4`・`L4`・`G4`・`A100`・`H100`、TPU が `v5e1`・`v6e1`。
+  この版には、アカウントごとの割り当て候補や機種別の消費レートを、確保前に一覧取得するコマンドがない。
+- 候補は利用枠のあるアカウントで Colab のノートブックを開き、
+  「ランタイム」→「ランタイムのタイプを変更」のハードウェア アクセラレータ欄で確認する。
+  空き状況は変動するため、実際に使えるかは必要な機種を `colab new` で確保して確認する。
+- 稼働時の目安は `colab usage` で測る。開始前と対象ランタイムの稼働中に実行し、
+  `Active assignments` と `Usage rate` を確認する。対象1台だけが稼働中なら、表示された毎時レートを
+  その実行条件での目安にできる。複数台が稼働している場合はアカウント合計なので、
+  個々の GPU のレートには使わない。確認のためだけに複数の機種を順に確保しない。
 
 ## ランタイムの確保と実行
 
@@ -44,9 +59,10 @@ PY
 
 確保の結果が不明なら `colab sessions` で確認し、今回の操作で作成したと確認できたランタイムを扱う。
 
-- 入力ファイルを転送するには `colab upload -s "$session" ./data.csv /content/data.csv`。
-  ディレクトリはアーカイブにして送り、ランタイム上で展開する。依存パッケージが必要なら
-  `colab install -s "$session" -r requirements.txt` を使う。
+- 小さい入力ファイルは `colab upload -s "$session" ./data.csv /content/data.csv` で転送する。
+  大きいデータは Drive からコピーするか、GCS・Kaggle・HF Hub などから VM 上で取得する。
+  多数の小さいファイルはアーカイブで転送し、照合後に `/content` に展開する。
+  依存パッケージが必要なら `colab install -s "$session" -r requirements.txt` を使う。
 - 短い Python は `colab exec -s "$session" --timeout 120 -f train.py`。ローカルのスクリプトを
   読み込んで実行する。通常の Python プロセスとして引数を渡したい場合は、ファイルをアップロードし、
   `colab exec` の stdin から `subprocess.run` で起動するか、次のバックグラウンド手順を使う。
