@@ -20,11 +20,10 @@ compatibility: Requires the official google-colab-cli on macOS or Linux, network
 2. `colab sessions` でサインインと既存ランタイムを確認する。`colab usage` の
    `Current balance` が残りのコンピューティングユニット、`Usage rate` がアカウント全体の毎時消費量。
    認証が必要なら [サインイン](#サインイン) へ進む。
-3. ユーザーが指定した GPU を優先する。指定がなければ、単純な CUDA 確認や小規模な学習には
-   `T4`、BF16 や T4 より多い VRAM が必要なら `L4` を選ぶ。大きなモデルやバッチで
-   VRAM が必要なら `A100`、Hopper 向けの機能や対応カーネルの速度が必要なら `H100` を検討する。
-   CLI は `G4` も受け付ける。GPU の空き、契約、残高によって割り当ては変わる。
-   `--high-mem` は VM のシステム RAM を増やすオプション。VRAM は実機の `nvidia-smi` で確認する。
+3. ユーザーが指定した機種を優先する。指定がなければ、下の手順で実行要件を満たす候補を絞り、
+   残高や期限に収まる候補のうち、完了までの見込み消費ユニットが最小の構成を選ぶ。
+   選んだ機種を確保コマンドの `--gpu` または `--tpu` に指定する。
+   指定機種が要件を満たさない場合や候補がない場合は、不足する要件を示して方針を確認する。
    割り当てが拒否されたらエラーを報告し、GPU 指定や利用枠の条件が変わる場合はユーザーに確認する。
 
 ### 選べるアクセラレータと消費量を調べる
@@ -35,10 +34,40 @@ compatibility: Requires the official google-colab-cli on macOS or Linux, network
 - 候補は利用枠のあるアカウントで Colab のノートブックを開き、
   「ランタイム」→「ランタイムのタイプを変更」のハードウェア アクセラレータ欄で確認する。
   空き状況は変動するため、実際に使えるかは必要な機種を `colab new` で確保して確認する。
+
+| 機種 | 公称デバイスメモリ | 使いどころと出典 |
+| --- | --- | --- |
+| `T4` | 16 GB GDDR6 | FP16 や INT8 で収まる小規模な推論、CUDA の動作確認。ネイティブ BF16・FP8 非対応。[NVIDIA T4](https://www.nvidia.com/en-us/data-center/tesla-t4/) |
+| `L4` | 24 GB GDDR6 | 24 GB クラスで収まる BF16 の軽量な学習や、対応カーネルでの FP8 推論。[NVIDIA L4 データシート](https://resources.nvidia.com/en-us-gpu-resources/l4-tensor-datasheet) |
+| `G4` | 96 GB GDDR7 | RTX PRO 6000 Blackwell Server Edition。長い系列や大きいバッチなど、80 GB クラスを超える BF16・FP8 ジョブにも使える。[Colab リリースノート](https://colab.research.google.com/notebooks/relnotes.ipynb)、[NVIDIA RTX PRO 6000](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/) |
+| `A100` | 40 / 80 GB HBM | BF16 の学習や推論で、L4 の容量やメモリ帯域が足りないときの候補。ネイティブ FP8 非対応。容量は割り当てを確認する。[NVIDIA A100](https://www.nvidia.com/en-us/data-center/a100/) |
+| `H100` | 80 GB HBM3 | 高いメモリ帯域を活かせる大規模な BF16 学習や、Hopper 対応カーネルでの FP8 学習・推論。[NVIDIA H100](https://www.nvidia.com/en-us/data-center/h100/) |
+| `v5e1` | 16 GiB HBM（1 チップ） | TPU 対応のコードで、小規模な BF16 学習や推論を行う場合の候補。[Google Cloud TPU v5e](https://docs.cloud.google.com/tpu/docs/v5e) |
+| `v6e1` | 32 GiB HBM（1 チップ） | TPU 対応の Transformer などの BF16 学習・推論で、v5e より容量や処理性能が必要な場合の候補。[Google Cloud TPU v6e](https://docs.cloud.google.com/tpu/docs/v6e) |
+
+- 重み、活性化、勾配、オプティマイザ状態、一時バッファなど、実行時のピークを見積もる。
+  系列長やバッチサイズを反映し、実際に使えるデバイスメモリに余裕を持たせる。
+  24 GB クラスに収まらない CUDA ジョブは `A100`・`H100`・`G4` から必要容量を満たす構成を選ぶ。
+  ネイティブ BF16 が必須なら `T4` を外す。CUDA で FP8 が必須なら `L4`・`G4`・`H100` のうち、
+  必要な FP8 形式を使うライブラリ、CUDA バージョン、カーネルが対応する機種に絞る。
+  TPU は JAX などの TPU 対応バックエンドで、処理に必要な演算や精度を使える場合に比較する。
+  [NVIDIA Transformer Engine の対応表](https://docs.nvidia.com/deeplearning/transformer-engine/support_matrix.html)
+- データの展開や CPU オフロードに使うシステム RAM も別に見積もり、足りる構成に絞る。
+  必要なら対応機種で `--high-mem` を使う。確保後は GPU の VRAM を `nvidia-smi`、
+  TPU の HBM をフレームワークの表示、システム RAM を VM 上で確認する。
+- 候補ごとに、モデル・系列長・バッチサイズ・精度・実装が近い過去ログや公開ベンチマークから
+  秒/ステップやトークン/秒を見積もる。長い学習では全エポック・全 fold に外挿し、
+  起動後のデータ準備、コンパイル、評価、保存にかかる時間も足す。
+  **総ユニットの見込み = 確保から停止までの見込み時間（時） × 毎時ユニット**。
+  毎時ユニットは同じアカウント・構成での直近の `colab usage` を参考にする。
+  毎時レートが 2 倍でも、完了までの時間が半分未満なら総ユニットは少なくなる。
+  比較に足りない値は前提や不明点を明示し、実ジョブに使う 1 台で見積もりを更新する。
 - 稼働時の目安は `colab usage` で測る。開始前と対象ランタイムの稼働中に実行し、
   `Active assignments` と `Usage rate` を確認する。対象1台だけが稼働中なら、表示された毎時レートを
   その実行条件での目安にできる。複数台が稼働している場合はアカウント合計なので、
   個々の GPU のレートには使わない。確認のためだけに複数の機種を順に確保しない。
+  長い学習は、選んだ機種でウォームアップ後の短い区間の速度と毎時レートを確認し、
+  残り時間・ユニットを再計算する。残高や期限に収まる見込みが立たなければ、継続前にユーザーに確認する。
 
 ## ランタイムの確保と実行
 
