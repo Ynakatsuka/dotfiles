@@ -93,6 +93,19 @@ use_orca_claude_account() {
   export CLAUDE_CONFIG_DIR="$config_dir"
 }
 
+# Orca trims the prompt and passes it to the agent CLI without `--`, so a prompt
+# starting with `-`, such as a pasted Markdown list, is parsed as an option. A
+# Markdown escape keeps the meaning for the agent.
+agent_prompt() {
+  local trimmed="${prompt#"${prompt%%[![:space:]]*}"}"
+
+  if [[ "$trimmed" == -* ]]; then
+    printf '\\%s' "$trimmed"
+  else
+    printf '%s' "$prompt"
+  fi
+}
+
 create_worktree() {
   local branch_name="$1"
   local create_json
@@ -102,7 +115,7 @@ create_worktree() {
     --no-parent \
     --name "$branch_name" \
     --agent "$provider" \
-    --prompt "$prompt" \
+    --prompt "$(agent_prompt)" \
     --activate \
     --json); then
     print_orca_response "$create_json"

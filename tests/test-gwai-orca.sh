@@ -132,6 +132,26 @@ Created Orca worktree: 261017-パスワード再設定修正'
 [[ "$(<"$run_output")" == "$expected_output" ]] ||
   fail 'successful run did not report its steps before the result'
 
+# Orca passes the prompt to the agent CLI without `--`; a leading dash must not
+# reach it, while naming still sees the original prompt.
+list_prompt=$'  - InsightX側での実装が完了\n- 確認用URL'
+PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$gwai_orca_script" -- "$list_prompt" >"$run_output" 2>&1
+
+assert_args_equal "$TEST_NAMER_ARGS" -- "$list_prompt"
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent claude \
+  --prompt $'\\- InsightX側での実装が完了\n- 確認用URL' \
+  --activate \
+  --json
+
 set +e
 PATH="$bin_dir:$PATH" \
   ORCA_BIN="$bin_dir/orca" \
@@ -158,7 +178,7 @@ set -e
 
 ((naming_failure_status != 0)) || fail 'naming failure unexpectedly succeeded'
 grep -Fq 'mocked naming failure' "$run_output" || fail 'naming failure was not written to stderr'
-[[ "$(grep -Fxc 'worktree create' "$orca_command_log")" -eq 2 ]] ||
+[[ "$(grep -Fxc 'worktree create' "$orca_command_log")" -eq 3 ]] ||
   fail 'worktree create ran after naming failed'
 
 printf 'test-gwai-orca: OK\n'
