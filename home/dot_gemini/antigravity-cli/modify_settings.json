@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # chezmoi modify_ script: merge "command(*)" into permissions.allow so the
-# Antigravity CLI (agy) auto-approves every shell command. The CLI itself
-# rewrites this file at runtime (e.g. trustedWorkspaces), so we read the
-# current contents from stdin and only adjust the fields we own.
+# Antigravity CLI (agy) auto-approves every shell command, and set
+# colorScheme to "dark". The CLI itself rewrites this file at runtime
+# (e.g. trustedWorkspaces), so we read the current contents from stdin
+# and only adjust the fields we own.
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -17,4 +18,5 @@ printf '%s' "$input" | jq '
   .permissions.allow = (
     ((.permissions.allow // []) + ["command(*)"]) | unique
   )
+  | .colorScheme = "dark"
 '
