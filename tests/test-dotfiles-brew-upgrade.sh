@@ -16,14 +16,9 @@ set -euo pipefail
 printf '%s\n' "$*" >>"$BREW_TEST_CALLS"
 
 case "$*" in
-  "list --cask stablyai/orca/orca")
-    [ "$BREW_TEST_ORCA_INSTALLED" = true ]
-    ;;
-  "list --cask orca")
-    [ "$BREW_TEST_ORCA_TOKEN_INSTALLED" = true ]
-    ;;
   "outdated --cask --quiet")
-    printf '%s\n' google-chrome docker-desktop
+    read -r -a casks <<<"${BREW_TEST_OUTDATED_CASKS:-google-chrome docker-desktop}"
+    printf '%s\n' "${casks[@]}"
     ;;
 esac
 EOF
@@ -48,32 +43,33 @@ assert_not_called() {
   fi
 }
 
-export BREW_TEST_ORCA_INSTALLED=true
-export BREW_TEST_ORCA_TOKEN_INSTALLED=false
+# Normal run skips google-chrome and stablyai/orca/orca, and does not force-upgrade Orca.
+export BREW_TEST_OUTDATED_CASKS="google-chrome stablyai/orca/orca docker-desktop"
 : >"$BREW_TEST_CALLS"
 bash "$SCRIPT"
 
-assert_called "upgrade --cask stablyai/orca/orca"
 assert_called "upgrade --cask docker-desktop"
 assert_not_called "upgrade --cask google-chrome"
+assert_not_called "upgrade --cask stablyai/orca/orca"
 
-export BREW_TEST_ORCA_INSTALLED=false
+# Without Orca IDE CLI on PATH, the unrelated "orca" cask token is still upgraded.
+export BREW_TEST_OUTDATED_CASKS="orca docker-desktop"
 : >"$BREW_TEST_CALLS"
 bash "$SCRIPT"
 
-assert_not_called "upgrade --cask stablyai/orca/orca"
+assert_called "upgrade --cask orca docker-desktop"
 
-export BREW_TEST_ORCA_TOKEN_INSTALLED=true
-: >"$BREW_TEST_CALLS"
-bash "$SCRIPT"
-assert_not_called "upgrade --cask stablyai/orca/orca"
-
+# With Orca IDE CLI installed, the "orca" cask token is skipped too.
 mkdir -p "$TMP_DIR/Orca.app/Contents/Resources/bin"
 printf '#!/usr/bin/env bash\n' >"$TMP_DIR/Orca.app/Contents/Resources/bin/orca"
 chmod +x "$TMP_DIR/Orca.app/Contents/Resources/bin/orca"
 ln -s "$TMP_DIR/Orca.app/Contents/Resources/bin/orca" "$TMP_DIR/bin/orca"
 : >"$BREW_TEST_CALLS"
 bash "$SCRIPT"
-assert_called "upgrade --cask stablyai/orca/orca"
+
+assert_called "upgrade --cask docker-desktop"
+assert_not_called "upgrade --cask orca docker-desktop"
+assert_not_called "upgrade --cask orca"
+assert_not_called "upgrade --cask stablyai/orca/orca"
 
 echo "test-dotfiles-brew-upgrade: OK"

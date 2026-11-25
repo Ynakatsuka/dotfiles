@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Upgrade Homebrew packages while leaving Chrome cask updates to Chrome itself.
+# Upgrade Homebrew packages while leaving self-updating Chrome and Orca casks
+# to their in-app updaters.
 
 set -euo pipefail
 
@@ -22,6 +23,8 @@ orca_ide_installed() {
 }
 
 main() {
+  local skip_orca_token=0
+
   CASK_LIST="$(mktemp)"
   FILTERED_CASK_LIST="$(mktemp)"
   trap cleanup EXIT
@@ -31,24 +34,31 @@ main() {
   brew autoremove
   brew upgrade --formula
 
-  # Homebrew omits auto-updating casks such as Orca from the default outdated list.
-  # An older Homebrew cask also uses the "orca" token, so check the IDE CLI
-  # before upgrading that token through the Orca IDE tap.
-  if brew list --cask stablyai/orca/orca >/dev/null 2>&1 ||
-    { brew list --cask orca >/dev/null 2>&1 && orca_ide_installed; }; then
-    brew upgrade --cask stablyai/orca/orca
+  # Orca self-updates via Squirrel; replacing /Applications/Orca.app while Orca
+  # is running invalidates app.asar chunk hashes and worker paths, crashing open
+  # sessions. Leave Orca updates to the in-app updater (matching its cask's
+  # auto_updates true) and also guard against outdated-list upgrades.
+  if orca_ide_installed; then
+    skip_orca_token=1
   fi
 
   brew outdated --cask --quiet >"$CASK_LIST"
-  awk '
+  awk -v skip_orca_token="$skip_orca_token" '
     $0 == "google-chrome" {
-      skipped = 1
+      skipped_chrome = 1
+      next
+    }
+    $0 == "stablyai/orca/orca" || (skip_orca_token == 1 && $0 == "orca") {
+      skipped_orca = 1
       next
     }
     { print }
     END {
-      if (skipped) {
+      if (skipped_chrome) {
         print "[INFO] Skipping google-chrome cask upgrade; Chrome self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
+      }
+      if (skipped_orca) {
+        print "[INFO] Skipping orca cask upgrade; Orca self-updates, and replacing its running app bundle can crash open sessions." > "/dev/stderr"
       }
     }
   ' "$CASK_LIST" >"$FILTERED_CASK_LIST"
