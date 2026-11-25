@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 # High effort re-drafted long inputs in thinking until the print timeout.
-ANTIGRAVITY_MODEL = "gemini-3.8-flash-medium"
+ANTIGRAVITY_MODEL = "gemini-4-hydrogen-medium"
 ANTIGRAVITY_EFFORT = "medium"
 ANTIGRAVITY_TIMEOUT_SECONDS = 150
 ANTIGRAVITY_PRINT_TIMEOUT = "120s"
