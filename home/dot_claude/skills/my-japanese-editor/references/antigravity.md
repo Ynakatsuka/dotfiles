@@ -95,7 +95,7 @@ python3 <skill-root>/scripts/rewrite_with_antigravity.py repair < job.json >| re
 対象には次を含む。
 
 - `agy`が見つからない。
-- 指定モデル`gemini-3.8-flash-medium`を利用できない、または認証に失敗した。
+- 指定モデル`gemini-4-hydrogen-medium`を利用できない、または認証に失敗した。
 - タイムアウト（`timed out after 120s`など）、拒否、CLIエラーが発生した。
 - Geminiがツールを呼び出した。
 - 応答がJSONでない、IDが欠落・重複する、本文が空である。
