@@ -181,4 +181,165 @@ grep -Fq 'mocked naming failure' "$run_output" || fail 'naming failure was not w
 [[ "$(grep -Fxc 'worktree create' "$orca_command_log")" -eq 3 ]] ||
   fail 'worktree create ran after naming failed'
 
+PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$gwai_orca_script" --provider claude --model fable -- "$prompt" >"$run_output" 2>&1
+
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent claude \
+  --model fable \
+  --prompt "$prompt" \
+  --activate \
+  --json
+
+PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$gwai_orca_script" --provider antigravity -- "$prompt" >"$run_output" 2>&1
+
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent antigravity \
+  --prompt "$prompt" \
+  --activate \
+  --json
+
+PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$gwai_orca_script" --model=fable -- "$prompt" >"$run_output" 2>&1
+
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent claude \
+  --model fable \
+  --prompt "$prompt" \
+  --activate \
+  --json
+
+create_count_before_validation=$(grep -Fxc 'worktree create' "$orca_command_log")
+rm -f "$TEST_NAMER_ARGS"
+for invalid_args in \
+  '--provider unknown' \
+  '--model' \
+  '--model='; do
+  set +e
+  # shellcheck disable=SC2086
+  PATH="$bin_dir:$PATH" \
+    ORCA_BIN="$bin_dir/orca" \
+    TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+    TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+    bash "$gwai_orca_script" $invalid_args -- "$prompt" >"$run_output" 2>&1
+  invalid_status=$?
+  set -e
+  ((invalid_status != 0)) || fail "invalid arguments unexpectedly succeeded: $invalid_args"
+done
+
+set +e
+PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$gwai_orca_script" --model '' -- "$prompt" >"$run_output" 2>&1
+empty_model_status=$?
+set -e
+((empty_model_status != 0)) || fail 'empty --model unexpectedly succeeded'
+
+[[ ! -e "$TEST_NAMER_ARGS" ]] ||
+  fail 'naming ran despite invalid provider or model'
+[[ "$(grep -Fxc 'worktree create' "$orca_command_log")" -eq "$create_count_before_validation" ]] ||
+  fail 'worktree create ran despite invalid provider or model'
+
+# Verify Raycast aio dropdown metadata and wrapper selection forwarding.
+raycast_source="$repo_root/home/dot_raycast/scripts/executable_gwai-orca.sh"
+arg2_json=$(sed -n 's/^# @raycast\.argument2 //p' "$raycast_source")
+jq -e '
+  .type == "dropdown"
+  and .optional == true
+  and ([.data[].value] == ["claude", "claude:fable", "codex", "antigravity"])
+' <<<"$arg2_json" >/dev/null || fail "unexpected @raycast.argument2 metadata: $arg2_json"
+
+cat >"$bin_dir/hs" <<'MOCK'
+#!/usr/bin/env bash
+exit 0
+MOCK
+chmod +x "$bin_dir/hs"
+
+raycast_wrapper="$test_dir/aio.sh"
+sed "s|^readonly HAMMERSPOON_CLI=.*$|readonly HAMMERSPOON_CLI='$bin_dir/hs'|" "$raycast_source" >"$raycast_wrapper"
+chmod +x "$raycast_wrapper"
+
+HOME="$test_dir" PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$raycast_wrapper" "$prompt" '' >"$run_output" 2>&1
+
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent claude \
+  --prompt "$prompt" \
+  --activate \
+  --json
+
+HOME="$test_dir" PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$raycast_wrapper" "$prompt" 'claude:fable' >"$run_output" 2>&1
+
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent claude \
+  --model fable \
+  --prompt "$prompt" \
+  --activate \
+  --json
+
+HOME="$test_dir" PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$raycast_wrapper" "$prompt" 'antigravity' >"$run_output" 2>&1
+
+assert_args_equal "$orca_create_args" \
+  worktree create \
+  --repo 'id:repo-123' \
+  --no-parent \
+  --name '261017-パスワード再設定修正' \
+  --agent antigravity \
+  --prompt "$prompt" \
+  --activate \
+  --json
+
+set +e
+HOME="$test_dir" PATH="$bin_dir:$PATH" \
+  ORCA_BIN="$bin_dir/orca" \
+  TEST_ORCA_COMMAND_LOG="$orca_command_log" \
+  TEST_ORCA_CREATE_ARGS="$orca_create_args" \
+  bash "$raycast_wrapper" "$prompt" 'claude:' >"$run_output" 2>&1
+invalid_selection_status=$?
+set -e
+((invalid_selection_status != 0)) || fail 'malformed aio selection unexpectedly succeeded'
+
 printf 'test-gwai-orca: OK\n'

@@ -7,18 +7,18 @@
 
 # Optional parameters:
 # @raycast.argument1 { "type": "text", "placeholder": "Prompt" }
-# @raycast.argument2 { "type": "dropdown", "placeholder": "Agent", "optional": true, "data": [{"title": "Claude", "value": "claude"}, {"title": "Codex", "value": "codex"}] }
+# @raycast.argument2 { "type": "dropdown", "placeholder": "Model", "optional": true, "data": [{"title": "Claude", "value": "claude"}, {"title": "Claude (Fable)", "value": "claude:fable"}, {"title": "Codex", "value": "codex"}, {"title": "Antigravity", "value": "antigravity"}] }
 # @raycast.packageName Git
 
 # Documentation:
-# @raycast.description Create a new Orca workspace in the selected workspace's repository and start Claude or Codex with the prompt.
+# @raycast.description Create a new Orca workspace in the selected workspace's repository and start Claude, Codex, or Antigravity with the prompt.
 # @raycast.author yuki
 
 set -euo pipefail
 
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# Initialize mise environment for Claude/Codex shims.
+# Initialize mise environment for agent CLI shims.
 command -v mise &>/dev/null && eval "$(mise activate bash --shims)"
 
 readonly HAMMERSPOON_CLI='/Applications/Hammerspoon.app/Contents/Frameworks/hs/hs'
@@ -26,7 +26,33 @@ readonly HAMMERSPOON_CLI='/Applications/Hammerspoon.app/Contents/Frameworks/hs/h
 readonly STEP_ALERT_SECONDS=300
 
 prompt="${1:-}"
-provider="${2:-claude}"
+selection="${2:-claude}"
+provider=''
+model=''
+
+case "$selection" in
+  claude | codex | antigravity)
+    provider="$selection"
+    ;;
+  *:*)
+    provider="${selection%%:*}"
+    model="${selection#*:}"
+    if [[ -z "$provider" || -z "$model" ]]; then
+      printf 'Error: invalid aio model selection: %s\n' "$selection" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    printf 'Error: invalid aio model selection: %s\n' "$selection" >&2
+    exit 1
+    ;;
+esac
+
+gwai_args=(--provider "$provider")
+if [[ -n "$model" ]]; then
+  gwai_args+=(--model "$model")
+fi
+gwai_args+=(-- "$prompt")
 
 # Silent mode closes Raycast while the script runs, so a Hammerspoon alert shows
 # the current step. Alerts are keyed by this script's PID so concurrent runs keep
@@ -57,7 +83,7 @@ close_step() {
 trap close_step EXIT
 
 # Echo every line so Raycast's final HUD still shows gwai-orca's last line.
-"$HOME/.local/bin/gwai-orca" --provider "$provider" -- "$prompt" |
+"$HOME/.local/bin/gwai-orca" "${gwai_args[@]}" |
   while IFS= read -r step; do
     printf '%s\n' "$step"
     show_step "$step"
