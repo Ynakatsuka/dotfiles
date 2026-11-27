@@ -12,7 +12,7 @@ readonly ORCA_CLAUDE_PROFILE_POINTER="${ORCA_CLAUDE_PROFILE_POINTER:-$HOME/Libra
 
 usage() {
   cat <<'USAGE'
-Usage: gwai-orca [--provider claude|codex] <prompt>
+Usage: gwai-orca [--provider claude|codex|antigravity] [--model <id>] <prompt>
 
 Creates a new top-level Orca worktree in the repository of the workspace
 currently selected in the Orca UI, names it with gwai-worktree-name
@@ -20,7 +20,8 @@ currently selected in the Orca UI, names it with gwai-worktree-name
 when <prompt> names a client company), and starts the chosen agent with
 <prompt> in the new workspace.
 
-If --provider is omitted, claude is used.
+If --provider is omitted, claude is used. If --model is omitted, the agent's
+configured default model is used.
 USAGE
 }
 
@@ -51,7 +52,7 @@ print_orca_response() {
 validate_provider() {
   local provider="$1"
 
-  [[ "$provider" == 'claude' || "$provider" == 'codex' ]] ||
+  [[ "$provider" == 'claude' || "$provider" == 'codex' || "$provider" == 'antigravity' ]] ||
     die "provider is invalid: $provider"
 }
 
@@ -109,15 +110,25 @@ agent_prompt() {
 create_worktree() {
   local branch_name="$1"
   local create_json
+  local -a create_args=(
+    worktree create
+    --repo "id:${active_repo_id}"
+    --no-parent
+    --name "$branch_name"
+    --agent "$provider"
+  )
 
-  if ! create_json=$("$ORCA_BIN" worktree create \
-    --repo "id:${active_repo_id}" \
-    --no-parent \
-    --name "$branch_name" \
-    --agent "$provider" \
-    --prompt "$(agent_prompt)" \
-    --activate \
-    --json); then
+  if [[ -n "$model" ]]; then
+    create_args+=(--model "$model")
+  fi
+
+  create_args+=(
+    --prompt "$(agent_prompt)"
+    --activate
+    --json
+  )
+
+  if ! create_json=$("$ORCA_BIN" "${create_args[@]}"); then
     print_orca_response "$create_json"
     die "failed to create the Orca worktree"
   fi
@@ -129,17 +140,29 @@ create_worktree() {
 }
 
 provider='claude'
+model=''
 prompt=''
 
 while (($# > 0)); do
   case "$1" in
     --provider)
-      (($# >= 2)) || die '--provider requires claude or codex'
+      (($# >= 2)) || die '--provider requires claude, codex, or antigravity'
       provider="$2"
       shift 2
       ;;
     --provider=*)
       provider="${1#--provider=}"
+      shift
+      ;;
+    --model)
+      (($# >= 2)) && [[ "$2" != '--' ]] || die '--model requires a model id'
+      [[ -n "$2" ]] || die 'model is empty'
+      model="$2"
+      shift 2
+      ;;
+    --model=*)
+      model="${1#--model=}"
+      [[ -n "$model" ]] || die 'model is empty'
       shift
       ;;
     --help | -h)
