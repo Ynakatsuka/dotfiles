@@ -23,9 +23,9 @@ compatibility: >-
 
 ## 2. Write one HTML file
 
-- Work outside repositories, in `/tmp/mock-<topic>/` unless the user names a place.
-- Copy `assets/compare.html` to `/tmp/mock-<topic>/mock.html`. Keep one `<section class="option">`
-  per option, title each `A: <name>`, and set `--frame-w` and `--frame-h` to the frame size.
+- Copy `assets/compare.html` as `mock.html` in `/tmp/mock-<topic>/` outside the repository, unless
+  the user names a place. Keep one `<section class="option">` per option, title each
+  `A: <name>`, and set `--frame-w` and `--frame-h` to the frame size.
 - Fill each `.frame` with inline HTML and CSS: realistic labels and sample data in the user's
   language, real controls drawn plainly, no lorem ipsum. Size content relative to the frame, not
   the browser window, so every option is judged at the same viewport.
