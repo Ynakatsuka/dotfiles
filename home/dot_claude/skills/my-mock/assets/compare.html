@@ -1,0 +1,52 @@
+<!doctype html>
+<!--
+  Mock comparison sheet. Copy this file, keep one <section class="option"> per option, and
+  set --frame-w / --frame-h to the target viewport.
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Mock</title>
+<style>
+  :root {
+    --frame-w: 960px;
+    --frame-h: 600px;
+    --ink: #1f2328;
+    --muted: #656d76;
+    --line: #d0d7de;
+    --surface: #ffffff;
+    --canvas: #f6f8fa;
+    --accent: #0969da;
+    font-family: system-ui, "Noto Sans CJK JP", "Hiragino Sans", sans-serif;
+    color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; background: #e9ecef; }
+  .sheet { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+  .option > h2 { margin: 0 0 8px; font-size: 18px; }
+  .frame {
+    width: var(--frame-w);
+    height: var(--frame-h);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  /* Mock content styles go below. Size content relative to .frame, not the browser window. */
+</style>
+</head>
+<body>
+<main class="sheet">
+  <section class="option" id="option-a">
+    <h2>A: </h2>
+    <div class="frame">
+    </div>
+  </section>
+  <section class="option" id="option-b">
+    <h2>B: </h2>
+    <div class="frame">
+    </div>
+  </section>
+</main>
+</body>
+</html>

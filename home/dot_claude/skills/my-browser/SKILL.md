@@ -27,6 +27,7 @@ When running as Claude, do not drive a browser yourself. Write the task to a fil
   calls it reports; when Codex asks for confirmation, ask the user and continue with the printed
   `--resume` command.
 - Run a project's own Playwright test suite directly; it is a test command, not browser work.
+- Render local mock HTML to PNG directly as the `my-mock` skill describes; it is not browser work.
 - When `codex-task` fails, report the failure, then follow sections 1–4 yourself, using Claude in
   Chrome through the `chrome-browser` skill where section 2 names Codex's Chrome plugin. First
   check the tool calls it reported and the page itself, and continue only the steps not yet done;
