@@ -55,8 +55,9 @@ agent-browser --session mock close
 
 ## 4. Show the result
 
-- In CCV, when the `ccv-user-question` MCP server is available, call its `preview_image` with the
-  absolute PNG path before the final response.
+- In CCV, when the `ccv-user-question` MCP server is available, call its `preview_image` before
+  the final response. It rejects paths outside the current project directory, so first copy the
+  PNG into a directory there that `git check-ignore` confirms is ignored, and pass that path.
 - Elsewhere, give the absolute PNG path, and the HTML path for interactive viewing.
 - Under the image, list the options with the recommended one first, each in one line:
   `A: <name> — 利点: … / 欠点: …`.
